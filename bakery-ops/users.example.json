@@ -1,0 +1,19 @@
+[
+  {
+    "userId": "u_owner",
+    "phone": "YOUR_PHONE_NUMBER",
+    "name": "Owner",
+    "role": "owner",
+    "permissions": [],
+    "storeIds": ["pavilion"]
+  },
+  {
+    "userId": "u_example",
+    "phone": "601XXXXXXXX",
+    "lid": "OPTIONAL_WHATSAPP_LID",
+    "name": "Example User",
+    "role": "store_manager",
+    "permissions": [],
+    "storeIds": ["pavilion"]
+  }
+]

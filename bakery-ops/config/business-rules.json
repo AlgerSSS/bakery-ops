@@ -1,0 +1,40 @@
+{
+  "firstMonthRevenue": 1640000,
+  "operationEnhancement": 0.02,
+  "marketEnhancement": 0.04,
+  "totalEnhancement": 0.06,
+  "monthlyCoefficients": {
+    "1": 1.00,
+    "2": 0.98,
+    "3": 0.87,
+    "4": 1.02,
+    "5": 1.10,
+    "6": 1.05,
+    "7": 0.98,
+    "8": 1.00,
+    "9": 0.94,
+    "10": 1.04,
+    "11": 1.12,
+    "12": 1.45
+  },
+  "weekdayWeights": {
+    "mondayToThursday": 1.00,
+    "friday": 1.20,
+    "weekend": 1.35
+  },
+  "shipmentFormula": {
+    "tastingWasteRate": 0.06,
+    "waterBarRate": 0.11,
+    "shipmentRate": 0.95
+  },
+  "baselineOverrides": {
+    "红豆松松吐司": {
+      "mondayToThursday": 30,
+      "friday": 36,
+      "weekend": 41
+    }
+  },
+  "productBoosts": {
+    "趁热心动蛋挞": 1.25
+  }
+}

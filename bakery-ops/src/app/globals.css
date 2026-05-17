@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+@import "tailwindcss";
+
+:root {
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
+  --apple-blue: #0071e3;
+  --apple-link: #0066cc;
+  --apple-link-dark: #2997ff;
+  --text-secondary: #86868b;
+  --surface-dark: #1d1d1f;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.022em;
+}
+
+/* Tab panel entrance animation */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fadeSlideUp 0.5s ease-out both;
+}
+
+/* Number update pulse */
+@keyframes numberPulse {
+  0% { transform: scale(1); color: inherit; }
+  30% { transform: scale(1.15); color: #0071e3; }
+  100% { transform: scale(1); color: inherit; }
+}
+
+.animate-number-pulse {
+  animation: numberPulse 0.4s ease-out;
+}

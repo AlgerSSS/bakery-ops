@@ -1,0 +1,16 @@
+[project]
+name = "lightrag-service"
+version = "0.1.0"
+description = "LightRAG knowledge graph service for Hot Crush"
+requires-python = ">=3.11"
+dependencies = [
+    "lightrag-hku",
+    "fastapi[standard]",
+    "uvicorn[standard]",
+    "openai",
+    "python-dotenv",
+    "numpy",
+]
+
+[project.scripts]
+serve = "server:main"

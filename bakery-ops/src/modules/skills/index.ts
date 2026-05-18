@@ -12,6 +12,7 @@ import { supplySendSkillDefinition, SupplySendSkillHandler } from "./supply-send
 import { kolDiscoverySkillDefinition, KOLDiscoverySkillHandler } from "./kol-discovery/kol-discovery.definition";
 import { kolOutreachSkillDefinition, KOLOutreachSkillHandler } from "./kol-outreach/kol-outreach.definition";
 import { resumeUploadSkillDefinition, ResumeUploadSkillHandler } from "./resume-upload/resume-upload.definition";
+import { dailyReviewChatSkillDefinition, DailyReviewChatSkillHandler } from "./daily-review-chat/daily-review-chat.definition";
 
 export const allSkills = [
   { definition: recruitmentSkillDefinition, Handler: RecruitmentSkillHandler },
@@ -28,4 +29,5 @@ export const allSkills = [
   { definition: kolDiscoverySkillDefinition, Handler: KOLDiscoverySkillHandler },
   { definition: kolOutreachSkillDefinition, Handler: KOLOutreachSkillHandler },
   { definition: resumeUploadSkillDefinition, Handler: ResumeUploadSkillHandler },
+  { definition: dailyReviewChatSkillDefinition, Handler: DailyReviewChatSkillHandler },
 ];

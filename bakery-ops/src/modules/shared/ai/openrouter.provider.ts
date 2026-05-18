@@ -52,12 +52,13 @@ export class OpenRouterProvider implements AiProvider {
   }
 
   async chatCompletion(prompt: string, maxTokens = 200): Promise<string> {
-    logger.info("OpenRouter LLM call", { model: CHAT_MODEL, maxTokens, prompt: prompt.slice(0, 120) });
+    const tokens = Math.max(16, maxTokens);
+    logger.info("OpenRouter LLM call", { model: CHAT_MODEL, maxTokens: tokens, prompt: prompt.slice(0, 120) });
     const data = await openrouterFetch("/chat/completions", {
       model: CHAT_MODEL,
       messages: [{ role: "user", content: prompt }],
       temperature: 0,
-      max_tokens: maxTokens,
+      max_tokens: tokens,
     });
     const content = data.choices[0]?.message?.content || "";
     logger.info("OpenRouter LLM response", { model: CHAT_MODEL, tokens: data.usage?.total_tokens, response: content.slice(0, 200) });

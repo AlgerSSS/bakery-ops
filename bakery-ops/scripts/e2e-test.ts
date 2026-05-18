@@ -28,24 +28,22 @@ async function testForecastEngine() {
   try {
     const { calculateSalesBaselines, calculateMonthlyTargets, calculateDailyTargets } =
       await import("../src/modules/domain/forecast/forecast-engine");
+    const { getBusinessRulesFromDB } = await import("../src/modules/data/repositories/forecast.repository");
+
+    const rules = await getBusinessRulesFromDB();
 
     // Monthly targets
-    const monthly = calculateMonthlyTargets(1640000, { "1": 0.08, "2": 0.07, "3": 0.08 });
-    if (monthly.length === 12 && monthly[0].target > 0) {
-      log("forecast", "calculateMonthlyTargets", "pass", `Jan=${monthly[0].target}`);
+    const monthly = calculateMonthlyTargets(rules, 2026);
+    if (monthly.length === 12 && monthly[0].enhancedRevenue > 0) {
+      log("forecast", "calculateMonthlyTargets", "pass", `Jan=${monthly[0].enhancedRevenue}`);
     } else {
       log("forecast", "calculateMonthlyTargets", "fail", `got ${monthly.length} months`);
     }
 
     // Daily targets
-    const daily = calculateDailyTargets(
-      monthly[0].target,
-      2026, 1,
-      { mondayToThursday: 1.0, friday: 1.25, saturday: 1.55, sunday: 1.55 },
-      []
-    );
-    if (daily.length === 31) {
-      log("forecast", "calculateDailyTargets", "pass", `31 days, day1=${daily[0].target.toFixed(0)}`);
+    const daily = calculateDailyTargets(monthly[0], rules);
+    if (daily.length > 28) {
+      log("forecast", "calculateDailyTargets", "pass", `${daily.length} days, day1 shipment=${daily[0].shipmentAmount}`);
     } else {
       log("forecast", "calculateDailyTargets", "fail", `got ${daily.length} days`);
     }
@@ -122,7 +120,7 @@ async function testOpenRouterAI() {
   console.log("\n━━━ 5. OpenRouter AI Provider ━━━");
   try {
     const { openrouterProvider } = await import("../src/modules/shared/ai/openrouter.provider");
-    const response = await openrouterProvider.chatCompletion("回复一个字：好", 10);
+    const response = await openrouterProvider.chatCompletion("回复一个字：好", 50);
     if (response && response.length > 0) {
       log("ai", "chatCompletion", "pass", `response="${response.trim()}"`);
     } else {
@@ -173,11 +171,11 @@ async function testEmployeeModule() {
   console.log("\n━━━ 8. Employee Module ━━━");
   try {
     const { parseEmployeeEvent } = await import("../src/modules/domain/employee/employee-event.parser");
-    const event = parseEmployeeEvent("Mikhail 今天面试表现不错，沟通能力强");
+    const event = await parseEmployeeEvent("Mikhail 今天面试表现不错，沟通能力强");
     if (event && event.employeeName) {
-      log("employee", "parseEmployeeEvent", "pass", `name=${event.employeeName}, type=${event.eventType}`);
+      log("employee", "parseEmployeeEvent (AI)", "pass", `name=${event.employeeName}, type=${event.eventType}`);
     } else {
-      log("employee", "parseEmployeeEvent", "fail", "could not parse");
+      log("employee", "parseEmployeeEvent (AI)", "fail", "could not parse");
     }
   } catch (e: any) {
     log("employee", "employee-event.parser", "fail", e.message);

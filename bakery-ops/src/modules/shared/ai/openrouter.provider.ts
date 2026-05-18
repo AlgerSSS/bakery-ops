@@ -66,7 +66,7 @@ export class OpenRouterProvider implements AiProvider {
   }
 
   async chatCompletionLong(prompt: string): Promise<string> {
-    return this.chatCompletion(prompt, 2000);
+    return this.chatCompletion(prompt, 4096);
   }
 
   async jsonCompletion(options: JsonCompletionOptions): Promise<string> {

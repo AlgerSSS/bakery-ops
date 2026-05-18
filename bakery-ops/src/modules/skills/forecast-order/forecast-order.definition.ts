@@ -17,19 +17,18 @@ import dayjs from "dayjs";
 export const forecastOrderSkillDefinition: SkillDefinition = {
   skillId: "forecast_order",
   name: "预估单",
-  description: "生成营业额目标、单品出货建议、分时段排产。支持：预估/排产/出货建议/营业额查询/复盘",
-  priority: 90,
+  description: "生成营业额目标、单品出货建议、分时段排产。支持：预估/排产/出货建议/营业额查询",
+  priority: 85,
   triggerKeywords: [
     "预估单", "排产", "出货", "出货建议", "预测",
     "营业额目标", "日目标", "月目标", "单品建议",
-    "时段排产", "分时段", "营业额", "复盘",
+    "时段排产", "分时段", "营业额",
     "发预估单", "导出", "excel", "表格", "发表格",
   ],
   examples: [
     "明天出什么",
     "预估明天",
     "今天营业额多少",
-    "昨天复盘怎么说",
     "后天排产",
   ],
   requiredInputs: [],

@@ -1,10 +1,17 @@
 import type { SkillDefinition, SkillExecutionInput, SkillExecutionResult, SkillHandler } from "../../shared/types";
 import { v4 as uuidv4 } from "uuid";
+import { readFileSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 import { lightragClient } from "../../domain/knowledge/lightrag-client";
 import { aiProvider } from "../../domain/ai/ai-provider";
 import { query } from "../../shared/db/postgres";
 import { getProductForecast } from "../../domain/forecast/forecast.service";
 import { logger } from "../../shared/logger";
+
+const SKILL_MD_PATH = resolve(process.cwd(), "src/modules/skills/daily-review-chat/SKILL.md");
+let SKILL_PROMPT = "";
+try { SKILL_PROMPT = readFileSync(SKILL_MD_PATH, "utf-8"); } catch { SKILL_PROMPT = "你是 Hot Crush Bakery 的运营分析顾问，请结合销售数据给出专业分析。"; }
 
 export const dailyReviewChatSkillDefinition: SkillDefinition = {
   skillId: "daily_review_chat",
@@ -41,12 +48,15 @@ async function getTodayDate(): Promise<string> {
 }
 
 async function getSalesData(date: string): Promise<string> {
+  logger.info("getSalesData called", { date });
   const revenue = await query<any>("SELECT * FROM daily_revenue WHERE date = $1", [date]);
   const hourly = await query<any>("SELECT hour, bill_count, net_sales, avg_order_net_sales, total_discount FROM hourly_sales_summary WHERE date = $1 ORDER BY hour", [date]);
   const topItems = await query<any>("SELECT item_name, SUM(qty) as total_qty, SUM(net_sales) as total_sales FROM item_hourly_sales WHERE date = $1 GROUP BY item_name ORDER BY total_sales DESC LIMIT 15", [date]);
   const payment = await query<any>("SELECT * FROM daily_payment_breakdown WHERE date = $1 ORDER BY net_sales DESC", [date]);
   const dining = await query<any>("SELECT * FROM daily_dining_breakdown WHERE date = $1", [date]);
   const pnl = await query<any>("SELECT * FROM daily_pnl WHERE date = $1", [date]);
+  const wasteByReason = await query<any>("SELECT waste_reason, SUM(qty) as total_qty, SUM(amount) as total_amount FROM item_waste WHERE date = $1 GROUP BY waste_reason", [date]);
+  const wasteTop = await query<any>("SELECT item_name, waste_reason, qty, amount FROM item_waste WHERE date = $1 ORDER BY amount DESC LIMIT 10", [date]);
 
   // 上周同天对比
   const lastWeekDate = new Date(date);
@@ -88,6 +98,26 @@ async function getSalesData(date: string): Promise<string> {
     ctx += `报废合计: RM${p.waste_total || 0} (排产:RM${p.waste_scheduling || 0}, 品尝:RM${p.waste_tasting || 0}, 生产:RM${p.waste_production || 0})\n`;
     if (p.labor_cost) ctx += `人力成本: RM${p.labor_cost}\n`;
     if (p.net_profit) ctx += `净利润: RM${p.net_profit}\n`;
+  }
+
+  if (wasteByReason.length) {
+    ctx += `\n【报废明细（POS系统）】\n`;
+    const REASON_LABELS: Record<string, string> = { scheduling: '排产报废', tasting: '试吃报废', production: '生产报废' };
+    const totalWaste = wasteByReason.reduce((a: number, r: any) => a + Number(r.total_amount), 0);
+    for (const r of wasteByReason) {
+      ctx += `${REASON_LABELS[r.waste_reason] || r.waste_reason}: ${r.total_qty}个, RM${Number(r.total_amount).toFixed(0)}\n`;
+    }
+    ctx += `报废总额: RM${totalWaste.toFixed(0)}\n`;
+    if (revenue.length) {
+      const wasteRate = ((totalWaste / Number(revenue[0].gross_sales)) * 100).toFixed(1);
+      ctx += `报废率: ${wasteRate}% (警戒线: 5%)\n`;
+    }
+    if (wasteTop.length) {
+      ctx += `报废TOP5:\n`;
+      for (const w of wasteTop.slice(0, 5)) {
+        ctx += `  ${w.item_name} (${REASON_LABELS[w.waste_reason] || w.waste_reason}): ${w.qty}个, RM${Number(w.amount).toFixed(0)}\n`;
+      }
+    }
   }
 
   if (hourly.length) {
@@ -185,7 +215,28 @@ export class DailyReviewChatSkillHandler implements SkillHandler {
     const rawText = String(input.input.jdText || input.rawMessage?.text || "");
     const isFollowUp = input.input._isFollowUp === true;
     const conversationHistory = (input.input._history as string) || "";
-    const reviewDate = (input.input._reviewDate as string) || await getTodayDate();
+
+    // Extract date from multiple possible sources
+    let reviewDate = (input.input._reviewDate as string)
+      || (input.input.date as string)
+      || (input.input.targetDate as string)
+      || "";
+
+    // Try to extract date from raw text if not provided
+    if (!reviewDate) {
+      const dateMatch = rawText.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
+      const shortMatch = rawText.match(/(\d{1,2})[.\/-](\d{1,2})/);
+      if (dateMatch) {
+        reviewDate = `${dateMatch[1]}-${dateMatch[2].padStart(2, "0")}-${dateMatch[3].padStart(2, "0")}`;
+      } else if (shortMatch) {
+        const year = new Date().getFullYear();
+        reviewDate = `${year}-${shortMatch[1].padStart(2, "0")}-${shortMatch[2].padStart(2, "0")}`;
+      }
+    }
+
+    if (!reviewDate) reviewDate = await getTodayDate();
+
+    logger.info("DailyReviewChat: resolved date", { reviewDate, inputDate: input.input.date, rawText: rawText.slice(0, 50) });
 
     try {
       // Follow-up question in multi-turn
@@ -228,40 +279,7 @@ export class DailyReviewChatSkillHandler implements SkillHandler {
       await query("INSERT INTO daily_review (date, content, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (date) DO UPDATE SET content = $2", [date, rawText]);
     } catch { /* table might not have unique on date, ignore */ }
 
-    const prompt = `你是 Hot Crush Bakery 的运营分析顾问。店长发来了今日复盘，请结合系统销售数据进行深度分析。
-
-【店长今日反馈】
-${rawText}
-
-【系统销售数据】
-${salesData}
-${ragContext}
-
-请按以下结构回复（用中文）：
-
-📊 **核心指标概览**
-列出当日关键数字：营业额、客单数、客单价、折扣率、会员占比，以及与上周同天的对比。
-
-⏰ **时段分析**
-- 哪些时段表现好（客单数高、客单价高）
-- 哪些时段表现差
-- 结合店长提到的特殊情况分析原因
-
-🏆 **单品表现**
-- TOP 5 单品
-- 如果店长提到断货，分析断货时间点的影响（用数据说明断货前后的销量变化）
-- 如果有浪费，给出调整建议
-
-💡 **策略建议**（结合店长反馈的特殊情况 + 数据）
-1. [高优先] 具体建议
-2. [中优先] 具体建议
-3. [低优先] 具体建议
-
-📋 **明日关注**
-- 需要追踪的事项
-
----
-最后问店长：还有什么想了解的吗？我可以帮你查具体时段、具体产品的详细数据。`;
+    const prompt = `${SKILL_PROMPT}\n\n---\n\n【店长今日反馈】\n${rawText}\n\n【系统销售数据】\n${salesData}\n${ragContext}\n\n请按照 SKILL.md 中定义的输出格式生成分析报告。最后问店长还有什么想了解的。`;
 
     const analysis = await aiProvider.chatCompletionLong(prompt);
 

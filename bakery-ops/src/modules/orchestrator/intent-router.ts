@@ -100,7 +100,8 @@ ${historyText}
 11. 发给供应商 → supply_send
 12. 找KOL/网红/博主 → kol_discovery
 13. 联系KOL → kol_outreach
-14. reply 必须自然、口语化`;
+14. 复盘/日复盘/今天总结/门店复盘/业绩分析 → daily_review_chat（不是forecast_order）
+15. reply 必须自然、口语化`;
 
     try {
       const response = await this.aiProvider.chatCompletionLong(systemPrompt);

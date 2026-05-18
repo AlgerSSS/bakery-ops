@@ -15,6 +15,7 @@ import { resumeUploadSkillDefinition, ResumeUploadSkillHandler } from "./resume-
 import { dailyReviewChatSkillDefinition, DailyReviewChatSkillHandler } from "./daily-review-chat/daily-review-chat.definition";
 
 export const allSkills = [
+  { definition: dailyReviewChatSkillDefinition, Handler: DailyReviewChatSkillHandler },
   { definition: recruitmentSkillDefinition, Handler: RecruitmentSkillHandler },
   { definition: forecastOrderSkillDefinition, Handler: ForecastOrderSkillHandler },
   { definition: kitchenProductionPlanSkillDefinition, Handler: KitchenProductionPlanSkillHandler },
@@ -29,5 +30,4 @@ export const allSkills = [
   { definition: kolDiscoverySkillDefinition, Handler: KOLDiscoverySkillHandler },
   { definition: kolOutreachSkillDefinition, Handler: KOLOutreachSkillHandler },
   { definition: resumeUploadSkillDefinition, Handler: ResumeUploadSkillHandler },
-  { definition: dailyReviewChatSkillDefinition, Handler: DailyReviewChatSkillHandler },
 ];

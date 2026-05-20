@@ -1,10 +1,11 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { chromium } from "playwright-extra";
+import type { Browser, BrowserContext, Page } from "playwright";
 import * as fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import type { JobSiteConnector } from "../connector.interface";
 import type { Candidate, CrawlResult, ParsedJD } from "../types";
 import { logger } from "../../../shared/logger";
-import { hasValidSession, getCookieFile, getStorageFile } from "./jobstreet-login";
+import { hasValidSession, getCookieFile, getStorageFile, refreshLogin } from "./jobstreet-login";
 
 const DELAY_MIN = parseInt(process.env.CRAWLER_DELAY_MIN_MS || "2000");
 const DELAY_MAX = parseInt(process.env.CRAWLER_DELAY_MAX_MS || "4000");
@@ -62,26 +63,47 @@ export class JobStreetConnector implements JobSiteConnector {
 
     try {
       if (!hasValidSession()) {
-        return this.errorResult([
-          "JobStreet: 未找到登录 Cookie。请先运行: npx tsx src/modules/domain/recruitment/connectors/jobstreet-login.ts",
-        ]);
+        logger.info("JobStreet: no session found, attempting auto login");
+        const loginOk = await refreshLogin();
+        if (!loginOk) {
+          return this.errorResult([
+            "JobStreet: 自动登录失败，请检查 JOBSTREET_EMAIL 和 JOBSTREET_PASSWORD 环境变量。",
+          ]);
+        }
       }
 
       browser = await chromium.launch({ headless: true });
-      const context = await this.createAuthContext(browser);
-      const page = await context.newPage();
+      let context = await this.createAuthContext(browser);
+      let page = await context.newPage();
 
       if (!(await this.verifyCookies(page))) {
-        return this.errorResult([
-          "JobStreet: Cookie 已过期。请重新运行登录脚本。",
-        ]);
+        logger.info("JobStreet: cookie expired, attempting auto re-login");
+        await context.close();
+        await browser.close();
+
+        const loginOk = await refreshLogin();
+        if (!loginOk) {
+          return this.errorResult([
+            "JobStreet: 自动登录失败，请检查 JOBSTREET_EMAIL 和 JOBSTREET_PASSWORD 环境变量。",
+          ]);
+        }
+
+        browser = await chromium.launch({ headless: true });
+        context = await this.createAuthContext(browser);
+        page = await context.newPage();
+
+        if (!(await this.verifyCookies(page))) {
+          return this.errorResult([
+            "JobStreet: 重新登录后 Cookie 仍无效。",
+          ]);
+        }
       }
 
       // Step 1: 构建搜索查询并搜索
       const query = this.buildSearchQuery(jd);
-      logger.info("JobStreet Talent Search: searching", { query });
+      logger.info("JobStreet Talent Search: searching", { query, location: jd.location });
 
-      const searchProfiles = await this.searchTalentPool(page, query);
+      const searchProfiles = await this.searchTalentPool(page, query, jd.location);
       logger.info("JobStreet Talent Search: found profiles", { count: searchProfiles.length });
 
       if (searchProfiles.length === 0) {
@@ -144,14 +166,11 @@ export class JobStreetConnector implements JobSiteConnector {
   ]);
 
   /**
-   * 构建 Talent Search 搜索查询
-   * 只用英文关键词，避免中文导致 URL 过长或搜索失败
+   * 构建 Talent Search 搜索查询（仅关键词，不含地点）
    */
   private buildSearchQuery(jd: ParsedJD): string {
     const parts: string[] = [];
     if (jd.jobTitle) parts.push(jd.jobTitle);
-    if (jd.location) parts.push(`in ${jd.location}`);
-    // 只附加能识别的语言名称，忽略中文描述
     const langs = jd.languageRequirements
       .map((l) => l.trim().toLowerCase())
       .filter((l) => JobStreetConnector.KNOWN_LANGUAGES.has(l));
@@ -164,9 +183,10 @@ export class JobStreetConnector implements JobSiteConnector {
   /**
    * 搜索人才库，返回搜索结果中的 profiles
    */
-  private async searchTalentPool(page: Page, query: string): Promise<TalentProfile[]> {
+  private async searchTalentPool(page: Page, query: string, location?: string): Promise<TalentProfile[]> {
     const profiles: TalentProfile[] = [];
     let totalCount = 0;
+    let graphqlResponseReceived = false;
 
     const handler = async (res: import("playwright").Response) => {
       if (!res.url().includes("/graphql")) return;
@@ -174,10 +194,30 @@ export class JobStreetConnector implements JobSiteConnector {
         const body = await res.text();
         if (!body.includes("talentSearchProfilesNaturalLanguageSearch")) return;
         const parsed = JSON.parse(body);
-        const result = parsed?.data?.talentSearchProfilesNaturalLanguageSearch?.result;
-        if (!result) return;
+        const tsData = parsed?.data?.talentSearchProfilesNaturalLanguageSearch;
+
+        if (!tsData) {
+          graphqlResponseReceived = true;
+          logger.warn("JobStreet GraphQL: talentSearchProfilesNaturalLanguageSearch is null/undefined", {
+            hasErrors: !!parsed?.errors,
+            errors: parsed?.errors?.map((e: any) => e.message)?.slice(0, 3),
+            dataKeys: Object.keys(parsed?.data || {}),
+          });
+          return;
+        }
+
+        const result = tsData.result;
+        if (!result) {
+          graphqlResponseReceived = true;
+          logger.warn("JobStreet GraphQL: result is null — likely no Talent Search subscription", {
+            typename: tsData.__typename,
+            responseKeys: Object.keys(tsData),
+          });
+          return;
+        }
 
         totalCount = result.totalCount || 0;
+        graphqlResponseReceived = true;
         if (result.serviceToken) {
           this.lastServiceToken = result.serviceToken;
         }
@@ -190,9 +230,24 @@ export class JobStreetConnector implements JobSiteConnector {
     page.on("response", handler);
 
     const encodedQuery = encodeURIComponent(query).replace(/%20/g, "+");
-    const searchUrl = `${this.siteUrl}/talentsearch?searchQuery=${encodedQuery}&market=MY`;
+    let searchUrl = `${this.siteUrl}/talentsearch?searchQuery=${encodedQuery}&market=MY`;
+    if (location) {
+      searchUrl += `&where=${encodeURIComponent(location).replace(/%20/g, "+")}`;
+    }
     await page.goto(searchUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
     await page.waitForTimeout(10000);
+
+    // 诊断：截图 + 页面 URL + 是否收到 GraphQL 响应
+    const currentUrl = page.url();
+    if (!graphqlResponseReceived) {
+      logger.warn("JobStreet: no GraphQL response intercepted after 10s", { currentUrl });
+    }
+    const pageTitle = await page.title();
+    logger.info("JobStreet: page state after search", { currentUrl, pageTitle, graphqlResponseReceived });
+    try {
+      await page.screenshot({ path: "/tmp/jobstreet-talent-search-debug.png", fullPage: false });
+      logger.info("JobStreet: debug screenshot saved to /tmp/jobstreet-talent-search-debug.png");
+    } catch {}
 
     // 关闭可能出现的 modal
     await page.keyboard.press("Escape");
@@ -320,15 +375,14 @@ export class JobStreetConnector implements JobSiteConnector {
 
   private async verifyCookies(page: Page): Promise<boolean> {
     try {
-      await page.goto(`${this.siteUrl}/`, {
-        waitUntil: "networkidle",
+      await page.goto(`${this.siteUrl}/talentsearch`, {
+        waitUntil: "domcontentloaded",
         timeout: 30000,
       });
-      // 等待所有 JS 重定向完成（首页 → dashboard 等）
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
       const url = page.url();
       const loggedIn = !url.includes("login") && !url.includes("oauth") && !url.includes("authenticate");
-      logger.info("JobStreet: cookie verification", { url, loggedIn });
+      logger.info("JobStreet: cookie verification", { url: url.slice(0, 80), loggedIn });
       return loggedIn;
     } catch {
       return false;

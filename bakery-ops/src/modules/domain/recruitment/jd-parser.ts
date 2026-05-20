@@ -4,7 +4,9 @@ import { logger } from "../../shared/logger";
 
 export async function parseJD(rawText: string): Promise<ParsedJD> {
   const prompt = `你是一个招聘 JD 解析器。请从以下招聘描述中提取结构化信息。
-注意：jobTitle 必须是英文（用于在招聘网站搜索），如果原文是中文请翻译。
+注意：
+- jobTitle 必须是英文（用于在招聘网站搜索），如果原文是中文请翻译。
+- location 必须是英文标准地区名（用于在招聘网站搜索）。如果原文是商场名或中文地名，请转换为对应的英文城市/区域名。例如：柏威年→Kuala Lumpur, 谷中城→Kuala Lumpur, 双威→Subang Jaya, 吉隆坡→Kuala Lumpur。
 
 招聘描述：
 """
@@ -14,7 +16,7 @@ ${rawText}
 请返回 JSON 格式（不要返回其他内容）：
 {
   "jobTitle": "英文岗位名称（如 Bakery Staff, Kitchen Helper, Cashier）",
-  "location": "工作地点（如未提及默认 Kuala Lumpur）",
+  "location": "英文标准地区名（如 Kuala Lumpur, Subang Jaya, Johor Bahru；如未提及默认 Kuala Lumpur）",
   "requirements": ["要求1", "要求2"],
   "preferredSkills": ["优先技能1"],
   "experienceYears": 0,

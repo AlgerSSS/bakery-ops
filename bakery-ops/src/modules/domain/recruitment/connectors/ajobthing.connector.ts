@@ -1,10 +1,11 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { chromium } from "playwright-extra";
+import type { Browser, BrowserContext, Page } from "playwright";
 import * as fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import type { JobSiteConnector } from "../connector.interface";
 import type { Candidate, CrawlResult, ParsedJD } from "../types";
 import { logger } from "../../../shared/logger";
-import { hasValidSession, getCookieFile, getStorageFile } from "./ajobthing-login";
+import { hasValidSession, getCookieFile, getStorageFile, refreshLogin } from "./ajobthing-login";
 
 /** AJobThing 搜索 API 返回的候选人 profile */
 interface AjtProfile {
@@ -59,17 +60,38 @@ export class AJobThingConnector implements JobSiteConnector {
 
     try {
       if (!hasValidSession()) {
-        return this.errorResult([
-          "AJobThing: 未找到登录 Cookie。请先运行: npx tsx src/modules/domain/recruitment/connectors/ajobthing-login.ts",
-        ]);
+        logger.info("AJobThing: no session found, attempting auto login");
+        const loginOk = await refreshLogin();
+        if (!loginOk) {
+          return this.errorResult([
+            "AJobThing: 自动登录失败，请检查 AJOBTHING_EMAIL 和 AJOBTHING_PASSWORD 环境变量。",
+          ]);
+        }
       }
 
       browser = await chromium.launch({ headless: true });
-      const context = await this.createAuthContext(browser);
-      const page = await context.newPage();
+      let context = await this.createAuthContext(browser);
+      let page = await context.newPage();
 
       if (!(await this.verifyCookies(page))) {
-        return this.errorResult(["AJobThing: Cookie 已过期。请重新运行登录脚本。"]);
+        logger.info("AJobThing: cookie expired, attempting auto re-login");
+        await context.close();
+        await browser.close();
+
+        const loginOk = await refreshLogin();
+        if (!loginOk) {
+          return this.errorResult([
+            "AJobThing: 自动登录失败，请检查 AJOBTHING_EMAIL 和 AJOBTHING_PASSWORD 环境变量。",
+          ]);
+        }
+
+        browser = await chromium.launch({ headless: true });
+        context = await this.createAuthContext(browser);
+        page = await context.newPage();
+
+        if (!(await this.verifyCookies(page))) {
+          return this.errorResult(["AJobThing: 重新登录后 Cookie 仍无效。"]);
+        }
       }
 
       // 导航到候选人搜索页获取 CSRF token

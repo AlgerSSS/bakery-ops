@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npx esbuild server.ts --bundle --platform=node --outfile=.server.js --external:playwright --external:playwright-core --external:whatsapp-web.js --external:puppeteer --external:qrcode-terminal --external:pdf-parse --external:@supabase/supabase-js --external:next --format=cjs && node .server.js",
-    "dev:bot": "npx esbuild bot-only.ts --bundle --platform=node --outfile=bot-only.js --external:playwright --external:playwright-core --external:whatsapp-web.js --external:puppeteer --external:qrcode-terminal --external:pdf-parse --external:@supabase/supabase-js --format=cjs && node bot-only.js",
+    "dev": "npx esbuild server.ts --bundle --platform=node --outfile=.server.js --external:playwright --external:playwright-core --external:playwright-extra --external:puppeteer-extra-plugin-stealth --external:whatsapp-web.js --external:puppeteer --external:qrcode-terminal --external:pdf-parse --external:@supabase/supabase-js --external:next --format=cjs && node .server.js",
+    "dev:bot": "npx esbuild bot-only.ts --bundle --platform=node --outfile=bot-only.js --external:playwright --external:playwright-core --external:playwright-extra --external:puppeteer-extra-plugin-stealth --external:whatsapp-web.js --external:puppeteer --external:qrcode-terminal --external:pdf-parse --external:@supabase/supabase-js --format=cjs && node bot-only.js",
     "dev:tsx": "tsx server.ts",
     "build": "next build",
     "start": "next start",

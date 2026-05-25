@@ -5,22 +5,17 @@ import { IntentRouter } from "./intent-router";
 import { StateManager } from "./state-manager";
 import { PermissionService } from "./permission-service";
 import { AuditService } from "./audit-service";
-import { WhatsAppFormatter } from "../channel/whatsapp/whatsapp.formatter";
+import { ConversationManager } from "./conversation-manager";
+import type { ChatHistoryEntry } from "./conversation-manager";
+import { ResponseFormatter } from "./response-formatter";
 import { UserNotRegisteredError } from "../shared/errors/skill-error";
 import { kolRepository } from "../data/repositories/kol.repository";
 import { logger } from "../shared/logger";
 
-interface ChatHistoryEntry {
-  role: "user" | "assistant";
-  content: string;
-}
-
-const MAX_HISTORY = 20;
-
 export class Orchestrator {
   private intentRouter: IntentRouter;
-  private formatter = new WhatsAppFormatter();
-  private chatHistory = new Map<string, ChatHistoryEntry[]>();
+  private conversationManager = new ConversationManager();
+  private responseFormatter = new ResponseFormatter();
 
   constructor(
     private registry: SkillRegistry,
@@ -56,7 +51,7 @@ export class Orchestrator {
           };
           this.permissionService.registerUser(user);
         } else {
-          return this.formatter.formatError(err.message);
+          return this.responseFormatter.formatError(err.message);
         }
       } else {
         throw err;
@@ -64,7 +59,7 @@ export class Orchestrator {
     }
 
     // 2. 获取对话历史
-    const history = this.getHistory(message.conversationId);
+    const history = this.conversationManager.getHistory(message.conversationId);
     history.push({ role: "user", content: text });
 
     // 3. 检查是否有进行中的 skill（等待补充信息）
@@ -105,7 +100,7 @@ export class Orchestrator {
       if (checkResult.action === "need_info") {
         const reply = checkResult.reply;
         history.push({ role: "assistant", content: reply });
-        this.trimHistory(message.conversationId);
+        this.conversationManager.trimHistory(message.conversationId);
         return [{ type: "text", text: reply }];
       }
 
@@ -128,7 +123,7 @@ export class Orchestrator {
       if (!skill || !skill.handler) {
         const reply = decision.reply || "这个功能还在开发中，暂时用不了。";
         history.push({ role: "assistant", content: reply });
-        this.trimHistory(message.conversationId);
+        this.conversationManager.trimHistory(message.conversationId);
         return [{ type: "text", text: reply }];
       }
 
@@ -142,7 +137,7 @@ export class Orchestrator {
 
         const reply = decision.reply;
         history.push({ role: "assistant", content: reply });
-        this.trimHistory(message.conversationId);
+        this.conversationManager.trimHistory(message.conversationId);
         return [{ type: "text", text: reply }];
       }
 
@@ -169,7 +164,7 @@ export class Orchestrator {
     // 普通聊天回复
     const reply = decision.reply || "你好，有什么可以帮你的？";
     history.push({ role: "assistant", content: reply });
-    this.trimHistory(message.conversationId);
+    this.conversationManager.trimHistory(message.conversationId);
     return [{ type: "text", text: reply }];
   }
 
@@ -215,13 +210,13 @@ export class Orchestrator {
       }
 
       // 用 formatter 输出结果（包含文件/截图）
-      const formatted = this.formatter.format(result);
+      const formatted = this.responseFormatter.format(result);
 
       // 记录到历史
       if (result.summary) {
         history.push({ role: "assistant", content: result.summary.slice(0, 500) });
       }
-      this.trimHistory(message.conversationId);
+      this.conversationManager.trimHistory(message.conversationId);
 
       return formatted;
     } catch (err) {
@@ -230,20 +225,6 @@ export class Orchestrator {
       this.stateManager.finishSkill(message.conversationId);
       logger.error("Skill execution failed", { skillId, error: errorMsg });
       return [{ type: "text", text: `搜索过程中遇到了问题: ${errorMsg}\n要不换个方式描述一下需求？` }];
-    }
-  }
-
-  private getHistory(conversationId: string): ChatHistoryEntry[] {
-    if (!this.chatHistory.has(conversationId)) {
-      this.chatHistory.set(conversationId, []);
-    }
-    return this.chatHistory.get(conversationId)!;
-  }
-
-  private trimHistory(conversationId: string): void {
-    const history = this.chatHistory.get(conversationId);
-    if (history && history.length > MAX_HISTORY) {
-      this.chatHistory.set(conversationId, history.slice(-MAX_HISTORY));
     }
   }
 }

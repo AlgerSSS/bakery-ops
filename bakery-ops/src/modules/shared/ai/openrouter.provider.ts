@@ -1,4 +1,4 @@
-import type { AiProvider } from "./ai-provider.interface";
+import type { AiProvider, ChatMessage } from "./ai-provider.interface";
 import { logger } from "../logger";
 
 const CHAT_MODEL = process.env.AI_CHAT_MODEL || "openai/chatgpt-5.5-latest";
@@ -51,18 +51,22 @@ export class OpenRouterProvider implements AiProvider {
       .map((d: any) => d.embedding);
   }
 
-  async chatCompletion(prompt: string, maxTokens = 200): Promise<string> {
-    const tokens = Math.max(16, maxTokens);
-    logger.info("OpenRouter LLM call", { model: CHAT_MODEL, maxTokens: tokens, prompt: prompt.slice(0, 120) });
+  async chatCompletionMessages(messages: ChatMessage[], options?: { maxTokens?: number }): Promise<string> {
+    const tokens = Math.max(16, options?.maxTokens ?? 200);
+    logger.info("OpenRouter LLM call (messages)", { model: CHAT_MODEL, maxTokens: tokens, messageCount: messages.length });
     const data = await openrouterFetch("/chat/completions", {
       model: CHAT_MODEL,
-      messages: [{ role: "user", content: prompt }],
+      messages,
       temperature: 0,
       max_tokens: tokens,
     });
     const content = data.choices[0]?.message?.content || "";
     logger.info("OpenRouter LLM response", { model: CHAT_MODEL, tokens: data.usage?.total_tokens, response: content.slice(0, 200) });
     return content;
+  }
+
+  async chatCompletion(prompt: string, maxTokens = 200): Promise<string> {
+    return this.chatCompletionMessages([{ role: "user", content: prompt }], { maxTokens });
   }
 
   async chatCompletionLong(prompt: string): Promise<string> {

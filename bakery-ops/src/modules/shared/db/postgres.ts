@@ -21,15 +21,6 @@ export function getSQL(): ReturnType<typeof postgres> {
   return _sql;
 }
 
-export const sql = new Proxy({} as ReturnType<typeof postgres>, {
-  get(_target, prop, receiver) {
-    return Reflect.get(getSQL(), prop, receiver);
-  },
-  apply(_target, thisArg, args) {
-    return Reflect.apply(getSQL() as unknown as (...a: unknown[]) => unknown, thisArg, args);
-  },
-});
-
 export async function query<T = Record<string, unknown>>(
   sqlStr: string,
   params?: unknown[]

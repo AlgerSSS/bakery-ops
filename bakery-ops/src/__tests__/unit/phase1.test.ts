@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { SkillRegistry } from "@/modules/orchestrator/skill-registry";
-import { SkillRouter, type AiRouterProvider } from "@/modules/orchestrator/skill-router";
+import { IntentRouter, type AiRouterProvider } from "@/modules/orchestrator/intent-router";
 import { StateManager } from "@/modules/orchestrator/state-manager";
 import { PermissionService } from "@/modules/orchestrator/permission-service";
 import { AuditService } from "@/modules/orchestrator/audit-service";
@@ -48,20 +48,19 @@ class MockEmployeeHandler implements SkillHandler {
 
 /**
  * Smart mock AI provider that returns context-appropriate LLM decisions.
- * The orchestrator calls chatCompletionLong with a system prompt containing
- * conversation history. We parse the last user message to decide the response.
+ * The orchestrator calls chatCompletionMessages with a messages array.
+ * We parse the last user message to decide the response.
  */
 function createSmartMockAi(): AiRouterProvider {
   return {
     async getEmbedding() { return []; },
     async getEmbeddings() { return []; },
     async chatCompletion() { return '{"skill_id": null, "confidence": 0}'; },
-    async chatCompletionLong(prompt: string) {
-      // Extract last user message from the prompt
-      const userLines = prompt.match(/用户: (.+)/g) || [];
-      const lastUserMsg = userLines.length > 0
-        ? userLines[userLines.length - 1].replace("用户: ", "")
-        : "";
+    async chatCompletionLong() { return '{"action": "chat", "reply": "你好"}'; },
+    async chatCompletionMessages(messages) {
+      const userMessages = messages.filter((m) => m.role === "user");
+      const lastUserMsg = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : "";
+      const systemMsg = messages.find((m) => m.role === "system")?.content ?? "";
 
       // Recruitment keywords
       if (/招聘|招人|找人|JD|岗位/.test(lastUserMsg)) {
@@ -92,8 +91,8 @@ function createSmartMockAi(): AiRouterProvider {
         });
       }
 
-      // Forced skill (补充信息 scenario) — check if prompt mentions forcedSkillId
-      if (prompt.includes("当前正在进行") && prompt.includes("用户在补充信息")) {
+      // Forced skill (补充信息 scenario) — check if system prompt mentions forcedSkillId
+      if (systemMsg.includes("当前正在进行") && systemMsg.includes("用户在补充信息")) {
         return JSON.stringify({
           action: "skill",
           reply: "信息足够了，开始处理。",
@@ -116,6 +115,7 @@ const simpleMockAi: AiRouterProvider = {
   async getEmbeddings() { return []; },
   async chatCompletion() { return '{"skill_id": null, "confidence": 0}'; },
   async chatCompletionLong() { return '{"action": "chat", "reply": "你好"}'; },
+  async chatCompletionMessages() { return '{"action": "chat", "reply": "你好"}'; },
 };
 
 function createTestOrchestrator() {
@@ -206,40 +206,35 @@ describe("SkillRegistry", () => {
   });
 });
 
-describe("SkillRouter Layer 1 — 关键词匹配", () => {
+describe("IntentRouter Layer 1 — 关键词匹配", () => {
   it("routes '招聘' to recruitment skill", async () => {
     const { registry } = createTestOrchestrator();
-    const router = new SkillRouter(registry, simpleMockAi);
-    const result = await router.route("帮我招聘一个店员");
-    expect(result).not.toBeNull();
-    expect(result!.selectedSkill.skillId).toBe("recruitment_sourcing");
-    expect(result!.layer).toBe(1);
-    expect(result!.confidence).toBeGreaterThanOrEqual(0.85);
+    const router = new IntentRouter(registry, createSmartMockAi());
+    const result = await router.route("帮我招聘一个店员", []);
+    expect(result.action).toBe("skill");
+    expect(result.skillId).toBe("recruitment_sourcing");
   });
 
-  it("routes '预估单' to forecast skill", async () => {
+  it("routes '预估单' to forecast skill via keyword then LLM", async () => {
     const { registry } = createTestOrchestrator();
-    const router = new SkillRouter(registry, simpleMockAi);
-    const result = await router.route("生成明天预估单");
-    expect(result).not.toBeNull();
-    expect(result!.selectedSkill.skillId).toBe("forecast_order");
-    expect(result!.layer).toBe(1);
+    const router = new IntentRouter(registry, simpleMockAi);
+    const result = await router.route("生成明天预估单", []);
+    // keyword match sets forcedSkillId; LLM reply may be chat but skillId is preserved
+    expect(result.skillId).toBe("forecast_order");
   });
 
-  it("routes '后厨计划' to kitchen skill", async () => {
+  it("routes '后厨计划' to kitchen skill via keyword then LLM", async () => {
     const { registry } = createTestOrchestrator();
-    const router = new SkillRouter(registry, simpleMockAi);
-    const result = await router.route("生成后厨计划");
-    expect(result).not.toBeNull();
-    expect(result!.selectedSkill.skillId).toBe("kitchen_production_plan");
-    expect(result!.layer).toBe(1);
+    const router = new IntentRouter(registry, simpleMockAi);
+    const result = await router.route("生成后厨计划", []);
+    expect(result.skillId).toBe("kitchen_production_plan");
   });
 
-  it("returns null for unrecognized text (with mock AI)", async () => {
+  it("returns chat for unrecognized text (with mock AI)", async () => {
     const { registry } = createTestOrchestrator();
-    const router = new SkillRouter(registry, simpleMockAi);
-    const result = await router.route("今天天气怎么样");
-    expect(result).toBeNull();
+    const router = new IntentRouter(registry, simpleMockAi);
+    const result = await router.route("今天天气怎么样", []);
+    expect(result.action).toBe("chat");
   });
 });
 

@@ -4,11 +4,13 @@ Provides /ingest and /query endpoints for the TypeScript bot.
 Run with: cd services/lightrag && uv run python server.py
 """
 import os
+import sys
 import logging
 from contextlib import asynccontextmanager
 
 import numpy as np
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from openai import AsyncOpenAI
 
@@ -24,6 +26,8 @@ from config import (
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("lightrag-server")
+
+LIGHTRAG_API_KEY = os.getenv("LIGHTRAG_API_KEY", "")
 
 # --- OpenRouter client ---
 openrouter = AsyncOpenAI(
@@ -79,11 +83,23 @@ async def lifespan(app: FastAPI):
         logger.info("LightRAG initialized, working_dir=%s", WORKING_DIR)
     except Exception as e:
         logger.error("Failed to initialize LightRAG: %s", e, exc_info=True)
-        rag = None
+        sys.exit(1)
     yield
 
 
 app = FastAPI(title="LightRAG Service", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    if request.url.path == "/health":
+        return await call_next(request)
+    if LIGHTRAG_API_KEY:
+        auth_header = request.headers.get("authorization", "")
+        token = auth_header[7:] if auth_header.startswith("Bearer ") else None
+        if token != LIGHTRAG_API_KEY:
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Unauthorized"})
+    return await call_next(request)
 
 
 # --- Request/Response models ---
@@ -120,8 +136,6 @@ async def health():
 
 @app.post("/ingest", response_model=IngestResponse)
 async def ingest(req: IngestRequest):
-    if rag is None:
-        raise HTTPException(503, "LightRAG not initialized")
     if not req.text.strip():
         raise HTTPException(400, "Empty text")
     try:
@@ -135,8 +149,6 @@ async def ingest(req: IngestRequest):
 
 @app.post("/query", response_model=QueryResponse)
 async def query(req: QueryRequest):
-    if rag is None:
-        raise HTTPException(503, "LightRAG not initialized")
     valid_modes = ["naive", "local", "global", "hybrid"]
     mode = req.mode if req.mode in valid_modes else "hybrid"
     try:
@@ -156,3 +168,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

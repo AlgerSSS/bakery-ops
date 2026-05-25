@@ -120,7 +120,7 @@ const initialState: ForecastState = {
   loading: false, dataLoaded: false,
 };
 
-function forecastReducer(state: ForecastState, action: ForecastAction): ForecastState {
+function coreDataReducer(state: ForecastState, action: ForecastAction): ForecastState {
   switch (action.type) {
     case "SET_CORE_DATA": return { ...state, ...action.payload, dataLoaded: true };
     case "SET_LOADING": return { ...state, loading: action.payload };
@@ -132,9 +132,21 @@ function forecastReducer(state: ForecastState, action: ForecastAction): Forecast
     case "SET_TIME_SLOT_SUGGESTIONS": return { ...state, timeSlotSuggestions: action.payload };
     case "SET_TIMESLOT_SALES_RECORDS": return { ...state, timeslotSalesRecords: action.payload };
     case "SET_ADJUSTED_QUANTITIES": return { ...state, adjustedQuantities: action.payload };
+    default: return state;
+  }
+}
+
+function selectionReducer(state: ForecastState, action: ForecastAction): ForecastState {
+  switch (action.type) {
     case "SET_SELECTED_MONTH": return { ...state, selectedMonth: action.payload };
     case "SET_SELECTED_DATE": return { ...state, selectedDate: action.payload };
     case "SET_YEAR": return { ...state, year: action.payload };
+    default: return state;
+  }
+}
+
+function aiStateReducer(state: ForecastState, action: ForecastAction): ForecastState {
+  switch (action.type) {
     case "SET_AI_CORRECTIONS": return { ...state, aiCorrections: action.payload };
     case "SET_AI_LOADING": return { ...state, aiLoading: action.payload };
     case "SET_AI_ERROR": return { ...state, aiError: action.payload };
@@ -148,15 +160,36 @@ function forecastReducer(state: ForecastState, action: ForecastAction): Forecast
     case "SET_AI_TIMESLOT_LOADING": return { ...state, aiTimeSlotLoading: action.payload };
     case "SET_AI_TIMESLOT_ERROR": return { ...state, aiTimeSlotError: action.payload };
     case "SET_AI_TIMESLOT_ADOPTED": return { ...state, aiTimeSlotAdopted: action.payload };
+    default: return state;
+  }
+}
+
+function dashboardReducer(state: ForecastState, action: ForecastAction): ForecastState {
+  switch (action.type) {
     case "SET_DASHBOARD_REVIEW": return { ...state, dashboardReview: action.payload };
     case "SET_DASHBOARD_EVENTS": return { ...state, dashboardEvents: action.payload };
     case "SET_YESTERDAY_SALES": return { ...state, yesterdaySales: action.payload };
-    case "SET_IMPORT_STATUS": return { ...state, importStatus: action.payload };
+    default: return state;
+  }
+}
+
+function settingsReducer(state: ForecastState, action: ForecastAction): ForecastState {
+  switch (action.type) {
     case "SET_BUSINESS_RULES": return { ...state, businessRulesState: action.payload };
     case "SET_FIXED_SCHEDULE": return { ...state, fixedSchedule: action.payload };
     case "SET_ALIASES": return { ...state, aliases: action.payload };
+    case "SET_IMPORT_STATUS": return { ...state, importStatus: action.payload };
     default: return state;
   }
+}
+
+function forecastReducer(state: ForecastState, action: ForecastAction): ForecastState {
+  let next = coreDataReducer(state, action);
+  next = selectionReducer(next, action);
+  next = aiStateReducer(next, action);
+  next = dashboardReducer(next, action);
+  next = settingsReducer(next, action);
+  return next;
 }
 
 // ========== Context ==========

@@ -1,6 +1,8 @@
-import type { AiProvider } from "../shared/ai/ai-provider.interface";
+import type { AiProvider, ChatMessage } from "../shared/ai/ai-provider.interface";
 import { SkillRegistry } from "./skill-registry";
 import { logger } from "../shared/logger";
+
+export type AiRouterProvider = AiProvider;
 
 export interface IntentResult {
   action: "chat" | "skill" | "need_info";
@@ -24,9 +26,16 @@ export class IntentRouter {
         logger.info("IntentRouter Layer 1 hit", { skillId: keywordMatch });
         return this.llmDecide(history, keywordMatch);
       }
+
+      // Layer 2: Embedding 语义相似度
+      const embeddingMatch = await this.matchByEmbedding(text);
+      if (embeddingMatch) {
+        logger.info("IntentRouter Layer 2 hit", { skillId: embeddingMatch });
+        return this.llmDecide(history, embeddingMatch);
+      }
     }
 
-    // Layer 2: LLM 分类
+    // Layer 3: LLM 分类
     return this.llmDecide(history, forcedSkillId);
   }
 
@@ -44,6 +53,41 @@ export class IntentRouter {
     return null;
   }
 
+  private async matchByEmbedding(text: string): Promise<string | null> {
+    const skills = this.registry.getAll();
+    if (skills.length === 0) return null;
+
+    const candidates = skills.map((s) => ({
+      skill: s,
+      text: `${s.name}: ${s.description}. 例如: ${s.examples.join("; ")}`,
+    }));
+
+    try {
+      const userEmbedding = await this.aiProvider.getEmbedding(text);
+      const candidateEmbeddings = await this.aiProvider.getEmbeddings(candidates.map((c) => c.text));
+
+      let bestScore = -1;
+      let bestIdx = -1;
+      for (let i = 0; i < candidateEmbeddings.length; i++) {
+        const score = cosineSimilarity(userEmbedding, candidateEmbeddings[i]);
+        if (score > bestScore) {
+          bestScore = score;
+          bestIdx = i;
+        }
+      }
+
+      if (bestIdx >= 0 && bestScore >= 0.60) {
+        return candidates[bestIdx].skill.skillId;
+      }
+    } catch (err) {
+      logger.warn("IntentRouter Layer 2 embedding failed, falling through to Layer 3", {
+        error: String(err),
+      });
+    }
+
+    return null;
+  }
+
   private async llmDecide(
     history: { role: string; content: string }[],
     forcedSkillId?: string,
@@ -53,21 +97,13 @@ export class IntentRouter {
       .map((s) => `- ${s.skillId}: ${s.name} — ${s.description}`)
       .join("\n");
 
-    const recentHistory = history.slice(-10);
-    const historyText = recentHistory
-      .map((h) => `${h.role === "user" ? "用户" : "助手"}: ${h.content.slice(0, 500)}`)
-      .join("\n");
-
-    const systemPrompt = `你是 Hot Crush 的 AI 助手，一家马来西亚连锁烘焙店的智能工作伙伴。
+    const systemContent = `你是 Hot Crush 的 AI 助手，一家马来西亚连锁烘焙店的智能工作伙伴。
 你的风格：友好、专业、简洁。用中文回复。不要用 emoji。
 
 你可以使用以下技能：
 ${skillList}
 
 ${forcedSkillId ? `当前正在进行 ${forcedSkillId} 技能，用户在补充信息。` : ""}
-
-对话历史：
-${historyText}
 
 请分析用户最新消息，返回 JSON（不要返回其他内容）：
 {
@@ -103,8 +139,17 @@ ${historyText}
 14. 复盘/日复盘/今天总结/门店复盘/业绩分析 → daily_review_chat（不是forecast_order）
 15. reply 必须自然、口语化`;
 
+    const recentHistory = history.slice(-10);
+    const messages: ChatMessage[] = [
+      { role: "system", content: systemContent },
+      ...recentHistory.map((h) => ({
+        role: (h.role === "user" ? "user" : "assistant") as "user" | "assistant",
+        content: h.content.slice(0, 500),
+      })),
+    ];
+
     try {
-      const response = await this.aiProvider.chatCompletionLong(systemPrompt);
+      const response = await this.aiProvider.chatCompletionMessages(messages, { maxTokens: 4096 });
       const jsonStr = response.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
       const parsed = JSON.parse(jsonStr);
       logger.info("IntentRouter LLM decision", {
@@ -124,4 +169,17 @@ ${historyText}
       return { action: "chat", reply: "不好意思，我没太理解你的意思，能再说一下吗？" };
     }
   }
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  return denom === 0 ? 0 : dot / denom;
 }

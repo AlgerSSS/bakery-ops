@@ -1,2 +1,6 @@
 .DS_Store
 .claude/
+storageState.json
+storageState*.json
+*-session/cookies.json
+*-session/storage.json

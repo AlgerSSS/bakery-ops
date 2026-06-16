@@ -168,8 +168,19 @@ export async function parseSalesData(
     });
   });
 
+  // 源数据可能把同一产品同一天拆成多行（如归一到同一 product_name 的规格/冷热变体）。
+  // 按 (productName, date) 求和合并为一行，匹配 UNIQUE(product_name, date) 约束，
+  // 并避免在销售基线里被当成多个样本重复计数。
+  const aggregated = new Map<string, DailySalesRecord>();
+  for (const r of records) {
+    const key = `${r.productName}__${r.date}`;
+    const existing = aggregated.get(key);
+    if (existing) existing.quantity += r.quantity;
+    else aggregated.set(key, { ...r });
+  }
+
   return {
-    records,
+    records: Array.from(aggregated.values()),
     unmatchedProducts: Array.from(unmatchedSet),
   };
 }

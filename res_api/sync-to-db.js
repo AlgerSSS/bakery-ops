@@ -69,12 +69,21 @@ async function syncDailySalesRecord() {
   // Delete existing records for today to avoid duplicates (no unique constraint on date+product)
   await sql`DELETE FROM daily_sales_record WHERE date = ${today}`;
 
-  let count = 0;
+  // Same dish can appear on multiple source rows (size/category variants). Sum the
+  // 30-day totals per name first, then write ONE row per (name, today) — otherwise we
+  // emit duplicate (product_name, date) rows (now blocked by the UNIQUE constraint) and
+  // double-count the day in the sales baseline.
+  const totals = new Map();
   for (const r of rows) {
     const name = r['Dish Name'];
     if (!name) continue;
     const totalQty = num(r['Total Qty']);
     if (!totalQty || totalQty <= 0) continue;
+    totals.set(name, (totals.get(name) || 0) + totalQty);
+  }
+
+  let count = 0;
+  for (const [name, totalQty] of totals) {
     // Calculate daily average from 30-day total
     const dailyAvg = Math.round(totalQty / 30);
     await sql`

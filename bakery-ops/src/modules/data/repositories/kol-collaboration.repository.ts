@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { query, execute } from "@/modules/shared/db/postgres";
 import { logger } from "../../shared/logger";
 import type { KOLCollaborationRow } from "../../domain/marketing/types";
 
@@ -14,47 +14,50 @@ export class KOLCollaborationRepository {
     dm_template_used?: string;
     metadata?: Record<string, unknown>;
   }): Promise<KOLCollaborationRow | null> {
-    const { data: row, error } = await supabase
-      .from("kol_collaborations")
-      .insert({
-        kol_id: data.kol_id,
-        campaign_id: data.campaign_id,
-        status: data.status || "prospected",
-        dm_sent: data.dm_sent || false,
-        dm_sent_at: data.dm_sent_at,
-        dm_template_used: data.dm_template_used,
-        metadata: data.metadata || {},
-      })
-      .select()
-      .single();
-
-    if (error) {
-      logger.error("Failed to create collaboration", { error: error.message });
+    try {
+      const rows = await query<KOLCollaborationRow>(
+        `INSERT INTO kol_collaborations
+           (kol_id, campaign_id, status, dm_sent, dm_sent_at, dm_template_used, metadata)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         RETURNING *`,
+        [
+          data.kol_id,
+          data.campaign_id ?? null,
+          data.status || "prospected",
+          data.dm_sent || false,
+          data.dm_sent_at ?? null,
+          data.dm_template_used ?? null,
+          JSON.stringify(data.metadata || {}),
+        ]
+      );
+      return rows[0] ?? null;
+    } catch (error) {
+      logger.error("Failed to create collaboration", { error: String(error) });
       return null;
     }
-    return row as KOLCollaborationRow;
   }
 
   async getByKOLId(kolId: string): Promise<KOLCollaborationRow[]> {
-    const { data, error } = await supabase
-      .from("kol_collaborations")
-      .select("*")
-      .eq("kol_id", kolId)
-      .order("created_at", { ascending: false });
-
-    if (error) return [];
-    return (data || []) as KOLCollaborationRow[];
+    try {
+      return await query<KOLCollaborationRow>(
+        "SELECT * FROM kol_collaborations WHERE kol_id = ? ORDER BY created_at DESC",
+        [kolId]
+      );
+    } catch {
+      return [];
+    }
   }
 
   async getById(id: string): Promise<KOLCollaborationRow | null> {
-    const { data, error } = await supabase
-      .from("kol_collaborations")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error || !data) return null;
-    return data as KOLCollaborationRow;
+    try {
+      const rows = await query<KOLCollaborationRow>(
+        "SELECT * FROM kol_collaborations WHERE id = ?",
+        [id]
+      );
+      return rows[0] ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async updateStatus(
@@ -62,13 +65,20 @@ export class KOLCollaborationRepository {
     status: string,
     extra?: Record<string, unknown>,
   ): Promise<void> {
-    const { error } = await supabase
-      .from("kol_collaborations")
-      .update({ status, updated_at: new Date().toISOString(), ...extra })
-      .eq("id", id);
-
-    if (error) {
-      logger.error("Failed to update collaboration status", { id, error: error.message });
+    try {
+      const columns = ["status = ?", "updated_at = ?"];
+      const params: unknown[] = [status, new Date().toISOString()];
+      for (const [key, value] of Object.entries(extra ?? {})) {
+        columns.push(`${key} = ?`);
+        params.push(value);
+      }
+      params.push(id);
+      await execute(
+        `UPDATE kol_collaborations SET ${columns.join(", ")} WHERE id = ?`,
+        params
+      );
+    } catch (error) {
+      logger.error("Failed to update collaboration status", { id, error: String(error) });
     }
   }
 
@@ -76,31 +86,28 @@ export class KOLCollaborationRepository {
     id: string,
     template: string,
   ): Promise<void> {
-    const { error } = await supabase
-      .from("kol_collaborations")
-      .update({
-        dm_sent: true,
-        dm_sent_at: new Date().toISOString(),
-        dm_template_used: template,
-        status: "contacted",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (error) {
-      logger.error("Failed to mark DM sent", { id, error: error.message });
+    try {
+      const now = new Date().toISOString();
+      await execute(
+        `UPDATE kol_collaborations
+         SET dm_sent = true, dm_sent_at = ?, dm_template_used = ?, status = 'contacted', updated_at = ?
+         WHERE id = ?`,
+        [now, template, now, id]
+      );
+    } catch (error) {
+      logger.error("Failed to mark DM sent", { id, error: String(error) });
     }
   }
 
   async getRecent(limit = 20): Promise<KOLCollaborationRow[]> {
-    const { data, error } = await supabase
-      .from("kol_collaborations")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(limit);
-
-    if (error) return [];
-    return (data || []) as KOLCollaborationRow[];
+    try {
+      return await query<KOLCollaborationRow>(
+        "SELECT * FROM kol_collaborations ORDER BY created_at DESC LIMIT ?",
+        [limit]
+      );
+    } catch {
+      return [];
+    }
   }
 }
 

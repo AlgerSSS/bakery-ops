@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { query, execute } from "@/modules/shared/db/postgres";
 import { logger } from "../../shared/logger";
 import type { KOLRow, KOLRaw } from "../../domain/marketing/types";
 
@@ -6,113 +6,112 @@ export type { KOLRow };
 
 export class KOLRepository {
   async upsertFromRaw(raw: KOLRaw): Promise<KOLRow | null> {
-    const { data: existing } = await supabase
-      .from("kols")
-      .select("id")
-      .eq("platform", raw.platform)
-      .eq("platform_id", raw.platformId)
-      .limit(1)
-      .single();
+    const existingRows = await query<{ id: string }>(
+      "SELECT id FROM kols WHERE platform = ? AND platform_id = ? LIMIT 1",
+      [raw.platform, raw.platformId]
+    );
+    const existing = existingRows[0];
 
     if (existing) {
-      const { error } = await supabase
-        .from("kols")
-        .update({
-          name: raw.name,
-          platform_handle: raw.handle,
-          follower_count: raw.followerCount,
-          engagement_rate: raw.engagementRate,
-          avg_views: raw.avgViews,
-          avg_likes: raw.avgLikes,
-          niche: raw.niche,
-          location: raw.location,
-          bio: raw.bio,
-          verified: raw.verified,
-          avatar_url: raw.avatarUrl,
-          contact_info: raw.contactInfo || {},
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", existing.id);
-
-      if (error) logger.error("Failed to update KOL", { error: error.message });
+      try {
+        await execute(
+          `UPDATE kols SET
+             name = ?,
+             platform_handle = ?,
+             follower_count = ?,
+             engagement_rate = ?,
+             avg_views = ?,
+             avg_likes = ?,
+             niche = ?,
+             location = ?,
+             bio = ?,
+             verified = ?,
+             avatar_url = ?,
+             contact_info = ?,
+             updated_at = ?
+           WHERE id = ?`,
+          [
+            raw.name,
+            raw.handle,
+            raw.followerCount,
+            raw.engagementRate,
+            raw.avgViews,
+            raw.avgLikes,
+            raw.niche,
+            raw.location,
+            raw.bio,
+            raw.verified,
+            raw.avatarUrl,
+            raw.contactInfo || {},
+            new Date().toISOString(),
+            existing.id,
+          ]
+        );
+      } catch (error) {
+        logger.error("Failed to update KOL", { error: (error as Error).message });
+      }
       return existing as KOLRow;
     }
 
-    const { data, error } = await supabase
-      .from("kols")
-      .insert({
-        name: raw.name,
-        platform: raw.platform,
-        platform_handle: raw.handle,
-        platform_id: raw.platformId,
-        follower_count: raw.followerCount,
-        engagement_rate: raw.engagementRate,
-        avg_views: raw.avgViews,
-        avg_likes: raw.avgLikes,
-        niche: raw.niche,
-        location: raw.location,
-        bio: raw.bio,
-        verified: raw.verified,
-        avatar_url: raw.avatarUrl,
-        contact_info: raw.contactInfo || {},
-      })
-      .select()
-      .single();
-
-    if (error) {
-      logger.error("Failed to insert KOL", { error: error.message });
+    try {
+      const rows = await query<KOLRow>(
+        `INSERT INTO kols (
+           name, platform, platform_handle, platform_id, follower_count,
+           engagement_rate, avg_views, avg_likes, niche, location,
+           bio, verified, avatar_url, contact_info
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         RETURNING *`,
+        [
+          raw.name,
+          raw.platform,
+          raw.handle,
+          raw.platformId,
+          raw.followerCount,
+          raw.engagementRate,
+          raw.avgViews,
+          raw.avgLikes,
+          raw.niche,
+          raw.location,
+          raw.bio,
+          raw.verified,
+          raw.avatarUrl,
+          raw.contactInfo || {},
+        ]
+      );
+      return (rows[0] as KOLRow) ?? null;
+    } catch (error) {
+      logger.error("Failed to insert KOL", { error: (error as Error).message });
       return null;
     }
-    return data as KOLRow;
   }
 
   async getById(id: string): Promise<KOLRow | null> {
-    const { data, error } = await supabase
-      .from("kols")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error || !data) return null;
-    return data as KOLRow;
+    const rows = await query<KOLRow>("SELECT * FROM kols WHERE id = ?", [id]);
+    return rows[0] ?? null;
   }
 
   async getByPhone(phone: string): Promise<KOLRow | null> {
     // 从 contact_info JSONB 中查找 phone
-    const { data, error } = await supabase
-      .from("kols")
-      .select("*")
-      .filter("contact_info->>phone", "eq", phone)
-      .limit(1)
-      .single();
-
-    if (error || !data) return null;
-    return data as KOLRow;
+    const rows = await query<KOLRow>(
+      "SELECT * FROM kols WHERE contact_info->>'phone' = ? LIMIT 1",
+      [phone]
+    );
+    return rows[0] ?? null;
   }
 
   async getByHandle(platform: string, handle: string): Promise<KOLRow | null> {
-    const { data, error } = await supabase
-      .from("kols")
-      .select("*")
-      .eq("platform", platform)
-      .eq("platform_handle", handle)
-      .limit(1)
-      .single();
-
-    if (error || !data) return null;
-    return data as KOLRow;
+    const rows = await query<KOLRow>(
+      "SELECT * FROM kols WHERE platform = ? AND platform_handle = ? LIMIT 1",
+      [platform, handle]
+    );
+    return rows[0] ?? null;
   }
 
   async findByPlatform(platform: string, limit = 50): Promise<KOLRow[]> {
-    const { data, error } = await supabase
-      .from("kols")
-      .select("*")
-      .eq("platform", platform)
-      .order("follower_count", { ascending: false })
-      .limit(limit);
-
-    if (error) return [];
-    return (data || []) as KOLRow[];
+    return query<KOLRow>(
+      "SELECT * FROM kols WHERE platform = ? ORDER BY follower_count DESC LIMIT ?",
+      [platform, limit]
+    );
   }
 
   async search(filters: {
@@ -122,43 +121,46 @@ export class KOLRepository {
     location?: string;
     limit?: number;
   }): Promise<KOLRow[]> {
-    let query = supabase.from("kols").select("*");
+    const conditions: string[] = [];
+    const params: unknown[] = [];
 
     if (filters.platform && filters.platform !== "all") {
-      query = query.eq("platform", filters.platform);
+      conditions.push("platform = ?");
+      params.push(filters.platform);
     }
     if (filters.minFollowers) {
-      query = query.gte("follower_count", filters.minFollowers);
+      conditions.push("follower_count >= ?");
+      params.push(filters.minFollowers);
     }
     if (filters.location) {
-      query = query.ilike("location", `%${filters.location}%`);
+      conditions.push("location ILIKE ?");
+      params.push(`%${filters.location}%`);
     }
-    // niche filtering via GIN: use .contains() on the niche array
+    // niche filtering via GIN: array contains
     if (filters.niche) {
-      query = query.contains("niche", [filters.niche]);
+      conditions.push("niche @> ?::text[]");
+      params.push([filters.niche]);
     }
 
-    query = query
-      .order("follower_count", { ascending: false })
-      .limit(filters.limit || 20);
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    params.push(filters.limit || 20);
 
-    const { data, error } = await query;
-    if (error) {
-      logger.error("Failed to search KOLs", { error: error.message });
+    try {
+      return await query<KOLRow>(
+        `SELECT * FROM kols ${where} ORDER BY follower_count DESC LIMIT ?`,
+        params
+      );
+    } catch (error) {
+      logger.error("Failed to search KOLs", { error: (error as Error).message });
       return [];
     }
-    return (data || []) as KOLRow[];
   }
 
   async getRecent(limit = 20): Promise<KOLRow[]> {
-    const { data, error } = await supabase
-      .from("kols")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(limit);
-
-    if (error) return [];
-    return (data || []) as KOLRow[];
+    return query<KOLRow>(
+      "SELECT * FROM kols ORDER BY created_at DESC LIMIT ?",
+      [limit]
+    );
   }
 }
 

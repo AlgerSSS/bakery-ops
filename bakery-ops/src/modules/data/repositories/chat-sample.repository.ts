@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { query } from "@/modules/shared/db/postgres";
 import { logger } from "../../shared/logger";
 import type { ChatSampleRow } from "../../domain/marketing/types";
 
@@ -12,46 +12,49 @@ export class ChatSampleRepository {
     message_type: "dm_sent" | "dm_received" | "comment" | "post";
     chat_context?: Record<string, unknown>;
   }): Promise<ChatSampleRow | null> {
-    const { data: row, error } = await supabase
-      .from("marketing_chat_samples")
-      .insert({
-        kol_id: data.kol_id,
-        platform: data.platform,
-        message_content: data.message_content,
-        message_type: data.message_type,
-        chat_context: data.chat_context || {},
-        captured_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
-
-    if (error) {
-      logger.error("Failed to create chat sample", { error: error.message });
+    try {
+      const rows = await query<ChatSampleRow>(
+        `INSERT INTO marketing_chat_samples (kol_id, platform, message_content, message_type, chat_context, captured_at)
+         VALUES (?, ?, ?, ?, ?::jsonb, ?)
+         RETURNING id, kol_id, platform, message_content, message_type, chat_context, captured_at, created_at`,
+        [
+          data.kol_id ?? null,
+          data.platform,
+          data.message_content,
+          data.message_type,
+          JSON.stringify(data.chat_context || {}),
+          new Date().toISOString(),
+        ],
+      );
+      return rows[0] ?? null;
+    } catch (error) {
+      logger.error("Failed to create chat sample", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
-    return row as ChatSampleRow;
   }
 
   async getByKOLId(kolId: string): Promise<ChatSampleRow[]> {
-    const { data, error } = await supabase
-      .from("marketing_chat_samples")
-      .select("*")
-      .eq("kol_id", kolId)
-      .order("captured_at", { ascending: true });
-
-    if (error) return [];
-    return (data || []) as ChatSampleRow[];
+    try {
+      return await query<ChatSampleRow>(
+        "SELECT * FROM marketing_chat_samples WHERE kol_id = ? ORDER BY captured_at ASC",
+        [kolId],
+      );
+    } catch {
+      return [];
+    }
   }
 
   async getRecent(limit = 50): Promise<ChatSampleRow[]> {
-    const { data, error } = await supabase
-      .from("marketing_chat_samples")
-      .select("*")
-      .order("captured_at", { ascending: false })
-      .limit(limit);
-
-    if (error) return [];
-    return (data || []) as ChatSampleRow[];
+    try {
+      return await query<ChatSampleRow>(
+        "SELECT * FROM marketing_chat_samples ORDER BY captured_at DESC LIMIT ?",
+        [limit],
+      );
+    } catch {
+      return [];
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { query, execute } from "@/modules/shared/db/postgres";
 import { logger } from "../../shared/logger";
 import type { SupplyOrder, OrderItem } from "../../domain/supplychain/types";
 
@@ -17,62 +17,54 @@ export interface SupplyOrderRow {
 
 export class SupplyOrderRepository {
   async create(order: Omit<SupplyOrder, "id">): Promise<SupplyOrderRow | null> {
-    const { data, error } = await supabase
-      .from("supply_orders")
-      .insert({
-        order_date: order.orderDate,
-        store_id: order.storeId,
-        status: order.status,
-        items: order.items,
-        notes: order.notes,
-        created_by: order.createdBy,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      logger.error("Failed to create supply order", { error: error.message });
+    try {
+      const rows = await query<SupplyOrderRow>(
+        `INSERT INTO supply_orders (order_date, store_id, status, items, notes, created_by)
+         VALUES (?, ?, ?, ?::jsonb, ?, ?)
+         RETURNING *`,
+        [
+          order.orderDate,
+          order.storeId,
+          order.status,
+          JSON.stringify(order.items),
+          order.notes ?? null,
+          order.createdBy ?? null,
+        ]
+      );
+      return rows[0] ?? null;
+    } catch (error) {
+      logger.error("Failed to create supply order", { error: (error as Error).message });
       return null;
     }
-    return data as SupplyOrderRow;
   }
 
   async getById(id: string): Promise<SupplyOrderRow | null> {
-    const { data, error } = await supabase
-      .from("supply_orders")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error || !data) return null;
-    return data as SupplyOrderRow;
+    const rows = await query<SupplyOrderRow>(
+      "SELECT * FROM supply_orders WHERE id = ?",
+      [id]
+    );
+    return rows[0] ?? null;
   }
 
   async getTodayOrder(storeId: string): Promise<SupplyOrderRow | null> {
     const today = new Date().toISOString().split("T")[0];
-    const { data, error } = await supabase
-      .from("supply_orders")
-      .select("*")
-      .eq("store_id", storeId)
-      .eq("order_date", today)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error || !data) return null;
-    return data as SupplyOrderRow;
+    const rows = await query<SupplyOrderRow>(
+      `SELECT * FROM supply_orders
+       WHERE store_id = ? AND order_date = ?
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [storeId, today]
+    );
+    return rows[0] ?? null;
   }
 
   async getByDate(storeId: string, date: string): Promise<SupplyOrderRow[]> {
-    const { data, error } = await supabase
-      .from("supply_orders")
-      .select("*")
-      .eq("store_id", storeId)
-      .eq("order_date", date)
-      .order("created_at", { ascending: false });
-
-    if (error) return [];
-    return (data || []) as SupplyOrderRow[];
+    return query<SupplyOrderRow>(
+      `SELECT * FROM supply_orders
+       WHERE store_id = ? AND order_date = ?
+       ORDER BY created_at DESC`,
+      [storeId, date]
+    );
   }
 
   async appendItems(id: string, newItems: OrderItem[], reportedBy: string): Promise<boolean> {
@@ -82,19 +74,18 @@ export class SupplyOrderRepository {
     const currentItems = Array.isArray(existing.items) ? existing.items : [];
     const merged = [...currentItems, ...newItems.map(item => ({ ...item, reportedBy }))];
 
-    const { error } = await supabase
-      .from("supply_orders")
-      .update({
-        items: merged,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (error) {
-      logger.error("Failed to append items to supply order", { id, error: error.message });
+    try {
+      await execute(
+        `UPDATE supply_orders
+         SET items = ?::jsonb, updated_at = ?
+         WHERE id = ?`,
+        [JSON.stringify(merged), new Date().toISOString(), id]
+      );
+      return true;
+    } catch (error) {
+      logger.error("Failed to append items to supply order", { id, error: (error as Error).message });
       return false;
     }
-    return true;
   }
 
   async updateStatus(id: string, status: string, extra?: Record<string, unknown>): Promise<void> {
@@ -103,26 +94,25 @@ export class SupplyOrderRepository {
       updated_at: new Date().toISOString(),
       ...extra,
     };
-    const { error } = await supabase
-      .from("supply_orders")
-      .update(update)
-      .eq("id", id);
+    const columns = Object.keys(update);
+    const setClause = columns.map(col => `${col} = ?`).join(", ");
+    const params = [...columns.map(col => update[col]), id];
 
-    if (error) {
-      logger.error("Failed to update supply order status", { id, error: error.message });
+    try {
+      await execute(`UPDATE supply_orders SET ${setClause} WHERE id = ?`, params);
+    } catch (error) {
+      logger.error("Failed to update supply order status", { id, error: (error as Error).message });
     }
   }
 
   async getRecentOrders(storeId: string, limit = 10): Promise<SupplyOrderRow[]> {
-    const { data, error } = await supabase
-      .from("supply_orders")
-      .select("*")
-      .eq("store_id", storeId)
-      .order("order_date", { ascending: false })
-      .limit(limit);
-
-    if (error) return [];
-    return (data || []) as SupplyOrderRow[];
+    return query<SupplyOrderRow>(
+      `SELECT * FROM supply_orders
+       WHERE store_id = ?
+       ORDER BY order_date DESC
+       LIMIT ?`,
+      [storeId, limit]
+    );
   }
 }
 

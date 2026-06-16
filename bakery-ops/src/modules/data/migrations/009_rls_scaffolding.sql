@@ -95,9 +95,11 @@ BEGIN
 END $$;
 
 -- employees: scoped by employees.store_id (NULL store_id is owner/HR-only — excluded for authenticated).
+-- Table-guarded: skip when the recruitment tables are absent (e.g. forecast/POS database).
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies
+  IF to_regclass('public.employees') IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM pg_policies
                  WHERE schemaname='public' AND tablename='employees' AND policyname='employees_store_scope') THEN
     CREATE POLICY employees_store_scope ON public.employees
       FOR SELECT TO authenticated
@@ -112,9 +114,12 @@ BEGIN
 END $$;
 
 -- employee_events: scoped via the parent employee's store_id.
+-- Table-guarded: skip when the recruitment tables are absent.
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_policies
+  IF to_regclass('public.employee_events') IS NOT NULL
+     AND to_regclass('public.employees') IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM pg_policies
                  WHERE schemaname='public' AND tablename='employee_events' AND policyname='employee_events_store_scope') THEN
     CREATE POLICY employee_events_store_scope ON public.employee_events
       FOR SELECT TO authenticated

@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { query, execute } from "@/modules/shared/db/postgres";
 import { logger } from "../../shared/logger";
 
 export interface EmployeeRow {
@@ -29,61 +29,85 @@ export interface EmployeeRow {
   updated_at: string;
 }
 
+// Full EmployeeRow projection. Timestamps cast to text so they stay strings.
+const SELECT_COLS =
+  "id, name, phone, email, source, source_url, candidate_id, job_title, department, store_id, status, " +
+  "applied_at::text AS applied_at, interviewed_at::text AS interviewed_at, hired_at::text AS hired_at, resigned_at::text AS resigned_at, " +
+  "skills, languages, education, experience_summary, location, resume_file_id, resume_text, metadata, " +
+  "created_at::text AS created_at, updated_at::text AS updated_at";
+
+// Columns allowed in dynamic updates (updateStatus `extra`).
+const UPDATABLE_COLS = new Set([
+  "name", "phone", "email", "source", "source_url", "candidate_id", "job_title",
+  "department", "store_id", "status", "applied_at", "interviewed_at", "hired_at",
+  "resigned_at", "skills", "languages", "education", "experience_summary",
+  "location", "resume_file_id", "resume_text", "metadata",
+]);
+
+// postgres.js returns jsonb columns as raw JSON strings; parse back to objects.
+function mapRow(row: EmployeeRow): EmployeeRow {
+  if (typeof row.metadata === "string") {
+    row.metadata = JSON.parse(row.metadata) as Record<string, unknown>;
+  }
+  return row;
+}
+
 export class EmployeeRepository {
   async create(data: Partial<EmployeeRow>): Promise<EmployeeRow | null> {
-    const { data: row, error } = await supabase
-      .from("employees")
-      .insert({
-        name: data.name,
-        phone: data.phone,
-        email: data.email,
-        source: data.source || "manual",
-        source_url: data.source_url,
-        candidate_id: data.candidate_id,
-        job_title: data.job_title,
-        department: data.department,
-        store_id: data.store_id,
-        status: data.status || "candidate",
-        skills: data.skills || [],
-        languages: data.languages || [],
-        education: data.education,
-        experience_summary: data.experience_summary,
-        location: data.location,
-        resume_file_id: data.resume_file_id,
-        resume_text: data.resume_text,
-        metadata: data.metadata || {},
-      })
-      .select()
-      .single();
-
-    if (error) {
-      logger.error("Failed to create employee", { error: error.message });
+    try {
+      const rows = await query<EmployeeRow>(
+        `INSERT INTO employees
+           (name, phone, email, source, source_url, candidate_id, job_title, department, store_id, status,
+            applied_at, interviewed_at, hired_at, resigned_at, skills, languages, education,
+            experience_summary, location, resume_file_id, resume_text, metadata)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+         RETURNING ${SELECT_COLS}`,
+        [
+          data.name,
+          data.phone ?? null,
+          data.email ?? null,
+          data.source || "manual",
+          data.source_url ?? null,
+          data.candidate_id ?? null,
+          data.job_title ?? null,
+          data.department ?? null,
+          data.store_id ?? null,
+          data.status || "candidate",
+          data.applied_at ?? null,
+          data.interviewed_at ?? null,
+          data.hired_at ?? null,
+          data.resigned_at ?? null,
+          data.skills || [],
+          data.languages || [],
+          data.education ?? null,
+          data.experience_summary ?? null,
+          data.location ?? null,
+          data.resume_file_id ?? null,
+          data.resume_text ?? null,
+          JSON.stringify(data.metadata || {}),
+        ],
+      );
+      return rows[0] ? mapRow(rows[0]) : null;
+    } catch (e) {
+      logger.error("Failed to create employee", { error: (e as Error).message });
       return null;
     }
-    return row as EmployeeRow;
   }
-  async getById(id: string): Promise<EmployeeRow | null> {
-    const { data, error } = await supabase
-      .from("employees")
-      .select("*")
-      .eq("id", id)
-      .single();
 
-    if (error || !data) return null;
-    return data as EmployeeRow;
+  async getById(id: string): Promise<EmployeeRow | null> {
+    const rows = await query<EmployeeRow>(
+      `SELECT ${SELECT_COLS} FROM employees WHERE id = ?`,
+      [id],
+    );
+    return rows[0] ? mapRow(rows[0]) : null;
   }
 
   async findByName(name: string): Promise<EmployeeRow | null> {
-    const { data, error } = await supabase
-      .from("employees")
-      .select("*")
-      .ilike("name", `%${name}%`)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (error || !data) return null;
-    return data as EmployeeRow;
+    const rows = await query<EmployeeRow>(
+      `SELECT ${SELECT_COLS} FROM employees WHERE name ILIKE ? ORDER BY created_at DESC LIMIT 1`,
+      [`%${name}%`],
+    );
+    return rows[0] ? mapRow(rows[0]) : null;
   }
 
   async findByNames(names: string[]): Promise<EmployeeRow[]> {
@@ -97,36 +121,26 @@ export class EmployeeRepository {
   }
 
   async findRecentCandidates(limit = 10): Promise<EmployeeRow[]> {
-    const { data, error } = await supabase
-      .from("employees")
-      .select("*")
-      .eq("status", "candidate")
-      .order("created_at", { ascending: false })
-      .limit(limit);
-
-    if (error) return [];
-    return (data || []) as EmployeeRow[];
+    const rows = await query<EmployeeRow>(
+      `SELECT ${SELECT_COLS} FROM employees WHERE status = ? ORDER BY created_at DESC LIMIT ?`,
+      ["candidate", limit],
+    );
+    return rows.map(mapRow);
   }
 
   async listRecent(limit = 50): Promise<EmployeeRow[]> {
-    const { data, error } = await supabase
-      .from("employees")
-      .select("id, name, job_title, status, store_id")
-      .order("updated_at", { ascending: false })
-      .limit(limit);
-
-    if (error) return [];
-    return (data || []) as EmployeeRow[];
+    return query<EmployeeRow>(
+      "SELECT id, name, job_title, status, store_id FROM employees ORDER BY updated_at DESC LIMIT ?",
+      [limit],
+    );
   }
 
   async getByStatus(status: string): Promise<EmployeeRow[]> {
-    const { data, error } = await supabase
-      .from("employees")
-      .select("*")
-      .eq("status", status);
-
-    if (error) return [];
-    return (data || []) as EmployeeRow[];
+    const rows = await query<EmployeeRow>(
+      `SELECT ${SELECT_COLS} FROM employees WHERE status = ?`,
+      [status],
+    );
+    return rows.map(mapRow);
   }
 
   async updateStatus(
@@ -134,18 +148,28 @@ export class EmployeeRepository {
     status: string,
     extra?: Partial<EmployeeRow>,
   ): Promise<void> {
-    const update: Record<string, unknown> = {
-      status,
-      updated_at: new Date().toISOString(),
-      ...extra,
-    };
-    const { error } = await supabase
-      .from("employees")
-      .update(update)
-      .eq("id", id);
-
-    if (error) {
-      logger.error("Failed to update employee status", { id, error: error.message });
+    const setClauses = ["status = ?", "updated_at = ?"];
+    const params: unknown[] = [status, new Date().toISOString()];
+    if (extra) {
+      for (const [key, value] of Object.entries(extra)) {
+        if (!UPDATABLE_COLS.has(key)) continue;
+        if (key === "metadata") {
+          setClauses.push(`${key} = ?::jsonb`);
+          params.push(JSON.stringify(value));
+        } else {
+          setClauses.push(`${key} = ?`);
+          params.push(value ?? null);
+        }
+      }
+    }
+    params.push(id);
+    try {
+      await execute(
+        `UPDATE employees SET ${setClauses.join(", ")} WHERE id = ?`,
+        params,
+      );
+    } catch (e) {
+      logger.error("Failed to update employee status", { id, error: (e as Error).message });
     }
   }
 
@@ -169,30 +193,29 @@ export class EmployeeRepository {
     recruitmentJdLocation?: string;
   }): Promise<EmployeeRow | null> {
     // Check if already exists by name + source
-    const { data: existing } = await supabase
-      .from("employees")
-      .select("id")
-      .eq("name", candidate.name)
-      .eq("source", candidate.source)
-      .limit(1)
-      .single();
+    const existingRows = await query<{ id: string }>(
+      "SELECT id FROM employees WHERE name = ? AND source = ? LIMIT 1",
+      [candidate.name, candidate.source],
+    );
+    const existing = existingRows[0];
 
     if (existing) {
       // 更新 metadata（回填 rawData 等信息）
       if (candidate.rawData || candidate.matchScore) {
-        await supabase
-          .from("employees")
-          .update({
-            metadata: {
+        await execute(
+          "UPDATE employees SET metadata = ?::jsonb, updated_at = ? WHERE id = ?",
+          [
+            JSON.stringify({
               rawData: candidate.rawData || {},
               matchScore: candidate.matchScore,
               scoreReason: candidate.scoreReason,
               recruitmentJdTitle: candidate.recruitmentJdTitle,
               recruitmentJdLocation: candidate.recruitmentJdLocation,
-            },
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", existing.id);
+            }),
+            new Date().toISOString(),
+            existing.id,
+          ],
+        );
       }
       return existing as EmployeeRow;
     }
@@ -226,12 +249,13 @@ export class EmployeeRepository {
     const existing = await this.getById(id);
     if (!existing) return;
     const merged = { ...existing.metadata, ...patch };
-    const { error } = await supabase
-      .from("employees")
-      .update({ metadata: merged, updated_at: new Date().toISOString() })
-      .eq("id", id);
-    if (error) {
-      logger.error("Failed to update employee metadata", { id, error: error.message });
+    try {
+      await execute(
+        "UPDATE employees SET metadata = ?::jsonb, updated_at = ? WHERE id = ?",
+        [JSON.stringify(merged), new Date().toISOString(), id],
+      );
+    } catch (e) {
+      logger.error("Failed to update employee metadata", { id, error: (e as Error).message });
     }
   }
 
@@ -246,11 +270,9 @@ export class EmployeeRepository {
     avgTenure: number;
     resignedThisMonth: number;
   }> {
-    const { data: all } = await supabase
-      .from("employees")
-      .select("status, hired_at, resigned_at");
-
-    const rows = (all || []) as Array<{ status: string; hired_at?: string; resigned_at?: string }>;
+    const rows = await query<{ status: string; hired_at?: string; resigned_at?: string }>(
+      "SELECT status, hired_at::text AS hired_at, resigned_at::text AS resigned_at FROM employees",
+    );
     const active = rows.filter((r) => r.status === "hired").length;
     const resigned = rows.filter((r) => r.status === "resigned").length;
 

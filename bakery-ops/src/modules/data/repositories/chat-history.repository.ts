@@ -1,21 +1,24 @@
-import { supabase } from "../supabase";
+import { query, execute } from "@/modules/shared/db/postgres";
 import { logger } from "../../shared/logger";
 import type { ChatHistoryEntry } from "../../orchestrator/conversation-manager";
 
 export class ChatHistoryRepository {
   async replace(conversationId: string, entries: ChatHistoryEntry[]): Promise<void> {
     try {
-      await supabase.from("chat_history").delete().eq("conversation_id", conversationId);
+      await execute("DELETE FROM chat_history WHERE conversation_id = ?", [conversationId]);
       if (entries.length === 0) return;
       const now = Date.now();
-      await supabase.from("chat_history").insert(
-        entries.map((entry, i) => ({
-          conversation_id: conversationId,
-          role: entry.role,
-          content: entry.content,
-          // preserve ordering of the trimmed window via monotonic timestamps
-          created_at: new Date(now + i).toISOString(),
-        })),
+      const placeholders = entries.map(() => "(?, ?, ?, ?)").join(",");
+      const flat = entries.flatMap((entry, i) => [
+        conversationId,
+        entry.role,
+        entry.content,
+        // preserve ordering of the trimmed window via monotonic timestamps
+        new Date(now + i).toISOString(),
+      ]);
+      await execute(
+        `INSERT INTO chat_history (conversation_id, role, content, created_at) VALUES ${placeholders}`,
+        flat,
       );
     } catch (err) {
       logger.debug("chat_history persist skipped", { error: String(err) });
@@ -24,13 +27,11 @@ export class ChatHistoryRepository {
 
   async getByConversation(conversationId: string): Promise<ChatHistoryEntry[]> {
     try {
-      const { data, error } = await supabase
-        .from("chat_history")
-        .select("role, content")
-        .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: true });
-      if (error || !data) return [];
-      return data.map((row) => ({
+      const rows = await query<{ role: string; content: string }>(
+        "SELECT role, content FROM chat_history WHERE conversation_id = ? ORDER BY created_at ASC",
+        [conversationId],
+      );
+      return rows.map((row) => ({
         role: row.role as ChatHistoryEntry["role"],
         content: String(row.content),
       }));

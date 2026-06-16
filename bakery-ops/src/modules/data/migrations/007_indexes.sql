@@ -19,24 +19,39 @@
 -- ============================================
 -- employees (recruitment) — listRecent orders by updated_at;
 -- findRecentCandidates filters status + orders created_at
+-- Table-guarded: the recruitment tables are absent in some deployments (e.g. the
+-- forecast/POS database), so skip cleanly when the table does not exist.
 -- ============================================
-CREATE INDEX IF NOT EXISTS idx_employees_updated_at ON employees (updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_employees_status_created ON employees (status, created_at DESC);
+DO $$
+BEGIN
+  IF to_regclass('public.employees') IS NOT NULL THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_employees_updated_at ON employees (updated_at DESC)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_employees_status_created ON employees (status, created_at DESC)';
+  END IF;
+END $$;
 
 -- ============================================
 -- employee_events — getByEmployee orders by created_at;
 -- getByType filters event_type + orders created_at
 -- ============================================
-CREATE INDEX IF NOT EXISTS idx_employee_events_employee_created
-  ON employee_events (employee_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_employee_events_type_created
-  ON employee_events (event_type, created_at DESC);
+DO $$
+BEGIN
+  IF to_regclass('public.employee_events') IS NOT NULL THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_employee_events_employee_created ON employee_events (employee_id, created_at DESC)';
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_employee_events_type_created ON employee_events (event_type, created_at DESC)';
+  END IF;
+END $$;
 
 -- ============================================
 -- supply_orders — every read filters store_id (+ order_date), orders created_at/order_date.
--- store_id may not exist yet (003 defect) → guarded.
+-- Table-guarded; store_id may also not exist yet (003 defect) → additionally column-guarded.
 -- ============================================
-CREATE INDEX IF NOT EXISTS idx_supply_orders_created_at ON supply_orders (created_at DESC);
+DO $$
+BEGIN
+  IF to_regclass('public.supply_orders') IS NOT NULL THEN
+    EXECUTE 'CREATE INDEX IF NOT EXISTS idx_supply_orders_created_at ON supply_orders (created_at DESC)';
+  END IF;
+END $$;
 
 DO $$
 BEGIN

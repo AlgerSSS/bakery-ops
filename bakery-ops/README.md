@@ -67,7 +67,7 @@ src/
 │   │   └── files/          # File management
 │   ├── orchestrator/       # Intent routing & skill dispatch
 │   ├── channel/            # WhatsApp adapter
-│   ├── data/               # 17 Supabase repositories
+│   ├── data/               # Repositories (direct PostgreSQL via DATABASE_URL)
 │   └── shared/             # Logger, types, utilities
 ├── ui/                     # React components & hooks
 └── __tests__/              # Unit & integration tests
@@ -96,8 +96,7 @@ cp .env.example .env  # Fill in credentials
 
 | Variable | Description |
 |----------|-------------|
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_SERVICE_KEY` | Supabase service role key |
+| `DATABASE_URL` | PostgreSQL connection string — the single database connection (Supabase JS client retired) |
 | `OPENROUTER_API_KEY` | OpenRouter API key |
 | `JOBSTREET_EMAIL/PASSWORD` | JobStreet employer account |
 | `AJOBTHING_EMAIL/PASSWORD` | AJobThing employer account |

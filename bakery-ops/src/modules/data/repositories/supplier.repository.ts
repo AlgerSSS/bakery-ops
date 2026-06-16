@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { query, execute } from "@/modules/shared/db/postgres";
 import { logger } from "../../shared/logger";
 
 export interface SupplierRow {
@@ -12,6 +12,9 @@ export interface SupplierRow {
   updated_at: string;
 }
 
+const SELECT_COLUMNS =
+  "id, name, whatsapp_id, phone, categories, is_active, created_at::text AS created_at, updated_at::text AS updated_at";
+
 export class SupplierRepository {
   async create(supplier: {
     name: string;
@@ -19,71 +22,73 @@ export class SupplierRepository {
     phone?: string;
     categories: string[];
   }): Promise<SupplierRow | null> {
-    const { data, error } = await supabase
-      .from("suppliers")
-      .insert({
-        name: supplier.name,
-        whatsapp_id: supplier.whatsappId,
-        phone: supplier.phone,
-        categories: supplier.categories,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      logger.error("Failed to create supplier", { error: error.message });
+    try {
+      const rows = await query<SupplierRow>(
+        `INSERT INTO suppliers (name, whatsapp_id, phone, categories)
+         VALUES (?, ?, ?, ?)
+         RETURNING ${SELECT_COLUMNS}`,
+        [
+          supplier.name,
+          supplier.whatsappId ?? null,
+          supplier.phone ?? null,
+          supplier.categories,
+        ]
+      );
+      return rows[0] ?? null;
+    } catch (error) {
+      logger.error("Failed to create supplier", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
-    return data as SupplierRow;
   }
 
   async getAll(): Promise<SupplierRow[]> {
-    const { data, error } = await supabase
-      .from("suppliers")
-      .select("*")
-      .eq("is_active", true)
-      .order("name");
-
-    if (error) return [];
-    return (data || []) as SupplierRow[];
+    try {
+      return await query<SupplierRow>(
+        `SELECT ${SELECT_COLUMNS} FROM suppliers WHERE is_active = true ORDER BY name`
+      );
+    } catch {
+      return [];
+    }
   }
 
   async getByCategory(category: string): Promise<SupplierRow[]> {
-    const { data, error } = await supabase
-      .from("suppliers")
-      .select("*")
-      .eq("is_active", true)
-      .contains("categories", [category]);
-
-    if (error) return [];
-    return (data || []) as SupplierRow[];
+    try {
+      return await query<SupplierRow>(
+        `SELECT ${SELECT_COLUMNS} FROM suppliers WHERE is_active = true AND categories @> ARRAY[?]::text[]`,
+        [category]
+      );
+    } catch {
+      return [];
+    }
   }
 
   async getById(id: string): Promise<SupplierRow | null> {
-    const { data, error } = await supabase
-      .from("suppliers")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (error || !data) return null;
-    return data as SupplierRow;
+    try {
+      const rows = await query<SupplierRow>(
+        `SELECT ${SELECT_COLUMNS} FROM suppliers WHERE id = ?`,
+        [id]
+      );
+      return rows[0] ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async getDefaultSupplier(): Promise<SupplierRow | null> {
     const whatsappId = process.env.SUPPLIER_DEFAULT_WHATSAPP;
     if (!whatsappId) return null;
 
-    const { data, error } = await supabase
-      .from("suppliers")
-      .select("*")
-      .eq("whatsapp_id", whatsappId)
-      .eq("is_active", true)
-      .limit(1)
-      .single();
-
-    if (error || !data) return null;
-    return data as SupplierRow;
+    try {
+      const rows = await query<SupplierRow>(
+        `SELECT ${SELECT_COLUMNS} FROM suppliers WHERE whatsapp_id = ? AND is_active = true LIMIT 1`,
+        [whatsappId]
+      );
+      return rows[0] ?? null;
+    } catch {
+      return null;
+    }
   }
 }
 

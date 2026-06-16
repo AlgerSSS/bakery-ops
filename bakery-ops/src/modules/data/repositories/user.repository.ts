@@ -1,52 +1,59 @@
-import { supabase } from "../supabase";
+import { query, execute } from "@/modules/shared/db/postgres";
 import type { User, UserRole } from "../../shared/types";
 import { logger } from "../../shared/logger";
 
 export class UserRepository {
   async getAll(): Promise<User[]> {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("is_active", true);
-
-    if (error) {
-      logger.error("Failed to fetch users", { error: error.message });
+    try {
+      const rows = await query<Record<string, unknown>>(
+        "SELECT * FROM users WHERE is_active = true"
+      );
+      return rows.map(this.toUser);
+    } catch (error) {
+      logger.error("Failed to fetch users", { error: (error as Error).message });
       return [];
     }
-
-    return (data || []).map(this.toUser);
   }
 
   async getByPhone(phone: string): Promise<User | null> {
-    const { data, error } = await supabase
-      .from("users")
-      .select("*")
-      .or(`phone.eq.${phone},lid.eq.${phone}`)
-      .eq("is_active", true)
-      .limit(1)
-      .single();
-
-    if (error || !data) return null;
-    return this.toUser(data);
+    try {
+      const rows = await query<Record<string, unknown>>(
+        "SELECT * FROM users WHERE (phone = ? OR lid = ?) AND is_active = true LIMIT 1",
+        [phone, phone]
+      );
+      if (rows.length === 0) return null;
+      return this.toUser(rows[0]);
+    } catch {
+      return null;
+    }
   }
 
   async upsert(user: User): Promise<void> {
-    const { error } = await supabase.from("users").upsert(
-      {
-        user_id: user.userId,
-        phone: user.phone,
-        lid: user.lid || null,
-        name: user.name,
-        role: user.role,
-        permissions: user.permissions,
-        store_ids: user.storeIds,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id" },
-    );
-
-    if (error) {
-      logger.error("Failed to upsert user", { userId: user.userId, error: error.message });
+    try {
+      await execute(
+        `INSERT INTO users (user_id, phone, lid, name, role, permissions, store_ids, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (user_id) DO UPDATE SET
+           phone = EXCLUDED.phone,
+           lid = EXCLUDED.lid,
+           name = EXCLUDED.name,
+           role = EXCLUDED.role,
+           permissions = EXCLUDED.permissions,
+           store_ids = EXCLUDED.store_ids,
+           updated_at = EXCLUDED.updated_at`,
+        [
+          user.userId,
+          user.phone,
+          user.lid || null,
+          user.name,
+          user.role,
+          user.permissions,
+          user.storeIds,
+          new Date().toISOString(),
+        ]
+      );
+    } catch (error) {
+      logger.error("Failed to upsert user", { userId: user.userId, error: (error as Error).message });
     }
   }
 

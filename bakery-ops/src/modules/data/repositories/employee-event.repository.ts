@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { query } from "@/modules/shared/db/postgres";
 import { logger } from "../../shared/logger";
 
 export interface EmployeeEventRow {
@@ -12,42 +12,54 @@ export interface EmployeeEventRow {
   created_at: string;
 }
 
+const SELECT_COLUMNS =
+  "id, employee_id, event_type, summary, raw_message, reported_by, data, created_at::text AS created_at";
+
 export class EmployeeEventRepository {
   async create(event: Omit<EmployeeEventRow, "id" | "created_at">): Promise<EmployeeEventRow | null> {
-    const { data, error } = await supabase
-      .from("employee_events")
-      .insert(event)
-      .select()
-      .single();
-
-    if (error) {
-      logger.error("Failed to create employee event", { error: error.message });
+    try {
+      const rows = await query<EmployeeEventRow>(
+        `INSERT INTO employee_events (employee_id, event_type, summary, raw_message, reported_by, data)
+         VALUES (?, ?, ?, ?, ?, ?)
+         RETURNING ${SELECT_COLUMNS}`,
+        [
+          event.employee_id,
+          event.event_type,
+          event.summary,
+          event.raw_message ?? null,
+          event.reported_by ?? null,
+          JSON.stringify(event.data),
+        ]
+      );
+      return rows[0] ?? null;
+    } catch (error) {
+      logger.error("Failed to create employee event", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
-    return data as EmployeeEventRow;
   }
 
   async getByEmployee(employeeId: string): Promise<EmployeeEventRow[]> {
-    const { data, error } = await supabase
-      .from("employee_events")
-      .select("*")
-      .eq("employee_id", employeeId)
-      .order("created_at", { ascending: false });
-
-    if (error) return [];
-    return (data || []) as EmployeeEventRow[];
+    try {
+      return await query<EmployeeEventRow>(
+        `SELECT ${SELECT_COLUMNS} FROM employee_events WHERE employee_id = ? ORDER BY created_at DESC`,
+        [employeeId]
+      );
+    } catch {
+      return [];
+    }
   }
 
   async getByType(eventType: string, limit = 50): Promise<EmployeeEventRow[]> {
-    const { data, error } = await supabase
-      .from("employee_events")
-      .select("*")
-      .eq("event_type", eventType)
-      .order("created_at", { ascending: false })
-      .limit(limit);
-
-    if (error) return [];
-    return (data || []) as EmployeeEventRow[];
+    try {
+      return await query<EmployeeEventRow>(
+        `SELECT ${SELECT_COLUMNS} FROM employee_events WHERE event_type = ? ORDER BY created_at DESC LIMIT ?`,
+        [eventType, limit]
+      );
+    } catch {
+      return [];
+    }
   }
 }
 

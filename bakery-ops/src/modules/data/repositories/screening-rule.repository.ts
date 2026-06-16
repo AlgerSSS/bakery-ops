@@ -1,4 +1,4 @@
-import { supabase } from "../supabase";
+import { query, execute } from "@/modules/shared/db/postgres";
 import { logger } from "../../shared/logger";
 
 export interface ScreeningRuleRow {
@@ -18,16 +18,21 @@ export interface ScreeningRuleRow {
 
 export class ScreeningRuleRepository {
   async getActiveRules(jobTitle?: string): Promise<ScreeningRuleRow[]> {
-    let query = supabase
-      .from("screening_rules")
-      .select("*")
-      .eq("is_active", true)
-      .order("confidence", { ascending: false });
+    let rows: ScreeningRuleRow[];
+    try {
+      rows = await query<ScreeningRuleRow>(
+        `SELECT id, rule_type, category, description, evidence, confidence, sample_count,
+                job_titles, departments, is_active,
+                created_at::text AS created_at, updated_at::text AS updated_at
+         FROM screening_rules
+         WHERE is_active = ?
+         ORDER BY confidence DESC`,
+        [true],
+      );
+    } catch {
+      return [];
+    }
 
-    const { data, error } = await query;
-    if (error) return [];
-
-    const rows = (data || []) as ScreeningRuleRow[];
     if (!jobTitle) return rows;
 
     // Filter: rules with empty job_titles apply to all, otherwise match
@@ -37,13 +42,28 @@ export class ScreeningRuleRepository {
   }
 
   async upsert(rule: Omit<ScreeningRuleRow, "id" | "created_at" | "updated_at">): Promise<void> {
-    const { error } = await supabase.from("screening_rules").insert({
-      ...rule,
-      updated_at: new Date().toISOString(),
-    });
-
-    if (error) {
-      logger.error("Failed to upsert screening rule", { error: error.message });
+    try {
+      await execute(
+        `INSERT INTO screening_rules
+           (rule_type, category, description, evidence, confidence, sample_count, job_titles, departments, is_active, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          rule.rule_type,
+          rule.category,
+          rule.description,
+          rule.evidence,
+          rule.confidence,
+          rule.sample_count,
+          rule.job_titles,
+          rule.departments,
+          rule.is_active,
+          new Date().toISOString(),
+        ],
+      );
+    } catch (error) {
+      logger.error("Failed to upsert screening rule", {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 }

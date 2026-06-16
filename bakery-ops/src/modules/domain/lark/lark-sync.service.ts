@@ -4,7 +4,6 @@ import type { EmployeeRow } from "../../data/repositories/employee.repository";
 import type { EmployeeEventRow } from "../../data/repositories/employee-event.repository";
 import type { ParsedResume } from "../resume/types";
 import { logger } from "../../shared/logger";
-import { supabase } from "../../data/supabase";
 
 export class LarkSyncService {
   async onEmployeeCreated(employee: EmployeeRow, parsedResume?: ParsedResume): Promise<void> {
@@ -73,13 +72,7 @@ export class LarkSyncService {
   }
 
   private async saveLarkRecordId(employeeId: string, larkRecordId: string): Promise<void> {
-    const employee = await employeeRepository.getById(employeeId);
-    if (!employee) return;
-    const metadata = { ...employee.metadata, lark_record_id: larkRecordId };
-    await supabase
-      .from("employees")
-      .update({ metadata, updated_at: new Date().toISOString() })
-      .eq("id", employeeId);
+    await employeeRepository.updateLarkRecordId(employeeId, larkRecordId);
   }
 }
 

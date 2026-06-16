@@ -9,9 +9,9 @@ async function main() {
   await import("./src/modules/domain/ai/ai-provider");
   console.log("[4] ai-provider OK");
 
-  console.log("[5] Importing supabase...");
-  await import("./src/modules/data/supabase");
-  console.log("[6] supabase OK");
+  console.log("[5] Importing postgres db...");
+  await import("./src/modules/shared/db/postgres");
+  console.log("[6] postgres db OK");
 
   console.log("[7] Importing employee repository...");
   await import("./src/modules/data/repositories/employee.repository");

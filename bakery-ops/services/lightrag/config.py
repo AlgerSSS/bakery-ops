@@ -16,6 +16,7 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # LightRAG storage — data lives inside services/lightrag/
 WORKING_DIR = os.getenv("LIGHTRAG_WORKING_DIR", str(Path(__file__).resolve().parent / "lightrag_data"))
 
-# Server
-HOST = os.getenv("LIGHTRAG_HOST", "0.0.0.0")
+# Server — 默认仅监听本机回环，避免在未设置 LIGHTRAG_API_KEY 时把无鉴权服务暴露到网络。
+# 如需跨主机访问，显式设置 LIGHTRAG_HOST=0.0.0.0（并务必同时设置 LIGHTRAG_API_KEY）。
+HOST = os.getenv("LIGHTRAG_HOST", "127.0.0.1")
 PORT = int(os.getenv("LIGHTRAG_PORT", "8020"))

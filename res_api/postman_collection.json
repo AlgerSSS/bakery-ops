@@ -1,0 +1,54 @@
+{
+  "info": {
+    "name": "Hot Crush Sales API",
+    "_postman_id": "hot-crush-sales-api",
+    "description": "Read-only sales data scraped from Restosuite back office.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8787" },
+    { "key": "apiKey", "value": "REPLACE_ME" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{apiKey}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Public",
+      "item": [
+        { "name": "GET / (catalog)", "request": { "method": "GET", "url": "{{baseUrl}}/", "auth": { "type": "noauth" } } },
+        { "name": "GET /v1/status",  "request": { "method": "GET", "url": "{{baseUrl}}/v1/status", "auth": { "type": "noauth" } } }
+      ]
+    },
+    {
+      "name": "Sales",
+      "item": [
+        { "name": "GET /v1/sales/overview",          "request": { "method": "GET", "url": "{{baseUrl}}/v1/sales/overview" } },
+        { "name": "GET /v1/sales/totals",            "request": { "method": "GET", "url": "{{baseUrl}}/v1/sales/totals" } },
+        { "name": "GET /v1/sales/by-date",           "request": { "method": "GET", "url": "{{baseUrl}}/v1/sales/by-date" } },
+        { "name": "GET /v1/sales/by-dining-option",  "request": { "method": "GET", "url": "{{baseUrl}}/v1/sales/by-dining-option" } },
+        { "name": "GET /v1/sales/by-payment",        "request": { "method": "GET", "url": "{{baseUrl}}/v1/sales/by-payment" } },
+        { "name": "GET /v1/sales/by-date (CSV)",     "request": { "method": "GET", "url": "{{baseUrl}}/v1/sales/by-date?format=csv" } }
+      ]
+    },
+    {
+      "name": "Items",
+      "item": [
+        { "name": "GET /v1/items/totals",          "request": { "method": "GET", "url": "{{baseUrl}}/v1/items/totals" } },
+        { "name": "GET /v1/items/by-category",     "request": { "method": "GET", "url": "{{baseUrl}}/v1/items/by-category" } },
+        { "name": "GET /v1/items/by-dish",         "request": { "method": "GET", "url": "{{baseUrl}}/v1/items/by-dish" } },
+        { "name": "GET /v1/items/by-hour",         "request": { "method": "GET", "url": "{{baseUrl}}/v1/items/by-hour" } },
+        { "name": "GET /v1/items/by-hour-qty",     "request": { "method": "GET", "url": "{{baseUrl}}/v1/items/by-hour-qty" } },
+        { "name": "GET /v1/items/by-hour-sales",   "request": { "method": "GET", "url": "{{baseUrl}}/v1/items/by-hour-sales" } },
+        { "name": "GET /v1/items/by-hour-qty (CSV)", "request": { "method": "GET", "url": "{{baseUrl}}/v1/items/by-hour-qty?format=csv" } }
+      ]
+    },
+    {
+      "name": "Operations",
+      "item": [
+        { "name": "POST /v1/refresh", "request": { "method": "POST", "url": "{{baseUrl}}/v1/refresh" } }
+      ]
+    }
+  ]
+}

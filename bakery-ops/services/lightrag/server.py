@@ -28,6 +28,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("lightrag-server")
 
 LIGHTRAG_API_KEY = os.getenv("LIGHTRAG_API_KEY", "")
+if not LIGHTRAG_API_KEY:
+    logger.warning("LIGHTRAG_API_KEY is not set — /ingest and /query are UNAUTHENTICATED. Set LIGHTRAG_API_KEY to require Bearer auth.")
 
 # --- OpenRouter client ---
 openrouter = AsyncOpenAI(

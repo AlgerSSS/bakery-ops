@@ -1,0 +1,186 @@
+openapi: 3.1.0
+info:
+  title: Hot Crush Sales API
+  version: "1.0.0"
+  description: |
+    Read-only HTTP API exposing Restosuite back-office sales data for HOT CRUSH BAKERY
+    (shop id `406994127`). Data is scraped on demand and returned as JSON or CSV.
+    Rolling 30-day window in Asia/Kuala_Lumpur time.
+servers:
+  - url: http://localhost:8787
+    description: Local dev
+components:
+  securitySchemes:
+    BearerKey:
+      type: http
+      scheme: bearer
+      description: Send the API key as `Authorization: Bearer <key>`.
+    QueryKey:
+      type: apiKey
+      in: query
+      name: key
+      description: Send the API key as `?key=<key>`.
+  schemas:
+    TableResponse:
+      type: object
+      required: [route, modified, count, rows]
+      properties:
+        route: { type: string, example: /v1/sales/overview }
+        modified: { type: string, format: date-time }
+        count: { type: integer, example: 30 }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        hint: { type: string }
+  parameters:
+    Format:
+      name: format
+      in: query
+      required: false
+      schema: { type: string, enum: [csv] }
+      description: Pass `csv` to get CSV instead of JSON. Equivalent to `Accept: text/csv`.
+security:
+  - BearerKey: []
+  - QueryKey: []
+paths:
+  /:
+    get:
+      summary: API catalog
+      security: []
+      responses:
+        "200":
+          description: Catalog
+  /v1:
+    get:
+      summary: API catalog (alias)
+      security: []
+      responses:
+        "200": { description: Catalog }
+  /v1/status:
+    get:
+      summary: File freshness + last refresh status
+      security: []
+      responses:
+        "200":
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  refreshRunning: { type: boolean }
+                  lastRefresh:
+                    type: object
+                    nullable: true
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        route: { type: string }
+                        file: { type: string }
+                        exists: { type: boolean }
+                        size: { type: integer }
+                        modified: { type: string, format: date-time, nullable: true }
+  /v1/sales/overview:
+    get:
+      summary: Headline KPIs (Net Sales, Gross Sales, Bill Count, Guests)
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200":
+          description: 1 row
+          content:
+            application/json: { schema: { $ref: "#/components/schemas/TableResponse" } }
+            text/csv: { schema: { type: string } }
+        "401": { description: Unauthorized }
+  /v1/sales/totals:
+    get:
+      summary: Sales Breakdown totals (single aggregated row, 32+ metrics)
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200": { description: 1 row }
+        "401": { description: Unauthorized }
+  /v1/sales/by-date:
+    get:
+      summary: Daily Sales Breakdown for the last 30 days
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200": { description: 30 rows, one per business date }
+        "401": { description: Unauthorized }
+  /v1/sales/by-dining-option:
+    get:
+      summary: Bill count split by dining option (Dine-in / Takeaway)
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200": { description: 2 rows }
+        "401": { description: Unauthorized }
+  /v1/sales/by-payment:
+    get:
+      summary: Net Sales split by payment method
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200": { description: 7 rows }
+        "401": { description: Unauthorized }
+  /v1/items/totals:
+    get:
+      summary: Item-level totals (qty, gross, net, refund, discount)
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200": { description: 1 row }
+        "401": { description: Unauthorized }
+  /v1/items/by-category:
+    get:
+      summary: Items by parent + sub category
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200": { description: ~10 rows }
+        "401": { description: Unauthorized }
+  /v1/items/by-dish:
+    get:
+      summary: Per-SKU 30-day totals (rank by netQty)
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200": { description: ~80 rows }
+        "401": { description: Unauthorized }
+  /v1/items/by-hour:
+    get:
+      summary: Long form — one row per (dish, hour)
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200": { description: ~800 rows }
+        "401": { description: Unauthorized }
+  /v1/items/by-hour-qty:
+    get:
+      summary: Pivot — rows = dishes, columns = H00..H23 + Total Qty
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200": { description: ~80 rows }
+        "401": { description: Unauthorized }
+  /v1/items/by-hour-sales:
+    get:
+      summary: Pivot — rows = dishes, columns = H00..H23 + Total Net Sales
+      parameters: [ { $ref: "#/components/parameters/Format" } ]
+      responses:
+        "200": { description: ~80 rows }
+        "401": { description: Unauthorized }
+  /v1/refresh:
+    post:
+      summary: Trigger a re-scrape (runs in background; ~60-120s)
+      responses:
+        "202":
+          description: Started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: started }
+                  pollAt: { type: string, example: /v1/status }
+        "401": { description: Unauthorized }
+        "409": { description: Refresh already running }

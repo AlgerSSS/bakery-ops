@@ -8,6 +8,10 @@ const MAX_HISTORY = 20;
 export class ConversationManager {
   private chatHistory = new Map<string, ChatHistoryEntry[]>();
 
+  constructor(
+    private repo?: { replace(conversationId: string, entries: ChatHistoryEntry[]): Promise<void> },
+  ) {}
+
   getHistory(conversationId: string): ChatHistoryEntry[] {
     if (!this.chatHistory.has(conversationId)) {
       this.chatHistory.set(conversationId, []);
@@ -25,5 +29,6 @@ export class ConversationManager {
     if (history && history.length > MAX_HISTORY) {
       this.chatHistory.set(conversationId, history.slice(-MAX_HISTORY));
     }
+    void this.repo?.replace(conversationId, this.chatHistory.get(conversationId) ?? []);
   }
 }

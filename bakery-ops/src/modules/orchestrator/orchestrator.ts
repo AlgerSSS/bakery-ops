@@ -10,11 +10,12 @@ import type { ChatHistoryEntry } from "./conversation-manager";
 import { ResponseFormatter } from "./response-formatter";
 import { UserNotRegisteredError } from "../shared/errors/skill-error";
 import { kolRepository } from "../data/repositories/kol.repository";
+import { chatHistoryRepository } from "../data/repositories/chat-history.repository";
 import { logger } from "../shared/logger";
 
 export class Orchestrator {
   private intentRouter: IntentRouter;
-  private conversationManager = new ConversationManager();
+  private conversationManager = new ConversationManager(chatHistoryRepository);
   private responseFormatter = new ResponseFormatter();
 
   constructor(
@@ -39,7 +40,11 @@ export class Orchestrator {
       if (err instanceof UserNotRegisteredError) {
         // 检查是否是已知 KOL（博主被 DM 引流来 WhatsApp）
         const phone = message.phone || "";
-        const kol = await kolRepository.getByPhone(phone).catch(() => null);
+        // 限定 KOL 查询时长：DB 不可达/缓慢时退回未注册响应（与原行为一致），避免阻塞
+        const kol = await Promise.race([
+          kolRepository.getByPhone(phone).catch(() => null),
+          new Promise<null>((res) => setTimeout(() => res(null), 2000)),
+        ]);
         if (kol) {
           user = {
             userId: `kol_${kol.id}`,

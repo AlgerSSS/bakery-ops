@@ -13,7 +13,7 @@ const UNIT_PATTERN = UNITS.map(u => u.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).jo
 
 // 匹配 "品名:数量单位" 或 "品名：数量 单位"
 const ITEM_REGEX = new RegExp(
-  `([^,:：;；\\d]+?)[：:]\\s*(\\d+(?:\\.\\d+)?)\\s*(${UNIT_PATTERN})`,
+  `([^,，、:：;；\\d]+?)[：:]\\s*(\\d+(?:\\.\\d+)?)\\s*(${UNIT_PATTERN})`,
   "gi",
 );
 

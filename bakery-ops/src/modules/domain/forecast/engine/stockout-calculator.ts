@@ -17,7 +17,9 @@ export function parseStockoutLine(line: string): { inputName: string; soldoutTim
 
 export function calculateLossSlots(soldoutTime: string): string[] {
   const [h, m] = soldoutTime.split(":").map(Number);
-  const nextSlotHour = m > 0 ? h + 1 : h + 1;
+  // 整点售罄（m===0）：该整点时段全程无货，整段计入损失，从 h 起算；
+  // 整点后售罄（m>0）：该时段已有部分销售，从下一时段 h+1 起算损失。
+  const nextSlotHour = m > 0 ? h + 1 : h;
   const slots: string[] = [];
   for (let hour = nextSlotHour; hour <= 21; hour++) {
     slots.push(`${String(hour).padStart(2, "0")}:00`);

@@ -1,0 +1,26 @@
+{
+  "name": "restosuite-scraper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "login": "node login.js",
+    "scrape": "node scrape.js",
+    "scrape-daily": "node scrape-daily.js",
+    "translate": "node fetch-translations.js",
+    "apply": "node apply-translations.js",
+    "inspect": "node inspect.js",
+    "refresh": "node login.js && node scrape.js && node scrape-items-by-hour.js && node scrape-daily.js && node fetch-translations.js && node apply-translations.js && node apply-items-by-hour.js && node sync-to-db.js",
+    "start": "node server.js",
+    "scheduler": "node scheduler.js",
+    "sync-pnl": "node sync-pnl.js",
+    "test": "node test-api.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3",
+    "playwright": "^1.60.0",
+    "postgres": "^3.4.5",
+    "xlsx": "^0.18.5"
+  }
+}

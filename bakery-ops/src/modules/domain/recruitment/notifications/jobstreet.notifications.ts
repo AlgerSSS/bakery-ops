@@ -51,7 +51,7 @@ export class JobStreetNotificationChecker implements NotificationChecker {
 
       // 更新 state
       if (applicants.length > 0) {
-        state.jsLastApplicationId = applicants[0].id;
+        state.jsLastApplicationId = applicants[0].id.replace("js-app-", "");
       }
       if (replies.length > 0) {
         state.jsLastMessageTimestamp = replies[0].timestamp;

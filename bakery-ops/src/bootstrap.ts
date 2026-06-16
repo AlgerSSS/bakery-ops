@@ -10,9 +10,12 @@ import { whatsappAdapter } from "./modules/channel/whatsapp/whatsapp.adapter";
 import { aiProvider } from "./modules/domain/ai/ai-provider";
 import { logger } from "./modules/shared/logger";
 import { allSkills } from "./modules/skills";
+import { sessionStateRepository } from "./modules/data/repositories/session-state.repository";
+import { auditLogRepository } from "./modules/data/repositories/audit-log.repository";
 import type { User } from "./modules/shared/types";
 import { extractRules } from "./modules/domain/employee/rule-extractor";
 import { checkAndNotify } from "./modules/domain/recruitment/notifications/notification.service";
+import { checkDataFreshness } from "./modules/domain/notifications/freshness-check";
 
 export async function bootstrap() {
   // 1. 自动注册 Skills
@@ -22,9 +25,16 @@ export async function bootstrap() {
   }
 
   // 2. 初始化服务
-  const stateManager = new StateManager();
+  const stateManager = new StateManager(sessionStateRepository);
   const permissionService = new PermissionService();
-  const auditService = new AuditService();
+  const auditService = new AuditService(auditLogRepository);
+
+  // 2a. 冷启动时尝试从 DB 恢复进行中的多轮会话（迁移未应用/DB 不可用时静默 no-op）
+  try {
+    await stateManager.hydrate(sessionStateRepository);
+  } catch (err) {
+    logger.debug("session_state hydrate skipped", { error: String(err) });
+  }
 
   // 3. 从数据库加载用户，失败则 fallback 到 users.json
   try {
@@ -81,6 +91,15 @@ export async function bootstrap() {
       await checkAndNotify();
     } catch (err) {
       logger.error("Notification check failed", { error: String(err) });
+    }
+  }, { timezone: "Asia/Kuala_Lumpur" });
+
+  // 9. 每日检查 POS 数据新鲜度（默认关闭，DATA_FRESHNESS_CHECK=true 启用）
+  cron.schedule("0 9 * * *", async () => {
+    try {
+      await checkDataFreshness();
+    } catch (err) {
+      logger.error("Data freshness check failed", { error: String(err) });
     }
   }, { timezone: "Asia/Kuala_Lumpur" });
 

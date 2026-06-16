@@ -148,7 +148,7 @@ export function useAI() {
     dispatch({ type: "SET_AI_TIMESLOT_LOADING", payload: true });
     dispatch({ type: "SET_AI_TIMESLOT_ERROR", payload: "" });
     dispatch({ type: "SET_AI_TIMESLOT_ADOPTED", payload: false });
-    getTimeslotSalesRecords(dayTarget.dayType).then((r) => dispatch({ type: "SET_TIMESLOT_SALES_RECORDS", payload: r }));
+    getTimeslotSalesRecords(dayTarget.dayType).then((r) => dispatch({ type: "SET_TIMESLOT_SALES_RECORDS", payload: r })).catch(() => {});
     try {
       const res = await fetch("/api/ai-timeslot", {
         method: "POST",

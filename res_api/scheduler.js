@@ -42,6 +42,10 @@ function runShop(shop) {
         child.stdout.on('data', (b) => log.write(b));
         child.stderr.on('data', (b) => log.write(b));
         child.on('close', resolve);
+        child.on('error', (err) => {
+          log.write(`\n!!! ${label} spawn error: ${err.message}\n`);
+          resolve(1);
+        });
       });
       if (code !== 0) {
         log.write(`\n!!! ${label} failed with code ${code}\n`);

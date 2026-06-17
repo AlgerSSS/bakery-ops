@@ -12,7 +12,14 @@ import * as fs from "fs";
 import * as path from "path";
 import * as readline from "readline";
 
-chromium.use(StealthPlugin());
+// 懒加载 stealth 插件：放在模块顶层会在 Next.js/Turbopack 的 instrumentation 导入阶段
+// 触发依赖崩溃（utils.typeOf is not a function）。改为首次启动浏览器前再 use，行为不变。
+let _stealthApplied = false;
+function ensureStealth() {
+  if (_stealthApplied) return;
+  chromium.use(StealthPlugin());
+  _stealthApplied = true;
+}
 
 const SESSION_DIR = process.env.TIKTOK_SESSION_DIR || "./tiktok-session";
 const COOKIE_FILE = path.join(SESSION_DIR, "cookies.json");
@@ -73,6 +80,7 @@ async function tryAutoLogin(): Promise<boolean> {
 
   let browser: any = null;
   try {
+    ensureStealth();
     browser = await chromium.launch({ headless: true });
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -126,6 +134,7 @@ async function manualLogin(): Promise<void> {
   if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, { recursive: true });
 
   console.log("  Opening browser for manual login...");
+  ensureStealth();
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext();
   const page = await context.newPage();

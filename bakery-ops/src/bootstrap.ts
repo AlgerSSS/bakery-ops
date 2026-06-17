@@ -17,7 +17,18 @@ import { extractRules } from "./modules/domain/employee/rule-extractor";
 import { checkAndNotify } from "./modules/domain/recruitment/notifications/notification.service";
 import { checkDataFreshness } from "./modules/domain/notifications/freshness-check";
 
-export async function bootstrap() {
+// 幂等守卫：`npm run dev` 下 server.ts 会直接调用 bootstrap()，而 Next.js 的
+// instrumentation hook (app.prepare()) 又会在另一个模块 realm 再调一次。用 globalThis
+// 缓存（跨 realm 共享）确保只真正初始化一次，避免起两个 WhatsApp 客户端抢同一会话锁。
+export function bootstrap() {
+  const g = globalThis as unknown as { __bakeryOpsBootstrap?: ReturnType<typeof runBootstrap> };
+  if (!g.__bakeryOpsBootstrap) {
+    g.__bakeryOpsBootstrap = runBootstrap();
+  }
+  return g.__bakeryOpsBootstrap;
+}
+
+async function runBootstrap() {
   // 1. 自动注册 Skills
   for (const { definition, Handler } of allSkills) {
     definition.handler = new Handler();

@@ -101,14 +101,22 @@ async function runBootstrap() {
     aiProvider,
   );
 
-  // 5. 连接 WhatsApp Adapter
-  whatsappAdapter.setHandler((msg) => orchestrator.handle(msg));
-  whatsappAdapter.start();
+  // INSTANCE_ROLE：拆分部署用。core=核心(Lark入站+复盘/预测/内部推送，跑云上 Contabo)；
+  // whatsapp=WA(招聘，跑住宅 IP/家用机避免封号)；不设=all(全部，单机/本地)。
+  // 两边共用同一 DB，按角色分派「渠道 + 定时任务」，避免两边重复触发。
+  const ROLE = process.env.INSTANCE_ROLE || "all";
+  const onCore = ROLE === "all" || ROLE === "core";
+  const onWa = ROLE === "all" || ROLE === "whatsapp";
+  logger.info("Instance role", { role: ROLE, onCore, onWa });
 
-  // 5b. Lark 入站（长连接）：内部人员在 Lark 与机器人对话，走同一个 orchestrator。
-  //     凭据未配置时自动禁用；连接失败不影响 WhatsApp 主链路。
+  // 5. WhatsApp Adapter（仅 whatsapp/all 连接；core 不连，避开数据中心 IP 封号）
+  whatsappAdapter.setHandler((msg) => orchestrator.handle(msg));
+  if (onWa) whatsappAdapter.start();
+
+  // 5b. Lark 入站长连接（仅 core/all 接收）。注：Lark「发送」(sendLarkToUser 等)走 API token，
+  //     任何角色都能发，不受此限——所以 whatsapp 角色的招聘 cron 仍能往 Lark 发摘要。
   larkInboundAdapter.setHandler((msg) => orchestrator.handle(msg));
-  larkInboundAdapter.start();
+  if (onCore) larkInboundAdapter.start();
 
   // 5a. cron 心跳：每个定时任务执行前后写 audit_log（channel='cron'），失败记 failRun。
   //     供"状态"指令读取近 24h 运行统计，防止定时任务静默停摆无人知晓。
@@ -123,74 +131,76 @@ async function runBootstrap() {
     }
   };
 
-  // 6. 定时清理过期会话（每 60 秒）——高频任务不进 audit 心跳（每天会写 ~2880 条噪音记录），
-  //    失败只打日志；心跳留给低频业务 cron。
+  const TZ = { timezone: "Asia/Kuala_Lumpur" } as const;
+
+  // 6. 定时清理过期会话（每 60 秒）——每个实例清自己的会话，两边都跑。高频不进 audit 心跳。
   cron.schedule("* * * * *", () => {
     try {
       stateManager.cleanup();
     } catch (err) {
       logger.error("Cron job failed: session_cleanup", { error: String(err) });
     }
-  }, { timezone: "Asia/Kuala_Lumpur" });
+  }, TZ);
 
+  // ── core 角色的定时任务（Lark/内部推送/预测/数据；跑云上）──
   // 7. 每周日凌晨 3 点触发规则提炼
-  cron.schedule("0 3 * * 0", wrapCron("weekly_rule_extraction", async () => {
+  if (onCore) cron.schedule("0 3 * * 0", wrapCron("weekly_rule_extraction", async () => {
     logger.info("Weekly rule extraction triggered");
     const result = await extractRules();
     logger.info("Weekly rule extraction completed", result);
-  }), { timezone: "Asia/Kuala_Lumpur" });
-
-  // 8. 每 15 分钟检查招聘通知。当前唯一的检查器是 JobStreet，且默认关闭
-  //    （需 JOBSTREET_NOTIFICATIONS_ENABLED=true；其 GraphQL query 仍是未验证占位符，
-  //    待 live discovery 确认后才开启）。flag 关闭时 checkAndNotify 干净 no-op，不报错。
-  cron.schedule("*/15 * * * *", wrapCron("recruitment_notify", checkAndNotify), { timezone: "Asia/Kuala_Lumpur" });
+  }), TZ);
 
   // 9. 每日检查 POS 数据新鲜度（默认关闭，DATA_FRESHNESS_CHECK=true 启用）
-  cron.schedule("0 9 * * *", wrapCron("data_freshness_check", checkDataFreshness), { timezone: "Asia/Kuala_Lumpur" });
+  if (onCore) cron.schedule("0 9 * * *", wrapCron("data_freshness_check", checkDataFreshness), TZ);
 
   // 9a. 每日 07:00 后厨生产计划推送：主厨 + 抄送老板，幂等(kind, recipient, date)
-  cron.schedule("0 7 * * *", wrapCron("production_plan_push", runProductionPlanPush), { timezone: "Asia/Kuala_Lumpur" });
+  if (onCore) cron.schedule("0 7 * * *", wrapCron("production_plan_push", runProductionPlanPush), TZ);
 
-  // 9b. 每晚 23:30 今日复盘：23:00 数据刷新后推送，覆盖当天；收件人读 team_member 订阅，幂等(kind, recipient, date)；无数据静默跳过
-  cron.schedule("30 23 * * *", wrapCron("morning_brief", runMorningBrief), { timezone: "Asia/Kuala_Lumpur" });
+  // 9b. 每晚 23:30 今日复盘：收件人读 team_member 订阅（Lark 发送），无数据静默跳过
+  if (onCore) cron.schedule("30 23 * * *", wrapCron("morning_brief", runMorningBrief), TZ);
 
-  // 9c. 每日 03:00 同步 Lark 组织架构 → team_member（保留用户配的 role/subscriptions）。启动时也同步一次。
-  cron.schedule("0 3 * * *", wrapCron("lark_org_sync", async () => { await syncLarkOrg(); }), { timezone: "Asia/Kuala_Lumpur" });
-  void syncLarkOrg().catch((e) => logger.warn("startup lark org sync failed", { error: String(e) }));
+  // 9c. 每日 03:00 同步 Lark 组织架构 → team_member（保留用户配的 role/subscriptions）。core 启动时也同步一次。
+  if (onCore) {
+    cron.schedule("0 3 * * *", wrapCron("lark_org_sync", async () => { await syncLarkOrg(); }), TZ);
+    void syncLarkOrg().catch((e) => logger.warn("startup lark org sync failed", { error: String(e) }));
+  }
 
-  // 10. 每晚 23:00 试工摘要：分别推送给店长(前场/FOH)和厨师长(后厨/BOH)，幂等(店,收件人,日期)
-  cron.schedule("0 23 * * *", wrapCron("trial_digest", runTrialDigest), { timezone: "Asia/Kuala_Lumpur" });
+  // 13. 每周一 10:00 经营周报（F3）
+  if (onCore) cron.schedule("0 10 * * 1", wrapCron("weekly_report", runWeeklyReport), TZ);
 
-  // 10b. 每晚 21:00 初面结论摘要：分别推送给店长(前场/FOH)和厨师长(后厨/BOH)，幂等(店,收件人,日期,kind)
-  cron.schedule("0 21 * * *", wrapCron("interview_digest", runInterviewDigest), { timezone: "Asia/Kuala_Lumpur" });
+  // 14. 每晚 23:30 断货检测（检测口径为"昨日"）
+  if (onCore) cron.schedule("30 23 * * *", wrapCron("stockout_detect", runStockoutDetection), TZ);
 
-  // 11. 每 2 分钟排空 WhatsApp 冷发外呼队列（治理：营业时间/日上限/抖动）。队列空时为安全 no-op。
-  //     高频任务不进 audit 心跳（同 session_cleanup），worker 自带日志。
-  cron.schedule("*/2 * * * *", async () => {
+  // 15. 工作日 16:00 订货提醒（F4，Lark 发送）
+  if (onCore) cron.schedule("0 16 * * 1-5", wrapCron("order_reminder", runOrderReminder), TZ);
+
+  // ── whatsapp 角色的定时任务（招聘/候选人；跑有 WA 客户端的一侧）──
+  // 8. 每 15 分钟检查招聘通知（JobStreet，默认关闭；候选人走 WhatsApp）
+  if (onWa) cron.schedule("*/15 * * * *", wrapCron("recruitment_notify", checkAndNotify), TZ);
+
+  // 10. 每晚 23:00 试工摘要（推店长/厨师长；含 WA 回落）
+  if (onWa) cron.schedule("0 23 * * *", wrapCron("trial_digest", runTrialDigest), TZ);
+
+  // 10b. 每晚 21:00 初面结论摘要
+  if (onWa) cron.schedule("0 21 * * *", wrapCron("interview_digest", runInterviewDigest), TZ);
+
+  // 11. 每 2 分钟排空 WhatsApp 冷发外呼队列。队列空时安全 no-op；高频不进 audit 心跳。
+  if (onWa) cron.schedule("*/2 * * * *", async () => {
     try {
       await drainOutboundQueue();
     } catch (err) {
       logger.error("Cron job failed: outbound_queue_drain", { error: String(err) });
     }
-  }, { timezone: "Asia/Kuala_Lumpur" });
+  }, TZ);
 
   // 12. 每日 12:00 JobStreet 申请人拉取（F12）
-  cron.schedule("0 12 * * *", wrapCron("jobstreet_pull", pullDailyApplicants), { timezone: "Asia/Kuala_Lumpur" });
+  if (onWa) cron.schedule("0 12 * * *", wrapCron("jobstreet_pull", pullDailyApplicants), TZ);
 
-  // 13. 每周一 10:00 经营周报（F3）
-  cron.schedule("0 10 * * 1", wrapCron("weekly_report", runWeeklyReport), { timezone: "Asia/Kuala_Lumpur" });
-
-  // 14. 每晚 23:30 断货检测（检测口径为"昨日"，见 stockout-detector.service）
-  cron.schedule("30 23 * * *", wrapCron("stockout_detect", runStockoutDetection), { timezone: "Asia/Kuala_Lumpur" });
-
-  // 15. 工作日 16:00 订货提醒（F4）
-  cron.schedule("0 16 * * 1-5", wrapCron("order_reminder", runOrderReminder), { timezone: "Asia/Kuala_Lumpur" });
-
-  // 16. 每日 09:05 面试当日提醒（F11）
-  cron.schedule("5 9 * * *", wrapCron("appointment_reminder", runAppointmentReminder), { timezone: "Asia/Kuala_Lumpur" });
+  // 16. 每日 09:05 面试当日提醒（F11，候选人）
+  if (onWa) cron.schedule("5 9 * * *", wrapCron("appointment_reminder", runAppointmentReminder), TZ);
 
   // 17. 每日 09:10 转正提醒（env 可选 PROBATION_DAYS，默认 90）
-  cron.schedule("10 9 * * *", wrapCron("probation_reminder", runProbationReminder), { timezone: "Asia/Kuala_Lumpur" });
+  if (onWa) cron.schedule("10 9 * * *", wrapCron("probation_reminder", runProbationReminder), TZ);
 
   // 18. 一次性 LightRAG 健康探测（fire-and-forget）：不可用时只告警，不阻塞启动。
   lightragClient

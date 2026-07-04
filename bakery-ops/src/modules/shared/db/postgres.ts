@@ -21,13 +21,23 @@ export function getSQL(): ReturnType<typeof postgres> {
   return _sql;
 }
 
+/**
+ * Convert MySQL-style `?` placeholders to Postgres positional `$1..$n`.
+ * If the SQL already contains "$1" it is returned unchanged (note: only
+ * "$1" is checked, not "$2"+ — intentional, do not "fix").
+ * SQL 内禁止出现字面量 ?（会被误当作占位符替换）。
+ */
+export function toPositional(sqlStr: string): string {
+  return sqlStr.includes("$1") ? sqlStr : sqlStr.replace(/\?/g, (() => { let i = 0; return () => `$${++i}`; })());
+}
+
 export async function query<T = Record<string, unknown>>(
   sqlStr: string,
   params?: unknown[]
 ): Promise<T[]> {
   const db = getSQL();
   if (params && params.length > 0) {
-    const pgSql = sqlStr.includes("$1") ? sqlStr : sqlStr.replace(/\?/g, (() => { let i = 0; return () => `$${++i}`; })());
+    const pgSql = toPositional(sqlStr);
     const result = await db.unsafe(pgSql, params as (string | number | boolean | null)[]);
     return result as unknown as T[];
   }
@@ -38,16 +48,16 @@ export async function query<T = Record<string, unknown>>(
 export async function execute(
   sqlStr: string,
   params?: unknown[]
-): Promise<{ affectedRows: number; insertId: number }> {
+): Promise<{ affectedRows: number }> {
   const db = getSQL();
   let result;
   if (params && params.length > 0) {
-    const pgSql = sqlStr.includes("$1") ? sqlStr : sqlStr.replace(/\?/g, (() => { let i = 0; return () => `$${++i}`; })());
+    const pgSql = toPositional(sqlStr);
     result = await db.unsafe(pgSql, params as (string | number | boolean | null)[]);
   } else {
     result = await db.unsafe(sqlStr);
   }
-  return { affectedRows: result.count ?? 0, insertId: 0 };
+  return { affectedRows: result.count ?? 0 };
 }
 
 export async function withTransaction<T>(
@@ -60,7 +70,7 @@ export async function withTransaction<T>(
       params?: unknown[]
     ): Promise<R[]> => {
       if (params && params.length > 0) {
-        const pgSql = sqlStr.includes("$1") ? sqlStr : sqlStr.replace(/\?/g, (() => { let i = 0; return () => `$${++i}`; })());
+        const pgSql = toPositional(sqlStr);
         const result = await txSql.unsafe(pgSql, params as (string | number | boolean | null)[]);
         return result as unknown as R[];
       }
@@ -71,14 +81,14 @@ export async function withTransaction<T>(
     const txExecute = async (
       sqlStr: string,
       params?: unknown[]
-    ): Promise<{ affectedRows: number; insertId: number }> => {
+    ): Promise<{ affectedRows: number }> => {
       if (params && params.length > 0) {
-        const pgSql = sqlStr.includes("$1") ? sqlStr : sqlStr.replace(/\?/g, (() => { let i = 0; return () => `$${++i}`; })());
+        const pgSql = toPositional(sqlStr);
         const result = await txSql.unsafe(pgSql, params as (string | number | boolean | null)[]);
-        return { affectedRows: result.count ?? 0, insertId: 0 };
+        return { affectedRows: result.count ?? 0 };
       }
       const result = await txSql.unsafe(sqlStr);
-      return { affectedRows: result.count ?? 0, insertId: 0 };
+      return { affectedRows: result.count ?? 0 };
     };
 
     return await fn({ query: txQuery, execute: txExecute });

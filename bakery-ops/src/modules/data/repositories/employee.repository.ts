@@ -102,6 +102,14 @@ export class EmployeeRepository {
     return rows[0] ? mapRow(rows[0]) : null;
   }
 
+  async findByPhone(phone: string): Promise<EmployeeRow | null> {
+    const rows = await query<EmployeeRow>(
+      `SELECT ${SELECT_COLS} FROM employees WHERE phone = ? ORDER BY updated_at DESC LIMIT 1`,
+      [phone],
+    );
+    return rows[0] ? mapRow(rows[0]) : null;
+  }
+
   async findByName(name: string): Promise<EmployeeRow | null> {
     const rows = await query<EmployeeRow>(
       `SELECT ${SELECT_COLS} FROM employees WHERE name ILIKE ? ORDER BY created_at DESC LIMIT 1`,

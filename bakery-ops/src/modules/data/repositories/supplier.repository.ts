@@ -48,7 +48,8 @@ export class SupplierRepository {
       return await query<SupplierRow>(
         `SELECT ${SELECT_COLUMNS} FROM suppliers WHERE is_active = true ORDER BY name`
       );
-    } catch {
+    } catch (error) {
+      logger.error("supplier.repository.getAll failed", { error: String(error) });
       return [];
     }
   }
@@ -59,7 +60,8 @@ export class SupplierRepository {
         `SELECT ${SELECT_COLUMNS} FROM suppliers WHERE is_active = true AND categories @> ARRAY[?]::text[]`,
         [category]
       );
-    } catch {
+    } catch (error) {
+      logger.error("supplier.repository.getByCategory failed", { error: String(error) });
       return [];
     }
   }
@@ -71,7 +73,8 @@ export class SupplierRepository {
         [id]
       );
       return rows[0] ?? null;
-    } catch {
+    } catch (error) {
+      logger.error("supplier.repository.getById failed", { error: String(error) });
       return null;
     }
   }
@@ -86,7 +89,8 @@ export class SupplierRepository {
         [whatsappId]
       );
       return rows[0] ?? null;
-    } catch {
+    } catch (error) {
+      logger.error("supplier.repository.getDefaultSupplier failed", { error: String(error) });
       return null;
     }
   }

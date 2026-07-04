@@ -91,8 +91,13 @@ export async function parseResumeFile(buffer: Buffer, mimeType: string): Promise
         max_tokens: 2000,
       }),
     });
-    const data = await res.json() as any;
-    text = data.choices?.[0]?.message?.content || "";
+    if (!res.ok) {
+      logger.warn("Resume OCR request failed", { status: res.status, statusText: res.statusText });
+      text = "";
+    } else {
+      const data = await res.json() as any;
+      text = data.choices?.[0]?.message?.content || "";
+    }
   } else {
     text = buffer.toString("utf-8");
   }

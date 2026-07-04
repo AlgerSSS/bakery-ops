@@ -54,81 +54,89 @@ async function syncDailyRevenue() {
 }
 
 // === 2. daily_sales_record (existing table) ===
-// Writes per-product per-date records from items_by_hour_long (has dish name + date-aggregated qty)
+// Real per-day per-product quantities aggregated from daily.json itemsByDateHour.
+// (Previously wrote a 30-day rolling average stamped with the sync date, which
+// flattened all weekday variation downstream — see IMPROVEMENT-PLAN.md G1.)
 async function syncDailySalesRecord() {
-  const rows = loadCsv(`${READABLE_DIR}/items_by_hour_qty.csv`);
-  if (!rows?.length) { console.log('  [skip] no data'); return 0; }
+  if (!fs.existsSync(DAILY_FILE)) { console.log('  [skip] daily.json not found'); return 0; }
+  const daily = JSON.parse(fs.readFileSync(DAILY_FILE, 'utf8'));
+  if (!daily.itemsByDateHour?.length) { console.log('  [skip] no itemsByDateHour data'); return 0; }
 
-  // items_by_hour_qty has 30-day totals per dish. We write one record per product for today's sync date.
-  // The existing data uses individual dates; we'll use the date range end as the reference.
-  const tz = 'Asia/Kuala_Lumpur';
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
-  const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  const dayOfWeek = now.getDay();
+  const transFile = 'output/sales/translations.json';
+  let itemNames = {};
+  if (fs.existsSync(transFile)) {
+    const t = JSON.parse(fs.readFileSync(transFile, 'utf8'));
+    itemNames = t.dimOptions?.D_itemName || {};
+  }
 
-  // Delete existing records for today to avoid duplicates (no unique constraint on date+product)
-  await sql`DELETE FROM daily_sales_record WHERE date = ${today}`;
-
-  // Same dish can appear on multiple source rows (size/category variants). Sum the
-  // 30-day totals per name first, then write ONE row per (name, today) — otherwise we
-  // emit duplicate (product_name, date) rows (now blocked by the UNIQUE constraint) and
-  // double-count the day in the sales baseline.
-  const totals = new Map();
-  for (const r of rows) {
-    const name = r['Dish Name'];
-    if (!name) continue;
-    const totalQty = num(r['Total Qty']);
-    if (!totalQty || totalQty <= 0) continue;
-    totals.set(name, (totals.get(name) || 0) + totalQty);
+  // Sum real qty per (date, product); dedupe date|hour|name like syncItemHourlySales
+  const seen = new Set();
+  const byDate = new Map();
+  for (const r of daily.itemsByDateHour) {
+    if (!r.date || !r.name) continue;
+    const name = itemNames[r.name] || r.name;
+    const uid = `${r.date}|${r.hour}|${name}`;
+    if (seen.has(uid)) continue;
+    seen.add(uid);
+    const qty = num(r.qty);
+    if (!qty || qty <= 0) continue;
+    if (!byDate.has(r.date)) byDate.set(r.date, new Map());
+    const m = byDate.get(r.date);
+    m.set(name, (m.get(name) || 0) + qty);
   }
 
   let count = 0;
-  for (const [name, totalQty] of totals) {
-    // Calculate daily average from 30-day total
-    const dailyAvg = Math.round(totalQty / 30);
-    await sql`
-      INSERT INTO daily_sales_record (product_name, standard_name, quantity, date, day_of_week, created_at)
-      VALUES (${name}, ${name}, ${dailyAvg}, ${today}, ${dayOfWeek}, NOW())
-    `;
-    count++;
-  }
+  await sql.begin(async (sql) => {
+    for (const [date, products] of byDate) {
+      const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
+      await sql`DELETE FROM daily_sales_record WHERE date = ${date}`;
+      const batch = [...products].map(([name, qty]) => ({
+        product_name: name, standard_name: name, quantity: qty, date, day_of_week: dayOfWeek,
+      }));
+      for (let i = 0; i < batch.length; i += 200) {
+        const chunk = batch.slice(i, i + 200);
+        await sql`INSERT INTO daily_sales_record ${sql(chunk, 'product_name', 'standard_name', 'quantity', 'date', 'day_of_week')}`;
+      }
+      count += batch.length;
+    }
+  });
   return count;
 }
 
 // === 3. timeslot_sales_record (existing table) ===
+// Real per-dayType per-hour averages aggregated from item_hourly_sales (56-day window).
+// Must run AFTER syncItemHourlySales so the window includes tonight's data.
+// (Previously copied one 30-day average to all three day_types with snake_case
+// 'monday_to_thursday', which the TS engine — expecting 'mondayToThursday' — could
+// never match for Mon-Thu; see IMPROVEMENT-PLAN.md G1.)
 async function syncTimeslotSalesRecord() {
-  const rows = loadCsv(`${READABLE_DIR}/items_by_hour_qty.csv`);
-  if (!rows?.length) { console.log('  [skip] no data'); return 0; }
-
-  await sql`TRUNCATE timeslot_sales_record RESTART IDENTITY`;
-
-  const batch = [];
-  const seen = new Set();
-  for (const r of rows) {
-    const name = r['Dish Name'];
-    if (!name) continue;
-    for (let h = 10; h <= 22; h++) {
-      const key = `H${String(h).padStart(2, '0')}`;
-      const qty = num(r[key]);
-      if (!qty || qty <= 0) continue;
-      const avgQty = +(qty / 30).toFixed(1);
-      const timeSlot = `${String(h).padStart(2, '0')}:00`;
-      for (const dayType of ['monday_to_thursday', 'friday', 'weekend']) {
-        const uid = `${name}|${dayType}|${timeSlot}`;
-        if (seen.has(uid)) continue;
-        seen.add(uid);
-        batch.push({ product_name: name, day_type: dayType, time_slot: timeSlot, avg_quantity: avgQty, sample_count: 30 });
-      }
-    }
-  }
-
-  for (let i = 0; i < batch.length; i += 200) {
-    const chunk = batch.slice(i, i + 200);
-    await sql`
-      INSERT INTO timeslot_sales_record ${sql(chunk, 'product_name', 'day_type', 'time_slot', 'avg_quantity', 'sample_count')}
+  return await sql.begin(async (sql) => {
+    await sql`TRUNCATE timeslot_sales_record RESTART IDENTITY`;
+    const inserted = await sql`
+      WITH win AS (
+        SELECT DISTINCT date FROM item_hourly_sales
+        WHERE date >= CURRENT_DATE - INTERVAL '56 days'
+      ), typed AS (
+        SELECT date,
+          CASE WHEN EXTRACT(DOW FROM date) = 5 THEN 'friday'
+               WHEN EXTRACT(DOW FROM date) IN (0, 6) THEN 'weekend'
+               ELSE 'mondayToThursday' END AS day_type
+        FROM win
+      ), day_counts AS (
+        SELECT day_type, COUNT(*) AS days FROM typed GROUP BY day_type
+      )
+      INSERT INTO timeslot_sales_record (product_name, day_type, time_slot, avg_quantity, sample_count)
+      SELECT s.item_name, t.day_type, lpad(s.hour::text, 2, '0') || ':00',
+             ROUND(SUM(s.qty)::numeric / c.days, 1), c.days
+      FROM item_hourly_sales s
+      JOIN typed t ON t.date = s.date
+      JOIN day_counts c ON c.day_type = t.day_type
+      GROUP BY s.item_name, t.day_type, s.hour, c.days
+      HAVING SUM(s.qty) > 0
+      RETURNING 1
     `;
-  }
-  return batch.length;
+    return inserted.length;
+  });
 }
 
 // === 4. hourly_sales_summary (per-day per-hour) ===
@@ -183,16 +191,18 @@ async function syncItemHourlySales() {
     batch.push({ date: r.date, hour: Number(r.hour), item_name: name, qty: r.qty || 0, net_sales: r.netSales || 0, gross_sales: r.grossSales || 0 });
   }
 
-  // Clear and bulk insert in chunks
-  const dates = [...new Set(batch.map(r => r.date))];
-  for (const d of dates) {
-    await sql`DELETE FROM item_hourly_sales WHERE date = ${d}`;
-  }
-
-  for (let i = 0; i < batch.length; i += 500) {
-    const chunk = batch.slice(i, i + 500);
-    await sql`INSERT INTO item_hourly_sales ${sql(chunk, 'date', 'hour', 'item_name', 'qty', 'net_sales', 'gross_sales')}`;
-  }
+  // Clear and bulk insert in chunks — atomic per run so a mid-sync crash
+  // can't leave a date half-deleted (IMPROVEMENT-PLAN.md A4)
+  await sql.begin(async (sql) => {
+    const dates = [...new Set(batch.map(r => r.date))];
+    for (const d of dates) {
+      await sql`DELETE FROM item_hourly_sales WHERE date = ${d}`;
+    }
+    for (let i = 0; i < batch.length; i += 500) {
+      const chunk = batch.slice(i, i + 500);
+      await sql`INSERT INTO item_hourly_sales ${sql(chunk, 'date', 'hour', 'item_name', 'qty', 'net_sales', 'gross_sales')}`;
+    }
+  });
   return batch.length;
 }
 
@@ -292,15 +302,17 @@ async function syncItemWaste() {
     batch.push({ date: r.date, item_name: name, waste_reason: reason, qty: r.qty || 0, amount: r.amount || 0 });
   }
 
-  // Delete existing and bulk insert
-  const dates = [...new Set(batch.map(r => r.date))];
-  for (const d of dates) {
-    await sql`DELETE FROM item_waste WHERE date = ${d}`;
-  }
-  for (let i = 0; i < batch.length; i += 500) {
-    const chunk = batch.slice(i, i + 500);
-    await sql`INSERT INTO item_waste ${sql(chunk, 'date', 'item_name', 'waste_reason', 'qty', 'amount')}`;
-  }
+  // Delete existing and bulk insert — atomic per run (IMPROVEMENT-PLAN.md A4)
+  await sql.begin(async (sql) => {
+    const dates = [...new Set(batch.map(r => r.date))];
+    for (const d of dates) {
+      await sql`DELETE FROM item_waste WHERE date = ${d}`;
+    }
+    for (let i = 0; i < batch.length; i += 500) {
+      const chunk = batch.slice(i, i + 500);
+      await sql`INSERT INTO item_waste ${sql(chunk, 'date', 'item_name', 'waste_reason', 'qty', 'amount')}`;
+    }
+  });
   return batch.length;
 }
 
@@ -311,21 +323,21 @@ async function main() {
   const c1 = await syncDailyRevenue();
   console.log(`   -> ${c1} rows\n`);
 
-  console.log('2. daily_sales_record (existing)');
+  console.log('2. daily_sales_record (real per-day, from itemsByDateHour)');
   const c2 = await syncDailySalesRecord();
   console.log(`   -> ${c2} rows\n`);
 
-  console.log('3. timeslot_sales_record (existing)');
-  const c3 = await syncTimeslotSalesRecord();
-  console.log(`   -> ${c3} rows\n`);
-
-  console.log('4. hourly_sales_summary (per-day per-hour)');
+  console.log('3. hourly_sales_summary (per-day per-hour)');
   const c4 = await syncHourlySales();
   console.log(`   -> ${c4} rows\n`);
 
-  console.log('5. item_hourly_sales (per-day per-hour per-item)');
+  console.log('4. item_hourly_sales (per-day per-hour per-item)');
   const c5 = await syncItemHourlySales();
   console.log(`   -> ${c5} rows\n`);
+
+  console.log('5. timeslot_sales_record (real day-type averages, from item_hourly_sales)');
+  const c3 = await syncTimeslotSalesRecord();
+  console.log(`   -> ${c3} rows\n`);
 
   console.log('6. daily_payment_breakdown');
   const c6 = await syncPaymentBreakdown();
@@ -343,4 +355,8 @@ async function main() {
   await sql.end();
 }
 
-main().catch(e => { console.error('[sync-to-db] ERROR:', e.message); sql.end(); process.exit(1); });
+main().catch(async e => {
+  console.error('[sync-to-db] ERROR:', e.message);
+  await sql.end({ timeout: 5 }).catch(() => {});
+  process.exit(1);
+});

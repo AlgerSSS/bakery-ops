@@ -107,6 +107,31 @@ export class KOLRepository {
     return rows[0] ?? null;
   }
 
+  /** 按 handle 跨平台查找：tiktok 优先，其次 instagram（F14：不再假设平台）。 */
+  async getByHandleAnyPlatform(handle: string): Promise<KOLRow | null> {
+    const rows = await query<KOLRow>(
+      `SELECT * FROM kols WHERE platform_handle = ?
+       ORDER BY CASE platform WHEN 'tiktok' THEN 0 ELSE 1 END LIMIT 1`,
+      [handle]
+    );
+    return rows[0] ?? null;
+  }
+
+  /** 写 contact_info.phone（F15：绑定博主 WhatsApp 号码，入站消息按此识别）。 */
+  async updateContactPhone(id: string, phone: string): Promise<void> {
+    try {
+      await execute(
+        `UPDATE kols SET
+           contact_info = COALESCE(contact_info, '{}'::jsonb) || jsonb_build_object('phone', ?::text),
+           updated_at = ?
+         WHERE id = ?`,
+        [phone, new Date().toISOString(), id]
+      );
+    } catch (error) {
+      logger.error("Failed to update KOL contact phone", { id, error: (error as Error).message });
+    }
+  }
+
   async findByPlatform(platform: string, limit = 50): Promise<KOLRow[]> {
     return query<KOLRow>(
       "SELECT * FROM kols WHERE platform = ? ORDER BY follower_count DESC LIMIT ?",

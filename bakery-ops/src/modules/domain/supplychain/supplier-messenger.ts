@@ -1,5 +1,5 @@
 import { logger } from "../../shared/logger";
-import { getWhatsAppClient } from "../../channel/whatsapp/whatsapp.client";
+import { getWhatsAppClient, isClientConnected } from "../../channel/whatsapp/whatsapp.client";
 import { MessageMedia } from "whatsapp-web.js";
 import * as fs from "fs";
 import * as path from "path";
@@ -25,6 +25,11 @@ export class SupplierMessenger {
     }
 
     try {
+      if (!(await isClientConnected())) {
+        logger.warn("Supplier messenger: WhatsApp client not connected, skipping send", { supplier: targetId });
+        return { success: false, error: "WhatsApp 客户端未连接" };
+      }
+
       const client = getWhatsAppClient();
 
       // 读取 Excel 文件并转为 base64

@@ -4,6 +4,7 @@ import type { JobPostingConnector } from "./posting.interface";
 import type { GeneratedJD, JobPostingResult } from "../types";
 import { logger } from "../../../shared/logger";
 import { hasValidSession, getCookieFile, getStorageFile } from "../connectors/jobstreet-login";
+import { JOBSTREET_BASE_URL } from "../connectors/jobstreet.constants";
 
 /** 从 URL 提取 draft/job ID（支持多种参数名） */
 function extractIdFromUrl(url: string): string | undefined {
@@ -40,7 +41,7 @@ function extractIdFromUrl(url: string): string | undefined {
  */
 export class JobStreetPosting implements JobPostingConnector {
   readonly platformName = "JobStreet";
-  private readonly siteUrl = "https://my.employer.seek.com";
+  private readonly siteUrl = JOBSTREET_BASE_URL;
 
   // ── 原有一步到位方法（保留兼容） ──
 

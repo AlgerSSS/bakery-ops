@@ -4,9 +4,12 @@ const LIGHTRAG_URL = process.env.LIGHTRAG_URL || "http://localhost:8020";
 
 export class LightRAGClient {
   private baseUrl: string;
+  private authHeaders: Record<string, string>;
 
   constructor(baseUrl?: string) {
     this.baseUrl = baseUrl || LIGHTRAG_URL;
+    const apiKey = process.env.LIGHTRAG_API_KEY;
+    this.authHeaders = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
   }
 
   async isAvailable(): Promise<boolean> {
@@ -26,12 +29,16 @@ export class LightRAGClient {
     try {
       const res = await fetch(`${this.baseUrl}/ingest`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.authHeaders },
         body: JSON.stringify({ text, metadata }),
         signal: AbortSignal.timeout(30000),
       });
       if (!res.ok) {
-        logger.warn("LightRAG ingest failed", { status: res.status });
+        if (res.status === 401) {
+          logger.error("LightRAG ingest unauthorized — check LIGHTRAG_API_KEY", { status: res.status });
+        } else {
+          logger.warn("LightRAG ingest failed", { status: res.status });
+        }
         return false;
       }
       const data = await res.json() as { chars: number };
@@ -47,12 +54,16 @@ export class LightRAGClient {
     try {
       const res = await fetch(`${this.baseUrl}/query`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...this.authHeaders },
         body: JSON.stringify({ question, mode }),
         signal: AbortSignal.timeout(60000),
       });
       if (!res.ok) {
-        logger.warn("LightRAG query failed", { status: res.status });
+        if (res.status === 401) {
+          logger.error("LightRAG query unauthorized — check LIGHTRAG_API_KEY", { status: res.status });
+        } else {
+          logger.warn("LightRAG query failed", { status: res.status });
+        }
         return null;
       }
       const data = await res.json() as { answer: string };

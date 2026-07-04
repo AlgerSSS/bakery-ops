@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useForecastContext } from "@/ui/components/providers/forecast-provider";
-import { getTimeslotSalesRecords } from "@/app/(forecast)/actions";
+import { getTimeslotSalesRecords, saveAIDailyCorrection } from "@/app/(forecast)/actions";
 import type { DailyAICorrection, AIProductCorrection } from "@/modules/domain/forecast/types";
 
 export function useAI() {
@@ -51,6 +51,9 @@ export function useAI() {
     const monthRevenue = monthlyTarget?.enhancedRevenue || 0;
     const shipmentRate = state.businessRulesState?.shipmentFormula?.shipmentRate || 0.95;
 
+    // G2-②: 采纳结果落库（AI_CORRECTION_APPLY=true 时参与排产计算）；失败不影响原有 state 行为
+    saveAIDailyCorrection(date, correction.aiCoefficient, correction.reason).catch((err) => console.warn("AI 修正落库失败", err));
+
     dispatch({ type: "SET_AI_CORRECTIONS", payload: state.aiCorrections.map((c) => c.date === date ? { ...c, adopted: true } : c) });
     const updated = state.dailyTargets.map((d) => d.date === date ? { ...d, weight: correction.aiCoefficient } : d);
     const newTotalWeight = updated.reduce((s, d) => s + d.weight, 0);
@@ -68,6 +71,11 @@ export function useAI() {
     const monthlyTarget = state.monthlyTargets.find((t) => t.month === state.selectedMonth);
     const monthRevenue = monthlyTarget?.enhancedRevenue || 0;
     const shipmentRate = state.businessRulesState?.shipmentFormula?.shipmentRate || 0.95;
+
+    // G2-②: 全部采纳同样逐条落库；失败不影响原有 state 行为
+    for (const c of state.aiCorrections) {
+      saveAIDailyCorrection(c.date, c.aiCoefficient, c.reason).catch((err) => console.warn("AI 修正落库失败", err));
+    }
 
     dispatch({ type: "SET_AI_CORRECTIONS", payload: state.aiCorrections.map((c) => ({ ...c, adopted: true })) });
     const updated = state.dailyTargets.map((d) => {

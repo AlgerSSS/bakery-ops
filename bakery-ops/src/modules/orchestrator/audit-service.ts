@@ -46,6 +46,7 @@ export class AuditService {
     run.durationMs = new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
     void this.repo?.upsert(run);
     logger.info("Skill run completed", { runId, skillId: run.skillId, durationMs: run.durationMs });
+    this.runs.delete(runId);
   }
 
   failRun(runId: string, error: string): void {
@@ -57,6 +58,7 @@ export class AuditService {
     run.durationMs = new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
     void this.repo?.upsert(run);
     logger.error("Skill run failed", { runId, skillId: run.skillId, error });
+    this.runs.delete(runId);
   }
 
   getRun(runId: string): SkillRun | undefined {

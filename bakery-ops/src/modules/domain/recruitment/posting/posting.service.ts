@@ -1,5 +1,4 @@
 import type { GeneratedJD, JobPostingResult } from "../types";
-import { AJobThingPosting } from "./ajobthing.posting";
 import { JobStreetPosting } from "./jobstreet.posting";
 import { generateJobDescription } from "../jd-generator";
 import { logger } from "../../../shared/logger";
@@ -20,7 +19,6 @@ export interface PostingState {
   step: PostingStep;
   jd?: GeneratedJD;
   rawInput: string;
-  ajtResult?: JobPostingResult;
   jsResult?: JobPostingResult;
   jsDraftId?: string;
 }
@@ -32,7 +30,6 @@ export interface PostingStepResult {
   waitForConfirm: boolean;
 }
 
-const ajtPosting = new AJobThingPosting();
 const jsPosting = new JobStreetPosting();
 
 // ── 交互式发布入口 ──
@@ -88,7 +85,7 @@ async function stepGenerateJd(rawInput: string): Promise<PostingStepResult> {
     "",
     preview,
     "",
-    "确认发布到 AJobThing 和 JobStreet？",
+    "确认发布到 JobStreet？",
     "回复 '确认' 继续，'修改 XXX' 调整内容，'取消' 放弃",
   ];
 
@@ -145,18 +142,10 @@ async function handleConfirmJd(
   const messages: string[] = ["正在填写平台表单..."];
   const images: string[] = [];
 
-  // 并行填写两个平台的 Step 1
-  const [ajtFormResult, jsClassifyResult] = await Promise.allSettled([
-    ajtPosting.fillFormStep(state.jd),
+  // 填写 JobStreet Step 1
+  const [jsClassifyResult] = await Promise.allSettled([
     jsPosting.fillClassifyStep(state.jd),
   ]);
-
-  if (ajtFormResult.status === "fulfilled") {
-    images.push(ajtFormResult.value.screenshot);
-    messages.push("AJobThing: 表单已填写");
-  } else {
-    messages.push(`AJobThing: 填写失败 - ${ajtFormResult.reason}`);
-  }
 
   let jsDraftId: string | undefined;
   if (jsClassifyResult.status === "fulfilled") {
@@ -275,18 +264,13 @@ async function handleConfirmDescription(
   logger.info("PostingInteractive: executing final post");
   const messages: string[] = ["正在发布..."];
 
-  // 并行发布
+  // 发布
   // JobStreet: 有 draftId 时用分步方法，否则用完整的 postJob 一次性完成
-  const [ajtResult, jsResult] = await Promise.allSettled([
-    ajtPosting.submitPost(state.jd),
+  const [jsResult] = await Promise.allSettled([
     state.jsDraftId
       ? jsPosting.fillManageAndPost(state.jsDraftId)
       : jsPosting.postJob(state.jd),
   ]);
-
-  const ajtFinal: JobPostingResult = ajtResult.status === "fulfilled"
-    ? ajtResult.value
-    : { platform: "AJobThing", status: "failed", error: String(ajtResult.reason) };
 
   const jsFinal: JobPostingResult = jsResult.status === "fulfilled"
     ? jsResult.value
@@ -299,15 +283,10 @@ async function handleConfirmDescription(
   if (jsFinal.jobUrl) messages.push(`   ${jsFinal.jobUrl}`);
   if (jsFinal.error) messages.push(`   ${jsFinal.error}`);
 
-  messages.push(`${icon(ajtFinal.status)} AJobThing: ${ajtFinal.status === "posted" ? "已发布" : ajtFinal.status === "draft" ? "草稿" : "失败"}`);
-  if (ajtFinal.jobUrl) messages.push(`   ${ajtFinal.jobUrl}`);
-  if (ajtFinal.error) messages.push(`   ${ajtFinal.error}`);
-
   return {
     state: {
       ...state,
       step: "done",
-      ajtResult: ajtFinal,
       jsResult: jsFinal,
     },
     messages: [messages.join("\n")],
@@ -353,7 +332,7 @@ export async function postJob(rawChineseInput: string): Promise<{
   logger.info("Job posting (legacy): JD generated", { title: jd.title, location: jd.location });
 
   const results = await Promise.all(
-    [ajtPosting, jsPosting].map(async (connector) => {
+    [jsPosting].map(async (connector) => {
       try {
         logger.info(`Job posting: posting to ${connector.platformName}`);
         return await connector.postJob(jd);

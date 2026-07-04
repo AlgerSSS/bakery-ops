@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import postgres from 'postgres';
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => { const [k, v] = a.replace(/^--/, '').split('='); return [k, v]; }));
 
@@ -27,6 +28,44 @@ const fmtSlash = (d) => `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.get
 const RANGE_DASH = [fmtDash(from), fmtDash(today)];
 const RANGE_SLASH = [fmtSlash(from), fmtSlash(today)];
 console.log(`[scrape-daily] date range: ${RANGE_DASH.join(' .. ')}`);
+
+// ---- 增量窗口：per-day 明细(hourlyByDate / itemsByDateHour / itemWaste)过了当天就基本定型，
+// 无需每次重抓整 30 天。默认只抓最近 SCRAPE_INCREMENTAL_DAYS 天(应对当日/迟到流水)，并查库把
+// [from..today] 内缺失的日期一并回填，保证完整性。聚合/滚动均值查询仍用整 30 天窗口。
+// --full 或 SCRAPE_FULL=1 强制整窗口；DB 不可达时退回整窗口，宁多抓不漏。
+const INCREMENTAL_DAYS = Math.max(1, Number(process.env.SCRAPE_INCREMENTAL_DAYS || 4));
+const FULL_PERDAY = args.full !== undefined || process.env.SCRAPE_FULL === '1';
+const recentFrom = new Date(today);
+recentFrom.setDate(recentFrom.getDate() - (INCREMENTAL_DAYS - 1));
+const mkDate = (s) => new Date(`${s}T00:00:00`);
+const ARG_FROM = args.from || process.env.SCRAPE_FROM; // 显式回填区间起点
+const ARG_TO = args.to || process.env.SCRAPE_TO;        // 显式回填区间终点(默认 today)
+let incFrom = recentFrom;
+let incTo = today;
+if (ARG_FROM) {
+  // --from=YYYY-MM-DD [--to=YYYY-MM-DD]：显式区间，覆盖增量/缺口逻辑(历史回填用)
+  incFrom = mkDate(ARG_FROM);
+  if (ARG_TO) incTo = mkDate(ARG_TO);
+  console.log('[scrape-daily] per-day window: explicit backfill');
+} else if (FULL_PERDAY) {
+  incFrom = new Date(from);
+  console.log('[scrape-daily] per-day window: FULL (forced)');
+} else if (process.env.DATABASE_URL) {
+  try {
+    const gapSql = postgres(process.env.DATABASE_URL, { max: 1, idle_timeout: 5 });
+    const present = await gapSql`SELECT DISTINCT date::text AS d FROM item_hourly_sales WHERE date >= ${fmtDash(from)} AND date <= ${fmtDash(today)}`;
+    await gapSql.end();
+    const have = new Set(present.map((r) => r.d));
+    for (let d = new Date(from); d <= today; d.setDate(d.getDate() + 1)) {
+      if (!have.has(fmtDash(d))) { if (d < incFrom) incFrom = new Date(d); break; }
+    }
+  } catch (e) {
+    incFrom = new Date(from);
+    console.log(`[scrape-daily] DB gap-check failed (${e.message}); using full window`);
+  }
+}
+const INC_RANGE_DASH = [fmtDash(incFrom), fmtDash(incTo)];
+console.log(`[scrape-daily] per-day range: ${INC_RANGE_DASH.join(' .. ')}`);
 
 fs.mkdirSync(outDir, { recursive: true });
 
@@ -86,6 +125,12 @@ const filtersSlash = [
   { fieldName: 'D_shopId', filterType: 'IN', filterValue: ['0', SHOP_ID] },
   { fieldName: 'D_currency', filterType: 'EQ', filterValue: ['MYR'] },
 ];
+// per-day 明细查询用增量窗口(见上方 INC_RANGE_DASH)，避免重抓已定型的历史日期。
+const filtersDashInc = [
+  { fieldName: 'D_businessDate', filterType: 'RANGE', filterValue: INC_RANGE_DASH },
+  { fieldName: 'D_currency', filterType: 'EQ', filterValue: ['MYR'] },
+  { fieldName: 'D_shopId', filterType: 'IN', filterValue: ['0', SHOP_ID] },
+];
 
 const queries = {
   // 30-day summary with payment channel breakdown
@@ -137,7 +182,7 @@ const queries = {
       'M_Order_SUM_totalPromotionAmount',
     ],
     metricsByDimQryV2: [], aggFilters: [], proportionProperty: { enable: false }, dimAdditionalStrategy: [],
-    filters: filtersDash,
+    filters: filtersDashInc,
     page: { pageNo: 1, pageSize: 5000 }, orderBy: [{ D_businessDate: 'DESC' }, { D_hours: 'ASC' }],
   },
 
@@ -184,7 +229,7 @@ const queries = {
     selectFields: ['D_businessDate', 'D_itemName', 'D_hours', 'M_Item_SUM_netQty', 'M_Item_SUM_netSales', 'M_Item_SUM_grossSales'],
     metricsByDimQryV2: [], aggFilters: [], proportionProperty: { enable: false }, dimAdditionalStrategy: [],
     filters: [
-      { fieldName: 'D_businessDate', filterType: 'RANGE', filterValue: RANGE_DASH },
+      { fieldName: 'D_businessDate', filterType: 'RANGE', filterValue: INC_RANGE_DASH },
       { fieldName: 'D_itemType', filterType: 'IN', filterValue: ['0', '2'] },
       { fieldName: 'D_currency', filterType: 'EQ', filterValue: ['MYR'] },
       { fieldName: 'D_shopId', filterType: 'IN', filterValue: [SHOP_ID] },
@@ -207,7 +252,7 @@ const queries = {
     selectFields: ['D_date', 'D_itemName', 'D_damageReason', 'M_LossItem_SUM_damageQty', 'M_LossItem_SUM_damageAmount'],
     metricsByDimQryV2: [], aggFilters: [], proportionProperty: { enable: false }, dimAdditionalStrategy: [],
     filters: [
-      { fieldName: 'D_date', filterType: 'RANGE', filterValue: RANGE_DASH },
+      { fieldName: 'D_date', filterType: 'RANGE', filterValue: INC_RANGE_DASH },
       { fieldName: 'D_currency', filterType: 'EQ', filterValue: ['MYR'] },
       { fieldName: 'D_shopId', filterType: 'IN', filterValue: [SHOP_ID] },
     ],

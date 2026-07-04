@@ -26,7 +26,13 @@ page.on('console', (msg) => {
 });
 
 console.log(`[login] opening ${targetUrl}`);
-await page.goto(targetUrl, { waitUntil: 'domcontentloaded' });
+// 60s 超时(默认 30s 在网络慢/从睡眠唤醒时易超时);失败再重试一次。
+try {
+  await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+} catch (e) {
+  console.log(`[login] goto retry after: ${e.message}`);
+  await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+}
 await page.waitForLoadState('networkidle').catch(() => {});
 console.log(`[login] landed on ${page.url()}`);
 

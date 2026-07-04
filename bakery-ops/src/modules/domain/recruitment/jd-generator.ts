@@ -1,5 +1,6 @@
 import { aiProvider } from "../ai/ai-provider";
 import type { GeneratedJD } from "./types";
+import { JD_TITLE_KEYS, type JdTitleKey } from "./jd-title-keys";
 import { logger } from "../../shared/logger";
 
 /**
@@ -7,7 +8,7 @@ import { logger } from "../../shared/logger";
  */
 export async function generateJobDescription(rawChineseInput: string): Promise<GeneratedJD> {
   const prompt = `You are a professional HR copywriter for a Malaysian bakery chain (Hot Crush).
-Convert the following Chinese job requirement into a structured English job description suitable for posting on Malaysian job portals (JobStreet, AJobThing).
+Convert the following Chinese job requirement into a structured English job description suitable for posting on Malaysian job portals (JobStreet).
 
 Chinese input:
 """
@@ -66,9 +67,9 @@ Guidelines:
   }
 }
 
-/** 从中文输入提取英文职位名（复用 jd-parser 的映射） */
+/** 从中文输入提取英文职位名（键集与 jd-parser 共享，见 jd-title-keys.ts；值为职位名，与搜索关键词不同） */
 function fallbackTitle(text: string): string {
-  const mapping: Record<string, string> = {
+  const mapping: Record<JdTitleKey, string> = {
     "店员": "Retail Staff",
     "前场": "Front of House Staff",
     "后厨": "Kitchen Staff",
@@ -81,8 +82,8 @@ function fallbackTitle(text: string): string {
     "经理": "Manager",
     "主管": "Supervisor",
   };
-  for (const [cn, en] of Object.entries(mapping)) {
-    if (text.includes(cn)) return en;
+  for (const cn of JD_TITLE_KEYS) {
+    if (text.includes(cn)) return mapping[cn];
   }
   return "Staff";
 }

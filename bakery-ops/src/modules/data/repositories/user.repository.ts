@@ -23,7 +23,36 @@ export class UserRepository {
       );
       if (rows.length === 0) return null;
       return this.toUser(rows[0]);
-    } catch {
+    } catch (error) {
+      logger.error("user.repository.getByPhone failed", { error: String(error) });
+      return null;
+    }
+  }
+
+  async getByUserId(userId: string): Promise<User | null> {
+    try {
+      const rows = await query<Record<string, unknown>>(
+        "SELECT * FROM users WHERE user_id = ? AND is_active = true LIMIT 1",
+        [userId],
+      );
+      if (rows.length === 0) return null;
+      return this.toUser(rows[0]);
+    } catch (error) {
+      logger.error("user.repository.getByUserId failed", { error: String(error) });
+      return null;
+    }
+  }
+
+  async getByRoleAndStore(role: UserRole, storeCode: string): Promise<User | null> {
+    try {
+      const rows = await query<Record<string, unknown>>(
+        "SELECT * FROM users WHERE role = ? AND ? = ANY (store_ids) AND is_active = true LIMIT 1",
+        [role, storeCode],
+      );
+      if (rows.length === 0) return null;
+      return this.toUser(rows[0]);
+    } catch (error) {
+      logger.error("user.repository.getByRoleAndStore failed", { error: String(error) });
       return null;
     }
   }

@@ -1,11 +1,12 @@
 // 渠道消息类型定义
 
 export interface ChannelMessage {
-  channel: "whatsapp" | "web" | "api" | "cron";
+  channel: "whatsapp" | "lark" | "web" | "api" | "cron";
   messageId: string;
   conversationId: string;
   userId?: string;
   phone?: string;
+  larkOpenId?: string; // Lark 入站消息带上发送者 open_id，供部门权限解析
   text?: string;
   attachments?: ChannelAttachment[];
   timestamp: string;

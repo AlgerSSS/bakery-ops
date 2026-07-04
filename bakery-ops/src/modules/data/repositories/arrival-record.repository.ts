@@ -72,7 +72,8 @@ export class ArrivalRecordRepository {
         [orderId]
       );
       return rows.map(toRow);
-    } catch {
+    } catch (error) {
+      logger.error("arrival-record.repository.getByOrderId failed", { error: String(error) });
       return [];
     }
   }
@@ -84,7 +85,8 @@ export class ArrivalRecordRepository {
         [storeId, date]
       );
       return rows.map(toRow);
-    } catch {
+    } catch (error) {
+      logger.error("arrival-record.repository.getByDate failed", { error: String(error) });
       return [];
     }
   }

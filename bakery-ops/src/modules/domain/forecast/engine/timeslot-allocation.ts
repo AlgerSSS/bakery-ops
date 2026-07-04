@@ -6,11 +6,34 @@ import {
   TimeSlotSuggestion,
 } from "../types";
 
+/**
+ * 从近 4 周同日型的 hourly_sales_summary bill_count 曲线中选出销量占比最高的 2 个小时，
+ * 作为无历史品项的默认上架时段。无数据/无正值时回落 ["11:00"]。纯函数，曲线由调用方传入。
+ */
+export function selectDefaultTimeSlots(
+  hourlyCurve?: Array<{ hour: number; billCount: number }>
+): string[] {
+  if (!hourlyCurve || hourlyCurve.length === 0) return ["11:00"];
+  const byHour = new Map<number, number>();
+  for (const r of hourlyCurve) {
+    if (!Number.isInteger(r.hour) || r.hour < 0 || r.hour > 23) continue;
+    byHour.set(r.hour, (byHour.get(r.hour) || 0) + (r.billCount || 0));
+  }
+  const top = Array.from(byHour.entries())
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 2)
+    .map(([hour]) => `${String(hour).padStart(2, "0")}:00`)
+    .sort();
+  return top.length > 0 ? top : ["11:00"];
+}
+
 export function calculateTimeSlotSuggestions(
   productSuggestions: ProductSuggestion[],
   dailyTarget: DailyTarget,
   planningRules: PlanningRules,
-  timeslotHistory?: TimeslotSalesRecord[]
+  timeslotHistory?: TimeslotSalesRecord[],
+  defaultSlots?: string[]
 ): TimeSlotSuggestion[] {
   const fixedSchedule = planningRules.fixedShipmentSchedule || {};
   const { dayType } = dailyTarget;
@@ -44,7 +67,7 @@ export function calculateTimeSlotSuggestions(
     } else if (productHistory && productHistory.size > 0) {
       targetSlots = Array.from(productHistory.keys()).sort();
     } else {
-      targetSlots = ["11:00"];
+      targetSlots = (defaultSlots && defaultSlots.length > 0) ? defaultSlots : ["11:00"];
     }
 
     if (targetSlots.length === 1) {

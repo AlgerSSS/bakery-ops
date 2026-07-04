@@ -1,17 +1,25 @@
 import type { NotificationChecker } from "./notification-checker.interface";
 import type { RecruitmentNotification } from "./notification.types";
-import { AJobThingNotificationChecker } from "./ajobthing.notifications";
-import { JobStreetNotificationChecker } from "./jobstreet.notifications";
+import { JobStreetNotificationChecker, jobStreetNotificationsEnabled } from "./jobstreet.notifications";
 import { loadNotificationState, saveNotificationState } from "./notification-state";
-import { getWhatsAppClient } from "../../../channel/whatsapp/whatsapp.client";
+import { notifyInternal } from "../../../channel/internal-notify";
 import { logger } from "../../../shared/logger";
 
 const FEEDBACK_WHATSAPP = process.env.OWNER_WHATSAPP || "";
 
-const checkers: NotificationChecker[] = [
-  new AJobThingNotificationChecker(),
-  new JobStreetNotificationChecker(),
-];
+/**
+ * 启用的通知检查器。JobStreet 默认关闭（query 未经 live discovery 验证），
+ * 仅在 JOBSTREET_NOTIFICATIONS_ENABLED=true 时注册，否则干净跳过。
+ */
+function activeCheckers(): NotificationChecker[] {
+  const list: NotificationChecker[] = [];
+  if (jobStreetNotificationsEnabled()) {
+    list.push(new JobStreetNotificationChecker());
+  } else {
+    logger.debug("Notification check: JobStreet checker disabled (JOBSTREET_NOTIFICATIONS_ENABLED!=true), skipping");
+  }
+  return list;
+}
 
 /**
  * 检查所有平台的新通知，去重后通过 WhatsApp 推送
@@ -21,7 +29,7 @@ export async function checkAndNotify(): Promise<void> {
 
   const allNotifications: RecruitmentNotification[] = [];
 
-  for (const checker of checkers) {
+  for (const checker of activeCheckers()) {
     try {
       const items = await checker.checkNewNotifications();
       allNotifications.push(...items);
@@ -51,31 +59,26 @@ export async function checkAndNotify(): Promise<void> {
 }
 
 async function sendNotifications(notifications: RecruitmentNotification[]): Promise<void> {
-  try {
-    const client = getWhatsAppClient();
-    if (!client.info) {
-      logger.warn("WhatsApp client not ready, skipping notification push");
-      return;
-    }
+  const lines: string[] = ["*\uD83D\uDD14 招聘通知*", ""];
 
-    const lines: string[] = ["*\uD83D\uDD14 招聘通知*", ""];
+  for (const n of notifications) {
+    const icon = n.type === "new_applicant" ? "\uD83D\uDCE9" : "\uD83D\uDCAC";
+    const typeLabel = n.type === "new_applicant" ? "新投递" : "消息回复";
+    lines.push(`${icon} *${typeLabel}* — ${n.platform}`);
+    lines.push(`   候选人: ${n.candidateName}`);
+    if (n.jobTitle) lines.push(`   职位: ${n.jobTitle}`);
+    if (n.message) lines.push(`   消息: ${n.message}`);
+    if (n.sourceUrl) lines.push(`   查看: ${n.sourceUrl}`);
+    lines.push("");
+  }
 
-    for (const n of notifications) {
-      const icon = n.type === "new_applicant" ? "\uD83D\uDCE9" : "\uD83D\uDCAC";
-      const typeLabel = n.type === "new_applicant" ? "新投递" : "消息回复";
-      lines.push(`${icon} *${typeLabel}* — ${n.platform}`);
-      lines.push(`   候选人: ${n.candidateName}`);
-      if (n.jobTitle) lines.push(`   职位: ${n.jobTitle}`);
-      if (n.message) lines.push(`   消息: ${n.message}`);
-      if (n.sourceUrl) lines.push(`   查看: ${n.sourceUrl}`);
-      lines.push("");
-    }
+  lines.push(`共 ${notifications.length} 条新通知`);
 
-    lines.push(`共 ${notifications.length} 条新通知`);
-
-    await client.sendMessage(FEEDBACK_WHATSAPP, lines.join("\n"));
-    logger.info("Notification push sent to WhatsApp", { count: notifications.length });
-  } catch (err) {
-    logger.error("Failed to send notifications to WhatsApp", { error: String(err) });
+  // FEEDBACK_WHATSAPP is a pre-formatted chat id (ends in @c.us) — notifyInternal handles both forms.
+  const sent = await notifyInternal(FEEDBACK_WHATSAPP, lines.join("\n"));
+  if (sent) {
+    logger.info("Notification push sent", { count: notifications.length });
+  } else {
+    logger.error("Failed to send notifications");
   }
 }

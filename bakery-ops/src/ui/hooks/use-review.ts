@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useForecastContext } from "@/ui/components/providers/forecast-provider";
 import {
   saveOutOfStockRecords, deleteOutOfStockByDate, adoptDailyReview, upsertDailyRevenue, addContextEvent,
-  getTimeslotSalesRecords, getProducts, getProductAliases,
+  getTimeslotSalesRecords, getProducts, getProductAliases, getDailyRevenues,
 } from "@/app/(forecast)/actions";
 import { calculateLossSlots, calculateStockoutLoss, calculateStockoutLossWithTraffic } from "@/modules/domain/forecast/forecast-engine";
 import type { OutOfStockRecord, DailyReviewResult } from "@/modules/domain/forecast/types";
@@ -33,7 +33,7 @@ function saveSession(data: Record<string, unknown>) {
 export function useReview() {
   const { state, dispatch } = useForecastContext();
 
-  const [reviewDate, setReviewDate] = useState<string>(() => loadSession()?.reviewDate ?? dayjs().format("YYYY-MM-DD"));
+  const [reviewDate, setReviewDate] = useState<string>(() => loadSession()?.reviewDate ?? dayjs().subtract(1, "day").format("YYYY-MM-DD"));
   const [reviewActualRevenue, setReviewActualRevenue] = useState<string>(() => loadSession()?.reviewActualRevenue ?? "");
   const [stockoutEntries, setStockoutEntries] = useState<StockoutEntry[]>(() => loadSession()?.stockoutEntries ?? []);
   const [parsedStockouts, setParsedStockouts] = useState<OutOfStockRecord[]>(() => loadSession()?.parsedStockouts ?? []);
@@ -49,6 +49,19 @@ export function useReview() {
   useEffect(() => {
     getProducts().then((products) => setProductNames(products.map((p) => p.name).sort()));
   }, []);
+
+  // Prefill from POS-synced daily_revenue when reviewDate changes (only fills fields still empty)
+  useEffect(() => {
+    let cancelled = false;
+    getDailyRevenues(reviewDate, reviewDate).then((rows) => {
+      if (cancelled || rows.length === 0) return;
+      const row = rows[0];
+      if (row.revenue != null) setReviewActualRevenue((prev) => prev === "" ? String(row.revenue) : prev);
+      if (row.transaction_count != null) setTransactionCount((prev) => prev === "" ? String(row.transaction_count) : prev);
+      if (row.avg_transaction_value != null) setAvgTransactionValue((prev) => prev === "" ? String(row.avg_transaction_value) : prev);
+    }).catch(() => { /* ignore */ });
+    return () => { cancelled = true; };
+  }, [reviewDate]);
 
   // Persist state to sessionStorage on every change
   useEffect(() => {

@@ -1,12 +1,10 @@
 import type { ActiveJobsState, ActiveJob, JobApplicant } from "../types";
 import type { OutputFile } from "../../../shared/types";
 import { JobStreetActiveJobs } from "./jobstreet.active-jobs";
-import { AJobThingActiveJobs } from "./ajobthing.active-jobs";
 import { fileService } from "../../files/file-service";
 import { logger } from "../../../shared/logger";
 
 const jsFetcher = new JobStreetActiveJobs();
-const ajtFetcher = new AJobThingActiveJobs();
 
 export interface ActiveJobsStepResult {
   state: ActiveJobsState;
@@ -51,21 +49,19 @@ export async function activeJobsInteractive(
 // ── Step 1: 查询两个平台的在招岗位 ──
 
 async function stepFetchJobs(): Promise<ActiveJobsStepResult> {
-  logger.info("ActiveJobs: fetching active jobs from both platforms");
+  logger.info("ActiveJobs: fetching active jobs from JobStreet");
 
-  const [jsJobs, ajtJobs] = await Promise.allSettled([
+  const [jsJobs] = await Promise.allSettled([
     jsFetcher.fetchActiveJobs(),
-    ajtFetcher.fetchActiveJobs(),
   ]);
 
   const allJobs: ActiveJob[] = [];
   if (jsJobs.status === "fulfilled") allJobs.push(...jsJobs.value);
-  if (ajtJobs.status === "fulfilled") allJobs.push(...ajtJobs.value);
 
   if (allJobs.length === 0) {
     return {
       state: { step: "done" },
-      messages: ["两个平台上暂无在招岗位。"],
+      messages: ["JobStreet 上暂无在招岗位。"],
       waitForReply: false,
     };
   }
@@ -73,7 +69,6 @@ async function stepFetchJobs(): Promise<ActiveJobsStepResult> {
   // 按平台分组显示
   const lines: string[] = [];
   const jsGroup = allJobs.filter((j) => j.platform === "JobStreet");
-  const ajtGroup = allJobs.filter((j) => j.platform === "AJobThing");
   let idx = 1;
 
   if (jsGroup.length > 0) {
@@ -83,14 +78,6 @@ async function stepFetchJobs(): Promise<ActiveJobsStepResult> {
       idx++;
     }
     lines.push("");
-  }
-
-  if (ajtGroup.length > 0) {
-    lines.push("*AJobThing*");
-    for (const job of ajtGroup) {
-      lines.push(`${idx}. ${job.title} - ${job.location || "未知地点"} (${job.applicantCount} 位申请者)`);
-      idx++;
-    }
   }
 
   lines.push("");
@@ -131,8 +118,7 @@ async function handleJobSelection(
 
   logger.info("ActiveJobs: fetching applicants", { jobId: job.jobId, platform: job.platform });
 
-  const fetcher = job.platform === "JobStreet" ? jsFetcher : ajtFetcher;
-  const applicants = await fetcher.fetchApplicants(job.jobId);
+  const applicants = await jsFetcher.fetchApplicants(job.jobId);
 
   if (applicants.length === 0) {
     return {
@@ -160,7 +146,7 @@ async function handleJobSelection(
   }
 
   lines.push("");
-  lines.push("回复 '简历 1' 下载简历，'返回' 回到岗位列表");
+  lines.push("回复 '简历 1' 查看候选人档案（教育/技能/经历），'返回' 回到岗位列表");
 
   return {
     state: {
@@ -212,44 +198,75 @@ async function handleApplicantAction(
   if (applicantIndex < 0 || applicantIndex >= state.applicants.length) {
     return {
       state,
-      messages: [`请回复 '简历 1'-'简历 ${state.applicants.length}' 下载简历，或 '返回' 回到岗位列表。`],
+      messages: [`请回复 '简历 1'-'简历 ${state.applicants.length}' 查看候选人档案，或 '返回' 回到岗位列表。`],
       waitForReply: true,
     };
   }
 
   const applicant = state.applicants[applicantIndex];
-  return downloadResumeForApplicant(state, applicant);
+  return getApplicantDetail(state, applicant, applicantIndex);
 }
 
-async function downloadResumeForApplicant(
+// 下载优先：付费套餐能拿到简历 PDF 原文（→ WhatsApp/Lark 发文件）；
+// SEEK express 免费套餐被付费墙拦（canDownloadAttachments=false）时降级为在线档案文本。
+async function getApplicantDetail(
   state: ActiveJobsState,
   applicant: JobApplicant,
+  applicantIndex: number,
 ): Promise<ActiveJobsStepResult> {
-  logger.info("ActiveJobs: downloading resume", { name: applicant.name, platform: applicant.platform });
+  if (applicant.hasResumeAttachment) {
+    logger.info("ActiveJobs: attempting resume download", { name: applicant.name });
+    const dl = await jsFetcher.downloadResume(applicant);
+    if (dl) {
+      const file = await fileService.saveFile(dl.buffer, dl.fileName, "application/pdf");
+      return {
+        state,
+        messages: [`${applicant.name} 的简历：`],
+        files: [file],
+        waitForReply: true,
+      };
+    }
+    // 下载失败（付费墙/无有效会话）→ 降级到在线档案
+    logger.info("ActiveJobs: resume download unavailable, falling back to profile", { name: applicant.name });
+  }
+  return showApplicantProfile(state, applicant, applicantIndex);
+}
 
-  const fetcher = applicant.platform === "JobStreet" ? jsFetcher : ajtFetcher;
-  const result = await fetcher.downloadResume(applicant);
+// 展示 SEEK 免费可得的候选人在线档案（教育/技能/工作经历/工作权利）。
+async function showApplicantProfile(
+  state: ActiveJobsState,
+  applicant: JobApplicant,
+  applicantIndex: number,
+): Promise<ActiveJobsStepResult> {
+  logger.info("ActiveJobs: fetching applicant profile", { name: applicant.name, platform: applicant.platform });
 
-  if (!result) {
+  const profile = await jsFetcher.fetchApplicantProfile(applicant.jobId, applicantIndex, applicant);
+
+  if (!profile) {
     return {
       state,
       messages: [
-        `${applicant.name} 的简历暂时无法下载。`,
-        "",
-        "回复其他数字下载其他简历，或 '返回' 回到岗位列表。",
+        `${applicant.name} 的档案暂时拉取不到（可能会话过期，请让管理员跑 jobstreet-relogin）。`,
+        "回复其他数字查看其他候选人，或 '返回' 回到岗位列表。",
       ],
       waitForReply: true,
     };
   }
 
-  const file = await fileService.saveFile(result.buffer, result.fileName, "application/pdf");
+  const lines: string[] = [`👤 ${applicant.name} 的候选人档案`];
+  if (applicant.currentTitle) lines.push(`当前职位：${applicant.currentTitle}`);
+  if (applicant.phone) lines.push(`电话：${applicant.phone}`);
+  if (profile.education.length) lines.push(`\n🎓 教育：\n· ${profile.education.join("\n· ")}`);
+  if (profile.workHistory.length) lines.push(`\n💼 工作经历：\n· ${profile.workHistory.join("\n· ")}`);
+  if (profile.skills.length) lines.push(`\n🛠 技能：${profile.skills.join("、")}`);
+  if (profile.rightToWork.length) lines.push(`\n📋 工作权利：${profile.rightToWork.join("、")}`);
+  if (profile.nationalities.length) lines.push(`🌏 国籍：${profile.nationalities.join("、")}`);
+  if (profile.hasResumeAttachment) {
+    lines.push(`\n📎 该候选人上传了简历文件，但下载 PDF 需升级 SEEK 付费套餐；以上在线档案免费可得。`);
+  }
+  lines.push(`\n回复其他数字查看其他候选人，或 '返回' 回到岗位列表。`);
 
-  return {
-    state,
-    messages: [`${applicant.name} 的简历:`],
-    files: [file],
-    waitForReply: true,
-  };
+  return { state, messages: [lines.join("\n")], waitForReply: true };
 }
 
 // ── 辅助函数 ──
@@ -259,7 +276,6 @@ function formatJobList(jobs: ActiveJob[]): string {
 
   const lines: string[] = [];
   const jsGroup = jobs.filter((j) => j.platform === "JobStreet");
-  const ajtGroup = jobs.filter((j) => j.platform === "AJobThing");
   let idx = 1;
 
   if (jsGroup.length > 0) {
@@ -269,14 +285,6 @@ function formatJobList(jobs: ActiveJob[]): string {
       idx++;
     }
     lines.push("");
-  }
-
-  if (ajtGroup.length > 0) {
-    lines.push("*AJobThing*");
-    for (const job of ajtGroup) {
-      lines.push(`${idx}. ${job.title} - ${job.location || "未知地点"} (${job.applicantCount} 位申请者)`);
-      idx++;
-    }
   }
 
   lines.push("");

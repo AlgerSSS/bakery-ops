@@ -213,3 +213,28 @@ forecast query. `009` is deliberately limited to the safe, dormant scaffolding.
 **Verify on staging:** with a store-scoped JWT, confirm a user sees only their
 `store_ids` rows in `users`/`employees`/`supply_orders`/`arrival_records`, while the
 service-role background paths (imports, sync) still see everything.
+
+---
+
+## Shipped follow-ups: `015` / `016`
+
+These two migration files now carry the schema-drift fixes described above, written so they
+are safe against a live DB that diverges from the committed migrations.
+
+- **`015_supply_chain_fix.sql`** — idempotent reconciliation of the supply-chain schema (Tasks
+  1 and 2 above). Adds `store_id`/`created_by`/`sent_at` to `supply_orders`, adds
+  `order_id`/`store_id`/`reported_by`/`synced_to_inventory` to `arrival_records`, drops the stale
+  `supplier_name NOT NULL` on both (only where the column exists), and creates the `suppliers`
+  table (UUID id, `name`, `whatsapp_id`, `phone`, `categories TEXT[]`, `is_active`, timestamps)
+  with a GIN index on `categories` and a btree index on `whatsapp_id`. Every statement is guarded
+  (`to_regclass` table guards, `information_schema.columns` column guards, `IF NOT EXISTS`), so it
+  is a no-op whether the live DB is in the 003-stale shape, the reconciled 010 shape, or
+  hand-edited. **Note:** `010_consolidate_missing_tables.sql` already creates these tables in their
+  reconciled form for a fresh DB; `015` exists to repair a live DB provisioned from the stale 003.
+  **Verify the `id`/`order_id` PK TYPE against the live DB before applying** — the additive guards
+  cannot detect column-type drift, and a SERIAL→UUID change is a separate data migration.
+
+- **`016_drop_recruitment_runs.sql`** — `DROP TABLE IF EXISTS public.recruitment_runs;`.
+  Superseded by 013's `applications`/`job_openings` funnel; the old AJobThing crawl/score flow that
+  used it has been removed and no repository references it. **DESTRUCTIVE — NOT auto-applied; the
+  owner runs it manually** after confirming the table holds no needed rows.

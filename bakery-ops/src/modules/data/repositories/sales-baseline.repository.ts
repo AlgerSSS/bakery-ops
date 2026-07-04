@@ -76,6 +76,25 @@ export async function importTimeslotSalesData(records: TimeslotSalesRecord[]): P
   }
 }
 
+/** 近 4 周同日型的每小时 bill_count 汇总曲线（用于无历史品项的默认上架时段推断）。 */
+export async function getHourlyBillCurve(
+  dayType: "mondayToThursday" | "friday" | "weekend"
+): Promise<{ hour: number; billCount: number }[]> {
+  const dowFilter =
+    dayType === "weekend" ? "IN (0, 6)"
+    : dayType === "friday" ? "= 5"
+    : "BETWEEN 1 AND 4";
+  const rows = await query<{ hour: number; bill_count: number }>(
+    `SELECT hour, SUM(bill_count)::int AS bill_count
+     FROM hourly_sales_summary
+     WHERE date >= CURRENT_DATE - INTERVAL '28 days'
+       AND EXTRACT(DOW FROM date) ${dowFilter}
+     GROUP BY hour
+     ORDER BY hour`
+  );
+  return rows.map((r) => ({ hour: r.hour, billCount: Number(r.bill_count) }));
+}
+
 export async function hasTimeslotSalesData(): Promise<boolean> {
   const rows = await query<{ cnt: number }>("SELECT COUNT(*) as cnt FROM timeslot_sales_record");
   return (rows[0] as { cnt: number }).cnt > 0;

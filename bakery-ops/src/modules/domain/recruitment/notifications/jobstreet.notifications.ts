@@ -5,6 +5,15 @@ import type { RecruitmentNotification } from "./notification.types";
 import { loadNotificationState, saveNotificationState } from "./notification-state";
 import { logger } from "../../../shared/logger";
 import { hasValidSession, getCookieFile, getStorageFile, refreshLogin } from "../connectors/jobstreet-login";
+import { JOBSTREET_BASE_URL } from "../connectors/jobstreet.constants";
+
+/**
+ * Feature flag：JobStreet 通知检查是否启用。
+ * 默认关闭，因为 query 仍是未验证的占位符（见 class 注释 / 各 query 的 TODO）。
+ */
+export function jobStreetNotificationsEnabled(): boolean {
+  return process.env.JOBSTREET_NOTIFICATIONS_ENABLED === "true";
+}
 
 /**
  * JobStreet 通知检查器
@@ -13,13 +22,25 @@ import { hasValidSession, getCookieFile, getStorageFile, refreshLogin } from "..
  * 1. 新 applications（投递）
  * 2. inbox 消息（候选人回复）
  *
- * TODO: 具体 query 名称需要 discovery 脚本确认
+ * ⚠️ 默认关闭（feature flag JOBSTREET_NOTIFICATIONS_ENABLED=true 才启用）。
+ * 下面 checkNewApplications / checkNewMessages 用的 GraphQL query 名称/字段是
+ * 未经验证的占位符，尚未由真实的 live discovery 确认（service-crew 的 Test 阶段
+ * 正在跑这套发现）。在确认之前保持关闭，避免每 15 分钟静默报错/产生噪音。
+ *
+ * TODO: 待 live discovery 确认真实的 applications / messages GraphQL query
+ *       （query 名、input 变量、edges 字段）后，替换占位符并把 flag 默认改为开启。
  */
 export class JobStreetNotificationChecker implements NotificationChecker {
   readonly platformName = "JobStreet";
-  private readonly siteUrl = "https://my.employer.seek.com";
+  private readonly siteUrl = JOBSTREET_BASE_URL;
 
   async checkNewNotifications(): Promise<RecruitmentNotification[]> {
+    if (!jobStreetNotificationsEnabled()) {
+      // 防御性二次守卫：query 未验证前默认关闭，干净 no-op（service 层通常已先跳过）。
+      logger.debug("JobStreet notifications: disabled (JOBSTREET_NOTIFICATIONS_ENABLED!=true)");
+      return [];
+    }
+
     if (!hasValidSession()) {
       logger.debug("JobStreet notifications: no valid session");
       return [];
@@ -70,7 +91,8 @@ export class JobStreetNotificationChecker implements NotificationChecker {
 
   /**
    * 查询新投递 — GraphQL query
-   * TODO: 替换为 discovery 发现的真实 query
+   * TODO: 此 query（名称/input/edges 字段）是未验证的占位符，必须由真实的 live
+   *       discovery 确认后才能开启（JOBSTREET_NOTIFICATIONS_ENABLED=true）。
    */
   private async checkNewApplications(page: Page, lastId?: string): Promise<RecruitmentNotification[]> {
     try {
@@ -136,7 +158,8 @@ export class JobStreetNotificationChecker implements NotificationChecker {
 
   /**
    * 查询 inbox 新消息 — GraphQL query
-   * TODO: 替换为 discovery 发现的真实 query
+   * TODO: 此 query（名称/input/edges 字段）是未验证的占位符，必须由真实的 live
+   *       discovery 确认后才能开启（JOBSTREET_NOTIFICATIONS_ENABLED=true）。
    */
   private async checkNewMessages(page: Page, lastTimestamp?: string): Promise<RecruitmentNotification[]> {
     try {

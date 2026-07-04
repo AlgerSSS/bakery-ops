@@ -1,5 +1,16 @@
-import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
+import { chromium } from "playwright-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import type { Browser, BrowserContext, Page } from "playwright";
 import * as fs from "fs";
+
+// 懒加载 stealth（与 jobstreet-login.ts 一致）：顶层 use 会在 Next.js instrumentation
+// 导入阶段触发依赖崩溃。SEEK 雇主端会拦截非 stealth 的 headless 浏览器并跳登录页。
+let _stealthApplied = false;
+function ensureStealth() {
+  if (_stealthApplied) return;
+  chromium.use(StealthPlugin());
+  _stealthApplied = true;
+}
 import type { ActiveJobsFetcher } from "./active-jobs.interface";
 import type { ActiveJob, JobApplicant } from "../types";
 import {
@@ -7,9 +18,8 @@ import {
   getStorageFile,
   hasValidSession,
 } from "../connectors/jobstreet-login";
+import { JOBSTREET_BASE_URL as SITE_URL } from "../connectors/jobstreet.constants";
 import { logger } from "../../../shared/logger";
-
-const SITE_URL = "https://my.employer.seek.com";
 
 export class JobStreetActiveJobs implements ActiveJobsFetcher {
   readonly platformName = "JobStreet" as const;
@@ -20,58 +30,62 @@ export class JobStreetActiveJobs implements ActiveJobsFetcher {
       return [];
     }
 
-    const browser = await chromium.launch({ headless: true });
-    try {
-      const context = await this.createAuthContext(browser);
-      const page = await context.newPage();
-
-      if (!(await this.verifyCookies(page))) {
-        logger.warn("JobStreet: session expired, cannot fetch active jobs");
-        return [];
-      }
-
-      return await this.doFetchActiveJobs(page);
-    } catch (err) {
-      logger.error("JobStreet fetchActiveJobs failed", { error: String(err) });
-      return [];
-    } finally {
-      await browser.close();
-    }
+    return this.withAuthedPage(
+      {
+        methodName: "fetchActiveJobs",
+        fallback: [] as ActiveJob[],
+        expiredWarning: "JobStreet: session expired, cannot fetch active jobs",
+      },
+      (page) => this.doFetchActiveJobs(page),
+    );
   }
 
   async fetchApplicants(jobId: string): Promise<JobApplicant[]> {
     if (!hasValidSession()) return [];
 
-    const browser = await chromium.launch({ headless: true });
-    try {
-      const context = await this.createAuthContext(browser);
-      const page = await context.newPage();
-
-      if (!(await this.verifyCookies(page))) return [];
-
-      return await this.doFetchApplicants(page, jobId);
-    } catch (err) {
-      logger.error("JobStreet fetchApplicants failed", { error: String(err) });
-      return [];
-    } finally {
-      await browser.close();
-    }
+    return this.withAuthedPage(
+      { methodName: "fetchApplicants", fallback: [] as JobApplicant[] },
+      (page) => this.doFetchApplicants(page, jobId),
+    );
   }
 
   async downloadResume(applicant: JobApplicant): Promise<{ buffer: Buffer; fileName: string } | null> {
-    if (!hasValidSession() || !applicant.profileUrl) return null;
+    // 需要 RESUME 附件 id + correlationId 走 SEEK 的 /attachment/applications 端点。
+    if (!hasValidSession() || !applicant.resumeAttachmentId || !applicant.correlationId) return null;
 
-    const browser = await chromium.launch({ headless: true });
+    return this.withAuthedPage(
+      { methodName: "downloadResume", fallback: null },
+      (page) => this.doDownloadResume(page, applicant),
+    );
+  }
+
+  /**
+   * 三个 public 方法共用的开会话样板：
+   * ensureStealth → launch（stealth+args，勿改）→ auth context → verifyCookies → fn。
+   * verifyCookies 失败或抛错时返回 fallback，浏览器保证关闭。
+   */
+  private async withAuthedPage<T>(
+    opts: { methodName: string; fallback: T; expiredWarning?: string },
+    fn: (page: Page) => Promise<T>,
+  ): Promise<T> {
+    ensureStealth();
+    const browser = await chromium.launch({
+      headless: true,
+      args: ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+    });
     try {
       const context = await this.createAuthContext(browser);
       const page = await context.newPage();
 
-      if (!(await this.verifyCookies(page))) return null;
+      if (!(await this.verifyCookies(page))) {
+        if (opts.expiredWarning) logger.warn(opts.expiredWarning);
+        return opts.fallback;
+      }
 
-      return await this.doDownloadResume(page, applicant);
+      return await fn(page);
     } catch (err) {
-      logger.error("JobStreet downloadResume failed", { error: String(err) });
-      return null;
+      logger.error(`JobStreet ${opts.methodName} failed`, { error: String(err) });
+      return opts.fallback;
     } finally {
       await browser.close();
     }
@@ -94,17 +108,30 @@ export class JobStreetActiveJobs implements ActiveJobsFetcher {
       }
     });
 
-    await page.goto(`${SITE_URL}/job/managejob`, {
+    // Express-ad accounts list their jobs on /dashboard via the `dashboardJobs` GraphQL op
+    // (/job/managejob redirects a logged-in express account to the create-ad funnel).
+    await page.goto(`${SITE_URL}/dashboard`, {
       waitUntil: "domcontentloaded",
       timeout: 30000,
     });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
+    await this.selectAccountIfNeeded(page);
+    await page.waitForTimeout(3000);
 
-    // 尝试从 GraphQL 响应提取岗位
+    // Primary: extract from the dashboardJobs GraphQL response
+    for (const resp of graphqlResponses) {
+      const extracted = this.extractDashboardJobs(resp);
+      if (extracted.length > 0) {
+        logger.info("JobStreet: extracted jobs from dashboardJobs", { count: extracted.length });
+        return extracted;
+      }
+    }
+
+    // Secondary: legacy managejob GraphQL shape
     for (const resp of graphqlResponses) {
       const extracted = this.extractJobsFromGraphQL(resp);
       if (extracted.length > 0) {
-        logger.info("JobStreet: extracted jobs from GraphQL", { count: extracted.length });
+        logger.info("JobStreet: extracted jobs from GraphQL (legacy)", { count: extracted.length });
         return extracted;
       }
     }
@@ -278,31 +305,26 @@ export class JobStreetActiveJobs implements ActiveJobsFetcher {
       }
     });
 
-    // 尝试多种 URL 模式
-    const urls = [
-      `${SITE_URL}/manage-applications/${jobId}`,
-      `${SITE_URL}/job/${jobId}/applications`,
-      `${SITE_URL}/job/managejob/${jobId}/applications`,
-    ];
+    // Applicants to our posted ad live at /candidates?jobid=<jobId> (the `applications` GraphQL op,
+    // whose result[] exposes firstName/lastName/phone/email for everyone who applied to our ad).
+    await page.goto(`${SITE_URL}/candidates?jobid=${jobId}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
+    });
+    await page.waitForTimeout(3000);
+    await this.selectAccountIfNeeded(page);
+    await page.waitForTimeout(4000);
 
-    let loaded = false;
-    for (const url of urls) {
-      try {
-        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
-        await page.waitForTimeout(3000);
-        if (!page.url().includes("error") && !page.url().includes("404")) {
-          loaded = true;
-          break;
-        }
-      } catch { /* try next URL */ }
+    // Primary: the `applications` GraphQL op (result[] includes phone + email)
+    for (const resp of graphqlResponses) {
+      const extracted = this.extractApplicationsResult(resp, jobId);
+      if (extracted.length > 0) {
+        logger.info("JobStreet: extracted applicants from applications op", { jobId, count: extracted.length });
+        return extracted;
+      }
     }
 
-    if (!loaded) {
-      logger.warn("JobStreet: could not load applicants page", { jobId });
-      return [];
-    }
-
-    // 尝试从 GraphQL 提取
+    // Secondary: legacy applicant extractor
     for (const resp of graphqlResponses) {
       const extracted = this.extractApplicantsFromData(resp, jobId);
       if (extracted.length > 0) return extracted;
@@ -438,50 +460,231 @@ export class JobStreetActiveJobs implements ActiveJobsFetcher {
   }
 
   private async doDownloadResume(page: Page, applicant: JobApplicant): Promise<{ buffer: Buffer; fileName: string } | null> {
-    if (!applicant.profileUrl) return null;
-
+    // SEEK 简历下载：GET {SITE}/attachment/applications?jobId&applicationCorrelationId&attachmentType&actionType&attachmentId
+    // 需带 Authorization: Bearer <auth0 access_token>（存在 SPA 缓存 @@auth0spajs@@ 里，scope advertiser:*）。
+    // 端点/参数/鉴权均经实测确认；付费(paid)账号返回 200+PDF，express 免费账号返回 422（付费墙）→ 本方法返回 null 降级。
     try {
-      await page.goto(applicant.profileUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: 20000,
+      // 先进候选人列表页，确保 auth0 SPA 缓存已注入 localStorage
+      await page.goto(`${SITE_URL}/candidates?jobid=${applicant.jobId}`, { waitUntil: "domcontentloaded", timeout: 30000 });
+      await page.waitForTimeout(2500);
+      await this.selectAccountIfNeeded(page);
+
+      const params = new URLSearchParams({
+        jobId: applicant.jobId,
+        applicationCorrelationId: applicant.correlationId!,
+        attachmentType: "PdfConvertedResume",
+        actionType: "Download",
+        attachmentId: applicant.resumeAttachmentId!,
       });
-      await page.waitForTimeout(2000);
+      const url = `${SITE_URL}/attachment/applications?${params.toString()}`;
 
-      // 尝试点击下载按钮
-      const downloadBtn = await page.$(
-        "button:has-text('Download CV'), button:has-text('Download Resume'), a:has-text('Download CV'), a:has-text('Download Resume'), [data-testid='download-resume'], [class*='download']",
-      );
-
-      if (downloadBtn) {
-        const [download] = await Promise.all([
-          page.waitForEvent("download", { timeout: 15000 }),
-          downloadBtn.click(),
-        ]);
-
-        const filePath = await download.path();
-        if (filePath) {
-          const buffer = fs.readFileSync(filePath);
-          const fileName = download.suggestedFilename() || `${applicant.name.replace(/\s+/g, "_")}_resume.pdf`;
-          return { buffer, fileName };
+      const result = await page.evaluate(async (u: string) => {
+        // 内联读取 auth0 access_token（避免命名内部函数触发打包器的 __name 注入）
+        let token = "";
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k || !/auth0|@@/.test(k)) continue;
+          try {
+            const v = JSON.parse(localStorage.getItem(k) || "{}");
+            const at = (v.body || v)?.access_token;
+            if (at) { token = at as string; break; }
+          } catch { /* ignore */ }
         }
+        const res = await fetch(u, {
+          credentials: "include",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const ct = res.headers.get("content-type") || "";
+        if (res.ok && /pdf|octet-stream/i.test(ct)) {
+          const buf = new Uint8Array(await res.arrayBuffer());
+          let bin = "";
+          for (let i = 0; i < buf.length; i += 8192) {
+            bin += String.fromCharCode(...buf.subarray(i, i + 8192));
+          }
+          return { ok: true, status: res.status, base64: btoa(bin) };
+        }
+        return { ok: false, status: res.status, ct };
+      }, url);
+
+      if (result.ok && result.base64) {
+        const buffer = Buffer.from(result.base64, "base64");
+        const fileName = `${applicant.name.replace(/\s+/g, "_")}_resume.pdf`;
+        return { buffer, fileName };
       }
 
-      // 如果有直接的 resumeUrl，尝试直接下载
-      if (applicant.resumeUrl) {
-        const response = await page.goto(applicant.resumeUrl, { timeout: 15000 });
-        if (response && response.ok()) {
-          const buffer = Buffer.from(await response.body());
-          const fileName = `${applicant.name.replace(/\s+/g, "_")}_resume.pdf`;
-          return { buffer, fileName };
-        }
-      }
-
-      logger.warn("JobStreet: no download button or resume URL found", { applicantId: applicant.applicantId });
+      // 422 = SEEK express 免费套餐付费墙（付费账号可下）；401 = 会话/令牌过期
+      logger.info("JobStreet: resume download not available (likely SEEK express paywall)", {
+        applicantId: applicant.applicantId,
+        status: (result as { status?: number }).status,
+      });
       return null;
     } catch (err) {
       logger.error("JobStreet: resume download failed", { error: String(err) });
       return null;
     }
+  }
+
+  /** SEEK shows an /account/select interstitial for multi-account users; pick the Hot Crush account. */
+  private async selectAccountIfNeeded(page: Page): Promise<void> {
+    if (!page.url().includes("/account/select")) return;
+    try {
+      await page.waitForTimeout(1500);
+      const clicked = await page.evaluate(() => {
+        const els = Array.from(document.querySelectorAll("a,button,[role=button],li,div"));
+        const target = els.find(
+          (e) => (e as HTMLElement).offsetParent && /hot\s*crush|yune|sdn\.?\s*bhd/i.test((e as HTMLElement).innerText || ""),
+        );
+        if (target) { (target as HTMLElement).click(); return true; }
+        return false;
+      });
+      logger.info("JobStreet: account/select handled", { clicked });
+      await page.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
+    } catch (err) {
+      logger.warn("JobStreet: account/select handling failed", { error: String(err) });
+    }
+  }
+
+  /** Extract active jobs from the `dashboardJobs` GraphQL op (data.dashboardJobs.jobs.edges[].node). */
+  private extractDashboardJobs(data: unknown): ActiveJob[] {
+    const jobs: ActiveJob[] = [];
+    try {
+      const root = data as Record<string, any>;
+      const edges = root?.data?.dashboardJobs?.jobs?.edges;
+      if (!Array.isArray(edges)) return [];
+      for (const edge of edges) {
+        const n = edge?.node;
+        if (!n?.id || !n?.title) continue;
+        const status = String(n.status || "").toUpperCase();
+        jobs.push({
+          jobId: String(n.id),
+          platform: "JobStreet",
+          title: String(n.title),
+          location: String(n.locations?.[0]?.description || ""),
+          status:
+            status === "ACTIVE" ? "active"
+              : status === "EXPIRED" ? "expired"
+                : status === "DRAFT" ? "draft" : "closed",
+          applicantCount: Number(n.candidatesCount ?? 0),
+          postedAt: n.listingDate ? String(n.listingDate) : undefined,
+          jobUrl: `${SITE_URL}/candidates?jobid=${n.id}`,
+        });
+      }
+    } catch { /* ignore parse errors */ }
+    return jobs;
+  }
+
+  /** Extract applicants from the `applications` GraphQL op (data.applications.result[] has phone/email). */
+  private extractApplicationsResult(data: unknown, jobId: string): JobApplicant[] {
+    const applicants: JobApplicant[] = [];
+    try {
+      const root = data as Record<string, any>;
+      const result = root?.data?.applications?.result;
+      if (!Array.isArray(result)) return [];
+      for (const r of result) {
+        const name = [r.firstName, r.lastName].filter(Boolean).join(" ").trim();
+        if (!name) continue;
+        applicants.push({
+          applicantId: String(r.applicationId || r.id || r.candidateId || ""),
+          platform: "JobStreet",
+          jobId,
+          name,
+          phone: r.phone ? this.normalizeMyPhone(String(r.phone)) : undefined,
+          email: r.email ? String(r.email) : undefined,
+          currentTitle: r.mostRecentJobTitle ? String(r.mostRecentJobTitle) : undefined,
+          experienceYears:
+            typeof r.mostRecentRoleMonths === "number"
+              ? Math.round((r.mostRecentRoleMonths / 12) * 10) / 10
+              : undefined,
+          appliedAt: r.appliedDateUtc ? String(r.appliedDateUtc) : undefined,
+          candidateId: r.candidateId != null ? String(r.candidateId) : undefined,
+          correlationId: r.id != null ? String(r.id) : undefined,
+          hasResumeAttachment: Array.isArray(r.attachmentsV2?.result)
+            ? r.attachmentsV2.result.some((a: { attachmentType?: string }) => /RESUME|CV/i.test(String(a?.attachmentType)))
+            : undefined,
+          resumeAttachmentId: Array.isArray(r.attachmentsV2?.result)
+            ? (r.attachmentsV2.result.find((a: { attachmentType?: string }) => /RESUME|CV/i.test(String(a?.attachmentType)))?.attachmentId != null
+                ? String(r.attachmentsV2.result.find((a: { attachmentType?: string }) => /RESUME|CV/i.test(String(a?.attachmentType))).attachmentId)
+                : undefined)
+            : undefined,
+        });
+      }
+    } catch { /* ignore parse errors */ }
+    return applicants;
+  }
+
+  /**
+   * 拉取候选人在线档案（教育/技能/工作经历/工作权利/国籍）。
+   * SEEK express 免费套餐无法下载简历 PDF（详情抽屉显示 "Upgrade to download"），
+   * 但这些结构化档案可免费获取——点开候选人卡片会触发 ProfileDrawerApplication，
+   * 我们被动截获其响应并提取。applicantIndex = 列表顺序（卡片 data-testid=job-application-card-N）。
+   */
+  async fetchApplicantProfile(
+    jobId: string,
+    applicantIndex: number,
+    applicant: JobApplicant,
+  ): Promise<import("../types").ApplicantProfile | null> {
+    if (!hasValidSession()) return null;
+    return this.withAuthedPage(
+      { methodName: "fetchApplicantProfile", fallback: null },
+      (page) => this.doFetchApplicantProfile(page, jobId, applicantIndex, applicant),
+    );
+  }
+
+  private async doFetchApplicantProfile(
+    page: Page,
+    jobId: string,
+    applicantIndex: number,
+    applicant: JobApplicant,
+  ): Promise<import("../types").ApplicantProfile | null> {
+    const responses: unknown[] = [];
+    page.on("response", async (response) => {
+      if (!response.url().includes("graphql")) return;
+      try { responses.push(await response.json()); } catch { /* ignore */ }
+    });
+
+    await page.goto(`${SITE_URL}/candidates?jobid=${jobId}`, { waitUntil: "domcontentloaded", timeout: 30000 });
+    await page.waitForTimeout(3000);
+    await this.selectAccountIfNeeded(page);
+    await page.waitForTimeout(3000);
+
+    // 点开对应候选人卡片打开档案抽屉（触发 ProfileDrawerApplication）
+    const card =
+      (await page.$(`[data-testid='job-application-card-${applicantIndex}']`)) ||
+      (applicant.name ? await page.$(`text=${applicant.name.split(" ")[0]}`) : null);
+    if (!card) return null;
+    await card.click().catch(() => {});
+    await page.waitForTimeout(5000);
+
+    return this.extractProfileFromResponses(responses, applicant);
+  }
+
+  private extractProfileFromResponses(
+    responses: unknown[],
+    applicant: JobApplicant,
+  ): import("../types").ApplicantProfile | null {
+    for (const resp of responses) {
+      const p = (resp as Record<string, any>)?.data?.application?.result?.profile?.result;
+      if (!p) continue;
+      const list = (arr: unknown, fmt: (x: any) => string | undefined): string[] =>
+        (Array.isArray(arr) ? arr.map(fmt).filter((s): s is string => Boolean(s)) : []);
+      return {
+        education: list(p.education, (e) => [e?.name, e?.institute].filter(Boolean).join(" @ ") || undefined),
+        skills: list(p.skills, (s) => s?.keyword),
+        workHistory: list(p.workHistory, (w) => [w?.title || w?.jobTitle, w?.companyName || w?.company].filter(Boolean).join(" @ ") || undefined),
+        rightToWork: list(p.rightsToWorkV2, (r) => r?.displayLabel),
+        nationalities: list(p.nationalities?.result, (n) => n?.countryName),
+        hasResumeAttachment: Boolean(applicant.hasResumeAttachment),
+      };
+    }
+    return null;
+  }
+
+  /** Normalize a SEEK phone (e.g. "+60 0182479081" / "0182479081") to 60XXXXXXXXX (no +, no leading 0). */
+  private normalizeMyPhone(raw: string): string {
+    let d = raw.replace(/\D/g, "");
+    if (d.startsWith("60")) d = d.slice(2);
+    d = d.replace(/^0+/, "");
+    return `60${d}`;
   }
 
   // ── Auth helpers ──
@@ -511,13 +714,16 @@ export class JobStreetActiveJobs implements ActiveJobsFetcher {
 
   private async verifyCookies(page: Page): Promise<boolean> {
     try {
-      await page.goto(`${SITE_URL}/`, {
+      // Probe a REAL authenticated page (/dashboard), not "/" — root redirects through
+      // /onboarding + a silent auth0 check that transiently sits on an oauth URL and would
+      // false-negative. A stale session bounces to authenticate.seek.com/login.
+      await page.goto(`${SITE_URL}/dashboard`, {
         waitUntil: "domcontentloaded",
         timeout: 30000,
       });
       await page.waitForTimeout(5000);
       const url = page.url();
-      return !url.includes("login") && !url.includes("oauth") && !url.includes("authenticate");
+      return !url.includes("authenticate.seek.com") && !url.includes("/login") && !url.includes("/oauth/");
     } catch {
       return false;
     }

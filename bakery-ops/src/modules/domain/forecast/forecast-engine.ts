@@ -5,6 +5,7 @@ export {
 } from "./engine/product-suggestion";
 export {
   calculateTimeSlotSuggestions,
+  selectDefaultTimeSlots,
 } from "./engine/timeslot-allocation";
 export {
   parseStockoutLine,

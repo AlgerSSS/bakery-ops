@@ -76,7 +76,8 @@ function parseCollectedInputs(value: unknown): Record<string, unknown> {
   if (typeof value === "string") {
     try {
       return JSON.parse(value) as Record<string, unknown>;
-    } catch {
+    } catch (error) {
+      logger.error("session-state.repository.parseCollectedInputs failed", { error: String(error) });
       return {};
     }
   }

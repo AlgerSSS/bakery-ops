@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { DAY_TYPE_LABELS, DOW_LABELS, ALL_SLOTS } from "@/ui/constants";
+import { DAY_TYPE_LABELS, DOW_LABELS, ALL_SLOTS } from "./constants";
 import type {
   TimeSlotSuggestion,
   ProductSuggestion,
@@ -7,8 +7,6 @@ import type {
   Product,
   DailyTarget,
 } from "./types";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 export async function buildForecastExcelBuffer(opts: {
   date: string;
@@ -28,7 +26,7 @@ export async function buildForecastExcelBuffer(opts: {
   return Buffer.from(buf);
 }
 
-function buildTimeSlotSheet(wb: any, opts: {
+function buildTimeSlotSheet(wb: ExcelJS.Workbook, opts: {
   timeSlotSuggestions: TimeSlotSuggestion[];
   productSuggestions: ProductSuggestion[];
   timeslotSalesRecords: TimeslotSalesRecord[];
@@ -78,7 +76,7 @@ function buildTimeSlotSheet(wb: any, opts: {
 
   // Row 2: Date & basic info
   const infoRow = ws.addRow([`日期：${selectedDate}`, "", `${dayOfWeek}（${dayTypeLabel}）`, "", "业绩预估", dayRevenue, "出货金额", shipmentAmount]);
-  infoRow.eachCell((cell: any) => { cell.font = { size: 10 }; cell.border = thinBorder; });
+  infoRow.eachCell((cell: ExcelJS.Cell) => { cell.font = { size: 10 }; cell.border = thinBorder; });
   infoRow.getCell(5).font = { bold: true, size: 10 };
   infoRow.getCell(6).font = { bold: true, size: 10, color: { argb: "FFDC2626" } };
   infoRow.getCell(7).font = { bold: true, size: 10 };
@@ -86,14 +84,14 @@ function buildTimeSlotSheet(wb: any, opts: {
 
   // Row 3
   const infoRow2 = ws.addRow(["", "", "", "", "试吃+排产", tastingWasteAmount, "试吃占比", "6%"]);
-  infoRow2.eachCell((cell: any) => { cell.font = { size: 10 }; cell.border = thinBorder; });
+  infoRow2.eachCell((cell: ExcelJS.Cell) => { cell.font = { size: 10 }; cell.border = thinBorder; });
   ws.addRow([]);
 
   // Header row
   const headerRow = ws.addRow(["品名", "定位", "冷/热", "单价", "倍数", "满柜", "总数", "金额",
     ...slotHeaders.map((s) => `${s}出货`), ...slotHeaders.map((s) => `${s}金额`),
     "试吃量", "试吃金额", "加货数量", "加货备注", "减货数量", "减货备注"]);
-  headerRow.eachCell((cell: any) => {
+  headerRow.eachCell((cell: ExcelJS.Cell) => {
     cell.fill = headerFill; cell.font = { bold: true, size: 9, color: { argb: "FF6B7280" } };
     cell.border = thinBorder; cell.alignment = { horizontal: "center" };
   });
@@ -123,7 +121,7 @@ function buildTimeSlotSheet(wb: any, opts: {
     const slotQtyValues = ALL_SLOTS.map((slot) => { const data = slotMap.get(name)?.get(slot); return data && data.quantity > 0 ? data.quantity : ""; });
     const slotAmtValues = ALL_SLOTS.map((slot) => { const data = slotMap.get(name)?.get(slot); return data && data.amount > 0 ? data.amount : ""; });
     const row = ws.addRow([name, info?.positioning ?? "", info?.coldHot ?? "", info?.price ?? "", info?.packMultiple ?? "", fullQtyMap.get(name) ?? "", totalQty, totalAmount, ...slotQtyValues, ...slotAmtValues, "", "", "", "", "", ""]);
-    row.eachCell((cell: any, colNumber: number) => { cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; cell.font = { size: 10 }; });
+    row.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; cell.font = { size: 10 }; });
     ALL_SLOTS.forEach((slot, idx) => {
       if (schedule.includes(slot)) { const cell = row.getCell(COL_OFFSET_QTY + idx); cell.fill = fixedSlotFill; cell.font = { bold: true, size: 10 }; }
     });
@@ -133,7 +131,7 @@ function buildTimeSlotSheet(wb: any, opts: {
   const sumSlotQtyValues = ALL_SLOTS.map((slot) => timeSlotSuggestions.filter((s) => s.timeSlot === slot).reduce((sum, s) => sum + s.quantity, 0) || "");
   const sumSlotAmtValues = ALL_SLOTS.map((slot) => timeSlotSuggestions.filter((s) => s.timeSlot === slot).reduce((sum, s) => sum + s.amount, 0) || "");
   const sumRow = ws.addRow(["合计", "", "", "", "", "", timeSlotSuggestions.reduce((s, item) => s + item.quantity, 0), timeSlotSuggestions.reduce((s, item) => s + item.amount, 0), ...sumSlotQtyValues, ...sumSlotAmtValues]);
-  sumRow.eachCell((cell: any) => { cell.fill = sumRowFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
+  sumRow.eachCell((cell: ExcelJS.Cell) => { cell.fill = sumRowFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
   sumRow.getCell(1).alignment = { horizontal: "left" };
 
   // 预计销售 row
@@ -145,7 +143,7 @@ function buildTimeSlotSheet(wb: any, opts: {
     return amt || "";
   });
   const salesRow = ws.addRow(["预计销售", "", "", "", "", "", "", estimatedSalesTotal || "", ...salesSlotValues]);
-  salesRow.eachCell((cell: any) => { cell.fill = salesRowFill; cell.font = { size: 10, color: { argb: "FF1D4ED8" } }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
+  salesRow.eachCell((cell: ExcelJS.Cell) => { cell.fill = salesRowFill; cell.font = { size: 10, color: { argb: "FF1D4ED8" } }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
   salesRow.getCell(1).alignment = { horizontal: "left" };
 
   // 预计剩余 row
@@ -161,7 +159,7 @@ function buildTimeSlotSheet(wb: any, opts: {
     return cumulativeShipment - cumulativeSales;
   });
   const remainRow = ws.addRow(["预计剩余", "", "", "", "", "", "", shipmentTotal - estimatedSalesTotal, ...remainSlotValues]);
-  remainRow.eachCell((cell: any, colNumber: number) => {
+  remainRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => {
     cell.fill = remainRowFill; cell.border = thinBorder; cell.alignment = { horizontal: "center" };
     const val = cell.value as number;
     if (colNumber >= 8 && typeof val === "number") cell.font = { size: 10, color: { argb: val < 0 ? "FFEF4444" : "FF16A34A" } };
@@ -180,7 +178,7 @@ function buildTimeSlotSheet(wb: any, opts: {
   });
   const displayTotal = products.reduce((sum, p) => sum + p.displayFullQuantity * p.price, 0);
   const displayRow = ws.addRow(["门店陈列(满柜金额)", "", "", "", "", "", "", displayTotal || "", ...displaySlotValues]);
-  displayRow.eachCell((cell: any) => {
+  displayRow.eachCell((cell: ExcelJS.Cell) => {
     cell.fill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF0FDF4" } };
     cell.font = { size: 10, color: { argb: "FF16A34A" } }; cell.border = thinBorder; cell.alignment = { horizontal: "center" };
   });
@@ -232,7 +230,7 @@ function buildTimeSlotSheet(wb: any, opts: {
 
   ws.addRow([]);
   const tastingHeaderRow = ws.addRow(["试吃分配", "", "", "", "", "", "", "", ...slotHeaders]);
-  tastingHeaderRow.eachCell((cell: any) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
+  tastingHeaderRow.eachCell((cell: ExcelJS.Cell) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
   tastingHeaderRow.getCell(1).alignment = { horizontal: "left" };
 
   const tastingPriceMap: Record<string, number> = {};
@@ -243,27 +241,26 @@ function buildTimeSlotSheet(wb: any, opts: {
     const unitPrice = tastingPriceMap[tp.name];
     const slotValues = ALL_SLOTS.map((slot) => { const amt = tastingSlotAmounts[tp.name][slot]; return amt && amt > 0 ? amt : ""; });
     const row = ws.addRow([tp.name, "", "", "", "", "", "", totalBudget, ...slotValues]);
-    row.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+    row.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
     const totalQty = unitPrice > 0 ? Math.ceil(totalBudget / unitPrice) : 0;
     const qtySlotValues = ALL_SLOTS.map((slot) => { const amt = tastingSlotAmounts[tp.name][slot]; if (!amt || amt <= 0 || unitPrice <= 0) return ""; return Math.ceil(amt / unitPrice); });
     const qtyRow = ws.addRow([`${tp.name}(个数)`, "", "", "", "", "", "", totalQty || "", ...qtySlotValues]);
-    qtyRow.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10, color: { argb: "FF6B7280" } }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+    qtyRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10, color: { argb: "FF6B7280" } }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
   }
 
   const tastingSubtotal = Math.round(shipmentAmount * 0.04);
   const subtotalSlotValues = ALL_SLOTS.map((slot) => { const total = tastingProducts.reduce((sum, tp) => { const amt = tastingSlotAmounts[tp.name][slot]; return sum + (amt && amt > 0 ? amt : 0); }, 0); return total > 0 ? total : ""; });
   const subtotalRow = ws.addRow(["试吃小计", "", "", "", "", "", "", tastingSubtotal, ...subtotalSlotValues]);
-  subtotalRow.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+  subtotalRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
 
   const tastingSalesRow = ws.addRow(["该时段预计销售", "", "", "", "", "", "", estimatedSalesTotal || "", ...salesSlotValues]);
-  tastingSalesRow.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10, color: { argb: "FF1D4ED8" } }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+  tastingSalesRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10, color: { argb: "FF1D4ED8" } }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
 
   const wasteAmount = Math.round(shipmentAmount * wasteRate);
   const wasteRow = ws.addRow(["排产报废", "", "", "", "", "", "", wasteAmount]);
-  wasteRow.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+  wasteRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
 
   const totalLoss = Math.round(shipmentAmount * 0.06);
   const lossRow = ws.addRow(["损耗合计", "", "", "", "", "", "", totalLoss]);
-  lossRow.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+  lossRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */

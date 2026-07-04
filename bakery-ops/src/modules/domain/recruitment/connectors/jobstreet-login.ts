@@ -9,6 +9,7 @@ import { chromium } from "playwright-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import * as fs from "fs";
 import * as path from "path";
+import { JOBSTREET_BASE_URL } from "./jobstreet.constants";
 
 // 懒加载 stealth 插件：放在模块顶层会在 Next.js/Turbopack 的 instrumentation 导入阶段
 // 触发依赖崩溃（utils.typeOf is not a function）。改为首次启动浏览器前再 use，行为不变。
@@ -22,10 +23,22 @@ function ensureStealth() {
 const SESSION_DIR = process.env.JOBSTREET_SESSION_DIR || "./jobstreet-session";
 const COOKIE_FILE = path.join(SESSION_DIR, "cookies.json");
 const STORAGE_FILE = path.join(SESSION_DIR, "storage.json");
-const LOGIN_URL = "https://my.employer.seek.com/oauth/login/";
+const LOGIN_URL = `${JOBSTREET_BASE_URL}/oauth/login/`;
 
 export function hasValidSession(): boolean {
-  return fs.existsSync(COOKIE_FILE);
+  if (!fs.existsSync(COOKIE_FILE)) return false;
+  try {
+    const cookies: Array<{ name: string; expires?: number }> = JSON.parse(fs.readFileSync(COOKIE_FILE, "utf-8"));
+    const nowSec = Date.now() / 1000;
+    // The auth0/hirer cookies gate the employer area. If every known auth cookie has a past
+    // expiry, the session is stale — return false so callers re-login instead of "succeeding"
+    // with zero results. (Playwright session cookies use expires === -1; treat those as live.)
+    const authCookies = cookies.filter((c) => /auth0|hirer_sid|seek_session/i.test(c.name));
+    if (authCookies.length === 0) return false;
+    return authCookies.some((c) => c.expires == null || c.expires <= 0 || c.expires > nowSec);
+  } catch {
+    return false;
+  }
 }
 
 export function getSessionDir(): string {

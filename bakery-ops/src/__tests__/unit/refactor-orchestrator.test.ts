@@ -1,4 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
+
+// Stub the recruitment pre-router so orchestrator integration tests don't hit the live DB. See
+// phase1.test.ts for the rationale (pre-router runs first and drives the funnel via repositories).
+vi.mock("@/modules/domain/recruitment/intake/recruitment-pre-router", () => ({
+  recruitmentPreRouter: {
+    async tryRoute() { return null; },
+    async greetStranger() { return null; },
+  },
+}));
+
 import { ConversationManager } from "@/modules/orchestrator/conversation-manager";
 import { ResponseFormatter } from "@/modules/orchestrator/response-formatter";
 import { IntentRouter, type AiRouterProvider } from "@/modules/orchestrator/intent-router";
@@ -383,7 +393,7 @@ describe("Orchestrator integration", () => {
     expect(nonSystem.some((m) => m.content === "第一条消息")).toBe(true);
   });
 
-  it("returns error response for unregistered user", async () => {
+  it("returns no auto-reply for an unregistered, non-candidate user (open inbox)", async () => {
     const mockAi: AiProvider = {
       async chatCompletion() { return ""; },
       async chatCompletionLong() { return ""; },
@@ -398,7 +408,78 @@ describe("Orchestrator integration", () => {
     const msg = makeMessage("99999999999", "你好");
     const responses = await orchestrator.handle(msg);
 
-    expect(responses.length).toBeGreaterThan(0);
-    expect(responses[0].type).toBe("text");
+    // Unregistered numbers fall through to an open inbox (no rejection message) after the
+    // recruitment funnel change; pre-router is mocked to null so no candidate greeting fires.
+    expect(responses).toEqual([]);
+  });
+
+  // B1（IMPROVEMENT-PLAN.md）：非招聘技能的 ack 不再是写死的招聘话术
+  it("keyword fast-path ack uses the skill name, not the recruitment catchphrase", async () => {
+    const mockAi: AiProvider = {
+      async chatCompletion() { return ""; },
+      async chatCompletionLong() { return ""; },
+      async chatCompletionMessages() { return JSON.stringify({ action: "chat", reply: "ok" }); },
+      async getEmbedding() { return []; },
+      async getEmbeddings() { return [[]]; },
+    };
+    const registry = new SkillRegistry();
+    const stateManager = new StateManager();
+    const permissionService = new PermissionService();
+    const auditService = new AuditService();
+    permissionService.registerUser({
+      userId: "u_owner", phone: "60123456789", name: "Test Owner",
+      role: "owner", permissions: [], storeIds: ["store1"],
+    });
+    const okHandler: SkillHandler = {
+      async execute(): Promise<SkillExecutionResult> {
+        return { runId: "r1", skillId: "order_summary", status: "success", summary: "done" };
+      },
+    };
+    registry.register({
+      ...makeSkillDef("order_summary", okHandler),
+      name: "汇总订货",
+      triggerKeywords: ["汇总今天订货"],
+    });
+    const orchestrator = new Orchestrator(registry, stateManager, permissionService, auditService, mockAi);
+
+    const responses = await orchestrator.handle(makeMessage("60123456789", "汇总今天订货"));
+    const allText = responses.map((r) => ("text" in r ? String(r.text) : "")).join("\n");
+    expect(allText).not.toContain("人选");
+    expect(allText).toContain("汇总订货");
+  });
+
+  // B1：技能抛错时原始异常只进日志，不透传给用户
+  it("skill errors are not leaked to the user reply", async () => {
+    const mockAi: AiProvider = {
+      async chatCompletion() { return ""; },
+      async chatCompletionLong() { return ""; },
+      async chatCompletionMessages() { return JSON.stringify({ action: "chat", reply: "ok" }); },
+      async getEmbedding() { return []; },
+      async getEmbeddings() { return [[]]; },
+    };
+    const registry = new SkillRegistry();
+    const stateManager = new StateManager();
+    const permissionService = new PermissionService();
+    const auditService = new AuditService();
+    permissionService.registerUser({
+      userId: "u_owner", phone: "60123456789", name: "Test Owner",
+      role: "owner", permissions: [], storeIds: ["store1"],
+    });
+    const failingHandler: SkillHandler = {
+      async execute(): Promise<SkillExecutionResult> {
+        throw new Error("connect ECONNREFUSED 127.0.0.1:5432");
+      },
+    };
+    registry.register({
+      ...makeSkillDef("broken_skill", failingHandler),
+      name: "坏技能",
+      triggerKeywords: ["触发坏技能"],
+    });
+    const orchestrator = new Orchestrator(registry, stateManager, permissionService, auditService, mockAi);
+
+    const responses = await orchestrator.handle(makeMessage("60123456789", "触发坏技能"));
+    const allText = responses.map((r) => ("text" in r ? String(r.text) : "")).join("\n");
+    expect(allText).not.toContain("ECONNREFUSED");
+    expect(allText).toContain("执行失败");
   });
 });

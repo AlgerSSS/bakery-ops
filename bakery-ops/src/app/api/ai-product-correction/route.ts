@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/modules/shared/db/postgres";
 import { buildPrompt } from "@/modules/domain/forecast/prompt-engine";
 import { generateJsonFromPrompt } from "@/modules/domain/forecast/gemini-client";
+import { roundCorrections, rebalanceToTarget } from "@/modules/domain/forecast/correction-math";
+import { DAY_TYPE_LABELS } from "@/modules/domain/forecast/constants";
 
 interface BaselineRow {
   product_name: string;
@@ -27,11 +29,6 @@ interface ProductInput {
   adjustedQuantity?: number;
 }
 
-const DAY_TYPE_LABELS: Record<string, string> = {
-  mondayToThursday: "周一至周四",
-  friday: "周五",
-  weekend: "周六周日",
-};
 
 const DAY_TYPE_COL: Record<string, string> = {
   mondayToThursday: "avg_monday_to_thursday",
@@ -134,65 +131,10 @@ export async function POST(req: NextRequest) {
       productMap.set(p.productName, p);
     }
 
-    const corrections = parsed.corrections.map((c: { productName: string; suggestedQuantity: number; reason: string }) => {
-      const product = productMap.get(c.productName);
-      let qty = Math.max(0, Math.round(c.suggestedQuantity));
-      if (product && product.unitType === "batch" && product.packMultiple > 1) {
-        qty = Math.round(qty / product.packMultiple) * product.packMultiple;
-      }
-      return { productName: c.productName, suggestedQuantity: qty, reason: c.reason || "" };
-    });
-
-    const correctionMap = new Map<string, number>();
-    for (const c of corrections) {
-      correctionMap.set(c.productName, c.suggestedQuantity);
-    }
-    let correctedTotal = 0;
-    for (const p of products) {
-      const qty = correctionMap.get(p.productName) ?? (p.adjustedQuantity ?? p.roundedQuantity);
-      correctedTotal += qty * p.price;
-    }
+    const corrections = roundCorrections(parsed.corrections, productMap);
 
     // 金额兜底
-    const diff = shipmentAmount - correctedTotal;
-    const tolerance = shipmentAmount * 0.02;
-    if (Math.abs(diff) > tolerance) {
-      const adjustable = corrections
-        .map((c: { productName: string; suggestedQuantity: number; reason: string }) => ({
-          correction: c,
-          product: productMap.get(c.productName),
-        }))
-        .filter((x: { product: ProductInput | undefined }) => x.product)
-        .sort((a: { product: ProductInput }, b: { product: ProductInput }) => {
-          const posOrder: Record<string, number> = { "TOP": 0, "潜在TOP": 1, "其他": 2 };
-          const pa = posOrder[a.product.positioning] ?? 2;
-          const pb = posOrder[b.product.positioning] ?? 2;
-          if (pa !== pb) return pa - pb;
-          return b.product.price - a.product.price;
-        });
-
-      let remaining = diff;
-      for (const { correction: c, product: p } of adjustable) {
-        if (Math.abs(remaining) <= tolerance) break;
-        if (!p) continue;
-        const unit = (p.unitType === "batch" && p.packMultiple > 1) ? p.packMultiple : 1;
-        const stepAmount = unit * p.price;
-        if (remaining > 0 && stepAmount <= remaining * 1.5) {
-          c.suggestedQuantity += unit;
-          remaining -= stepAmount;
-          correctionMap.set(c.productName, c.suggestedQuantity);
-        } else if (remaining < 0 && c.suggestedQuantity > unit) {
-          c.suggestedQuantity -= unit;
-          remaining += stepAmount;
-          correctionMap.set(c.productName, c.suggestedQuantity);
-        }
-      }
-      correctedTotal = 0;
-      for (const p of products) {
-        const qty = correctionMap.get(p.productName) ?? (p.adjustedQuantity ?? p.roundedQuantity);
-        correctedTotal += qty * p.price;
-      }
-    }
+    const correctedTotal = rebalanceToTarget(corrections, products, productMap, shipmentAmount);
 
     return NextResponse.json({
       corrections,

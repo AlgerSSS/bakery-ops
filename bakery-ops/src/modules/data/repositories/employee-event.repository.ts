@@ -46,7 +46,8 @@ export class EmployeeEventRepository {
         `SELECT ${SELECT_COLUMNS} FROM employee_events WHERE employee_id = ? ORDER BY created_at DESC`,
         [employeeId]
       );
-    } catch {
+    } catch (error) {
+      logger.error("employee-event.repository.getByEmployee failed", { error: String(error) });
       return [];
     }
   }
@@ -57,7 +58,8 @@ export class EmployeeEventRepository {
         `SELECT ${SELECT_COLUMNS} FROM employee_events WHERE event_type = ? ORDER BY created_at DESC LIMIT ?`,
         [eventType, limit]
       );
-    } catch {
+    } catch (error) {
+      logger.error("employee-event.repository.getByType failed", { error: String(error) });
       return [];
     }
   }

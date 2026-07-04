@@ -1,4 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// The orchestrator runs the recruitment pre-router FIRST (for unregistered numbers it drives the
+// candidate funnel via live repositories). These unit tests exercise routing/permissions, not the
+// funnel, so stub the pre-router to keep them off the live DB. See recruitment-pre-router.ts.
+vi.mock("@/modules/domain/recruitment/intake/recruitment-pre-router", () => ({
+  recruitmentPreRouter: {
+    async tryRoute() { return null; },
+    async greetStranger() { return null; },
+  },
+}));
+
 import { SkillRegistry } from "@/modules/orchestrator/skill-registry";
 import { IntentRouter, type AiRouterProvider } from "@/modules/orchestrator/intent-router";
 import { StateManager } from "@/modules/orchestrator/state-manager";
@@ -215,19 +226,40 @@ describe("IntentRouter Layer 1 — 关键词匹配", () => {
     expect(result.skillId).toBe("recruitment_sourcing");
   });
 
-  it("routes '预估单' to forecast skill via keyword then LLM", async () => {
+  it("fast-paths '预估单' to forecast skill WITHOUT an LLM call", async () => {
     const { registry } = createTestOrchestrator();
-    const router = new IntentRouter(registry, simpleMockAi);
+    // High-confidence keyword: '预估单' is unique and not a substring of any sibling skill's
+    // keyword, so the router returns directly and never calls the LLM (efficiency goal).
+    let llmCalls = 0;
+    const mockAi: AiRouterProvider = {
+      async getEmbedding() { return []; },
+      async getEmbeddings() { return []; },
+      async chatCompletion() { return ""; },
+      async chatCompletionLong() { return ""; },
+      async chatCompletionMessages() { llmCalls++; return '{"action":"chat","reply":"x"}'; },
+    };
+    const router = new IntentRouter(registry, mockAi);
     const result = await router.route("生成明天预估单", []);
-    // keyword match sets forcedSkillId; LLM reply may be chat but skillId is preserved
+    expect(result.action).toBe("skill");
     expect(result.skillId).toBe("forecast_order");
+    expect(llmCalls).toBe(0);
   });
 
-  it("routes '后厨计划' to kitchen skill via keyword then LLM", async () => {
+  it("fast-paths '后厨计划' to kitchen skill WITHOUT an LLM call", async () => {
     const { registry } = createTestOrchestrator();
-    const router = new IntentRouter(registry, simpleMockAi);
+    let llmCalls = 0;
+    const mockAi: AiRouterProvider = {
+      async getEmbedding() { return []; },
+      async getEmbeddings() { return []; },
+      async chatCompletion() { return ""; },
+      async chatCompletionLong() { return ""; },
+      async chatCompletionMessages() { llmCalls++; return '{"action":"chat","reply":"x"}'; },
+    };
+    const router = new IntentRouter(registry, mockAi);
     const result = await router.route("生成后厨计划", []);
+    expect(result.action).toBe("skill");
     expect(result.skillId).toBe("kitchen_production_plan");
+    expect(llmCalls).toBe(0);
   });
 
   it("returns chat for unrecognized text (with mock AI)", async () => {
@@ -272,11 +304,14 @@ describe("Orchestrator — LLM 决策", () => {
 });
 
 describe("Orchestrator — 权限", () => {
-  it("rejects unregistered user", async () => {
+  it("does not auto-reply to an unregistered, non-candidate number (open inbox)", async () => {
+    // Recruitment funnel change: unregistered numbers no longer get a rejection message. The
+    // pre-router (mocked to null here) and greetStranger own genuine candidates; everything else
+    // falls through to an open inbox with no auto-reply.
     const { orchestrator } = createTestOrchestrator();
     const msg = makeMessage("99999999999", "招聘");
     const responses = await orchestrator.handle(msg);
-    expect(responses[0].text).toContain("尚未注册");
+    expect(responses).toEqual([]);
   });
 });
 

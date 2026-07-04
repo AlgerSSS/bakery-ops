@@ -1,4 +1,5 @@
 import { query, execute, withTransaction } from "@/modules/shared/db/postgres";
+import { logger } from "@/modules/shared/logger";
 import type {
   BusinessRules,
   PlanningRules,
@@ -161,6 +162,29 @@ export async function getDailySalesTotal(date: string): Promise<number> {
   return Math.round(total);
 }
 
+// ========== Scheduling Waste Rate (F7-②) ==========
+/** 纯计算：报废金额 ÷ 营业额；任一无效或 ≤0 返回 null（调用方 fallback 默认值）。 */
+export function computeWasteRate(wasteTotal: number | null, revenueTotal: number | null): number | null {
+  const waste = Number(wasteTotal);
+  const revenue = Number(revenueTotal);
+  if (!Number.isFinite(waste) || !Number.isFinite(revenue) || waste <= 0 || revenue <= 0) return null;
+  return waste / revenue;
+}
+
+/**
+ * 实测排产报废率：近 30 天 scheduling 报废金额 ÷ 同期营业额（走金额汇总，绕开单品名匹配）。
+ * 无数据返回 null。
+ */
+export async function getSchedulingWasteRate30d(): Promise<number | null> {
+  const wasteRows = await query<{ total: string | number | null }>(
+    "SELECT SUM(amount) as total FROM item_waste WHERE waste_reason = 'scheduling' AND date >= CURRENT_DATE - 30"
+  );
+  const revenueRows = await query<{ total: string | number | null }>(
+    "SELECT SUM(revenue) as total FROM daily_revenue WHERE date >= to_char(CURRENT_DATE - 30, 'YYYY-MM-DD')"
+  );
+  return computeWasteRate(Number(wasteRows[0]?.total ?? 0), Number(revenueRows[0]?.total ?? 0));
+}
+
 // ========== Auto Import from Data Directory ==========
 export async function autoImportFromDataDir(): Promise<{
   products: ImportResult;
@@ -191,7 +215,10 @@ export async function autoImportFromDataDir(): Promise<{
     try {
       const dfqBuf = await readFile(path.join(dataDir, "kl陈列满柜单品数量.xlsx"));
       dfqMap = await parseDisplayFullQuantity(dfqBuf.buffer as ArrayBuffer);
-    } catch { /* file may not exist */ }
+    } catch (error) {
+      // file may not exist
+      logger.warn("forecast-calc.repository.autoImportFromDataDir dfq file skipped", { error: String(error) });
+    }
     await withTransaction(async ({ execute }) => {
       await execute("DELETE FROM product");
       for (const p of products) {
@@ -246,7 +273,8 @@ export async function autoImportFromDataDir(): Promise<{
     const buf = await readFile(path.join(dataDir, "单品销售数量1.1-4.2.xlsx"));
     const { records, unmatchedProducts } = await parseSalesData(buf.buffer as ArrayBuffer, products);
     const businessRules = await getBusinessRulesFromDB();
-    const baselines = calculateSalesBaselines(records, products, businessRules.baselineOverrides);
+    const stockoutRecords = await getOutOfStockRecords();
+    const baselines = calculateSalesBaselines(records, products, businessRules.baselineOverrides, stockoutRecords);
     await withTransaction(async ({ execute }) => {
       await execute("DELETE FROM daily_sales_record");
       const BATCH = 500;

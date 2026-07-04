@@ -29,7 +29,8 @@ export class ScreeningRuleRepository {
          ORDER BY confidence DESC`,
         [true],
       );
-    } catch {
+    } catch (error) {
+      logger.error("screening-rule.repository.getActiveRules failed", { error: String(error) });
       return [];
     }
 

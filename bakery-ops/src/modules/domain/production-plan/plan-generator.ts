@@ -1,8 +1,27 @@
 import { getProductForecast } from "@/modules/domain/forecast/forecast.service";
 import type { ProductionBatch, ProductionPlan } from "./types";
+import prepTimesConfig from "./prep-times.json";
 
-const HOT_PREP_MINUTES = 50;
-const COLD_PREP_MINUTES = 240;
+// 备制时长配置（分钟）：prep-times.json 按品项覆盖，师傅逐品校准只改 JSON。
+// 值可以是数字（该品项冷热通用）或 { hot, cold } 对象；"默认" 为兜底。
+type PrepTimeEntry = number | { hot?: number; cold?: number };
+
+const FALLBACK_PREP = { hot: 50, cold: 240 };
+
+export function getPrepMinutes(
+  productName: string,
+  coldHot: "冷" | "热",
+  config: Record<string, PrepTimeEntry> = prepTimesConfig as Record<string, PrepTimeEntry>
+): number {
+  const key = coldHot === "热" ? "hot" : "cold";
+  const entry = config[productName];
+  if (typeof entry === "number") return entry;
+  if (entry && typeof entry[key] === "number") return entry[key]!;
+  const def = config["默认"];
+  if (typeof def === "number") return def;
+  if (def && typeof def[key] === "number") return def[key]!;
+  return FALLBACK_PREP[key];
+}
 
 const WORKSTATION_LABELS: Record<ProductionBatch["workstation"], string> = {
   "oven-1": "烤箱1",
@@ -45,7 +64,7 @@ export async function generateProductionPlan(date: string): Promise<ProductionPl
     if (!meta || slot.quantity <= 0) continue;
 
     const coldHot = (meta.coldHot === "冷" ? "冷" : "热") as "冷" | "热";
-    const prepMinutes = coldHot === "热" ? HOT_PREP_MINUTES : COLD_PREP_MINUTES;
+    const prepMinutes = getPrepMinutes(slot.productName, coldHot);
     const prepareBy = subtractMinutes(slot.timeSlot, prepMinutes);
     const batchCount = meta.packMultiple > 1
       ? Math.ceil(slot.quantity / meta.packMultiple)

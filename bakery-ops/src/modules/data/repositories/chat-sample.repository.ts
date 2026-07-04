@@ -41,7 +41,8 @@ export class ChatSampleRepository {
         "SELECT * FROM marketing_chat_samples WHERE kol_id = ? ORDER BY captured_at ASC",
         [kolId],
       );
-    } catch {
+    } catch (error) {
+      logger.error("chat-sample.repository.getByKOLId failed", { error: String(error) });
       return [];
     }
   }
@@ -52,7 +53,8 @@ export class ChatSampleRepository {
         "SELECT * FROM marketing_chat_samples ORDER BY captured_at DESC LIMIT ?",
         [limit],
       );
-    } catch {
+    } catch (error) {
+      logger.error("chat-sample.repository.getRecent failed", { error: String(error) });
       return [];
     }
   }

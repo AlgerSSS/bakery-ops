@@ -10,7 +10,8 @@ export interface ConversationState {
   lastActiveAt: number;
 }
 
-const SESSION_TTL_MS = 10 * 60 * 1000; // 10 分钟超时
+// 会话超时，可通过 SESSION_TTL_MINUTES 配置（默认 60 分钟，避免长流程被中途丢弃）
+const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MINUTES || 60) * 60 * 1000;
 
 export class StateManager {
   private sessions: Map<string, ConversationState> = new Map();
@@ -54,7 +55,7 @@ export class StateManager {
   save(state: ConversationState): void {
     state.lastActiveAt = Date.now();
     this.sessions.set(state.conversationId, state);
-    void this.repo?.upsert(state);
+    this.repo?.upsert(state).catch((err) => logger.warn("session state persist failed", { error: String(err) }));
   }
 
   clear(conversationId: string): void {

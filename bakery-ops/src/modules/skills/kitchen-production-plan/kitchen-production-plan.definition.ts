@@ -8,6 +8,7 @@ export const kitchenProductionPlanSkillDefinition: SkillDefinition = {
   name: "后厨生产计划单",
   description: "根据预估单生成后厨可执行的生产计划，包含批次拆分、时间倒推、工位分配",
   priority: 85,
+  disambiguation: "把预估单转成后厨可执行的生产计划/排班；不是生成营业额预估本身(forecast_order)",
   triggerKeywords: [
     "后厨计划", "生产计划", "后厨", "生产计划单",
     "批次", "烘烤计划", "后厨任务",

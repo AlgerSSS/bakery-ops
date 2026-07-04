@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.hotcrush.lightrag</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/weiliangshao/hot/bakery-ops/services/lightrag/.venv/bin/python</string>
+    <string>/Users/weiliangshao/hot/bakery-ops/services/lightrag/server.py</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/weiliangshao/hot/bakery-ops/logs/lightrag.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/weiliangshao/hot/bakery-ops/logs/lightrag.err.log</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/weiliangshao/hot/bakery-ops/services/lightrag</string>
+  <key>ProcessType</key>
+  <string>Background</string>
+</dict>
+</plist>

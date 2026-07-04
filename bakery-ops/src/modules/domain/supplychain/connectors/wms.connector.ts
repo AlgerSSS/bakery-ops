@@ -14,6 +14,34 @@ function randomDelay(min = 1000, max = 2500): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+export interface StockMatch {
+  sku: string;
+  name: string;
+  qty: number;
+}
+
+export interface StockQueryResult {
+  success: boolean;
+  error?: string;
+  /** 每个查询词对应的匹配结果（可能多个 SKU，可能为空） */
+  items: Array<{ query: string; matches: StockMatch[] }>;
+}
+
+/**
+ * 解析 SKU 搜索结果文本，如:
+ * "CYLC118 (Traditional French Flour T65 法国伯爵传统T65面粉) (QTY:15)"
+ * F18 探测确认: get_customer_product_place_order 返回的 text 自带 (QTY:n)，即可用库存。
+ */
+export function parseSkuStockText(text: string): StockMatch | null {
+  const qtyMatch = text.match(/\(QTY:\s*(-?\d+)\)\s*$/);
+  if (!qtyMatch) return null;
+  const qty = parseInt(qtyMatch[1], 10);
+  const head = text.slice(0, qtyMatch.index).trim();
+  const skuMatch = head.match(/^(\S+)\s*\(([\s\S]*)\)$/);
+  if (!skuMatch) return { sku: head, name: head, qty };
+  return { sku: skuMatch[1], name: skuMatch[2].trim(), qty };
+}
+
 export class WmsConnector {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
@@ -104,6 +132,48 @@ export class WmsConnector {
     } catch (err) {
       logger.error("WMS: SKU search API failed", { error: String(err) });
       return [];
+    }
+  }
+
+  /**
+   * 查询库存 (F18)
+   * 复用下单页的 AJAX 搜索接口 get_customer_product_place_order，
+   * 其返回 text 自带 (QTY:n)。已探测 account/inventory 页存在但为
+   * 服务端渲染分页表格，无独立 JSON 接口，故不采用。
+   */
+  async getStock(names: string[]): Promise<StockQueryResult> {
+    let page: Page | null = null;
+
+    try {
+      page = await this.launch();
+
+      // Ensure logged in (account 页未登录会跳 getLoginType)
+      await page.goto(`${WMS_URL}index.php?route=account/account`, { waitUntil: "networkidle" });
+      await randomDelay(1000, 2000);
+      if (page.url().includes("login") || page.url().includes("LoginType")) {
+        const loggedIn = await this.login(page);
+        if (!loggedIn) return { success: false, error: "WMS 登录失败", items: [] };
+      }
+
+      const items: Array<{ query: string; matches: StockMatch[] }> = [];
+      for (const name of names) {
+        const results = await this.searchSku(page, name);
+        const matches = results
+          .map((r) => parseSkuStockText(r.text))
+          .filter((m): m is StockMatch => m !== null);
+        items.push({ query: name, matches });
+        await randomDelay(500, 1000);
+      }
+
+      await this.saveSession(page);
+      logger.info("WMS: stock query done", { queries: names.length });
+      return { success: true, items };
+    } catch (err) {
+      const error = String(err);
+      logger.error("WMS: getStock failed", { error });
+      return { success: false, error: `WMS 库存查询失败: ${error}`, items: [] };
+    } finally {
+      await this.close();
     }
   }
 

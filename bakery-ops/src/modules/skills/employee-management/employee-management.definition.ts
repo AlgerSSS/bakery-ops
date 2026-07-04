@@ -8,6 +8,7 @@ export const employeeManagementSkillDefinition: SkillDefinition = {
   name: "员工管理",
   description: "记录员工面试反馈、入职、离职、绩效等信息，自动更新员工档案",
   priority: 90,
+  disambiguation: "记录单个员工的面试反馈/入职/离职/绩效等事件；不是对员工或招聘数据做统计分析(knowledge_query)",
   triggerKeywords: [
     "面试", "入职", "离职", "辞职", "开除", "表现",
     "绩效", "试用期", "转正", "员工", "新人",

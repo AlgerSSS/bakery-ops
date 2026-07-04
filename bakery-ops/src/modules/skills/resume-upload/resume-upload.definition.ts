@@ -11,7 +11,8 @@ export const resumeUploadSkillDefinition: SkillDefinition = {
   name: "简历上传",
   description: "上传简历文件（PDF/图片），自动解析结构化信息并更新员工档案",
   priority: 85,
-  triggerKeywords: ["上传简历", "解析简历", "简历解析", "upload resume", "parse cv"],
+  disambiguation: "上传/解析已有的简历文件并更新员工档案；不是去招聘网站采集候选人(recruitment_sourcing)",
+  triggerKeywords: ["上传简历", "解析简历", "简历解析", "简历", "upload resume", "parse cv"],
   examples: [
     "帮我解析这份简历",
     "上传张三的简历",

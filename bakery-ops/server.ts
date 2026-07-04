@@ -6,6 +6,12 @@ process.on("unhandledRejection", (reason) => {
   console.error("[unhandledRejection]", reason);
 });
 
+// 记录后退出（不吞异常）；由 launchd KeepAlive 负责拉起 — IMPROVEMENT-PLAN.md A2
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+  process.exit(1);
+});
+
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
 const port = parseInt(process.env.PORT || "3000");

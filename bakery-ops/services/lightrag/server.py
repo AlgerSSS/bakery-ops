@@ -140,10 +140,17 @@ async def health():
 async def ingest(req: IngestRequest):
     if not req.text.strip():
         raise HTTPException(400, "Empty text")
+    text = req.text
+    # Anchor metadata (type/date) into the text so the graph retains provenance.
+    # Skip if the client already prefixed an anchor like "[复盘 2026-07-02]".
+    if req.metadata and not text.lstrip().startswith("["):
+        parts = [str(req.metadata[k]) for k in ("type", "date") if req.metadata.get(k)]
+        if parts:
+            text = f"[{' '.join(parts)}] {text}"
     try:
-        await rag.ainsert(req.text)
-        logger.info("Ingested %d chars", len(req.text))
-        return IngestResponse(status="ok", chars=len(req.text))
+        await rag.ainsert(text)
+        logger.info("Ingested %d chars", len(text))
+        return IngestResponse(status="ok", chars=len(text))
     except Exception as e:
         logger.error("Ingest failed: %s", e)
         raise HTTPException(500, f"Ingest failed: {e}")

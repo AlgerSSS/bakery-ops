@@ -12,7 +12,6 @@
     "inspect": "node inspect.js",
     "refresh": "node login.js && node scrape.js && node scrape-items-by-hour.js && node scrape-daily.js && node fetch-translations.js && node apply-translations.js && node apply-items-by-hour.js && node sync-to-db.js",
     "start": "node server.js",
-    "scheduler": "node scheduler.js",
     "sync-pnl": "node sync-pnl.js",
     "test": "node test-api.js"
   },

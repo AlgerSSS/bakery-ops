@@ -19,6 +19,7 @@ export const forecastOrderSkillDefinition: SkillDefinition = {
   name: "预估单",
   description: "生成营业额目标、单品出货建议、分时段排产。支持：预估/排产/出货建议/营业额查询",
   priority: 85,
+  disambiguation: "生成营业额目标与出货/排产预估；不是据此生成后厨执行计划(kitchen_production_plan)，也不是结合实际销售的每日复盘(daily_review_chat)",
   triggerKeywords: [
     "预估单", "排产", "出货", "出货建议", "预测",
     "营业额目标", "日目标", "月目标", "单品建议",

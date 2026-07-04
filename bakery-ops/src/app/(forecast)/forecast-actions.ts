@@ -15,6 +15,8 @@ import {
   updateBusinessRule,
   getProductConfigs,
   updateProductConfig,
+  saveAIDailyCorrection,
+  getSchedulingWasteRate30d,
 } from "@/modules/data/repositories/forecast.repository";
 import {
   generateFullForecast,
@@ -39,6 +41,8 @@ export {
   updateBusinessRule,
   getProductConfigs,
   updateProductConfig,
+  saveAIDailyCorrection,
+  getSchedulingWasteRate30d,
   generateFullForecast,
   generateMonthlyTargetsWithCustomCoefficients,
   generateDailyTargets,

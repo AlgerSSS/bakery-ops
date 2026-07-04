@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkImportKey } from "../_auth";
 import { parseStrategyData } from "@/modules/domain/forecast/parsers/excel-parser";
 import { withTransaction } from "@/modules/shared/db/postgres";
 
 export async function POST(req: NextRequest) {
+  const denied = checkImportKey(req);
+  if (denied) return denied;
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;

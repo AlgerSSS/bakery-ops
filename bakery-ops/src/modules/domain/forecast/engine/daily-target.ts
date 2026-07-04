@@ -1,10 +1,11 @@
 import dayjs from "dayjs";
 import { BusinessRules, MonthlyTarget, DailyTarget } from "../types";
 
+// prophetDowWeights 的默认值源自早年一次 Prophet 拟合，现为设置页可调的普通系数；
+// 原 prophetFactors 参数与 /api/prophet-trend 装饰链路已删（IMPROVEMENT-PLAN G2-③，2026-07-02）。
 export function calculateDailyTargets(
   monthlyTarget: MonthlyTarget,
   rules: BusinessRules,
-  prophetFactors?: Record<string, number>,
   aiCorrections?: Record<string, number>
 ): DailyTarget[] {
   const { year, month, enhancedRevenue } = monthlyTarget;

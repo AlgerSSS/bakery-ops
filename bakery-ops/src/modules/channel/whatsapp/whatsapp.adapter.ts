@@ -8,6 +8,9 @@ import { logger } from "../../shared/logger";
 export class WhatsAppAdapter {
   private orchestratorHandler: ((msg: ChannelMessage) => Promise<import("../../shared/types").ChannelResponse[]>) | null = null;
   private processedMessages = new Set<string>();
+  private reconnectAttempts = 0;
+  private reconnecting = false;
+  private static readonly MAX_RECONNECT_ATTEMPTS = 5;
 
   setHandler(handler: (msg: ChannelMessage) => Promise<import("../../shared/types").ChannelResponse[]>): void {
     this.orchestratorHandler = handler;
@@ -20,6 +23,7 @@ export class WhatsAppAdapter {
     client.removeAllListeners("qr");
     client.removeAllListeners("ready");
     client.removeAllListeners("disconnected");
+    client.removeAllListeners("auth_failure");
     client.removeAllListeners("message");
     client.removeAllListeners("message_create");
 
@@ -30,10 +34,19 @@ export class WhatsAppAdapter {
 
     client.on("ready", () => {
       logger.info("WhatsApp client ready", { botId: client.info?.wid?._serialized });
+      this.reconnectAttempts = 0;
     });
 
+    // 断连自动重连（带退避、限次、防重入）— IMPROVEMENT-PLAN.md A1
     client.on("disconnected", (reason: string) => {
-      logger.warn("WhatsApp client disconnected", { reason });
+      logger.warn("WhatsApp client disconnected", { reason: String(reason) });
+      void this.reconnect(client);
+    });
+
+    client.on("auth_failure", (message: string) => {
+      logger.error("WhatsApp auth failure — session invalid, manual QR re-scan likely required", {
+        message: String(message),
+      });
     });
 
     // message: 别人发来的消息
@@ -74,8 +87,43 @@ export class WhatsAppAdapter {
       }
     });
 
-    client.initialize();
+    // 首次启动失败（如系统繁忙时 Chromium 起不来）也走重连退避，
+    // 不再留在 unhandledRejection 里等人工重启 — IMPROVEMENT-PLAN.md A1
+    client.initialize().catch((err) => {
+      logger.error("WhatsApp initial launch failed, entering reconnect loop", { error: String(err) });
+      void this.reconnect(client);
+    });
     logger.info("WhatsApp adapter starting...");
+  }
+
+  // 断连后 destroy -> 退避等待 -> initialize，最多 MAX_RECONNECT_ATTEMPTS 次；
+  // ready 事件会把计数清零。耗尽后只能人工处理（LOGOUT 场景 re-init 会停在等扫码）。
+  private async reconnect(client: ReturnType<typeof getWhatsAppClient>): Promise<void> {
+    if (this.reconnecting) return;
+    this.reconnecting = true;
+    try {
+      while (this.reconnectAttempts < WhatsAppAdapter.MAX_RECONNECT_ATTEMPTS) {
+        this.reconnectAttempts++;
+        const delayMs = Math.min(60_000, 5_000 * 2 ** (this.reconnectAttempts - 1));
+        logger.warn("WhatsApp reconnecting", { attempt: this.reconnectAttempts, delayMs });
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        try {
+          await client.destroy().catch(() => {});
+          await client.initialize();
+          return;
+        } catch (err) {
+          logger.error("WhatsApp reconnect attempt failed", {
+            attempt: this.reconnectAttempts,
+            error: String(err),
+          });
+        }
+      }
+      logger.error("WhatsApp reconnect attempts exhausted — manual restart required", {
+        attempts: this.reconnectAttempts,
+      });
+    } finally {
+      this.reconnecting = false;
+    }
   }
 
   private async handleMessage(msg: Message): Promise<void> {
@@ -97,12 +145,25 @@ export class WhatsAppAdapter {
     // 提取发送者手机号
     const client = getWhatsAppClient();
     let senderPhone: string;
+    const rawSenderId = msg.fromMe ? "" : chat.isGroup ? (msg.author || "") : (msg.from || "");
     if (msg.fromMe) {
       senderPhone = client.info?.wid?.user || "";
     } else if (chat.isGroup) {
       senderPhone = (msg.author || "").replace(/@c\.us$/, "").replace(/@lid$/, "");
     } else {
       senderPhone = (msg.from || "").replace(/@c\.us$/, "").replace(/@lid$/, "");
+    }
+
+    // WhatsApp 隐私 ID（@lid）不是真实手机号——它会让"已联系候选人按手机号匹配"失效。
+    // 解析成真实号码（contact.number），这样候选人/经理无论以 @c.us 还是 @lid 进来都能被认出。
+    if (rawSenderId.endsWith("@lid")) {
+      try {
+        const contact = await msg.getContact();
+        const realNum = (contact?.number || contact?.id?.user || "").toString().replace(/@.*$/, "");
+        if (realNum) senderPhone = realNum;
+      } catch (err) {
+        logger.warn("Failed to resolve @lid to real phone", { error: String(err) });
+      }
     }
 
     // 去掉 @mention 部分，提取纯文本

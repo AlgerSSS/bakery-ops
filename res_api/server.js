@@ -20,6 +20,10 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
 const rateBuckets = new Map();
 function isRateLimited(ip) {
   const now = Date.now();
+  // Evict buckets idle for over an hour so the map doesn't grow forever
+  for (const [k, b] of rateBuckets) {
+    if (now - b.last > 60 * 60 * 1000) rateBuckets.delete(k);
+  }
   let bucket = rateBuckets.get(ip);
   if (!bucket) { bucket = { tokens: 60, last: now }; rateBuckets.set(ip, bucket); }
   const elapsed = (now - bucket.last) / 1000;
@@ -343,6 +347,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`[server] listening on http://localhost:${PORT}`);
-  console.log(`[server] API key: ${API_KEY}`);
-  console.log(`[server] try:   curl -H "Authorization: Bearer ${API_KEY}" http://localhost:${PORT}/v1/sales/overview`);
+  console.log(`[server] API key: ${API_KEY.slice(0, 4)}****`);
+  console.log(`[server] try:   curl -H "Authorization: Bearer <API_KEY>" http://localhost:${PORT}/v1/sales/overview`);
 });

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkImportKey } from "../_auth";
 import { parseSalesData, setDatabaseAliases } from "@/modules/domain/forecast/parsers/excel-parser";
 import { withTransaction } from "@/modules/shared/db/postgres";
-import { getProducts, getProductAliases, getBusinessRulesFromDB } from "@/modules/data/repositories/forecast.repository";
+import { getProducts, getProductAliases, getBusinessRulesFromDB, getOutOfStockRecords } from "@/modules/data/repositories/forecast.repository";
 import { calculateSalesBaselines } from "@/modules/domain/forecast/forecast-engine";
 
 export async function POST(req: NextRequest) {
+  const denied = checkImportKey(req);
+  if (denied) return denied;
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -13,16 +16,17 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = await file.arrayBuffer();
-    const [products, dbAliases, businessRules] = await Promise.all([
+    const [products, dbAliases, businessRules, stockoutRecords] = await Promise.all([
       getProducts(),
       getProductAliases(),
       getBusinessRulesFromDB(),
+      getOutOfStockRecords(),
     ]);
 
     setDatabaseAliases(dbAliases);
     const { records, unmatchedProducts } = await parseSalesData(buffer, products);
 
-    const baselines = calculateSalesBaselines(records, products, businessRules.baselineOverrides);
+    const baselines = calculateSalesBaselines(records, products, businessRules.baselineOverrides, stockoutRecords);
 
     await withTransaction(async ({ execute }) => {
       await execute("DELETE FROM daily_sales_record");

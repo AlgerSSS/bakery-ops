@@ -43,7 +43,8 @@ export class KOLCollaborationRepository {
         "SELECT * FROM kol_collaborations WHERE kol_id = ? ORDER BY created_at DESC",
         [kolId]
       );
-    } catch {
+    } catch (error) {
+      logger.error("kol-collaboration.repository.getByKOLId failed", { error: String(error) });
       return [];
     }
   }
@@ -55,7 +56,8 @@ export class KOLCollaborationRepository {
         [id]
       );
       return rows[0] ?? null;
-    } catch {
+    } catch (error) {
+      logger.error("kol-collaboration.repository.getById failed", { error: String(error) });
       return null;
     }
   }
@@ -105,7 +107,8 @@ export class KOLCollaborationRepository {
         "SELECT * FROM kol_collaborations ORDER BY created_at DESC LIMIT ?",
         [limit]
       );
-    } catch {
+    } catch (error) {
+      logger.error("kol-collaboration.repository.getRecent failed", { error: String(error) });
       return [];
     }
   }

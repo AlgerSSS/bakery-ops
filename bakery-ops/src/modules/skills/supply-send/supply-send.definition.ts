@@ -13,6 +13,7 @@ export const supplySendSkillDefinition: SkillDefinition = {
   name: "发送订货",
   description: "确认并执行订货：渠道A发WhatsApp给供应商，渠道B在WMS系统下单，写回金山文档",
   priority: 86,
+  disambiguation: "确认并把订货发送给供应商/下单执行；不是员工报数或汇总订货(supply_order)",
   triggerKeywords: [
     "发给供应商", "发送订货", "下单", "确认订货", "执行订货",
   ],
@@ -44,6 +45,18 @@ export class SupplySendSkillHandler implements SkillHandler {
         return this.executeOrder(pendingOrderId, storeId);
       }
 
+      // 有待确认订单但没回确认词 -> 兑现预览里"回复其他内容取消"的承诺，
+      // 结束流程（status=success 让 orchestrator finishSkill 清状态）。
+      // 此前这里会无条件重发预览，导致回"取消"也永远取消不掉 — IMPROVEMENT-PLAN.md B2
+      if (pendingOrderId) {
+        return {
+          runId: uuidv4(),
+          skillId: "supply_send",
+          status: "success",
+          summary: "已取消本次下单。如需重新下单，请再发「发给供应商」。",
+        };
+      }
+
       // 第一步：生成预览，等待确认
       return this.generatePreview(storeId);
     } catch (err) {
@@ -59,7 +72,8 @@ export class SupplySendSkillHandler implements SkillHandler {
   }
 
   private isConfirmation(text: string): boolean {
-    return /^(确认|确定|是|好|ok|yes|发|发送|下单)$/i.test(text.trim());
+    // 只做少量完整短语的精确扩充；不要放宽为前缀匹配（"好像不太对"会被误判下单）
+    return /^(确认|确定|是|好|好的|ok|yes|发|发送|下单|确认下单|确认发送)$/i.test(text.trim());
   }
 
   private async generatePreview(storeId: string): Promise<SkillExecutionResult> {

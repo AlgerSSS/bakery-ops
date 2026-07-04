@@ -10,7 +10,7 @@
     "translate": "node fetch-translations.js",
     "apply": "node apply-translations.js",
     "inspect": "node inspect.js",
-    "refresh": "node login.js && node scrape.js && node scrape-items-by-hour.js && node scrape-daily.js && node fetch-translations.js && node apply-translations.js && node apply-items-by-hour.js && node sync-to-db.js",
+    "refresh": "node login.js && node scrape.js && node scrape-items-by-hour.js && node scrape-daily.js && node fetch-translations.js && node apply-translations.js && node apply-items-by-hour.js && (node scrape-item-last-sale.mjs || true) && node sync-to-db.js",
     "start": "node server.js",
     "sync-pnl": "node sync-pnl.js",
     "test": "node test-api.js"

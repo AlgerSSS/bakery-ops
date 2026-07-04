@@ -316,6 +316,48 @@ async function syncItemWaste() {
   return batch.length;
 }
 
+// === 9. item_last_sale (per-day per-item last-sale MINUTE, for precise stockout) ===
+// Source: scrape-item-last-sale.mjs → output/sales/item-last-sale.json (menuItemId keyed).
+// Translate id → readable name via the same D_itemName map as item_hourly_sales/item_waste.
+async function syncItemLastSale() {
+  const file = 'output/sales/item-last-sale.json';
+  if (!fs.existsSync(file)) { console.log('  [skip] item-last-sale.json not found'); return 0; }
+  const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!data.rows?.length) { console.log('  [skip] no rows'); return 0; }
+
+  const transFile = 'output/sales/translations.json';
+  let itemNames = {};
+  if (fs.existsSync(transFile)) {
+    const t = JSON.parse(fs.readFileSync(transFile, 'utf8'));
+    itemNames = t.dimOptions?.D_itemName || {};
+  }
+
+  // Collapse to one row per (date, readable name): keep the latest last_sale_time.
+  const byKey = new Map();
+  for (const r of data.rows) {
+    if (!r.date || !r.id || !r.lastTime) continue;
+    const name = itemNames[r.id] || r.id;
+    const key = `${r.date}|${name}`;
+    const cur = byKey.get(key);
+    if (!cur || r.lastTime > cur.last_sale_time) {
+      byKey.set(key, { date: r.date, item_name: name, last_sale_time: r.lastTime, day_qty: (cur?.day_qty || 0) + (Number(r.dayQty) || 0) });
+    } else {
+      cur.day_qty += Number(r.dayQty) || 0;
+    }
+  }
+  const batch = [...byKey.values()];
+
+  await sql.begin(async (sql) => {
+    const dates = [...new Set(batch.map(r => r.date))];
+    for (const d of dates) await sql`DELETE FROM item_last_sale WHERE date = ${d}`;
+    for (let i = 0; i < batch.length; i += 500) {
+      const chunk = batch.slice(i, i + 500);
+      await sql`INSERT INTO item_last_sale ${sql(chunk, 'date', 'item_name', 'last_sale_time', 'day_qty')}`;
+    }
+  });
+  return batch.length;
+}
+
 async function main() {
   console.log('[sync-to-db] syncing scraped data to database...\n');
 
@@ -350,6 +392,10 @@ async function main() {
   console.log('8. item_waste (per-day per-item waste)');
   const c8 = await syncItemWaste();
   console.log(`   -> ${c8} rows\n`);
+
+  console.log('9. item_last_sale (per-day per-item last-sale minute)');
+  const c9 = await syncItemLastSale();
+  console.log(`   -> ${c9} rows\n`);
 
   console.log('[sync-to-db] done');
   await sql.end();

@@ -24,7 +24,7 @@ export async function buildForecastExcelBuffer(opts: {
   products: Product[];
   lastWeekSales?: Map<string, number>;
 }): Promise<Buffer> {
-  const { date, dailyTarget, productSuggestions, timeSlotSuggestions, products, lastWeekSales } = opts;
+  const { date, dailyTarget, productSuggestions, timeSlotSuggestions, products, lastWeekSales, fixedSchedule } = opts;
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(`预估单_${date}`);
   ws.views = [{ showGridLines: false }];
@@ -103,18 +103,39 @@ export async function buildForecastExcelBuffer(opts: {
     m[h] = (m[h] || 0) + s.quantity;
     rawHourly.set(s.productName, m);
   }
-  // 把真实曲线摊到 10-19 格(区间外的量按形状比例摊回，避免 19 点堆峰)，整数且和=总量。
-  const distribute = (raw: Record<number, number>, total: number): number[] => {
-    if (total <= 0) return HOURS.map(() => 0);
-    const base = HOURS.map((h) => raw[h] || 0);
-    const baseSum = base.reduce((s, v) => s + v, 0);
-    const shape = baseSum > 0 ? base.map((v) => v / baseSum) : HOURS.map(() => 1 / HOURS.length);
-    const scaled = shape.map((f) => f * total);
-    const arr = scaled.map((v) => Math.floor(v));
-    let left = total - arr.reduce((s, v) => s + v, 0);
+  // 最大余数法：把 total 按 weights 拆成整数(和恰为 total)，放进 idxs 指定的格位。
+  const allocByWeight = (total: number, weights: number[], idxs: number[]): number[] => {
+    const arr = HOURS.map(() => 0);
+    if (total <= 0) return arr;
+    const wSum = weights.reduce((s, v) => s + v, 0);
+    const w = wSum > 0 ? weights : weights.map(() => 1); // 无权重则等分
+    const ws = w.reduce((s, v) => s + v, 0);
+    const scaled = w.map((v) => (v / ws) * total);
+    const local = scaled.map((v) => Math.floor(v));
+    let left = total - local.reduce((s, v) => s + v, 0);
     scaled.map((v, i) => ({ i, f: v - Math.floor(v) })).sort((a, b) => b.f - a.f)
-      .forEach(({ i }) => { if (left > 0) { arr[i]++; left--; } });
+      .forEach(({ i }) => { if (left > 0) { local[i]++; left--; } });
+    idxs.forEach((gi, k) => { arr[gi] += local[k]; });
     return arr;
+  };
+
+  // 无固定出货时间时的回落：把真实曲线摊到 10-19 格(区间外按形状比例摊回)。
+  const distribute = (raw: Record<number, number>, total: number): number[] =>
+    allocByWeight(total, HOURS.map((h) => raw[h] || 0), HOURS.map((_, i) => i));
+
+  // 严格按「出货时间」出货：只在排期的小时出货，每次出货量 = 该次覆盖窗口(本次排期→下次排期)
+  // 内真实销量之和作权重。首个排期覆盖其之前全部，末个覆盖其之后全部。整数且和=总量。
+  const distributeToSchedule = (raw: Record<number, number>, total: number, schedHours: number[]): number[] => {
+    const sched = [...new Set(schedHours.map((h) => Math.min(19, Math.max(10, h))))].sort((a, b) => a - b);
+    if (!sched.length) return distribute(raw, total);
+    const weights = sched.map((h, i) => {
+      const lo = i === 0 ? -Infinity : h;
+      const hi = i === sched.length - 1 ? Infinity : sched[i + 1];
+      let w = 0;
+      for (const [hStr, q] of Object.entries(raw)) { const hn = Number(hStr); if (hn >= lo && hn < hi) w += q; }
+      return w;
+    });
+    return allocByWeight(total, weights, sched.map((h) => h - 10));
   };
 
   let r = FIRST;
@@ -130,8 +151,15 @@ export async function buildForecastExcelBuffer(opts: {
     set(C.temp, p.coldHot);
     if (lastWeekSales?.has(nm)) set(C.lastwk, lastWeekSales.get(nm)!);
     set(C.full, displayFull.get(nm) || "");
-    // 逐时出货(系统自动，真实曲线摊到 10-19)
-    const grid = distribute(rawHourly.get(nm) || {}, p.suggestedQuantity);
+    // 逐时出货：严格按 DB「出货时间」(fixed_shipment_schedule)排期，量按真实销量窗口分配；
+    // 无排期的品才回落曲线摊分。
+    const schedRaw = fixedSchedule?.[nm];
+    const schedHours = (schedRaw && schedRaw.length)
+      ? schedRaw.map((s) => parseInt(String(s).slice(0, 2), 10)).filter((h) => Number.isFinite(h))
+      : [];
+    const grid = schedHours.length
+      ? distributeToSchedule(rawHourly.get(nm) || {}, p.suggestedQuantity, schedHours)
+      : distribute(rawHourly.get(nm) || {}, p.suggestedQuantity);
     HOURS.forEach((_, i) => { if (grid[i] > 0) set(C.hq0 + i, grid[i]); });
     // 公式：总数量=SUM(逐时)；总金额=单价×总数量；TC=(总数-试吃)/客单数
     const q0 = L(C.hq0), q9 = L(C.hq0 + 9), pcol = L(C.price), tcol = L(C.total);
@@ -170,8 +198,18 @@ export async function buildForecastExcelBuffer(opts: {
   for (let c = 1; c <= C.ha0 + 9; c++) { const cell = sum.getCell(c); cell.border = border; cell.fill = sumFill; cell.font = { bold: true, size: 9 }; cell.alignment = { horizontal: "center" }; }
   r += 2;
 
-  // ── 右侧「预计销售」逐时表(对齐真实模板 时间/销售额；销售额=该时段逐时金额之和，活公式；
-  //     合计=产品表总金额之和=真实需求，新口径下可高于/低于顶部「出货金额」预算目标) ──
+  // ── 右侧「预计销售」逐时表 ──
+  // 销售≠出货：出货按排期(可能集中在几点)，销售是全天平滑发生。故本表用真实销量曲线×单价，
+  // 与左侧(按出货时间集中)的逐时金额脱钩；合计仍=产品表总金额(销售与出货全天总额相等)。
+  const salesByHour = HOURS.map(() => 0);
+  for (const p of productSuggestions) {
+    const raw = rawHourly.get(p.productName);
+    if (!raw) continue;
+    for (const [hStr, q] of Object.entries(raw)) {
+      const h = Math.min(19, Math.max(10, Number(hStr))); // 区间外(晚档)折入 19
+      salesByHour[h - 10] += q * p.price;
+    }
+  }
   const S1 = 50, S2 = 51; // 时间 / 预计销售 两列
   col(S1).width = 14; col(S2).width = 11;
   const stTitle = ws.getCell(3, S1); stTitle.value = "预计销售(逐时)"; stTitle.font = { bold: true, size: 9 };
@@ -183,7 +221,7 @@ export async function buildForecastExcelBuffer(opts: {
   HOURS.forEach((h, i) => {
     const rr = HEAD + 1 + i;
     const tc = ws.getCell(rr, S1); tc.value = `${h}:00-${h + 1}:00`; tc.border = border; tc.font = { size: 9 }; tc.alignment = { horizontal: "center" };
-    const ac = ws.getCell(rr, S2); ac.value = { formula: `SUM(${L(C.ha0 + i)}${FIRST}:${L(C.ha0 + i)}${LAST})` };
+    const ac = ws.getCell(rr, S2); ac.value = Math.round(salesByHour[i]);
     ac.border = border; ac.font = { size: 9 }; ac.fill = botFill; ac.alignment = { horizontal: "center" };
   });
   const stTot = HEAD + 1 + HOURS.length;
@@ -201,7 +239,7 @@ export async function buildForecastExcelBuffer(opts: {
   ws.mergeCells(r, 1, r + 11, 8);
   const nc = ws.getCell(r, 1); nc.value = notes; nc.alignment = { vertical: "top", wrapText: true }; nc.font = { size: 9 };
   const lg = ws.getCell(r + 13, 1);
-  lg.value = "绿=系统自动填(预估量/逐时/上周销量) · 黄=门店手工(实际出货/断货/加货/试吃/备注) · 逐时10:00–19:00(晚档折入19点) · 数量按倍数整批";
+  lg.value = "绿=系统自动填(预估量/逐时出货/上周销量) · 黄=门店手工(实际出货/断货/加货/试吃/备注) · 逐时出货按 DB 出货时间排期，量按真实销量分配 · 右侧预计销售=真实销量曲线 · 数量按倍数整批";
   lg.font = { color: { argb: "FF8A8F98" }, size: 9 };
 
   ws.views = [{ showGridLines: false, state: "frozen", xSplit: 6, ySplit: HEAD }];

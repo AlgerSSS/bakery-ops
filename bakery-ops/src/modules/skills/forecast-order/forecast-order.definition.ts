@@ -14,6 +14,7 @@ import { getTimeslotSalesRecords, getFixedShipmentSchedules, getProducts } from 
 import { fileService } from "../../domain/files/file-service";
 import { query } from "../../shared/db/postgres";
 import { generateRestockAdvice, buildRestockAdviceText } from "../../domain/forecast/restock-advice";
+import { getProductSalesStats } from "../../domain/forecast/product-demand";
 import { localDate } from "../../channel/whatsapp/outbound.config";
 import dayjs from "dayjs";
 
@@ -120,11 +121,14 @@ export class ForecastOrderSkillHandler implements SkillHandler {
           shipmentAmount: forecast.targetShipment,
         };
 
-        const [timeslotRecords, fixedSchedule, products] = await Promise.all([
+        const [timeslotRecords, fixedSchedule, products, stats] = await Promise.all([
           getTimeslotSalesRecords(),
           getFixedShipmentSchedules(),
           getProducts(),
+          getProductSalesStats(date),
         ]);
+        // 真实逐时销量曲线(中文名→{小时:均量})，供右侧「预计销售」表(与集中出货脱钩)
+        const salesCurve = new Map(Array.from(stats, ([n, s]) => [n, s.hourly] as [string, Record<number, number>]));
 
         const productSuggestions = forecast.products.map((p) => ({
           productName: p.name,
@@ -160,6 +164,7 @@ export class ForecastOrderSkillHandler implements SkillHandler {
           fixedSchedule,
           products,
           lastWeekSales,
+          salesCurve,
         });
 
         const outputFile = await fileService.saveFile(

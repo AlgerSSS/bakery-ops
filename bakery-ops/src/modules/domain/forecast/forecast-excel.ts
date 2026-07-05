@@ -23,8 +23,10 @@ export async function buildForecastExcelBuffer(opts: {
   fixedSchedule: Record<string, string[]>;
   products: Product[];
   lastWeekSales?: Map<string, number>;
+  /** 单品真实逐时销量曲线(中文名→{小时:均量})，供右侧「预计销售」表(与集中出货脱钩)。 */
+  salesCurve?: Map<string, Record<number, number>>;
 }): Promise<Buffer> {
-  const { date, dailyTarget, productSuggestions, timeSlotSuggestions, products, lastWeekSales, fixedSchedule } = opts;
+  const { date, dailyTarget, productSuggestions, timeSlotSuggestions, products, lastWeekSales, salesCurve } = opts;
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet(`预估单_${date}`);
   ws.views = [{ showGridLines: false }];
@@ -103,39 +105,14 @@ export async function buildForecastExcelBuffer(opts: {
     m[h] = (m[h] || 0) + s.quantity;
     rawHourly.set(s.productName, m);
   }
-  // 最大余数法：把 total 按 weights 拆成整数(和恰为 total)，放进 idxs 指定的格位。
-  const allocByWeight = (total: number, weights: number[], idxs: number[]): number[] => {
-    const arr = HOURS.map(() => 0);
-    if (total <= 0) return arr;
-    const wSum = weights.reduce((s, v) => s + v, 0);
-    const w = wSum > 0 ? weights : weights.map(() => 1); // 无权重则等分
-    const ws = w.reduce((s, v) => s + v, 0);
-    const scaled = w.map((v) => (v / ws) * total);
-    const local = scaled.map((v) => Math.floor(v));
-    let left = total - local.reduce((s, v) => s + v, 0);
-    scaled.map((v, i) => ({ i, f: v - Math.floor(v) })).sort((a, b) => b.f - a.f)
-      .forEach(({ i }) => { if (left > 0) { local[i]++; left--; } });
-    idxs.forEach((gi, k) => { arr[gi] += local[k]; });
-    return arr;
-  };
-
-  // 无固定出货时间时的回落：把真实曲线摊到 10-19 格(区间外按形状比例摊回)。
-  const distribute = (raw: Record<number, number>, total: number): number[] =>
-    allocByWeight(total, HOURS.map((h) => raw[h] || 0), HOURS.map((_, i) => i));
-
-  // 严格按「出货时间」出货：只在排期的小时出货，每次出货量 = 该次覆盖窗口(本次排期→下次排期)
-  // 内真实销量之和作权重。首个排期覆盖其之前全部，末个覆盖其之后全部。整数且和=总量。
-  const distributeToSchedule = (raw: Record<number, number>, total: number, schedHours: number[]): number[] => {
-    const sched = [...new Set(schedHours.map((h) => Math.min(19, Math.max(10, h))))].sort((a, b) => a - b);
-    if (!sched.length) return distribute(raw, total);
-    const weights = sched.map((h, i) => {
-      const lo = i === 0 ? -Infinity : h;
-      const hi = i === sched.length - 1 ? Infinity : sched[i + 1];
-      let w = 0;
-      for (const [hStr, q] of Object.entries(raw)) { const hn = Number(hStr); if (hn >= lo && hn < hi) w += q; }
-      return w;
-    });
-    return allocByWeight(total, weights, sched.map((h) => h - 10));
+  // 把某品逐时(键=小时)折进 10-19 格(区间外<10→10、>19→19)。逐时出货已由引擎按出货时间排好，这里只渲染。
+  const foldGrid = (raw: Record<number, number>): number[] => {
+    const grid = HOURS.map(() => 0);
+    for (const [hStr, q] of Object.entries(raw)) {
+      const h = Math.min(19, Math.max(10, Number(hStr)));
+      grid[h - 10] += q;
+    }
+    return grid;
   };
 
   let r = FIRST;
@@ -151,15 +128,8 @@ export async function buildForecastExcelBuffer(opts: {
     set(C.temp, p.coldHot);
     if (lastWeekSales?.has(nm)) set(C.lastwk, lastWeekSales.get(nm)!);
     set(C.full, displayFull.get(nm) || "");
-    // 逐时出货：严格按 DB「出货时间」(fixed_shipment_schedule)排期，量按真实销量窗口分配；
-    // 无排期的品才回落曲线摊分。
-    const schedRaw = fixedSchedule?.[nm];
-    const schedHours = (schedRaw && schedRaw.length)
-      ? schedRaw.map((s) => parseInt(String(s).slice(0, 2), 10)).filter((h) => Number.isFinite(h))
-      : [];
-    const grid = schedHours.length
-      ? distributeToSchedule(rawHourly.get(nm) || {}, p.suggestedQuantity, schedHours)
-      : distribute(rawHourly.get(nm) || {}, p.suggestedQuantity);
+    // 逐时出货：直接渲染引擎按 DB 出货时间(fixed_shipment_schedule)排好的逐时段量。
+    const grid = foldGrid(rawHourly.get(nm) || {});
     HOURS.forEach((_, i) => { if (grid[i] > 0) set(C.hq0 + i, grid[i]); });
     // 公式：总数量=SUM(逐时)；总金额=单价×总数量；TC=(总数-试吃)/客单数
     const q0 = L(C.hq0), q9 = L(C.hq0 + 9), pcol = L(C.price), tcol = L(C.total);
@@ -199,15 +169,17 @@ export async function buildForecastExcelBuffer(opts: {
   r += 2;
 
   // ── 右侧「预计销售」逐时表 ──
-  // 销售≠出货：出货按排期(可能集中在几点)，销售是全天平滑发生。故本表用真实销量曲线×单价，
-  // 与左侧(按出货时间集中)的逐时金额脱钩；合计仍=产品表总金额(销售与出货全天总额相等)。
+  // 销售≠出货：出货按排期(集中在几点)，销售全天平滑。本表把每品预估总量按其真实销量曲线形状
+  // 摊到各小时×单价，与左侧集中出货脱钩；合计=产品表总金额(销售与出货全天总额相等)。
   const salesByHour = HOURS.map(() => 0);
   for (const p of productSuggestions) {
-    const raw = rawHourly.get(p.productName);
-    if (!raw) continue;
-    for (const [hStr, q] of Object.entries(raw)) {
+    const curve = salesCurve?.get(p.productName);
+    if (!curve) continue;
+    const cTotal = Object.values(curve).reduce((s, v) => s + v, 0);
+    if (cTotal <= 0) continue;
+    for (const [hStr, q] of Object.entries(curve)) {
       const h = Math.min(19, Math.max(10, Number(hStr))); // 区间外(晚档)折入 19
-      salesByHour[h - 10] += q * p.price;
+      salesByHour[h - 10] += (p.suggestedQuantity * (q / cTotal)) * p.price;
     }
   }
   const S1 = 50, S2 = 51; // 时间 / 预计销售 两列

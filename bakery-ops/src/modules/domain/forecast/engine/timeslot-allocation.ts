@@ -75,12 +75,14 @@ export function calculateTimeSlotSuggestions(
     const schedule = fixedSchedule[product.productName];
     const fullQty = product.displayFullQuantity || 0;
 
+    // DB「出货时间」(fixed_shipment_schedule)优先——只在排期的时段出货；无排期才回落真实曲线/默认。
     let targetSlots: string[];
-    if (productHistory && productHistory.size > 0) {
-      // 真实小时曲线优先(按实际售卖时段分配)，比固定排期的粗档更贴近需求
+    let usingSchedule = false;
+    if (schedule && schedule.length > 0) {
+      targetSlots = [...schedule].sort();
+      usingSchedule = true;
+    } else if (productHistory && productHistory.size > 0) {
       targetSlots = Array.from(productHistory.keys()).sort();
-    } else if (schedule && schedule.length > 0) {
-      targetSlots = schedule;
     } else {
       targetSlots = (defaultSlots && defaultSlots.length > 0) ? defaultSlots : ["11:00"];
     }
@@ -95,12 +97,25 @@ export function calculateTimeSlotSuggestions(
       continue;
     }
 
+    // 每个排期时段的权重：按排期出货时，权重=该次覆盖窗口[本次→下次排期)内真实销量之和
+    // (首个覆盖其之前全部、末个覆盖其之后全部)，比只取排期整点的销量更贴合"这批货要卖到下批"。
     const slotAvgs = new Map<string, number>();
     let hasHistory = false;
-    for (const slot of targetSlots) {
-      const avg = productHistory?.get(slot) || 0;
-      slotAvgs.set(slot, avg);
-      if (avg > 0) hasHistory = true;
+    if (usingSchedule && productHistory && productHistory.size > 0) {
+      for (let i = 0; i < targetSlots.length; i++) {
+        const lo = i === 0 ? "00:00" : targetSlots[i];
+        const hi = i === targetSlots.length - 1 ? "99:99" : targetSlots[i + 1];
+        let w = 0;
+        for (const [slot, q] of productHistory) if (slot >= lo && slot < hi) w += q;
+        slotAvgs.set(targetSlots[i], w);
+        if (w > 0) hasHistory = true;
+      }
+    } else {
+      for (const slot of targetSlots) {
+        const avg = productHistory?.get(slot) || 0;
+        slotAvgs.set(slot, avg);
+        if (avg > 0) hasHistory = true;
+      }
     }
 
     let allocation: Map<string, number>;

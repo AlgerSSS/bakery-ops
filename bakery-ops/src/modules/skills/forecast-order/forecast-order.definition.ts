@@ -12,6 +12,7 @@ import {
 import { buildForecastExcelBuffer } from "../../domain/forecast/forecast-excel";
 import { getTimeslotSalesRecords, getFixedShipmentSchedules, getProducts } from "../../data/repositories/forecast.repository";
 import { fileService } from "../../domain/files/file-service";
+import { query } from "../../shared/db/postgres";
 import dayjs from "dayjs";
 
 export const forecastOrderSkillDefinition: SkillDefinition = {
@@ -119,6 +120,17 @@ export class ForecastOrderSkillHandler implements SkillHandler {
           displayFullQuantity: products.find((pr) => pr.name === p.name)?.displayFullQuantity ?? 0,
         }));
 
+        // 上周同日销量(中文名，经 name_en↔POS 归一化连接)，填「上周销售」列
+        const lwDate = dayjs(date).subtract(7, "day").format("YYYY-MM-DD");
+        const lwRows = await query<{ cn: string; q: number }>(
+          `SELECT p.name AS cn, SUM(s.qty)::int AS q FROM item_hourly_sales s
+             JOIN product p ON lower(btrim(regexp_replace(p.name_en,'[[:space:]]+',' ','g')))
+                             = lower(btrim(regexp_replace(s.item_name,'[[:space:]]+',' ','g')))
+            WHERE s.date = $1 GROUP BY p.name`,
+          [lwDate],
+        );
+        const lastWeekSales = new Map(lwRows.map((r) => [r.cn, Number(r.q)]));
+
         const buf = await buildForecastExcelBuffer({
           date,
           dailyTarget,
@@ -127,6 +139,7 @@ export class ForecastOrderSkillHandler implements SkillHandler {
           timeslotSalesRecords: timeslotRecords,
           fixedSchedule,
           products,
+          lastWeekSales,
         });
 
         const outputFile = await fileService.saveFile(

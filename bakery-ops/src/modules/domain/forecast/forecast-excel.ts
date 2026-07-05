@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { DAY_TYPE_LABELS, DOW_LABELS, ALL_SLOTS } from "./constants";
+import { DAY_TYPE_LABELS, DOW_LABELS } from "./constants";
 import type {
   TimeSlotSuggestion,
   ProductSuggestion,
@@ -7,6 +7,12 @@ import type {
   Product,
   DailyTarget,
 } from "./types";
+
+// 与门店真实「生产预估单」模板对齐：列布局 + 活公式(总数量=SUM逐时、总金额=单价×总数量、
+// TC占比=(总数-试吃)/客单数、逐时金额=单价×逐时、12点前储存、试吃金额、合计=SUM)。
+// 逐时格 10:00-19:00(与门店模板一致)；预测里 20-22 点的量折入 19:00，保证 总数=逐时之和。
+const HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+const AVG_TICKET = 70; // 客单价(门店口径)
 
 export async function buildForecastExcelBuffer(opts: {
   date: string;
@@ -16,251 +22,168 @@ export async function buildForecastExcelBuffer(opts: {
   timeslotSalesRecords: TimeslotSalesRecord[];
   fixedSchedule: Record<string, string[]>;
   products: Product[];
+  lastWeekSales?: Map<string, number>;
 }): Promise<Buffer> {
-  const { date, dailyTarget, productSuggestions, timeSlotSuggestions, timeslotSalesRecords, fixedSchedule, products } = opts;
-
+  const { date, dailyTarget, productSuggestions, timeSlotSuggestions, products, lastWeekSales } = opts;
   const wb = new ExcelJS.Workbook();
-  buildTimeSlotSheet(wb, { timeSlotSuggestions, productSuggestions, timeslotSalesRecords, fixedSchedule, products, dailyTarget, selectedDate: date });
+  const ws = wb.addWorksheet(`预估单_${date}`);
+  ws.views = [{ showGridLines: false }];
 
-  const buf = await wb.xlsx.writeBuffer();
-  return Buffer.from(buf);
-}
+  const col = (n: number) => ws.getColumn(n);
+  const L = (n: number) => ws.getColumn(n).letter; // 列字母，供公式引用
 
-function buildTimeSlotSheet(wb: ExcelJS.Workbook, opts: {
-  timeSlotSuggestions: TimeSlotSuggestion[];
-  productSuggestions: ProductSuggestion[];
-  timeslotSalesRecords: TimeslotSalesRecord[];
-  fixedSchedule: Record<string, string[]>;
-  products: Product[];
-  dailyTarget: DailyTarget;
-  selectedDate: string;
-}) {
-  const { timeSlotSuggestions, productSuggestions, timeslotSalesRecords, fixedSchedule, products, dailyTarget, selectedDate } = opts;
-  const ws = wb.addWorksheet(`分时段_${selectedDate}`);
-  const slotHeaders = ALL_SLOTS.map((s) => s.replace(":00", "点"));
-  const COL_OFFSET_QTY = 9;
+  // ── 列宽 ──
+  const widths = [8, 9, 5, 5, 8, 20, 26, 6, 6, 7, 7, 8, 7, 5, 8, 9,
+    ...HOURS.map(() => 5), ...HOURS.map(() => 6),
+    8, 9, 9, 6, 8, 12, 18, 8, 8, 14, 12, 12];
+  widths.forEach((w, i) => { col(i + 1).width = w; });
 
-  ws.columns = [
-    { width: 22 }, { width: 8 }, { width: 6 }, { width: 8 }, { width: 6 }, { width: 6 }, { width: 8 }, { width: 10 },
-    ...ALL_SLOTS.map(() => ({ width: 7 })),
-    ...ALL_SLOTS.map(() => ({ width: 8 })),
-    { width: 8 }, { width: 8 }, { width: 8 }, { width: 12 }, { width: 8 }, { width: 12 },
+  const thin = { style: "thin" as const, color: { argb: "FFD1D5DB" } };
+  const border = { top: thin, bottom: thin, left: thin, right: thin };
+  const hFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FF4340F4" } };
+  const hFont = { bold: true, size: 9, color: { argb: "FFFFFFFF" } };
+  const subFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFEEF0FF" } };
+  const botFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFE7F7EC" } }; // 系统自动
+  const inFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFFFFCEC" } };  // 手工填
+  const sumFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFFCE4E5" } };
+
+  const dow = `周${DOW_LABELS[dailyTarget.dayOfWeek]}`;
+  const dayTypeLabel = DAY_TYPE_LABELS[dailyTarget.dayType];
+  const revenue = dailyTarget.revenue;
+  const shipment = dailyTarget.shipmentAmount;
+  const custCount = Math.round(revenue / AVG_TICKET);
+
+  // 列位置(与真实模板一致)
+  const C = {
+    cat: 1, loc: 2, pos: 3, seq: 4, sub: 5, cn: 6, en: 7, price: 8, batch: 9,
+    total: 10, actual: 11, soldout: 12, tc: 13, temp: 14, lastwk: 15, amount: 16,
+    hq0: 17, ha0: 27, full: 37, store12: 38, storeAmt: 39, tasteQ: 40, tasteA: 41,
+    addDetail: 42, addNote: 43, addPending: 44, addAmt: 45, remark: 46, addTime: 47, redTime: 48,
+  };
+  const HEAD = 4;      // 列头行
+  const FIRST = 5;     // 首个产品行
+
+  // ── 行1 标题 ──
+  ws.mergeCells(1, 1, 1, 8);
+  const t = ws.getCell(1, 1); t.value = "生产预估单"; t.font = { bold: true, size: 16 };
+  // ── 行2 门店/日期/星期 ──
+  const r2 = [["门店", C.cat], ["Hot Crush · Pavilion KL", C.loc], ["日期", C.price], [date, C.batch], ["星期", C.tc], [dow, C.temp], ["制表人", C.amount], ["系统", C.hq0]];
+  for (const [v, c] of r2 as [string | number, number][]) ws.getCell(2, c).value = v;
+  // ── 行3 KPI(业绩预估=客单数×客单价) ──
+  ws.getCell(3, 1).value = "客单数"; ws.getCell(3, 2).value = custCount;
+  ws.getCell(3, 3).value = "客单价"; ws.getCell(3, 5).value = AVG_TICKET;
+  ws.getCell(3, C.price).value = "业绩预估";
+  ws.getCell(3, C.batch).value = { formula: `${L(2)}3*${L(5)}3` }; // = 客单数 × 客单价
+  ws.getCell(3, C.temp).value = "出货金额"; ws.getCell(3, C.lastwk).value = shipment;
+  for (const r of [2, 3]) for (let c = 1; c <= 16; c++) { const cell = ws.getCell(r, c); cell.border = border; if (typeof cell.value === "string" && cell.value) { cell.fill = subFill; cell.font = { bold: true, size: 9 }; } }
+
+  // ── 行4 列头 ──
+  const heads: [number, string][] = [
+    [C.cat, "品类"], [C.loc, "陈列位置"], [C.seq, "序号"], [C.sub, "品类"], [C.cn, "品名"], [C.en, "品名(英)"],
+    [C.price, "单价"], [C.batch, "倍数"], [C.total, "总数量"], [C.actual, "实际出货"], [C.soldout, "断货时间"],
+    [C.tc, "TC占比"], [C.temp, "冷/热"], [C.lastwk, "上周销售"], [C.amount, "总金额"],
+    [C.full, "满柜"], [C.store12, "12点前储存"], [C.storeAmt, "堆放金额"], [C.tasteQ, "试吃量"], [C.tasteA, "试吃金额"],
+    [C.addDetail, "加货明细"], [C.addNote, "加货备注(与后厨确认)"], [C.addPending, "加货待确认"], [C.remark, "备注"], [C.addTime, "加货时间"], [C.redTime, "减货时间"],
   ];
+  HOURS.forEach((h, i) => heads.push([C.hq0 + i, `${h}点出货`]));
+  HOURS.forEach((h, i) => heads.push([C.ha0 + i, `${h}点金额`]));
+  for (const [c, txt] of heads) { const cell = ws.getCell(HEAD, c); cell.value = txt; cell.fill = hFill; cell.font = hFont; cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; cell.border = border; }
+  ws.getRow(HEAD).height = 26;
 
-  const headerFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF3F4F6" } };
-  const fixedSlotFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FF0071E3" } };
-  const sumRowFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFFCE4E5" } };
-  const salesRowFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFEFF6FF" } };
-  const remainRowFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF9FAFB" } };
-  const tastingFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFFFFBEB" } };
-  const titleFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFDBEAFE" } };
-  const thinBorder = {
-    top: { style: "thin" as const, color: { argb: "FFE5E7EB" } },
-    bottom: { style: "thin" as const, color: { argb: "FFE5E7EB" } },
-    left: { style: "thin" as const, color: { argb: "FFE5E7EB" } },
-    right: { style: "thin" as const, color: { argb: "FFE5E7EB" } },
+  // ── 数据行 ──
+  const productMap = new Map(productSuggestions.map((p) => [p.productName, p]));
+  const displayFull = new Map(products.map((p) => [p.name, p.displayFullQuantity]));
+  const nameEn = new Map(products.map((p) => [p.name, p.nameEn]));
+  const category = new Map(products.map((p) => [p.name, p.category]));
+  // 每品原始逐时(真实小时曲线)
+  const rawHourly = new Map<string, Record<number, number>>();
+  for (const s of timeSlotSuggestions) {
+    const h = parseInt(s.timeSlot.slice(0, 2), 10);
+    const m = rawHourly.get(s.productName) || {};
+    m[h] = (m[h] || 0) + s.quantity;
+    rawHourly.set(s.productName, m);
+  }
+  // 把真实曲线摊到 10-19 格(区间外的量按形状比例摊回，避免 19 点堆峰)，整数且和=总量。
+  const distribute = (raw: Record<number, number>, total: number): number[] => {
+    if (total <= 0) return HOURS.map(() => 0);
+    const base = HOURS.map((h) => raw[h] || 0);
+    const baseSum = base.reduce((s, v) => s + v, 0);
+    const shape = baseSum > 0 ? base.map((v) => v / baseSum) : HOURS.map(() => 1 / HOURS.length);
+    const scaled = shape.map((f) => f * total);
+    const arr = scaled.map((v) => Math.floor(v));
+    let left = total - arr.reduce((s, v) => s + v, 0);
+    scaled.map((v, i) => ({ i, f: v - Math.floor(v) })).sort((a, b) => b.f - a.f)
+      .forEach(({ i }) => { if (left > 0) { arr[i]++; left--; } });
+    return arr;
   };
 
-  const shipmentAmount = dailyTarget.shipmentAmount;
-  const dayRevenue = dailyTarget.revenue;
-  const dayOfWeek = `周${DOW_LABELS[dailyTarget.dayOfWeek]}`;
-  const dayTypeLabel = DAY_TYPE_LABELS[dailyTarget.dayType];
-  const tastingWasteAmount = Math.round(shipmentAmount * 0.06);
+  let r = FIRST;
+  for (const p of productSuggestions) {
+    const nm = p.productName;
+    const cur = ws.getRow(r);
+    const set = (c: number, v: ExcelJS.CellValue) => { cur.getCell(c).value = v; };
+    set(C.cat, category.get(nm) ?? p.positioning ?? "");
+    set(C.pos, p.positioning ?? "");
+    set(C.seq, r - HEAD);
+    set(C.cn, nm); set(C.en, nameEn.get(nm) ?? "");
+    set(C.price, p.price); set(C.batch, p.packMultiple);
+    set(C.temp, p.coldHot);
+    if (lastWeekSales?.has(nm)) set(C.lastwk, lastWeekSales.get(nm)!);
+    set(C.full, displayFull.get(nm) || "");
+    // 逐时出货(系统自动，真实曲线摊到 10-19)
+    const grid = distribute(rawHourly.get(nm) || {}, p.suggestedQuantity);
+    HOURS.forEach((_, i) => { if (grid[i] > 0) set(C.hq0 + i, grid[i]); });
+    // 公式：总数量=SUM(逐时)；总金额=单价×总数量；TC=(总数-试吃)/客单数
+    const q0 = L(C.hq0), q9 = L(C.hq0 + 9), pcol = L(C.price), tcol = L(C.total);
+    set(C.total, { formula: `SUM(${q0}${r}:${q9}${r})` });
+    set(C.amount, { formula: `${pcol}${r}*${tcol}${r}` });
+    set(C.tc, { formula: `IF($${L(2)}$3=0,0,(${tcol}${r}-${L(C.tasteQ)}${r})/$${L(2)}$3)` });
+    // 逐时金额=单价×逐时
+    HOURS.forEach((h, i) => { set(C.ha0 + i, { formula: `${pcol}${r}*${L(C.hq0 + i)}${r}` }); });
+    // 12点前储存=IF(10点+11点-满柜>0,...)；堆放金额=储存×单价；试吃金额=试吃量×单价；加货金额=单价×待确认
+    set(C.store12, { formula: `IF(${L(C.hq0)}${r}+${L(C.hq0 + 1)}${r}-${L(C.full)}${r}>0,${L(C.hq0)}${r}+${L(C.hq0 + 1)}${r}-${L(C.full)}${r},0)` });
+    set(C.storeAmt, { formula: `${L(C.store12)}${r}*${pcol}${r}` });
+    set(C.tasteA, { formula: `${L(C.tasteQ)}${r}*${pcol}${r}` });
+    set(C.addAmt, { formula: `${pcol}${r}*${L(C.addPending)}${r}` });
+    // 冷热行加货/减货提前(按冷热)
+    set(C.addTime, p.coldHot === "热" ? "提前40分钟-1个小时" : "提前4个小时");
+    set(C.redTime, p.coldHot === "热" ? "提前2个小时" : "提前4个小时");
+    // TC占比百分比格式
+    cur.getCell(C.tc).numFmt = "0.0%";
+    // 底色：绿=系统自动，黄=门店手工
+    for (const c of [C.total, C.lastwk, C.full, ...HOURS.map((_, i) => C.hq0 + i)]) cur.getCell(c).fill = botFill;
+    for (const c of [C.actual, C.soldout, C.tasteQ, C.addDetail, C.addNote, C.addPending, C.remark]) cur.getCell(c).fill = inFill;
+    for (let c = 1; c <= C.ha0 + 9; c++) { const cell = cur.getCell(c); cell.border = border; cell.font = { size: 9 }; cell.alignment = { horizontal: c === C.cn || c === C.en ? "left" : "center", wrapText: false }; }
+    r++;
+  }
+  const LAST = r - 1;
 
-  // Row 1: Title
-  const titleRow = ws.addRow(["生产预估单"]);
-  ws.mergeCells(1, 1, 1, 8);
-  titleRow.getCell(1).font = { bold: true, size: 14 };
-  titleRow.getCell(1).fill = titleFill;
-  titleRow.getCell(1).alignment = { horizontal: "center" };
-
-  // Row 2: Date & basic info
-  const infoRow = ws.addRow([`日期：${selectedDate}`, "", `${dayOfWeek}（${dayTypeLabel}）`, "", "业绩预估", dayRevenue, "出货金额", shipmentAmount]);
-  infoRow.eachCell((cell: ExcelJS.Cell) => { cell.font = { size: 10 }; cell.border = thinBorder; });
-  infoRow.getCell(5).font = { bold: true, size: 10 };
-  infoRow.getCell(6).font = { bold: true, size: 10, color: { argb: "FFDC2626" } };
-  infoRow.getCell(7).font = { bold: true, size: 10 };
-  infoRow.getCell(8).font = { bold: true, size: 10, color: { argb: "FFDC2626" } };
-
-  // Row 3
-  const infoRow2 = ws.addRow(["", "", "", "", "试吃+排产", tastingWasteAmount, "试吃占比", "6%"]);
-  infoRow2.eachCell((cell: ExcelJS.Cell) => { cell.font = { size: 10 }; cell.border = thinBorder; });
-  ws.addRow([]);
-
-  // Header row
-  const headerRow = ws.addRow(["品名", "定位", "冷/热", "单价", "倍数", "满柜", "总数", "金额",
-    ...slotHeaders.map((s) => `${s}出货`), ...slotHeaders.map((s) => `${s}金额`),
-    "试吃量", "试吃金额", "加货数量", "加货备注", "减货数量", "减货备注"]);
-  headerRow.eachCell((cell: ExcelJS.Cell) => {
-    cell.fill = headerFill; cell.font = { bold: true, size: 9, color: { argb: "FF6B7280" } };
-    cell.border = thinBorder; cell.alignment = { horizontal: "center" };
+  // ── 合计行 ──
+  const sum = ws.getRow(r);
+  sum.getCell(C.cn).value = "合计";
+  sum.getCell(C.total).value = { formula: `SUM(${L(C.total)}${FIRST}:${L(C.total)}${LAST})` };
+  sum.getCell(C.amount).value = { formula: `SUM(${L(C.amount)}${FIRST}:${L(C.amount)}${LAST})` };
+  HOURS.forEach((h, i) => {
+    sum.getCell(C.hq0 + i).value = { formula: `SUM(${L(C.hq0 + i)}${FIRST}:${L(C.hq0 + i)}${LAST})` };
+    sum.getCell(C.ha0 + i).value = { formula: `SUM(${L(C.ha0 + i)}${FIRST}:${L(C.ha0 + i)}${LAST})` };
   });
-  headerRow.getCell(1).alignment = { horizontal: "left" };
+  for (let c = 1; c <= C.ha0 + 9; c++) { const cell = sum.getCell(c); cell.border = border; cell.fill = sumFill; cell.font = { bold: true, size: 9 }; cell.alignment = { horizontal: "center" }; }
+  r += 2;
 
-  // Build pivot data
-  const productNames = [...new Set(productSuggestions.map((p) => p.productName))];
-  const slotMap = new Map<string, Map<string, TimeSlotSuggestion>>();
-  for (const s of timeSlotSuggestions) {
-    if (!slotMap.has(s.productName)) slotMap.set(s.productName, new Map());
-    slotMap.get(s.productName)!.set(s.timeSlot, s);
-  }
-  const productInfoMap = new Map<string, ProductSuggestion>();
-  for (const p of productSuggestions) productInfoMap.set(p.productName, p);
-  const fullQtyMap = new Map<string, number>();
-  for (const p of products) fullQtyMap.set(p.name, p.displayFullQuantity);
-  const priceMap = new Map<string, number>();
-  for (const p of productSuggestions) priceMap.set(p.productName, p.price);
+  // ── 备注(10 条) ──
+  const notes = "备注：\n" +
+    "1. 优先加货，打造Top榜是核心工作；慎重加货、及时汇报上级，避免单小时加货过多导致下小时减货；批次数据永远第一。\n" +
+    "2. 前场每日12点前给到后厨后天的预估单；如需改出货数量，改电子版预估单，不要群里口头通知，车间只以预估单为准。\n" +
+    "3. 如有团购订单，需在预估单上体现。\n4. 每天14:00前，前场需确定最后一批搅拌类产品出货。\n" +
+    "5. 牛乳吐司每批不超72条。\n6. 三种坚果棒每批最大120根。\n7. 奶酪核桃马卡龙、红豆松松吐司、心太软每批最多60个。\n" +
+    "8. 加货明细：由战队长和主厨确定。\n9. 加货优先TOP榜，其次准TOP榜。\n10. 每小时必出：频次最重要；加货慎重，未达产能极限前寻求上级确认。";
+  ws.mergeCells(r, 1, r + 11, 8);
+  const nc = ws.getCell(r, 1); nc.value = notes; nc.alignment = { vertical: "top", wrapText: true }; nc.font = { size: 9 };
+  const lg = ws.getCell(r + 13, 1);
+  lg.value = "绿=系统自动填(预估量/逐时/上周销量) · 黄=门店手工(实际出货/断货/加货/试吃/备注) · 逐时10:00–19:00(晚档折入19点) · 数量按倍数整批";
+  lg.font = { color: { argb: "FF8A8F98" }, size: 9 };
 
-  // Product rows
-  for (const name of productNames) {
-    const info = productInfoMap.get(name);
-    const schedule = fixedSchedule[name] || [];
-    const productSlots = timeSlotSuggestions.filter((s) => s.productName === name);
-    const totalQty = productSlots.reduce((sum, s) => sum + s.quantity, 0);
-    const totalAmount = productSlots.reduce((sum, s) => sum + s.amount, 0);
-    const slotQtyValues = ALL_SLOTS.map((slot) => { const data = slotMap.get(name)?.get(slot); return data && data.quantity > 0 ? data.quantity : ""; });
-    const slotAmtValues = ALL_SLOTS.map((slot) => { const data = slotMap.get(name)?.get(slot); return data && data.amount > 0 ? data.amount : ""; });
-    const row = ws.addRow([name, info?.positioning ?? "", info?.coldHot ?? "", info?.price ?? "", info?.packMultiple ?? "", fullQtyMap.get(name) ?? "", totalQty, totalAmount, ...slotQtyValues, ...slotAmtValues, "", "", "", "", "", ""]);
-    row.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; cell.font = { size: 10 }; });
-    ALL_SLOTS.forEach((slot, idx) => {
-      if (schedule.includes(slot)) { const cell = row.getCell(COL_OFFSET_QTY + idx); cell.fill = fixedSlotFill; cell.font = { bold: true, size: 10 }; }
-    });
-  }
-
-  // 合计 row
-  const sumSlotQtyValues = ALL_SLOTS.map((slot) => timeSlotSuggestions.filter((s) => s.timeSlot === slot).reduce((sum, s) => sum + s.quantity, 0) || "");
-  const sumSlotAmtValues = ALL_SLOTS.map((slot) => timeSlotSuggestions.filter((s) => s.timeSlot === slot).reduce((sum, s) => sum + s.amount, 0) || "");
-  const sumRow = ws.addRow(["合计", "", "", "", "", "", timeSlotSuggestions.reduce((s, item) => s + item.quantity, 0), timeSlotSuggestions.reduce((s, item) => s + item.amount, 0), ...sumSlotQtyValues, ...sumSlotAmtValues]);
-  sumRow.eachCell((cell: ExcelJS.Cell) => { cell.fill = sumRowFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
-  sumRow.getCell(1).alignment = { horizontal: "left" };
-
-  // 预计销售 row
-  let estimatedSalesTotal = 0;
-  const salesSlotValues = ALL_SLOTS.map((slot) => {
-    if (slot < "12:00") return "";
-    const amt = Math.round(timeslotSalesRecords.filter((r) => r.timeSlot === slot).reduce((sum, r) => sum + r.avgQuantity * (priceMap.get(r.productName) ?? 0), 0));
-    estimatedSalesTotal += amt;
-    return amt || "";
-  });
-  const salesRow = ws.addRow(["预计销售", "", "", "", "", "", "", estimatedSalesTotal || "", ...salesSlotValues]);
-  salesRow.eachCell((cell: ExcelJS.Cell) => { cell.fill = salesRowFill; cell.font = { size: 10, color: { argb: "FF1D4ED8" } }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
-  salesRow.getCell(1).alignment = { horizontal: "left" };
-
-  // 预计剩余 row
-  const shipmentTotal = timeSlotSuggestions.reduce((s, item) => s + item.amount, 0);
-  let cumulativeShipment = 0;
-  let cumulativeSales = 0;
-  const remainSlotValues = ALL_SLOTS.map((slot, idx) => {
-    const slotShipment = timeSlotSuggestions.filter((s) => s.timeSlot === slot).reduce((sum, s) => sum + s.amount, 0);
-    cumulativeShipment += slotShipment;
-    const salesVal = typeof salesSlotValues[idx] === "number" ? salesSlotValues[idx] as number : 0;
-    cumulativeSales += salesVal;
-    if (cumulativeShipment === 0 && cumulativeSales === 0) return "";
-    return cumulativeShipment - cumulativeSales;
-  });
-  const remainRow = ws.addRow(["预计剩余", "", "", "", "", "", "", shipmentTotal - estimatedSalesTotal, ...remainSlotValues]);
-  remainRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => {
-    cell.fill = remainRowFill; cell.border = thinBorder; cell.alignment = { horizontal: "center" };
-    const val = cell.value as number;
-    if (colNumber >= 8 && typeof val === "number") cell.font = { size: 10, color: { argb: val < 0 ? "FFEF4444" : "FF16A34A" } };
-    else cell.font = { size: 10 };
-  });
-  remainRow.getCell(1).alignment = { horizontal: "left" };
-
-  // 门店陈列 row
-  const displaySlotValues = ALL_SLOTS.map((slot) => {
-    const slotAmt = timeSlotSuggestions.filter((s) => s.timeSlot === slot).reduce((sum, s) => {
-      const fq = fullQtyMap.get(s.productName) ?? 0;
-      const price = priceMap.get(s.productName) ?? 0;
-      return sum + fq * price;
-    }, 0);
-    return slotAmt > 0 ? slotAmt : "";
-  });
-  const displayTotal = products.reduce((sum, p) => sum + p.displayFullQuantity * p.price, 0);
-  const displayRow = ws.addRow(["门店陈列(满柜金额)", "", "", "", "", "", "", displayTotal || "", ...displaySlotValues]);
-  displayRow.eachCell((cell: ExcelJS.Cell) => {
-    cell.fill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF0FDF4" } };
-    cell.font = { size: 10, color: { argb: "FF16A34A" } }; cell.border = thinBorder; cell.alignment = { horizontal: "center" };
-  });
-  displayRow.getCell(1).alignment = { horizontal: "left" };
-
-  // 试吃报废表格
-  const tastingProducts = [
-    { name: "蛋挞", keyword: "蛋挞", rate: 0.015 },
-    { name: "马卡龙", keyword: "马卡龙", rate: 0.015 },
-    { name: "坚果棒", keyword: "坚果棒", rate: 0.01 },
-  ];
-  const wasteRate = 0.02;
-  const activeSlots = ALL_SLOTS.filter((s) => s >= "12:00");
-  const productSlotSales: Record<string, Record<string, number>> = {};
-  for (const tp of tastingProducts) {
-    productSlotSales[tp.name] = {};
-    for (const slot of activeSlots) {
-      const sales = timeslotSalesRecords.filter((r) => r.timeSlot === slot && r.productName.includes(tp.keyword)).reduce((sum, r) => sum + r.avgQuantity * (priceMap.get(r.productName) ?? 0), 0);
-      productSlotSales[tp.name][slot] = sales;
-    }
-  }
-  const slotAssignment: Record<string, string> = {};
-  for (const slot of activeSlots) {
-    let bestProduct = ""; let bestSales = 0;
-    for (const tp of tastingProducts) { const sales = productSlotSales[tp.name][slot]; if (sales > bestSales) { bestSales = sales; bestProduct = tp.name; } }
-    if (bestProduct) slotAssignment[slot] = bestProduct;
-  }
-  const getSalesForSlot = (slot: string): number => { const idx = ALL_SLOTS.indexOf(slot); const v = salesSlotValues[idx]; return typeof v === "number" ? v : 0; };
-  const productAssignedSlots: Record<string, string[]> = {};
-  for (const tp of tastingProducts) productAssignedSlots[tp.name] = [];
-  for (const [slot, pName] of Object.entries(slotAssignment)) productAssignedSlots[pName].push(slot);
-  for (const tp of tastingProducts) {
-    if (productAssignedSlots[tp.name].length === 0) {
-      const slotsWithSales = activeSlots.filter((s) => getSalesForSlot(s) > 0);
-      productAssignedSlots[tp.name] = slotsWithSales.length > 0 ? slotsWithSales : activeSlots;
-    }
-  }
-  const tastingSlotAmounts: Record<string, Record<string, number>> = {};
-  for (const tp of tastingProducts) {
-    tastingSlotAmounts[tp.name] = {};
-    const totalBudget = Math.round(shipmentAmount * tp.rate);
-    const slots = productAssignedSlots[tp.name];
-    const slotSalesSum = slots.reduce((sum, s) => sum + getSalesForSlot(s), 0);
-    for (const slot of slots) {
-      const slotSales = getSalesForSlot(slot);
-      tastingSlotAmounts[tp.name][slot] = slotSalesSum > 0 ? Math.round(totalBudget * slotSales / slotSalesSum) : Math.round(totalBudget / slots.length);
-    }
-  }
-
-  ws.addRow([]);
-  const tastingHeaderRow = ws.addRow(["试吃分配", "", "", "", "", "", "", "", ...slotHeaders]);
-  tastingHeaderRow.eachCell((cell: ExcelJS.Cell) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
-  tastingHeaderRow.getCell(1).alignment = { horizontal: "left" };
-
-  const tastingPriceMap: Record<string, number> = {};
-  for (const tp of tastingProducts) { const match = productSuggestions.find((p) => p.productName.includes(tp.keyword)); tastingPriceMap[tp.name] = match?.price ?? 0; }
-
-  for (const tp of tastingProducts) {
-    const totalBudget = Math.round(shipmentAmount * tp.rate);
-    const unitPrice = tastingPriceMap[tp.name];
-    const slotValues = ALL_SLOTS.map((slot) => { const amt = tastingSlotAmounts[tp.name][slot]; return amt && amt > 0 ? amt : ""; });
-    const row = ws.addRow([tp.name, "", "", "", "", "", "", totalBudget, ...slotValues]);
-    row.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
-    const totalQty = unitPrice > 0 ? Math.ceil(totalBudget / unitPrice) : 0;
-    const qtySlotValues = ALL_SLOTS.map((slot) => { const amt = tastingSlotAmounts[tp.name][slot]; if (!amt || amt <= 0 || unitPrice <= 0) return ""; return Math.ceil(amt / unitPrice); });
-    const qtyRow = ws.addRow([`${tp.name}(个数)`, "", "", "", "", "", "", totalQty || "", ...qtySlotValues]);
-    qtyRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10, color: { argb: "FF6B7280" } }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
-  }
-
-  const tastingSubtotal = Math.round(shipmentAmount * 0.04);
-  const subtotalSlotValues = ALL_SLOTS.map((slot) => { const total = tastingProducts.reduce((sum, tp) => { const amt = tastingSlotAmounts[tp.name][slot]; return sum + (amt && amt > 0 ? amt : 0); }, 0); return total > 0 ? total : ""; });
-  const subtotalRow = ws.addRow(["试吃小计", "", "", "", "", "", "", tastingSubtotal, ...subtotalSlotValues]);
-  subtotalRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
-
-  const tastingSalesRow = ws.addRow(["该时段预计销售", "", "", "", "", "", "", estimatedSalesTotal || "", ...salesSlotValues]);
-  tastingSalesRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10, color: { argb: "FF1D4ED8" } }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
-
-  const wasteAmount = Math.round(shipmentAmount * wasteRate);
-  const wasteRow = ws.addRow(["排产报废", "", "", "", "", "", "", wasteAmount]);
-  wasteRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
-
-  const totalLoss = Math.round(shipmentAmount * 0.06);
-  const lossRow = ws.addRow(["损耗合计", "", "", "", "", "", "", totalLoss]);
-  lossRow.eachCell((cell: ExcelJS.Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+  ws.views = [{ showGridLines: false, state: "frozen", xSplit: 6, ySplit: HEAD }];
+  const buf = await wb.xlsx.writeBuffer();
+  return Buffer.from(buf);
 }

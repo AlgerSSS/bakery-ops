@@ -33,15 +33,29 @@ export function calculateTimeSlotSuggestions(
   dailyTarget: DailyTarget,
   planningRules: PlanningRules,
   timeslotHistory?: TimeslotSalesRecord[],
-  defaultSlots?: string[]
+  defaultSlots?: string[],
+  // P1：单品真实逐时曲线(中文名键，来自 item_hourly_sales)。有则取代对不上名、恒等分的老路。
+  productHourly?: Map<string, Record<number, number>>
 ): TimeSlotSuggestion[] {
   const fixedSchedule = planningRules.fixedShipmentSchedule || {};
   const { dayType } = dailyTarget;
 
+  // 逐时曲线优先用「单品真实小时销量」(中文名键)；无则回落老 timeslotHistory(英文名，多对不上)。
   const historyMap = new Map<string, Map<string, number>>();
+  if (productHourly) {
+    for (const [name, hours] of productHourly) {
+      const sm = new Map<string, number>();
+      for (const [h, q] of Object.entries(hours)) {
+        const hn = Number(h);
+        if (q > 0 && hn >= 0 && hn <= 23) sm.set(`${String(hn).padStart(2, "0")}:00`, q);
+      }
+      if (sm.size) historyMap.set(name, sm);
+    }
+  }
   if (timeslotHistory && timeslotHistory.length > 0) {
     for (const r of timeslotHistory) {
       if (r.dayType !== dayType) continue;
+      if (historyMap.has(r.productName)) continue; // 真实曲线优先
       if (!historyMap.has(r.productName)) historyMap.set(r.productName, new Map());
       historyMap.get(r.productName)!.set(r.timeSlot, r.avgQuantity);
     }
@@ -62,10 +76,11 @@ export function calculateTimeSlotSuggestions(
     const fullQty = product.displayFullQuantity || 0;
 
     let targetSlots: string[];
-    if (schedule && schedule.length > 0) {
-      targetSlots = schedule;
-    } else if (productHistory && productHistory.size > 0) {
+    if (productHistory && productHistory.size > 0) {
+      // 真实小时曲线优先(按实际售卖时段分配)，比固定排期的粗档更贴近需求
       targetSlots = Array.from(productHistory.keys()).sort();
+    } else if (schedule && schedule.length > 0) {
+      targetSlots = schedule;
     } else {
       targetSlots = (defaultSlots && defaultSlots.length > 0) ? defaultSlots : ["11:00"];
     }

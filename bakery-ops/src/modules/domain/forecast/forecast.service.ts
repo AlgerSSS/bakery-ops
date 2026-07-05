@@ -22,6 +22,7 @@ import {
 } from "@/modules/data/repositories/forecast.repository";
 import { query, execute } from "@/modules/shared/db/postgres";
 import { computeDataDrivenTarget, type DataDrivenTarget } from "./data-driven-target";
+import { getProductSalesStats } from "./product-demand";
 import { logger } from "@/modules/shared/logger";
 import type {
   MonthlyTarget,
@@ -212,11 +213,19 @@ export async function getProductForecast(date: string): Promise<{
     : dailyTarget;
 
   const dayTypeHistory = allTimeslotHistory.filter((r) => r.dayType === dayType);
+  // P0/P1：new 模式下按单品实时销量(item_hourly_sales)取需求(中位数/P85)+逐时曲线，
+  // 取代 12 周旧基线与对不上名的 timeslot 老路。legacy 模式不查(保持原行为)。
+  const rawStats = useNew ? await getProductSalesStats(date) : undefined;
+  // 安全阀：单品统计为空(历史断档/名映射全失效)时不启用新基线+剪枝，避免误把预估单剪空。
+  const productStats = rawStats && rawStats.size > 0 ? rawStats : undefined;
   const productSuggestions = calculateProductSuggestions(
-    effectiveTarget, products, baselines, strategies, allTimeslotHistory, businessRules.productBoosts
+    effectiveTarget, products, baselines, strategies, allTimeslotHistory, businessRules.productBoosts, productStats
   );
   const defaultSlots = await getDefaultSlotsForDayType(dayType);
-  const timeSlotSuggestions = calculateTimeSlotSuggestions(productSuggestions, effectiveTarget, planningRules, dayTypeHistory, defaultSlots);
+  const productHourly = productStats
+    ? new Map(Array.from(productStats, ([n, s]) => [n, s.hourly] as [string, Record<number, number>]))
+    : undefined;
+  const timeSlotSuggestions = calculateTimeSlotSuggestions(productSuggestions, effectiveTarget, planningRules, dayTypeHistory, defaultSlots, productHourly);
 
   // F6-②：生成时 fire-and-forget 落快照（内部自捕获，不阻塞）
   void saveForecastSnapshot(

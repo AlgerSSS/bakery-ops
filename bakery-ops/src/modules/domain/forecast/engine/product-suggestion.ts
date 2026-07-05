@@ -7,6 +7,7 @@ import {
   TimeslotSalesRecord,
 } from "../types";
 import { roundToMultiple } from "./utils";
+import type { ProductDemand } from "../product-demand";
 
 export function calculateProductSuggestions(
   dailyTarget: DailyTarget,
@@ -14,7 +15,9 @@ export function calculateProductSuggestions(
   baselines: ProductSalesBaseline[],
   strategies: ProductStrategy[],
   timeslotRecords?: TimeslotSalesRecord[],
-  productBoosts?: Record<string, number>
+  productBoosts?: Record<string, number>,
+  // P0/P1：单品级实时需求(中位数/P85)。提供时取代老基线，并跳过定位加成与全局 rescale。
+  productStats?: Map<string, ProductDemand>
 ): ProductSuggestion[] {
   const { shipmentAmount, dayType } = dailyTarget;
 
@@ -59,32 +62,46 @@ export function calculateProductSuggestions(
   for (const product of products) {
     const baseline = baselineMap.get(product.name);
     const strategy = strategyMap.get(product.name);
+    const positioning = strategy?.positioning || "其他";
+    const stats = productStats?.get(product.name);
 
+    // P2 剪枝：新口径下，近期完全无销量(无 stats)的下架/僵尸品不进预估单(与人工只排在售品一致)。
+    if (productStats && !stats) continue;
+
+    // 需求基线：优先单品级实时中位数(P0/P1)；无实时样本时回落老路(timeslot / 12 周旧基线)。
     let baselineQty = 0;
-    const timeslotQty = timeslotBaselineMap.get(product.name);
-    if (timeslotQty !== undefined && timeslotQty > 0) {
-      baselineQty = Math.round(timeslotQty);
-    } else if (baseline) {
-      switch (dayType) {
-        case "mondayToThursday":
-          baselineQty = baseline.avgMondayToThursday;
-          break;
-        case "friday":
-          baselineQty = baseline.avgFriday;
-          break;
-        case "weekend":
-          baselineQty = baseline.avgWeekend;
-          break;
+    if (stats && stats.median > 0) {
+      // 中位数=典型同星期几需求(回测 MAE≈10%，优于人工 15%)；P85 太高会过量报废。
+      baselineQty = stats.median;
+    } else {
+      const timeslotQty = timeslotBaselineMap.get(product.name);
+      if (timeslotQty !== undefined && timeslotQty > 0) {
+        baselineQty = Math.round(timeslotQty);
+      } else if (baseline) {
+        switch (dayType) {
+          case "mondayToThursday":
+            baselineQty = baseline.avgMondayToThursday;
+            break;
+          case "friday":
+            baselineQty = baseline.avgFriday;
+            break;
+          case "weekend":
+            baselineQty = baseline.avgWeekend;
+            break;
+        }
       }
     }
 
     let adjustedQty = baselineQty;
-    const positioning = strategy?.positioning || "其他";
 
-    if (positioning === "TOP" && adjustedQty > 0) {
-      adjustedQty = Math.round(adjustedQty * boost.top);
-    } else if (positioning === "潜在TOP" && adjustedQty > 0) {
-      adjustedQty = Math.round(adjustedQty * boost.potentialTop);
+    // 定位加成只在回落老基线时叠加；单品实时中位数已是最准(回测 MAE≈10%，优于人工)，
+    // 再上浮会过量报废，防断货交给「断货检测」+ 人工加货那条路。
+    if (!(stats && stats.median > 0)) {
+      if (positioning === "TOP" && adjustedQty > 0) {
+        adjustedQty = Math.round(adjustedQty * boost.top);
+      } else if (positioning === "潜在TOP" && adjustedQty > 0) {
+        adjustedQty = Math.round(adjustedQty * boost.potentialTop);
+      }
     }
 
     const productBoost = productBoosts?.[product.name];
@@ -121,10 +138,12 @@ export function calculateProductSuggestions(
     });
   }
 
+  // 全局 rescale：仅老口径用。新口径(单品实时需求)不做——按比例砍会削掉爆款喂长尾，
+  // 而单品实际销量之和本身就是需求；总量对不上目标是"该多做多少"的真实反映(P1)。
   const totalSuggested = suggestions.reduce((sum, s) => sum + s.totalAmount, 0);
   const ratio = totalSuggested > 0 ? shipmentAmount / totalSuggested : 1;
 
-  if (Math.abs(ratio - 1) > 0.05) {
+  if (!productStats && Math.abs(ratio - 1) > 0.05) {
     for (const s of suggestions) {
       const scaledQty = Math.round(s.suggestedQuantity * ratio);
       s.suggestedQuantity = scaledQty;

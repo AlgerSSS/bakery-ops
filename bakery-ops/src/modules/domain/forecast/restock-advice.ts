@@ -129,8 +129,8 @@ export function buildRestockAdviceText(date: string, advices: RestockAdvice[], c
     lines.push("", "今日各单品基本按计划，暂无显著加减货建议 ✅");
     return lines.join("\n");
   }
-  if (add.length) { lines.push("", "🔺 *加货*"); for (const a of add) lines.push(`• ${a.reason}`); }
-  if (red.length) { lines.push("", "🔻 *减货*"); for (const a of red) lines.push(`• ${a.reason}`); }
+  if (add.length) { lines.push("", "🔺 *加货*"); for (const a of add) lines.push(`• *${a.productName}* ${a.reason}`); }
+  if (red.length) { lines.push("", "🔻 *减货*"); for (const a of red) lines.push(`• *${a.productName}* ${a.reason}`); }
   return lines.join("\n");
 }
 

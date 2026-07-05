@@ -173,34 +173,40 @@ describe("runMorningBrief 该不该发/幂等", () => {
 describe("runProductionPlanPush 该不该发/幂等", () => {
   const PLAN = { date: "2026-07-02", dayType: "工作日", targetRevenue: 3000, batches: [{}], summary: "🍞 计划" };
 
-  it("有计划 -> 推主厨+抄送老板，成功后写 daily_push_log", async () => {
+  it("有计划 -> 推 production_plan 订阅者(Lark)，成功后写 daily_push_log", async () => {
     setupQueryMock({});
     generatePlanMock.mockResolvedValue(PLAN);
-    getAllUsersMock.mockResolvedValue([{ role: "kitchen_manager", phone: "60222@c.us" }]);
+    getSubscriberOpenIdsMock.mockResolvedValue(["ou_owner"]);
     await runProductionPlanPush();
-    const recipients = sendTextToMock.mock.calls.map((c) => c[0]);
-    expect(recipients).toContain("60222@c.us");
-    expect(recipients).toContain("60000000000@c.us");
-    expect(executeMock).toHaveBeenCalledTimes(2);
+    const recipients = sendLarkToUserMock.mock.calls.map((c) => c[0]);
+    expect(recipients).toContain("ou_owner");
+    expect(executeMock).toHaveBeenCalledTimes(1);
   });
 
   it("空计划 -> 不发送", async () => {
     generatePlanMock.mockResolvedValue({ ...PLAN, batches: [] });
     await runProductionPlanPush();
-    expect(sendTextToMock).not.toHaveBeenCalled();
+    expect(sendLarkToUserMock).not.toHaveBeenCalled();
   });
 
   it("生成失败 -> 安全 no-op", async () => {
     generatePlanMock.mockRejectedValue(new Error("forecast not configured"));
     await runProductionPlanPush();
-    expect(sendTextToMock).not.toHaveBeenCalled();
+    expect(sendLarkToUserMock).not.toHaveBeenCalled();
+  });
+
+  it("无订阅者 -> 不发送", async () => {
+    generatePlanMock.mockResolvedValue(PLAN);
+    getSubscriberOpenIdsMock.mockResolvedValue([]);
+    await runProductionPlanPush();
+    expect(sendLarkToUserMock).not.toHaveBeenCalled();
   });
 
   it("daily_push_log 已有记录 -> 跳过不重发", async () => {
     setupQueryMock({ pushLogRows: [{ id: 1 }] });
     generatePlanMock.mockResolvedValue(PLAN);
     await runProductionPlanPush();
-    expect(sendTextToMock).not.toHaveBeenCalled();
+    expect(sendLarkToUserMock).not.toHaveBeenCalled();
     expect(executeMock).not.toHaveBeenCalled();
   });
 });

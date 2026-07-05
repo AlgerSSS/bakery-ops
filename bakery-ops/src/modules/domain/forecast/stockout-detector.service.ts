@@ -12,12 +12,14 @@
 // 落库经 forecast-calc.repository saveOutOfStockRecords；out_of_stock_record 表无来源
 // 字段，取最接近的 input_name 标 'auto'（手工录入该字段是老板原始输入文本）。
 // 落库幂等：当日已有同名 product_name 记录则跳过（同时保护网页手工记录）。
-// 推老板一条汇总，无检出不发；推送幂等 daily_push_log kind='stockout_detect'。
+// 推给 team_member 订阅 'stockout' 的人（Lark 直发，对内只走 Lark），无检出不发；
+// 推送幂等 daily_push_log kind='stockout_detect'（recipient=open_id）。
 // 手工录入（网页端复盘）保留为纠错通道。
 
 import { query } from "@/modules/shared/db/postgres";
 import { logger } from "@/modules/shared/logger";
-import { notifyInternal } from "@/modules/channel/internal-notify";
+import { sendLarkToUser } from "@/modules/channel/lark/lark-messenger";
+import { teamRepository } from "@/modules/data/repositories/team.repository";
 import { localDate } from "@/modules/channel/whatsapp/outbound.config";
 import { hasPushLog, recordPushLog } from "@/modules/domain/notifications/push-log";
 import { getProducts, getProductAliases } from "@/modules/data/repositories/product.repository";
@@ -323,25 +325,28 @@ export async function runStockoutDetection(): Promise<void> {
     return;
   }
 
-  // 推老板（幂等 kind='stockout_detect'）
-  const owner = process.env.OWNER_WHATSAPP || process.env.OWNER_PHONE || "";
-  if (!owner) {
-    logger.warn("Stockout detect: OWNER_WHATSAPP not configured, skipping push");
+  // 推给 team_member 订阅 'stockout' 的人（Lark 直发，对内只走 Lark；幂等 kind='stockout_detect'）
+  const openIds = await teamRepository.getSubscriberOpenIds("stockout");
+  if (!openIds.length) {
+    logger.error("Stockout detect: 无有效收件人(team_member 无 stockout 订阅者)");
     return;
   }
-  try {
-    if (await hasPushLog("stockout_detect", owner, yesterday)) {
-      logger.info("Stockout detect: already sent, skipping", { recipient: owner, date: yesterday });
-      return;
+  const text = buildStockoutDetectText(yesterday, suspects);
+  for (const openId of openIds) {
+    try {
+      if (await hasPushLog("stockout_detect", openId, yesterday)) {
+        logger.info("Stockout detect: already sent, skipping", { openId, date: yesterday });
+        continue;
+      }
+      const sent = await sendLarkToUser(openId, text);
+      if (sent) {
+        await recordPushLog("stockout_detect", openId, yesterday);
+        logger.info("Stockout detect: sent", { openId, date: yesterday, suspects: suspects.length });
+      } else {
+        logger.error("Stockout detect: send failed", { openId });
+      }
+    } catch (err) {
+      logger.error("Stockout detect: push failed", { openId, error: String(err) });
     }
-    const sent = await notifyInternal(owner, buildStockoutDetectText(yesterday, suspects));
-    if (sent) {
-      await recordPushLog("stockout_detect", owner, yesterday);
-      logger.info("Stockout detect: sent", { recipient: owner, date: yesterday, suspects: suspects.length });
-    } else {
-      logger.error("Stockout detect: send failed", { recipient: owner });
-    }
-  } catch (err) {
-    logger.error("Stockout detect: push failed", { recipient: owner, error: String(err) });
   }
 }

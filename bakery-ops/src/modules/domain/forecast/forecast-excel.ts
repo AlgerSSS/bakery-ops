@@ -170,6 +170,27 @@ export async function buildForecastExcelBuffer(opts: {
   for (let c = 1; c <= C.ha0 + 9; c++) { const cell = sum.getCell(c); cell.border = border; cell.fill = sumFill; cell.font = { bold: true, size: 9 }; cell.alignment = { horizontal: "center" }; }
   r += 2;
 
+  // ── 右侧「预计销售」逐时表(对齐真实模板 时间/销售额；销售额=该时段逐时金额之和，活公式；
+  //     合计=产品表总金额之和=真实需求，新口径下可高于/低于顶部「出货金额」预算目标) ──
+  const S1 = 50, S2 = 51; // 时间 / 预计销售 两列
+  col(S1).width = 14; col(S2).width = 11;
+  const stTitle = ws.getCell(3, S1); stTitle.value = "预计销售(逐时)"; stTitle.font = { bold: true, size: 9 };
+  ws.mergeCells(3, S1, 3, S2);
+  for (const [c, txt] of [[S1, "时间"], [S2, "预计销售"]] as [number, string][]) {
+    const cell = ws.getCell(HEAD, c); cell.value = txt; cell.fill = hFill; cell.font = hFont;
+    cell.alignment = { horizontal: "center", vertical: "middle" }; cell.border = border;
+  }
+  HOURS.forEach((h, i) => {
+    const rr = HEAD + 1 + i;
+    const tc = ws.getCell(rr, S1); tc.value = `${h}:00-${h + 1}:00`; tc.border = border; tc.font = { size: 9 }; tc.alignment = { horizontal: "center" };
+    const ac = ws.getCell(rr, S2); ac.value = { formula: `SUM(${L(C.ha0 + i)}${FIRST}:${L(C.ha0 + i)}${LAST})` };
+    ac.border = border; ac.font = { size: 9 }; ac.fill = botFill; ac.alignment = { horizontal: "center" };
+  });
+  const stTot = HEAD + 1 + HOURS.length;
+  const tt = ws.getCell(stTot, S1); tt.value = "合计"; tt.border = border; tt.fill = sumFill; tt.font = { bold: true, size: 9 }; tt.alignment = { horizontal: "center" };
+  const ta = ws.getCell(stTot, S2); ta.value = { formula: `SUM(${L(S2)}${HEAD + 1}:${L(S2)}${HEAD + HOURS.length})` };
+  ta.border = border; ta.fill = sumFill; ta.font = { bold: true, size: 9 }; ta.alignment = { horizontal: "center" };
+
   // ── 备注(10 条) ──
   const notes = "备注：\n" +
     "1. 优先加货，打造Top榜是核心工作；慎重加货、及时汇报上级，避免单小时加货过多导致下小时减货；批次数据永远第一。\n" +

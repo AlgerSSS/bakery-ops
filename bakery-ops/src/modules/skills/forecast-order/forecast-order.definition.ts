@@ -41,9 +41,9 @@ export const forecastOrderSkillDefinition: SkillDefinition = {
   riskLevel: "low",
   requiresConfirmation: false,
   supportsMultiTurn: false,
-  supportsFiles: false,
+  supportsFiles: true,
   supportsCron: false,
-  outputTypes: ["text"],
+  outputTypes: ["text", "excel"],
   handler: null,
 };
 
@@ -56,14 +56,16 @@ export class ForecastOrderSkillHandler implements SkillHandler {
     let queryType = (input.input.queryType as string) || "";
     let targetDate = (input.input.targetDate as string) || (input.input.date as string) || "";
 
-    // Auto-detect from message text
-    if (!queryType) {
+    // 文字里明确要「预估单/表格/excel/导出」→ 一律给填好的 Excel 附件（优先级最高，
+    // 覆盖 LLM 路由给的 queryType；summary 再带一段文字摘要）。用户 2026-07-05 定案。
+    if (lower.includes("excel") || lower.includes("表格") || lower.includes("导出") || lower.includes("预估单") || lower.includes("发表格")) {
+      queryType = "excel";
+    } else if (!queryType) {
+      // 其余按文字自动判断
       if (lower.includes("营业额") || lower.includes("业绩") || lower.includes("销售")) {
         queryType = "revenue";
       } else if (lower.includes("复盘") || lower.includes("总结") || lower.includes("review")) {
         queryType = "review";
-      } else if (lower.includes("excel") || lower.includes("表格") || lower.includes("导出") || lower.includes("发预估单") || lower.includes("发表格")) {
-        queryType = "excel";
       } else {
         queryType = "forecast";
       }
@@ -137,7 +139,7 @@ export class ForecastOrderSkillHandler implements SkillHandler {
           runId: uuidv4(),
           skillId: "forecast_order",
           status: "success",
-          summary: `📊 ${date} 排产预估单已生成`,
+          summary: `${formatForecastCompact(forecast)}\n\n📎 完整排产预估单 Excel 见附件（${date}）`,
           files: [outputFile],
         };
       }

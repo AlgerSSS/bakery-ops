@@ -27,6 +27,7 @@ const input = (overrides: Partial<StockoutDetectionInput> = {}): StockoutDetecti
   lastSaleMinutes: HHMM("18:47"),
   closeMinutes: HHMM("22:17"),
   hasSchedulingWaste: false,
+  isBeverage: false,
   ...overrides,
 });
 
@@ -37,6 +38,12 @@ describe("detectStockout 判定规则（分钟级）", () => {
 
   it("有排产报废 → 收工有剩余 → 没断货", () => {
     expect(detectStockout(input({ hasSchedulingWaste: true }))).toBeNull();
+  });
+
+  it("饮品类 → 永不做断货检测（即便早早卖完）", () => {
+    expect(detectStockout(input({ isBeverage: true }))).toBeNull();
+    // 饮品优先级最高：即使无报废、明显提前售罄，也不判
+    expect(detectStockout(input({ isBeverage: true, lastSaleMinutes: HHMM("14:00") }))).toBeNull();
   });
 
   it("卖到打烊（最后成交 = 打烊时间）→ 不算提前断货", () => {

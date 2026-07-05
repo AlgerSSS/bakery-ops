@@ -18,6 +18,7 @@ import { checkAndNotify } from "./modules/domain/recruitment/notifications/notif
 import { checkDataFreshness } from "./modules/domain/notifications/freshness-check";
 import { runMorningBrief } from "./modules/domain/notifications/morning-brief.service";
 import { runProductionPlanPush } from "./modules/domain/notifications/production-plan-push.service";
+import { runRestockAdvicePush } from "./modules/domain/notifications/restock-advice-push.service";
 import { runTrialDigest } from "./modules/domain/recruitment/digest/trial-digest.service";
 import { runInterviewDigest } from "./modules/domain/recruitment/digest/interview-digest.service";
 import { drainOutboundQueue } from "./modules/channel/whatsapp/outbound.worker";
@@ -173,6 +174,10 @@ async function runBootstrap() {
 
   // 15. 工作日 16:00 订货提醒（F4，Lark 发送）
   if (onCore) cron.schedule("0 16 * * 1-5", wrapCron("order_reminder", runOrderReminder), TZ);
+
+  // 15a. 每日 14:30 加减货建议：据今日到 14:20 实际销量(res_api intraday 14:20 拉)判加/减，
+  //      Lark 订阅制('restock_advice')，测试期只发 owner。数据不全时引擎自带护栏返回空。
+  if (onCore) cron.schedule("30 14 * * *", wrapCron("restock_advice", runRestockAdvicePush), TZ);
 
   // ── whatsapp 角色的定时任务（招聘/候选人；跑有 WA 客户端的一侧）──
   // 8. 每 15 分钟检查招聘通知（JobStreet，默认关闭；候选人走 WhatsApp）

@@ -13,6 +13,8 @@ import { buildForecastExcelBuffer } from "../../domain/forecast/forecast-excel";
 import { getTimeslotSalesRecords, getFixedShipmentSchedules, getProducts } from "../../data/repositories/forecast.repository";
 import { fileService } from "../../domain/files/file-service";
 import { query } from "../../shared/db/postgres";
+import { generateRestockAdvice, buildRestockAdviceText } from "../../domain/forecast/restock-advice";
+import { localDate } from "../../channel/whatsapp/outbound.config";
 import dayjs from "dayjs";
 
 export const forecastOrderSkillDefinition: SkillDefinition = {
@@ -26,6 +28,7 @@ export const forecastOrderSkillDefinition: SkillDefinition = {
     "营业额目标", "日目标", "月目标", "单品建议",
     "时段排产", "分时段", "营业额",
     "发预估单", "导出", "excel", "表格", "发表格",
+    "加减货", "加货", "减货", "现在加减货",
   ],
   examples: [
     "明天出什么",
@@ -57,9 +60,12 @@ export class ForecastOrderSkillHandler implements SkillHandler {
     let queryType = (input.input.queryType as string) || "";
     let targetDate = (input.input.targetDate as string) || (input.input.date as string) || "";
 
-    // 文字里明确要「预估单/表格/excel/导出」→ 一律给填好的 Excel 附件（优先级最高，
-    // 覆盖 LLM 路由给的 queryType；summary 再带一段文字摘要）。用户 2026-07-05 定案。
-    if (lower.includes("excel") || lower.includes("表格") || lower.includes("导出") || lower.includes("预估单") || lower.includes("发表格")) {
+    // 「加减货/加货/减货」→ 即时加减货建议（据今日实际销量，最高优先级）。用户 2026-07-05。
+    if (lower.includes("加减货") || lower.includes("加货") || lower.includes("减货")) {
+      queryType = "restock";
+    } else if (lower.includes("excel") || lower.includes("表格") || lower.includes("导出") || lower.includes("预估单") || lower.includes("发表格")) {
+      // 文字里明确要「预估单/表格/excel/导出」→ 一律给填好的 Excel 附件（优先级最高，
+      // 覆盖 LLM 路由给的 queryType；summary 再带一段文字摘要）。用户 2026-07-05 定案。
       queryType = "excel";
     } else if (!queryType) {
       // 其余按文字自动判断
@@ -81,6 +87,20 @@ export class ForecastOrderSkillHandler implements SkillHandler {
     }
 
     try {
+      if (queryType === "restock") {
+        // 即时加减货：据今日到「当前 KL 时刻」的实际销量。数据需 res_api 14:20 起拉取。
+        const date = localDate();
+        const has = await query<{ x: number }>(`SELECT 1 AS x FROM item_hourly_sales WHERE date = $1 LIMIT 1`, [date]);
+        if (!has.length) {
+          return { runId: uuidv4(), skillId: "forecast_order", status: "success", summary: "今日销量数据还没就绪（每日 14:20 起自动拉取，之后可随时问我加减货）。" };
+        }
+        const klNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" }));
+        const nowMin = klNow.getHours() * 60 + klNow.getMinutes();
+        const clock = `${String(klNow.getHours()).padStart(2, "0")}:${String(klNow.getMinutes()).padStart(2, "0")}`;
+        const advices = await generateRestockAdvice(date, nowMin);
+        return { runId: uuidv4(), skillId: "forecast_order", status: "success", summary: buildRestockAdviceText(date, advices, clock) };
+      }
+
       if (queryType === "excel") {
         const date = targetDate || dayjs().add(1, "day").format("YYYY-MM-DD");
         const forecast = await getProductForecast(date);

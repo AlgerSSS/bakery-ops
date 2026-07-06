@@ -8,6 +8,7 @@ import { aiProvider } from "../../domain/ai/ai-provider";
 import { query } from "../../shared/db/postgres";
 import { getProductForecast } from "../../domain/forecast/forecast.service";
 import { queryDataForQuestion } from "../../domain/forecast/ops-data-query";
+import { computeStockoutForDate } from "../../domain/forecast/stockout-detector.service";
 import { logger } from "../../shared/logger";
 
 const SKILL_MD_PATH = resolve(process.cwd(), "src/modules/skills/daily-review-chat/SKILL.md");
@@ -276,11 +277,21 @@ async function getSalesData(date: string): Promise<string> {
   const oos = await query<any>(
     `SELECT product_name AS nm, soldout_time AS t, estimated_loss_qty AS q, estimated_loss_amount AS amt
        FROM out_of_stock_record WHERE date = $1 AND estimated_loss_amount > 0 ORDER BY estimated_loss_amount DESC LIMIT 6`, [date]);
-  if (oos.length) {
-    const lossSum = oos.reduce((a: number, r: any) => a + Number(r.amt), 0);
+  let oosList = oos.map((r: any) => ({ nm: r.nm, t: r.t, q: Number(r.q), amt: Number(r.amt) }));
+  if (!oosList.length) {
+    // 当日复盘时断货检测(测「昨日」)还没跑到当天 → 实时算一份，保证当天断货损失可见。
+    try {
+      const recs = await computeStockoutForDate(date);
+      oosList = recs.filter((r) => r.estimatedLossAmount > 0)
+        .sort((a, b) => b.estimatedLossAmount - a.estimatedLossAmount).slice(0, 6)
+        .map((r) => ({ nm: r.productName, t: r.soldoutTime, q: r.estimatedLossQty, amt: r.estimatedLossAmount }));
+    } catch (err) { logger.warn("复盘内联断货计算失败，跳过断货节", { date, error: String(err) }); }
+  }
+  if (oosList.length) {
+    const lossSum = oosList.reduce((a: number, r: any) => a + r.amt, 0);
     ctx += `\n【断货损失（卖光=少赚的营业额，用于解释达成率缺口）】\n`;
     ctx += `断货损失合计约 RM${lossSum.toFixed(0)}\n`;
-    for (const r of oos) ctx += `  ${r.nm}: ${r.t}断货, 估少卖${r.q}个/RM${Number(r.amt).toFixed(0)}\n`;
+    for (const r of oosList) ctx += `  ${r.nm}: ${r.t}断货, 估少卖${r.q}个/RM${r.amt.toFixed(0)}\n`;
   }
 
   // 预估偏差：计划 vs 实卖（分析用，不出加减产指令；结合排产报废/断货判断真过量还是断货）

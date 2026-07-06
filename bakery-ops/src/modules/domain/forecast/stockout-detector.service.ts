@@ -245,72 +245,75 @@ async function detectForDate(date: string, dayType: OutOfStockRecord["dayType"])
 }
 
 /** 入口 — 由接线 agent 挂 cron。无数据/未连接/已推送时安全 no-op。 */
+/**
+ * 计算某日的断货记录（含损失估算 + 标准名解析），不落库、不推送。
+ * 供 runStockoutDetection（昨日→落库+推送）与「当日复盘内联实时断货损失」共用，避免时序依赖。
+ */
+export async function computeStockoutForDate(date: string): Promise<OutOfStockRecord[]> {
+  const dayType = getDayType(date);
+  const result = await detectForDate(date, dayType);
+  if (!result || !result.detected.length) return [];
+  const [products, aliases] = await Promise.all([getProducts(), getProductAliases()]);
+  const records: OutOfStockRecord[] = [];
+  for (const d of result.detected) {
+    const soldoutHour = Math.floor(d.soldoutMinutes / 60); // 损失估算按整点档
+    const soldoutTime = minutesToHHMM(d.soldoutMinutes); // 展示=分钟精度（断货时间）
+    const record: OutOfStockRecord = {
+      date,
+      productName: d.itemName, // 先用 POS 品名参与损失计算（与分时段历史同名），最后再换标准名
+      inputName: "auto",
+      soldoutTime,
+      soldoutSlot: `${String(soldoutHour).padStart(2, "0")}:00`,
+      dayType,
+      lossSlots: calculateLossSlots(`${soldoutHour + 1}:00`),
+      estimatedLossQty: 0,
+      estimatedLossAmount: 0,
+    };
+    const timeslotHistory: TimeslotSalesRecord[] = Object.entries(d.history.avgQtyByHour).map(([hour, avg]) => ({
+      productName: d.itemName,
+      dayType,
+      timeSlot: `${String(hour).padStart(2, "0")}:00`,
+      avgQuantity: avg,
+      sampleCount: result.histDays,
+    }));
+    const price = d.history.totalQty > 0 ? d.history.totalNet / d.history.totalQty : 0;
+    const { lossQty, lossAmount } =
+      result.txCount > 0
+        ? calculateStockoutLossWithTraffic(record, timeslotHistory, price, result.txCount)
+        : calculateStockoutLoss(record, timeslotHistory, price);
+    // 无可估损失 → 卖到营业结束或无历史，不算真断货。营业时段建模到 21:00，卖到打烊的品损失为 0，自然滤除。
+    if (lossQty <= 0) continue;
+    record.estimatedLossQty = lossQty;
+    record.estimatedLossAmount = lossAmount;
+    record.productName = resolveStandardName(d.itemName, products, aliases);
+    records.push(record);
+  }
+  return records;
+}
+
 export async function runStockoutDetection(): Promise<void> {
   const yesterday = localDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
-  const dayType = getDayType(yesterday);
 
-  let result: Awaited<ReturnType<typeof detectForDate>>;
+  let records: OutOfStockRecord[];
   try {
-    result = await detectForDate(yesterday, dayType);
+    records = await computeStockoutForDate(yesterday);
   } catch (err) {
     logger.error("Stockout detect: detection failed", { date: yesterday, error: String(err) });
     return;
   }
-  if (!result) return;
-  if (!result.detected.length) {
+  if (!records.length) {
     logger.info("Stockout detect: no suspects, nothing to send", { date: yesterday });
     return;
   }
 
-  // 估损 + 落库（当日已有同名记录则跳过落库，保护手工记录；推送仍汇总全部检出）
-  const suspects: StockoutSuspect[] = [];
-  const toSave: OutOfStockRecord[] = [];
+  const suspects: StockoutSuspect[] = records.map((r) => ({
+    productName: r.productName, soldoutTime: r.soldoutTime, lossQty: r.estimatedLossQty, lossAmount: r.estimatedLossAmount,
+  }));
+  // 落库（当日已有同名记录则跳过，保护手工记录；推送仍汇总全部检出）
   try {
-    const [products, aliases, existing] = await Promise.all([
-      getProducts(),
-      getProductAliases(),
-      getOutOfStockRecords(yesterday),
-    ]);
+    const existing = await getOutOfStockRecords(yesterday);
     const existingNames = new Set(existing.map((r) => r.productName));
-
-    for (const d of result.detected) {
-      const soldoutHour = Math.floor(d.soldoutMinutes / 60); // 损失估算按整点档
-      const soldoutTime = minutesToHHMM(d.soldoutMinutes); // 展示/落库=分钟精度（断货时间）
-      const record: OutOfStockRecord = {
-        date: yesterday,
-        productName: d.itemName, // 先用 POS 品名参与损失计算（与分时段历史同名），落库前再换标准名
-        inputName: "auto",
-        soldoutTime,
-        soldoutSlot: `${String(soldoutHour).padStart(2, "0")}:00`,
-        dayType,
-        // 损失从「最后成交小时之后」算起：该小时本身有成交，不计入损失
-        lossSlots: calculateLossSlots(`${soldoutHour + 1}:00`),
-        estimatedLossQty: 0,
-        estimatedLossAmount: 0,
-      };
-      const timeslotHistory: TimeslotSalesRecord[] = Object.entries(d.history.avgQtyByHour).map(([hour, avg]) => ({
-        productName: d.itemName,
-        dayType,
-        timeSlot: `${String(hour).padStart(2, "0")}:00`,
-        avgQuantity: avg,
-        sampleCount: result!.histDays,
-      }));
-      const price = d.history.totalQty > 0 ? d.history.totalNet / d.history.totalQty : 0;
-      const { lossQty, lossAmount } =
-        result.txCount > 0
-          ? calculateStockoutLossWithTraffic(record, timeslotHistory, price, result.txCount)
-          : calculateStockoutLoss(record, timeslotHistory, price);
-      // 无可估损失 → 卖到营业结束(最后成交在营业末档)或无历史，不算真断货，不推不存。
-      // 营业时段建模到 21:00(BUSINESS_SLOTS)，故卖到 21:00/22:00 打烊的品损失为 0，自然被此滤除。
-      if (lossQty <= 0) continue;
-      record.estimatedLossQty = lossQty;
-      record.estimatedLossAmount = lossAmount;
-      record.productName = resolveStandardName(d.itemName, products, aliases);
-
-      suspects.push({ productName: record.productName, soldoutTime, lossQty, lossAmount });
-      if (!existingNames.has(record.productName)) toSave.push(record);
-    }
-
+    const toSave = records.filter((r) => !existingNames.has(r.productName));
     if (toSave.length) {
       await saveOutOfStockRecords(toSave);
       logger.info("Stockout detect: records saved", { date: yesterday, count: toSave.length });

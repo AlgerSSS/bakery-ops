@@ -146,9 +146,16 @@ async function getSalesData(date: string): Promise<string> {
     if (lastWeek.length) {
       const lw = lastWeek[0];
       const lwGross = Number(lw.gross_sales) || 0;
-      const revDiff = lwGross > 0 ? ((grossRev - lwGross) / lwGross * 100).toFixed(1) : "0";
+      const lwNet = Number(lw.revenue) || 0;
+      // 上周同天水吧营业额(与今日同口径)，好让核心指标表的实收/水吧也有对比+变化
+      const lwWbRows = await query<any>(
+        `SELECT COALESCE(SUM(s.gross_sales),0) AS gross FROM item_hourly_sales s
+           JOIN item_category c ON lower(btrim(s.item_name)) = lower(btrim(c.item_name))
+          WHERE s.date = $1 AND c.category LIKE '%饮品%'`, [lwStr]);
+      const lwWb = Number(lwWbRows[0]?.gross) || 0;
+      const pct = (now: number, prev: number) => prev > 0 ? `${(now - prev) / prev * 100 >= 0 ? "+" : ""}${((now - prev) / prev * 100).toFixed(1)}%` : "—";
       const lwAvg = Number(lw.transaction_count) > 0 ? (lwGross / Number(lw.transaction_count)).toFixed(1) : "0";
-      ctx += `vs 上周同天(${lwStr}): 营业额(应收)RM${lwGross.toFixed(0)}(${Number(revDiff) > 0 ? "+" : ""}${revDiff}%), 客单数${lw.transaction_count}, 客单价RM${lwAvg}\n`;
+      ctx += `vs 上周同天(${lwStr}): 营业额(应收)RM${lwGross.toFixed(0)}(${pct(grossRev, lwGross)})，实收RM${lwNet.toFixed(0)}(${pct(netRev, lwNet)})，水吧RM${lwWb.toFixed(0)}(${pct(wbGross, lwWb)})，客单数${lw.transaction_count}，客单价RM${lwAvg}\n`;
     }
   } else {
     ctx += `【${date} 当日数据】暂无（可能还未同步）\n`;

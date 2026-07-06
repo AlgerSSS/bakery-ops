@@ -228,6 +228,78 @@ async function getSalesData(date: string): Promise<string> {
     }
   }
 
+  // ===== P1 归因分析：品类结构 / 毛利 / 断货损失 / 预估偏差 =====
+  // 这些是「为什么 + 值多少钱」的分析口径；不生成"明日减产X个"这类自动指令，只供归因判断。
+
+  // 品类结构（客单价归因）：各品类营业额占比 + 品类均价
+  const byCat = await query<any>(
+    `SELECT c.category AS cat, SUM(s.gross_sales) AS amt, SUM(s.qty) AS qty
+       FROM item_hourly_sales s JOIN item_category c ON lower(btrim(s.item_name)) = lower(btrim(c.item_name))
+      WHERE s.date = $1 GROUP BY c.category ORDER BY amt DESC`, [date]);
+  if (byCat.length) {
+    const catTotal = byCat.reduce((a: number, r: any) => a + Number(r.amt), 0);
+    ctx += `\n【品类结构（营业额占比｜看哪个品类拉高/拉低客单价）】\n`;
+    for (const r of byCat) {
+      const share = catTotal > 0 ? (Number(r.amt) / catTotal * 100).toFixed(1) : "0";
+      const per = Number(r.qty) > 0 ? (Number(r.amt) / Number(r.qty)).toFixed(1) : "0";
+      ctx += `${r.cat}: RM${Number(r.amt).toFixed(0)} (${share}%), 件均价RM${per}\n`;
+    }
+  }
+
+  // 毛利：热销单品毛利率（成本=食材直接成本，部分品暂无成本已略）
+  const marginTop = await query<any>(
+    `SELECT COALESCE(p.name, s.item_name) AS name, SUM(s.qty) AS qty, SUM(s.gross_sales) AS sales, m.material_cost AS cost, m.confidence AS conf
+       FROM item_hourly_sales s
+       LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("s.item_name")}
+       LEFT JOIN product_material_cost m ON m.product_name = p.name
+      WHERE s.date = $1 GROUP BY COALESCE(p.name, s.item_name), m.material_cost, m.confidence
+      ORDER BY qty DESC LIMIT 12`, [date]);
+  const withCost = marginTop.filter((r: any) => r.cost != null);
+  if (withCost.length) {
+    ctx += `\n【热销单品毛利率（成本=食材直接成本；注意低毛利高销量的隐患品）】\n`;
+    for (const r of withCost) {
+      const price = Number(r.qty) > 0 ? Number(r.sales) / Number(r.qty) : 0;
+      const gm = price > 0 ? ((price - Number(r.cost)) / price * 100).toFixed(0) : "0";
+      ctx += `${r.name}: 毛利率${gm}% (售约RM${price.toFixed(1)}/成本RM${Number(r.cost).toFixed(1)})${r.conf !== "exact" ? "[成本近似]" : ""}\n`;
+    }
+  }
+  // 排产报废的真实成本损失（=浪费掉的食材成本，比售价口径更贴近真金白银）
+  const wasteCost = await query<any>(
+    `SELECT COALESCE(SUM(w.qty * m.material_cost),0) AS loss
+       FROM item_waste w
+       LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("w.item_name")}
+       JOIN product_material_cost m ON m.product_name = p.name
+      WHERE w.date = $1 AND w.waste_reason = 'scheduling'`, [date]);
+  if (Number(wasteCost[0]?.loss) > 0) ctx += `排产报废的食材成本损失(真实亏损)约: RM${Number(wasteCost[0].loss).toFixed(0)}\n`;
+
+  // 断货损失：卖光=少赚的营业额，可解释达成率缺口（同日 stockout 若当晚尚未检测则可能为空）
+  const oos = await query<any>(
+    `SELECT product_name AS nm, soldout_time AS t, estimated_loss_qty AS q, estimated_loss_amount AS amt
+       FROM out_of_stock_record WHERE date = $1 AND estimated_loss_amount > 0 ORDER BY estimated_loss_amount DESC LIMIT 6`, [date]);
+  if (oos.length) {
+    const lossSum = oos.reduce((a: number, r: any) => a + Number(r.amt), 0);
+    ctx += `\n【断货损失（卖光=少赚的营业额，用于解释达成率缺口）】\n`;
+    ctx += `断货损失合计约 RM${lossSum.toFixed(0)}\n`;
+    for (const r of oos) ctx += `  ${r.nm}: ${r.t}断货, 估少卖${r.q}个/RM${Number(r.amt).toFixed(0)}\n`;
+  }
+
+  // 预估偏差：计划 vs 实卖（分析用，不出加减产指令；结合排产报废/断货判断真过量还是断货）
+  // 注意：forecast_snapshot.date 是 varchar，item_hourly_sales.date 是 date，共用 $1 需都 ::date。
+  // 只保留「确有销量(sold>0)但明显少于计划」的品——实卖=0 多为下架品/name_en 未对齐，不可信，剔除。
+  const dev = await query<any>(
+    `SELECT s.product_name AS nm, s.suggested_qty AS plan, a.sold AS sold
+       FROM forecast_snapshot s
+       JOIN product p ON p.name = s.product_name
+       JOIN (SELECT ${NORM("item_name")} AS k, SUM(qty) AS sold FROM item_hourly_sales WHERE date = $1::date GROUP BY ${NORM("item_name")}) a
+              ON a.k = ${NORM("p.name_en")}
+      WHERE s.date::date = $1::date AND s.suggested_qty > 0 AND a.sold > 0
+      ORDER BY (s.suggested_qty - a.sold) DESC LIMIT 8`, [date]);
+  const overPlan = dev.filter((r: any) => Number(r.plan) - Number(r.sold) >= Math.max(10, Number(r.plan) * 0.25));
+  if (overPlan.length) {
+    ctx += `\n【预估 vs 实卖（有销量但明显少于计划的品，供归因；有排产报废=真过量，若断货则相反）】\n`;
+    for (const r of overPlan) ctx += `  ${r.nm}: 计划${r.plan} 实卖${r.sold} (差${Number(r.plan) - Number(r.sold)})\n`;
+  }
+
   return ctx;
 }
 

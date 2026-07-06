@@ -90,15 +90,16 @@ async function fetchBriefData(date: string): Promise<MorningBriefData | null> {
   const lwStr = `${lastWeekDate.getFullYear()}-${String(lastWeekDate.getMonth() + 1).padStart(2, "0")}-${String(lastWeekDate.getDate()).padStart(2, "0")}`;
   const lastWeekRows = await query<any>("SELECT * FROM daily_revenue WHERE date = $1", [lwStr]);
 
-  // 口径=应收(gross_sales，折扣前)，与复盘一致；客单价按 应收÷客单数 算。
+  // 口径=应收(gross_sales，折扣前)，与复盘一致；单品按销量排(与复盘一致)。
   const topItems = await query<any>(
-    "SELECT item_name, SUM(qty) as total_qty, SUM(gross_sales) as total_sales FROM item_hourly_sales WHERE date = $1 GROUP BY item_name ORDER BY total_sales DESC LIMIT 5",
+    "SELECT item_name, SUM(qty) as total_qty, SUM(gross_sales) as total_sales FROM item_hourly_sales WHERE date = $1 GROUP BY item_name ORDER BY total_qty DESC LIMIT 5",
     [date],
   );
 
   const wasteTotalRows = await query<any>("SELECT SUM(amount) as total_amount FROM item_waste WHERE date = $1", [date]);
+  // 报废王只取排产报废(可改进的过量)；试吃(品尝)属品控投入，不进报废王。
   const wasteTop = await query<any>(
-    "SELECT item_name, waste_reason, qty, amount FROM item_waste WHERE date = $1 ORDER BY amount DESC LIMIT 3",
+    "SELECT item_name, waste_reason, qty, amount FROM item_waste WHERE date = $1 AND waste_reason = 'scheduling' ORDER BY amount DESC LIMIT 3",
     [date],
   );
 

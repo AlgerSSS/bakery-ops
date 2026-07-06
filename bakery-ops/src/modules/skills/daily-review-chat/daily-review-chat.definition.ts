@@ -78,12 +78,29 @@ async function getSalesData(date: string): Promise<string> {
   const revenue = await query<any>("SELECT * FROM daily_revenue WHERE date = $1", [date]);
   // 全部分析口径改为「应收金额」= gross_sales（后台的应收，折扣前）。实收(net_sales/revenue)仅作对账。
   const hourly = await query<any>("SELECT hour, bill_count, gross_sales, net_sales, avg_order_net_sales, total_discount FROM hourly_sales_summary WHERE date = $1 ORDER BY hour", [date]);
-  const topItems = await query<any>("SELECT item_name, SUM(qty) as total_qty, SUM(gross_sales) as total_sales FROM item_hourly_sales WHERE date = $1 GROUP BY item_name ORDER BY total_sales DESC LIMIT 15", [date]);
+  // 单品按「销量」排，品名转中文(经 name_en 归一化连接 product)；金额仍带出供参考。
+  const NORM = (c: string) => `lower(btrim(regexp_replace(${c}, '[[:space:]]+', ' ', 'g')))`;
+  const topItems = await query<any>(
+    `SELECT COALESCE(p.name, s.item_name) AS name, SUM(s.qty) AS total_qty, SUM(s.gross_sales) AS total_sales
+       FROM item_hourly_sales s
+       LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("s.item_name")}
+      WHERE s.date = $1 GROUP BY COALESCE(p.name, s.item_name) ORDER BY total_qty DESC LIMIT 15`, [date]);
+  // 水吧(饮品)营业额：item_hourly_sales × item_category（品类含"饮品"=咖啡饮品+特调饮品）
+  const waterBar = await query<any>(
+    `SELECT COALESCE(SUM(s.gross_sales),0) AS gross, COALESCE(SUM(s.qty),0) AS qty
+       FROM item_hourly_sales s JOIN item_category c ON lower(btrim(s.item_name)) = lower(btrim(c.item_name))
+      WHERE s.date = $1 AND c.category LIKE '%饮品%'`, [date]);
   const payment = await query<any>("SELECT * FROM daily_payment_breakdown WHERE date = $1 ORDER BY net_sales DESC", [date]);
   const dining = await query<any>("SELECT * FROM daily_dining_breakdown WHERE date = $1", [date]);
   const pnl = await query<any>("SELECT * FROM daily_pnl WHERE date = $1", [date]);
   const wasteByReason = await query<any>("SELECT waste_reason, SUM(qty) as total_qty, SUM(amount) as total_amount FROM item_waste WHERE date = $1 GROUP BY waste_reason", [date]);
-  const wasteTop = await query<any>("SELECT item_name, waste_reason, qty, amount FROM item_waste WHERE date = $1 ORDER BY amount DESC LIMIT 10", [date]);
+  // 报废王只取「排产报废」(可改进的过量)；试吃(品尝)属品控/推广投入，不进报废王。品名转中文。
+  const wasteTop = await query<any>(
+    `SELECT COALESCE(p.name, w.item_name) AS name, SUM(w.qty) AS qty, SUM(w.amount) AS amount
+       FROM item_waste w
+       LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("w.item_name")}
+      WHERE w.date = $1 AND w.waste_reason = 'scheduling'
+      GROUP BY COALESCE(p.name, w.item_name) ORDER BY amount DESC LIMIT 10`, [date]);
 
   // 上周同天对比
   const lastWeekDate = new Date(date);
@@ -104,9 +121,12 @@ async function getSalesData(date: string): Promise<string> {
     const grossRev = Number(r.gross_sales) || 0;
     const cnt = Number(r.transaction_count) || 0;
     const avgGross = cnt > 0 ? (grossRev / cnt).toFixed(1) : "0";
+    const netRev = Number(r.revenue) || 0;
+    const wbGross = Number(waterBar[0]?.gross) || 0;
     ctx += `【${date} 当日数据｜口径=应收金额(折扣前)】\n`;
-    ctx += `营业额(应收): RM${grossRev.toFixed(2)} | 客单数: ${r.transaction_count}单 | 客单价(应收): RM${avgGross}\n`;
-    ctx += `折扣: RM${r.total_discount} (折扣率${((r.discount_rate || 0) * 100).toFixed(1)}%) | 折扣后实收(不含税): RM${r.revenue}\n`;
+    ctx += `营业额(应收): RM${grossRev.toFixed(2)} | 实收(折后): RM${netRev.toFixed(2)} | 客单数: ${r.transaction_count}单 | 客单价(应收): RM${avgGross}\n`;
+    ctx += `其中 水吧(饮品)营业额: RM${wbGross.toFixed(0)} (占应收 ${grossRev > 0 ? (wbGross / grossRev * 100).toFixed(1) : "0"}%)\n`;
+    ctx += `折扣: RM${r.total_discount} (折扣率${((r.discount_rate || 0) * 100).toFixed(1)}%)\n`;
     ctx += `会员支付占比: ${((r.member_sales_ratio || 0) * 100).toFixed(1)}%\n`;
     if (forecastTarget) {
       const t = forecastTarget;
@@ -155,11 +175,13 @@ async function getSalesData(date: string): Promise<string> {
       ctx += `报废率: ${wasteRate}% (警戒线: 5%)\n`;
     }
     if (wasteTop.length) {
-      ctx += `报废TOP5:\n`;
+      ctx += `排产报废王(只计排产报废=预估过量，可据此判断明日该减产的品；不含试吃):\n`;
       for (const w of wasteTop.slice(0, 5)) {
-        ctx += `  ${w.item_name} (${REASON_LABELS[w.waste_reason] || w.waste_reason}): ${w.qty}个, RM${Number(w.amount).toFixed(0)}\n`;
+        ctx += `  ${w.name}: ${w.qty}个, RM${Number(w.amount).toFixed(0)}\n`;
       }
     }
+    const tasting = wasteByReason.find((x: any) => x.waste_reason === "tasting");
+    if (tasting) ctx += `试吃(品尝)投入: ${tasting.total_qty}个 RM${Number(tasting.total_amount).toFixed(0)}——属品控/推广投入，不列入报废王；仅评估投入是否过量\n`;
   }
 
   if (hourly.length) {
@@ -173,12 +195,22 @@ async function getSalesData(date: string): Promise<string> {
         ctx += `${String(h.hour).padStart(2, "0")}:00 | ${h.bill_count}单 | RM${hGross.toFixed(0)} | RM${hAvg} | RM${Number(h.total_discount).toFixed(0)}\n`;
       }
     }
+    // 峰谷只在营业时段 12:00-22:00 判定；22点及以后是打烊尾单，不计低谷。
+    const op = hourly.filter((h: any) => Number(h.hour) >= 12 && Number(h.hour) < 22 && Number(h.bill_count) > 0);
+    if (op.length) {
+      const g = (h: any) => Number(h.gross_sales) || 0;
+      const peak = op.reduce((a: any, b: any) => (g(b) > g(a) ? b : a));
+      const trough = op.reduce((a: any, b: any) => (g(b) < g(a) ? b : a));
+      ctx += `营业时段峰谷(仅取12:00-22:00，打烊后不计低谷)：高峰 ${peak.hour}点(${peak.bill_count}单/RM${g(peak).toFixed(0)})；低谷 ${trough.hour}点(${trough.bill_count}单/RM${g(trough).toFixed(0)})\n`;
+    }
   }
 
   if (topItems.length) {
-    ctx += `\n【单品销量TOP15】\n`;
+    const cntTC = Number(revenue[0]?.transaction_count) || 0;
+    ctx += `\n【单品表现TOP15（按销量排；TC占比=该品销量/客单数=每单渗透率）】\n`;
     for (const item of topItems) {
-      ctx += `${item.item_name}: ${item.total_qty}个, RM${Number(item.total_sales).toFixed(0)}\n`;
+      const tc = cntTC > 0 ? (Number(item.total_qty) / cntTC * 100).toFixed(0) : "0";
+      ctx += `${item.name}: ${item.total_qty}个 (TC ${tc}%), RM${Number(item.total_sales).toFixed(0)}\n`;
     }
   }
 

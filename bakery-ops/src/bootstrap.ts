@@ -157,7 +157,7 @@ async function runBootstrap() {
   // 9a. 每日 07:00 后厨生产计划推送：主厨 + 抄送老板，幂等(kind, recipient, date)
   if (onCore) cron.schedule("0 7 * * *", wrapCron("production_plan_push", runProductionPlanPush), TZ);
 
-  // 9b. 每晚 23:30 今日复盘：收件人读 team_member 订阅（Lark 发送），无数据静默跳过
+  // 9b. 每晚 23:30 今日复盘：收件人读 team_member 订阅（Lark 发送），无数据记 cron 失败
   if (onCore) cron.schedule("30 23 * * *", wrapCron("morning_brief", runMorningBrief), TZ);
 
   // 9c. 每日 03:00 同步 Lark 组织架构 → team_member（保留用户配的 role/subscriptions）。core 启动时也同步一次。

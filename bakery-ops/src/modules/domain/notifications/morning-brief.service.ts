@@ -5,7 +5,7 @@
 // AI 失败时回落固定中文模板（营业额/单数/客单价/折扣率 + 上周同日 + Top5 单品 + 报废）。
 // 收件人：config/team.json 里订阅 daily_review 的成员（名字→Lark open_id，直发卡片）。
 // 幂等：daily_push_log (kind='morning_brief', recipient=open_id, date)，发送成功才写。
-// 当天 daily_revenue 无行时静默跳过（logger.info），交给 freshness-check 报警。
+// 当天 daily_revenue 无行时抛错，让 cron 记录失败并触发运维关注。
 
 import { query } from "@/modules/shared/db/postgres";
 import { logger } from "@/modules/shared/logger";
@@ -146,7 +146,7 @@ async function fetchBriefData(date: string): Promise<MorningBriefData | null> {
   };
 }
 
-/** 入口 — bootstrap cron '30 23 * * *'（23:00 数据刷新后推当天复盘）。无数据/未连接时安全 no-op。 */
+/** 入口 — bootstrap cron '30 23 * * *'（23:00 数据刷新后推当天复盘）。无数据时抛错。 */
 export async function runMorningBrief(): Promise<void> {
   const today = localDate();
 
@@ -155,11 +155,10 @@ export async function runMorningBrief(): Promise<void> {
     data = await fetchBriefData(today);
   } catch (err) {
     logger.error("Today review: data fetch failed", { date: today, error: String(err) });
-    return;
+    throw err;
   }
   if (!data) {
-    logger.info("Today review: no daily_revenue for date, skipping (freshness-check will alert)", { date: today });
-    return;
+    throw new Error(`Today review: no daily_revenue for date ${today}`);
   }
 
   // 主：完整 AI 复盘（应收口径）；失败回落固定模板，保证复盘每天必到。

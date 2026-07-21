@@ -3,6 +3,11 @@ import postgres from 'postgres';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseCsv } from './lib/csv-parser.js';
+import {
+  kualaLumpurDate,
+  resolveDailyRevenueRecords,
+  selectDailyRevenueRecords,
+} from './lib/daily-revenue-resolver.js';
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => { const [k, v] = a.replace(/^--/, '').split('='); return [k, v]; }));
 
@@ -12,6 +17,14 @@ const sql = postgres(DB_URL, { max: 5, idle_timeout: 20 });
 
 const READABLE_DIR = args['readable-dir'] || 'output/sales/readable';
 const DAILY_FILE = args['daily-file'] || 'output/daily/daily.json';
+const EXPECTED_DATE_ARG = args['expected-date'];
+const EXPECTED_DATE = EXPECTED_DATE_ARG || kualaLumpurDate();
+const DAILY_REVENUE_ONLY = args['daily-revenue-only'] === 'true';
+
+if (DAILY_REVENUE_ONLY && !EXPECTED_DATE_ARG) {
+  console.error('[sync-to-db] ERROR: --daily-revenue-only=true requires --expected-date=YYYY-MM-DD');
+  process.exit(1);
+}
 
 function loadCsv(relPath) {
   if (!fs.existsSync(relPath)) return null;
@@ -24,21 +37,28 @@ function num(v) { const n = Number(v); return isNaN(n) ? null : n; }
 
 // === 1. daily_revenue (existing table) ===
 async function syncDailyRevenue() {
-  const rows = loadCsv(`${READABLE_DIR}/sales_by_business_date.csv`);
-  if (!rows?.length) { console.log('  [skip] no data'); return 0; }
+  const csvRows = loadCsv(`${READABLE_DIR}/sales_by_business_date.csv`) || [];
+  const daily = fs.existsSync(DAILY_FILE)
+    ? JSON.parse(fs.readFileSync(DAILY_FILE, 'utf8'))
+    : {};
+  const { records, fallbackUsed } = resolveDailyRevenueRecords({
+    csvRows,
+    daily,
+    expectedDate: EXPECTED_DATE,
+  });
+  const selectedRecords = selectDailyRevenueRecords(records, EXPECTED_DATE, DAILY_REVENUE_ONLY);
+  if (!selectedRecords.length) {
+    throw new Error(`daily_revenue source missing expected business date ${EXPECTED_DATE}`);
+  }
+  if (fallbackUsed) {
+    console.warn(`[sync-to-db] daily_revenue ${EXPECTED_DATE} resolved from hourlyByDate fallback`);
+  }
+
   let count = 0;
-  for (const r of rows) {
-    const date = r['Business Date'];
-    if (!date) continue;
-    const grossSales = num(r['Gross Sales']);
-    const discount = num(r['Amount Of Discount']);
-    const discountRate = grossSales > 0 ? +(discount / grossSales).toFixed(4) : null;
-    const totalPayment = num(r['Total Payment received']) || num(r['Net Sales']);
-    const memberPay = num(r['Payment Subtotal — Membership card pay']) || 0;
-    const memberRatio = totalPayment > 0 ? +(memberPay / totalPayment).toFixed(4) : null;
+  for (const record of selectedRecords) {
     await sql`
       INSERT INTO daily_revenue (date, revenue, transaction_count, avg_transaction_value, gross_sales, total_discount, discount_rate, member_sales_ratio)
-      VALUES (${date}, ${num(r['Net Sales'])}, ${num(r['Bill Count'])}, ${num(r['Avg Order Net Sales'])}, ${grossSales}, ${discount}, ${discountRate}, ${memberRatio})
+      VALUES (${record.date}, ${record.revenue}, ${record.transaction_count}, ${record.avg_transaction_value}, ${record.gross_sales}, ${record.total_discount}, ${record.discount_rate}, ${record.member_sales_ratio})
       ON CONFLICT ON CONSTRAINT uk_daily_revenue_date DO UPDATE SET
         revenue = EXCLUDED.revenue,
         transaction_count = EXCLUDED.transaction_count,
@@ -46,7 +66,7 @@ async function syncDailyRevenue() {
         gross_sales = EXCLUDED.gross_sales,
         total_discount = EXCLUDED.total_discount,
         discount_rate = EXCLUDED.discount_rate,
-        member_sales_ratio = EXCLUDED.member_sales_ratio
+        member_sales_ratio = COALESCE(EXCLUDED.member_sales_ratio, daily_revenue.member_sales_ratio)
     `;
     count++;
   }
@@ -364,6 +384,12 @@ async function main() {
   console.log('1. daily_revenue (existing)');
   const c1 = await syncDailyRevenue();
   console.log(`   -> ${c1} rows\n`);
+
+  if (DAILY_REVENUE_ONLY) {
+    console.log(`[sync-to-db] daily-revenue-only complete for ${EXPECTED_DATE}`);
+    await sql.end();
+    return;
+  }
 
   console.log('2. daily_sales_record (real per-day, from itemsByDateHour)');
   const c2 = await syncDailySalesRecord();

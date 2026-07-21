@@ -112,9 +112,16 @@ describe("buildMorningBriefText 模板", () => {
 });
 
 describe("runMorningBrief 该不该发/幂等", () => {
-  it("当天无 daily_revenue -> 静默跳过，不发送", async () => {
+  it("当天无 daily_revenue -> 抛错让 cron 记录失败，不发送", async () => {
     setupQueryMock({ revenueRows: [] });
-    await runMorningBrief();
+    await expect(runMorningBrief()).rejects.toThrow("no daily_revenue");
+    expect(sendLarkToUserMock).not.toHaveBeenCalled();
+    expect(executeMock).not.toHaveBeenCalled();
+  });
+
+  it("daily_revenue 查询失败 -> 向 cron 传播错误，不发送", async () => {
+    queryMock.mockRejectedValue(new Error("database offline"));
+    await expect(runMorningBrief()).rejects.toThrow("database offline");
     expect(sendLarkToUserMock).not.toHaveBeenCalled();
     expect(executeMock).not.toHaveBeenCalled();
   });

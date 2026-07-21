@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import { resetGeneratedDirectory } from './lib/generated-output.js';
 
 if (!fs.existsSync('storageState.json')) {
   console.error('storageState.json not found. Run `npm run login` first.');
@@ -103,7 +104,7 @@ for (const target of TARGETS) {
   const rawDir = path.join(dir, 'raw');
   const replayDir = path.join(dir, 'replay-30d');
   fs.mkdirSync(rawDir, { recursive: true });
-  fs.mkdirSync(replayDir, { recursive: true });
+  resetGeneratedDirectory(replayDir);
   console.log(`\n=== ${target.label} ===`);
 
   const page = await context.newPage();

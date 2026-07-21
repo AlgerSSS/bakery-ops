@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { removeGeneratedFile } from './lib/generated-output.js';
 
 const outRoot = 'output/sales';
 const T = JSON.parse(fs.readFileSync(path.join(outRoot, 'translations.json')));
@@ -158,6 +159,12 @@ const headlineMap = {
   'payment_by_payer_type.csv': ['sales-overview', (b) => b.reportId === '198'],
   'items_by_category_overview.csv': ['sales-overview', (b) => b.reportId === '211' && b.selectFields?.includes('D_category') && b.page],
 };
+
+// Headline files are generated artifacts. Remove yesterday's copies first so a
+// missing live query cannot be mistaken for a successful current-day refresh.
+for (const outName of Object.keys(headlineMap)) {
+  removeGeneratedFile(path.join(headlineDir, outName));
+}
 
 for (const [outName, [slug, pred]] of Object.entries(headlineMap)) {
   const found = findFirstRows(slug, pred);

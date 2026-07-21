@@ -38,4 +38,4 @@ A new pure module, `res_api/lib/daily-revenue-resolver.js`, normalizes daily-rev
 
 ## Deployment and recovery
 
-After local verification, the fix is merged into the primary worktree and deployed to Contabo core. The existing 2026-07-20 `daily.json` can be replayed with `--expected-date=2026-07-20` to restore the missing database row without sending a retroactive notification. No automatic historical Lark message is sent.
+After local verification, the fix is merged into the primary worktree and deployed to Contabo core. The existing 2026-07-20 `daily.json` can be replayed with `--expected-date=2026-07-20 --daily-revenue-only=true` to restore only the missing database row without touching the other sync stages or sending a retroactive notification. No automatic historical Lark message is sent.

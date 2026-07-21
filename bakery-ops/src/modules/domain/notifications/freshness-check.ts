@@ -24,7 +24,7 @@ export async function checkDataFreshness(): Promise<void> {
     return;
   }
 
-  const maxStaleDays = Number(process.env.DATA_FRESHNESS_MAX_STALE_DAYS || 2);
+  const maxStaleDays = Number(process.env.DATA_FRESHNESS_MAX_STALE_DAYS || 1);
   const staleDays = maxDate === null ? Infinity : dayjs().diff(dayjs(maxDate), "day");
 
   if (staleDays <= maxStaleDays) {

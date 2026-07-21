@@ -145,7 +145,7 @@ Merge the verified repair branch into `/Users/weiliangshao/hot`, run `./deploy.s
 
 - [ ] **Step 4: Recover the missing 2026-07-20 row without sending messages**
 
-On Contabo run `node sync-to-db.js --expected-date=2026-07-20` against the retained 2026-07-20 artifacts, then query `daily_revenue` for that date. Do not invoke `runMorningBrief` manually.
+On Contabo run `node sync-to-db.js --expected-date=2026-07-20 --daily-revenue-only=true` against the retained 2026-07-20 artifacts, then query `daily_revenue` for that date. This mode writes only the requested `daily_revenue` row and skips the other sync stages. Do not invoke `runMorningBrief` manually.
 
 - [ ] **Step 5: Verify production readiness**
 

@@ -1,5 +1,5 @@
 /**
- * Integration tests for Phase 1 — runs against real Supabase.
+ * Integration tests for Phase 1 — runs against the real database (DATABASE_URL).
  * Verifies: user loading, employee CRUD, event writing, screening rules.
  */
 import "dotenv/config";
@@ -8,7 +8,7 @@ import { UserRepository } from "@/modules/data/repositories/user.repository";
 import { EmployeeRepository } from "@/modules/data/repositories/employee.repository";
 import { EmployeeEventRepository } from "@/modules/data/repositories/employee-event.repository";
 import { ScreeningRuleRepository } from "@/modules/data/repositories/screening-rule.repository";
-import { getSupabase } from "@/modules/data/supabase";
+import { execute } from "@/modules/shared/db/postgres";
 
 const userRepo = new UserRepository();
 const employeeRepo = new EmployeeRepository();
@@ -20,19 +20,18 @@ const createdEmployeeIds: string[] = [];
 const createdRuleIds: string[] = [];
 
 afterAll(async () => {
-  const sb = getSupabase();
   // Clean up test data
   for (const id of createdEmployeeIds) {
-    await sb.from("employee_events").delete().eq("employee_id", id);
-    await sb.from("employees").delete().eq("id", id);
+    await execute("DELETE FROM employee_events WHERE employee_id = ?", [id]);
+    await execute("DELETE FROM employees WHERE id = ?", [id]);
   }
   for (const id of createdRuleIds) {
-    await sb.from("screening_rules").delete().eq("id", id);
+    await execute("DELETE FROM screening_rules WHERE id = ?", [id]);
   }
 });
 
 describe("UserRepository (integration)", () => {
-  it("loads seed users from Supabase", async () => {
+  it("loads seed users from the database", async () => {
     const users = await userRepo.getAll();
     expect(users.length).toBeGreaterThanOrEqual(4);
     const owner = users.find(u => u.userId === "u_owner");

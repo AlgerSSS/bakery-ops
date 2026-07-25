@@ -1,0 +1,6 @@
+node_modules/
+.env
+storageState.json
+output/
+*.log
+.DS_Store

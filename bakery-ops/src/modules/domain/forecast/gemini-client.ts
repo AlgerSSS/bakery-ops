@@ -5,7 +5,7 @@ export async function generateJsonFromPrompt(built: BuildPromptResult, userPromp
   return openrouterProvider.jsonCompletion({
     systemInstruction: built.systemInstruction,
     prompt: userPrompt || built.prompt,
-    model: undefined,
+    model: built.model || undefined, // G3c: DB prompt_template.model 生效；为空回落 provider 默认（AI_LONG_MODEL/AI_CHAT_MODEL）
     temperature: built.temperature,
     topP: built.topP,
   });

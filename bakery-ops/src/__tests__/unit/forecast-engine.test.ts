@@ -4,6 +4,7 @@ import {
   calculateDailyTargets,
   calculateSalesBaselines,
   calculateProductSuggestions,
+  calculateLossSlots,
 } from "@/modules/domain/forecast/forecast-engine";
 import type { BusinessRules, MonthlyTarget, Product, ProductSalesBaseline, ProductStrategy } from "@/modules/domain/forecast/types";
 
@@ -89,5 +90,25 @@ describe("calculateProductSuggestions", () => {
     expect(suggestions).toHaveLength(1);
     expect(suggestions[0].productName).toBe("蛋挞");
     expect(suggestions[0].roundedQuantity).toBeGreaterThan(0);
+  });
+});
+
+describe("calculateLossSlots", () => {
+  it("整点售罄时，把该整点时段也计入损失（从 h 起算）", () => {
+    // 18:00 售罄 → 18:00 时段全程无货，应计入损失
+    expect(calculateLossSlots("18:00")).toEqual(["18:00", "19:00", "20:00", "21:00"]);
+  });
+
+  it("整点后售罄时，当前时段已有部分销售，从下一时段起算损失", () => {
+    // 18:30 售罄 → 18:00 时段已部分销售，损失从 19:00 起
+    expect(calculateLossSlots("18:30")).toEqual(["19:00", "20:00", "21:00"]);
+  });
+
+  it("营业末段（21:00）整点售罄只损失最后一个时段", () => {
+    expect(calculateLossSlots("21:00")).toEqual(["21:00"]);
+  });
+
+  it("末段之后售罄无损失时段", () => {
+    expect(calculateLossSlots("21:30")).toEqual([]);
   });
 });

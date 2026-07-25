@@ -12,6 +12,10 @@ import {
 import { buildForecastExcelBuffer } from "../../domain/forecast/forecast-excel";
 import { getTimeslotSalesRecords, getFixedShipmentSchedules, getProducts } from "../../data/repositories/forecast.repository";
 import { fileService } from "../../domain/files/file-service";
+import { query } from "../../shared/db/postgres";
+import { generateRestockAdvice, buildRestockAdviceText } from "../../domain/forecast/restock-advice";
+import { getProductSalesStats } from "../../domain/forecast/product-demand";
+import { localDate } from "../../channel/whatsapp/outbound.config";
 import dayjs from "dayjs";
 
 export const forecastOrderSkillDefinition: SkillDefinition = {
@@ -19,11 +23,13 @@ export const forecastOrderSkillDefinition: SkillDefinition = {
   name: "预估单",
   description: "生成营业额目标、单品出货建议、分时段排产。支持：预估/排产/出货建议/营业额查询",
   priority: 85,
+  disambiguation: "生成营业额目标与出货/排产预估；不是据此生成后厨执行计划(kitchen_production_plan)，也不是结合实际销售的每日复盘(daily_review_chat)",
   triggerKeywords: [
     "预估单", "排产", "出货", "出货建议", "预测",
     "营业额目标", "日目标", "月目标", "单品建议",
     "时段排产", "分时段", "营业额",
     "发预估单", "导出", "excel", "表格", "发表格",
+    "加减货", "加货", "减货", "现在加减货",
   ],
   examples: [
     "明天出什么",
@@ -40,9 +46,9 @@ export const forecastOrderSkillDefinition: SkillDefinition = {
   riskLevel: "low",
   requiresConfirmation: false,
   supportsMultiTurn: false,
-  supportsFiles: false,
+  supportsFiles: true,
   supportsCron: false,
-  outputTypes: ["text"],
+  outputTypes: ["text", "excel"],
   handler: null,
 };
 
@@ -55,14 +61,19 @@ export class ForecastOrderSkillHandler implements SkillHandler {
     let queryType = (input.input.queryType as string) || "";
     let targetDate = (input.input.targetDate as string) || (input.input.date as string) || "";
 
-    // Auto-detect from message text
-    if (!queryType) {
+    // 「加减货/加货/减货」→ 即时加减货建议（据今日实际销量，最高优先级）。用户 2026-07-05。
+    if (lower.includes("加减货") || lower.includes("加货") || lower.includes("减货")) {
+      queryType = "restock";
+    } else if (lower.includes("excel") || lower.includes("表格") || lower.includes("导出") || lower.includes("预估单") || lower.includes("发表格")) {
+      // 文字里明确要「预估单/表格/excel/导出」→ 一律给填好的 Excel 附件（优先级最高，
+      // 覆盖 LLM 路由给的 queryType；summary 再带一段文字摘要）。用户 2026-07-05 定案。
+      queryType = "excel";
+    } else if (!queryType) {
+      // 其余按文字自动判断
       if (lower.includes("营业额") || lower.includes("业绩") || lower.includes("销售")) {
         queryType = "revenue";
       } else if (lower.includes("复盘") || lower.includes("总结") || lower.includes("review")) {
         queryType = "review";
-      } else if (lower.includes("excel") || lower.includes("表格") || lower.includes("导出") || lower.includes("发预估单") || lower.includes("发表格")) {
-        queryType = "excel";
       } else {
         queryType = "forecast";
       }
@@ -77,6 +88,20 @@ export class ForecastOrderSkillHandler implements SkillHandler {
     }
 
     try {
+      if (queryType === "restock") {
+        // 即时加减货：据今日到「当前 KL 时刻」的实际销量。数据需 res_api 14:20 起拉取。
+        const date = localDate();
+        const has = await query<{ x: number }>(`SELECT 1 AS x FROM item_hourly_sales WHERE date = $1 LIMIT 1`, [date]);
+        if (!has.length) {
+          return { runId: uuidv4(), skillId: "forecast_order", status: "success", summary: "今日销量数据还没就绪（每日 14:20 起自动拉取，之后可随时问我加减货）。" };
+        }
+        const klNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" }));
+        const nowMin = klNow.getHours() * 60 + klNow.getMinutes();
+        const clock = `${String(klNow.getHours()).padStart(2, "0")}:${String(klNow.getMinutes()).padStart(2, "0")}`;
+        const advices = await generateRestockAdvice(date, nowMin);
+        return { runId: uuidv4(), skillId: "forecast_order", status: "success", summary: buildRestockAdviceText(date, advices, clock) };
+      }
+
       if (queryType === "excel") {
         const date = targetDate || dayjs().add(1, "day").format("YYYY-MM-DD");
         const forecast = await getProductForecast(date);
@@ -96,11 +121,14 @@ export class ForecastOrderSkillHandler implements SkillHandler {
           shipmentAmount: forecast.targetShipment,
         };
 
-        const [timeslotRecords, fixedSchedule, products] = await Promise.all([
+        const [timeslotRecords, fixedSchedule, products, stats] = await Promise.all([
           getTimeslotSalesRecords(),
           getFixedShipmentSchedules(),
           getProducts(),
+          getProductSalesStats(date),
         ]);
+        // 真实逐时销量曲线(中文名→{小时:均量})，供右侧「预计销售」表(与集中出货脱钩)
+        const salesCurve = new Map(Array.from(stats, ([n, s]) => [n, s.hourly] as [string, Record<number, number>]));
 
         const productSuggestions = forecast.products.map((p) => ({
           productName: p.name,
@@ -116,6 +144,17 @@ export class ForecastOrderSkillHandler implements SkillHandler {
           displayFullQuantity: products.find((pr) => pr.name === p.name)?.displayFullQuantity ?? 0,
         }));
 
+        // 上周同日销量(中文名，经 name_en↔POS 归一化连接)，填「上周销售」列
+        const lwDate = dayjs(date).subtract(7, "day").format("YYYY-MM-DD");
+        const lwRows = await query<{ cn: string; q: number }>(
+          `SELECT p.name AS cn, SUM(s.qty)::int AS q FROM item_hourly_sales s
+             JOIN product p ON lower(btrim(regexp_replace(p.name_en,'[[:space:]]+',' ','g')))
+                             = lower(btrim(regexp_replace(s.item_name,'[[:space:]]+',' ','g')))
+            WHERE s.date = $1 GROUP BY p.name`,
+          [lwDate],
+        );
+        const lastWeekSales = new Map(lwRows.map((r) => [r.cn, Number(r.q)]));
+
         const buf = await buildForecastExcelBuffer({
           date,
           dailyTarget,
@@ -124,6 +163,8 @@ export class ForecastOrderSkillHandler implements SkillHandler {
           timeslotSalesRecords: timeslotRecords,
           fixedSchedule,
           products,
+          lastWeekSales,
+          salesCurve,
         });
 
         const outputFile = await fileService.saveFile(
@@ -136,7 +177,7 @@ export class ForecastOrderSkillHandler implements SkillHandler {
           runId: uuidv4(),
           skillId: "forecast_order",
           status: "success",
-          summary: `📊 ${date} 排产预估单已生成`,
+          summary: `${formatForecastCompact(forecast)}\n\n📎 完整排产预估单 Excel 见附件（${date}）`,
           files: [outputFile],
         };
       }

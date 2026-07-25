@@ -9,9 +9,10 @@ export const kolDiscoverySkillDefinition: SkillDefinition = {
   name: "寻找KOL",
   description: "添加博主或搜索博主。手动添加格式：添加博主 @handle 平台 粉丝量 领域。也可以尝试自动搜索。",
   priority: 85,
+  disambiguation: "查找/搜索/添加录入博主到库；不是给已选博主发私信邀请(kol_outreach)",
   triggerKeywords: [
     "找KOL", "寻找网红", "kol", "influencer", "博主", "达人",
-    "推广", "合作", "添加博主", "添加KOL", "录入博主",
+    "添加博主", "添加KOL", "录入博主",
   ],
   examples: [
     "添加博主 @foodlover_kl tiktok 8万粉 美食探店",

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkImportKey } from "../_auth";
 import { parseSalesData, setDatabaseAliases } from "@/modules/domain/forecast/parsers/excel-parser";
-import { execute } from "@/modules/shared/db/postgres";
-import { getProducts, getProductAliases, getBusinessRulesFromDB } from "@/modules/data/repositories/forecast.repository";
+import { withTransaction } from "@/modules/shared/db/postgres";
+import { getProducts, getProductAliases, getBusinessRulesFromDB, getOutOfStockRecords } from "@/modules/data/repositories/forecast.repository";
 import { calculateSalesBaselines } from "@/modules/domain/forecast/forecast-engine";
 
 export async function POST(req: NextRequest) {
+  const denied = checkImportKey(req);
+  if (denied) return denied;
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -13,42 +16,28 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = await file.arrayBuffer();
-    const [products, dbAliases, businessRules] = await Promise.all([
+    const [products, dbAliases, businessRules, stockoutRecords] = await Promise.all([
       getProducts(),
       getProductAliases(),
       getBusinessRulesFromDB(),
+      getOutOfStockRecords(),
     ]);
 
     setDatabaseAliases(dbAliases);
     const { records, unmatchedProducts } = await parseSalesData(buffer, products);
 
-    const baselines = calculateSalesBaselines(records, products, businessRules.baselineOverrides);
-
-    await execute("DELETE FROM daily_sales_record");
-    const BATCH = 500;
-    for (let i = 0; i < records.length; i += BATCH) {
-      const batch = records.slice(i, i + BATCH);
-      const placeholders = batch.map(() => "(?, ?, ?, ?, ?)").join(",");
-      const flat = batch.flatMap((r) => [r.productName, r.standardName, r.quantity, r.date, r.dayOfWeek]);
-      await execute(
-        `INSERT INTO daily_sales_record (product_name, standard_name, quantity, date, day_of_week) VALUES ${placeholders}`,
-        flat
-      );
-    }
-
-    await execute("DELETE FROM product_sales_baseline");
-    for (const b of baselines) {
-      await execute(
-        `INSERT INTO product_sales_baseline (product_name, avg_monday_to_thursday, avg_friday, avg_weekend, total_sales, day_count)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [b.productName, b.avgMondayToThursday, b.avgFriday, b.avgWeekend, b.totalSales, b.dayCount]
-      );
-    }
+    // 【已摘除】这里原本是 DELETE FROM daily_sales_record + DELETE FROM product_sales_baseline
+    // 后整表重灌。两处都必须拆掉：
+    //   · daily_sales_record 的唯一合法写者是 res_api/sync-to-db.js（按 date 逐日重写），
+    //     整表清空会抹掉爬虫写的半年 POS 数据（2026-01-01 起 10364 行）。
+    //   · product_sales_baseline 已由 item_hourly_sales 实时中位数取代（product-demand.ts），
+    //     停写让它冻结，等观察期满后单独提 DROP 迁移。
+    // Excel 导入现在只做解析与未匹配品名校验，不落库。
 
     return NextResponse.json({
       success: true,
       totalRows: records.length,
-      importedRows: records.length,
+      importedRows: 0,
       skippedRows: 0,
       errors: [],
       unmatchedProducts,

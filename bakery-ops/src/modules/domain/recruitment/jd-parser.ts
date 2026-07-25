@@ -1,5 +1,6 @@
 import { aiProvider } from "../ai/ai-provider";
 import type { ParsedJD } from "./types";
+import { JD_TITLE_KEYS, type JdTitleKey } from "./jd-title-keys";
 import { logger } from "../../shared/logger";
 
 export async function parseJD(rawText: string): Promise<ParsedJD> {
@@ -57,9 +58,9 @@ ${rawText}
   }
 }
 
-/** 从中文 JD 中提取英文搜索关键词 */
+/** 从中文 JD 中提取英文搜索关键词（键集与 jd-generator 共享，见 jd-title-keys.ts；值为搜索关键词，与职位名不同） */
 function extractEnglishTitle(text: string): string {
-  const mapping: Record<string, string> = {
+  const mapping: Record<JdTitleKey, string> = {
     "店员": "retail staff",
     "前场": "front of house",
     "后厨": "kitchen staff",
@@ -73,8 +74,8 @@ function extractEnglishTitle(text: string): string {
     "主管": "supervisor",
   };
 
-  for (const [cn, en] of Object.entries(mapping)) {
-    if (text.includes(cn)) return en;
+  for (const cn of JD_TITLE_KEYS) {
+    if (text.includes(cn)) return mapping[cn];
   }
   return "staff";
 }

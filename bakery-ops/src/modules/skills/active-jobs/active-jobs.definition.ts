@@ -7,8 +7,9 @@ import { logger } from "../../shared/logger";
 export const activeJobsSkillDefinition: SkillDefinition = {
   skillId: "active_jobs",
   name: "查看招聘岗位",
-  description: "查看 JobStreet 和 AJobThing 上当前在招的岗位、申请者列表，下载简历",
+  description: "查看 JobStreet 上当前在招的岗位、申请者列表，下载简历",
   priority: 85,
+  disambiguation: "查看已在招岗位与申请者/投递情况；不是采集候选人(recruitment_sourcing)，也不是发布新岗位(job_posting)",
   triggerKeywords: [
     "在招", "在招岗位", "招聘岗位", "查看岗位", "看看岗位",
     "有哪些岗位", "岗位列表", "申请者", "申请人", "投递",

@@ -11,8 +11,6 @@ export interface RecruitmentNotification {
 
 export interface NotificationState {
   lastCheckedAt: string;
-  ajtLastNotificationId?: string;
-  ajtLastMessageTimestamp?: string;
   jsLastApplicationId?: string;
   jsLastMessageTimestamp?: string;
 }

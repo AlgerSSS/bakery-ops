@@ -1,11 +1,8 @@
 import { parseJD } from "./jd-parser";
 import { JobStreetConnector } from "./connectors/jobstreet.connector";
-import { IndeedConnector } from "./connectors/indeed.connector";
-import { AJobThingConnector } from "./connectors/ajobthing.connector";
 import { deduplicateCandidates } from "./candidate-deduper";
 import { scoreCandidates } from "./candidate-scorer";
 import { generateCandidateResumePdf } from "./resume-pdf";
-import { runOutreach } from "./outreach/outreach.service";
 import type { Candidate, RecruitmentTaskResult } from "./types";
 import type { JobSiteConnector } from "./connector.interface";
 import { employeeRepository } from "../../data/repositories/employee.repository";
@@ -17,8 +14,6 @@ const MAX_CANDIDATES = 10;
 
 const connectors: JobSiteConnector[] = [
   new JobStreetConnector(),
-  new IndeedConnector(),
-  new AJobThingConnector(),
 ];
 
 /**
@@ -27,7 +22,6 @@ const connectors: JobSiteConnector[] = [
 export async function runRecruitmentPipeline(
   jdText: string,
   maxCandidates = MAX_CANDIDATES,
-  outreachEnabled = false,
 ): Promise<RecruitmentTaskResult> {
   // 1. 解析 JD
   logger.info("Recruitment pipeline: parsing JD");
@@ -123,20 +117,6 @@ export async function runRecruitmentPipeline(
     totalAfterDedup: deduped.length,
     topCandidates,
   };
-
-  // 8. 自动触达候选人
-  if (outreachEnabled) {
-    logger.info("Recruitment pipeline: starting outreach");
-    try {
-      const outreachResults = await runOutreach(topCandidates, jd);
-      result.outreach = outreachResults;
-      const totalSent = outreachResults.reduce((sum, r) => sum + r.sent, 0);
-      const totalFailed = outreachResults.reduce((sum, r) => sum + r.failed, 0);
-      logger.info("Recruitment pipeline: outreach complete", { totalSent, totalFailed });
-    } catch (err) {
-      logger.error("Recruitment pipeline: outreach failed", { error: String(err) });
-    }
-  }
 
   return result;
 }

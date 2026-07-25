@@ -6,6 +6,7 @@ import type { JobSiteConnector } from "../connector.interface";
 import type { Candidate, CrawlResult, ParsedJD } from "../types";
 import { logger } from "../../../shared/logger";
 import { hasValidSession, getCookieFile, getStorageFile, refreshLogin } from "./jobstreet-login";
+import { JOBSTREET_BASE_URL } from "./jobstreet.constants";
 
 const DELAY_MIN = parseInt(process.env.CRAWLER_DELAY_MIN_MS || "2000");
 const DELAY_MAX = parseInt(process.env.CRAWLER_DELAY_MAX_MS || "4000");
@@ -54,7 +55,7 @@ interface TalentProfile {
  */
 export class JobStreetConnector implements JobSiteConnector {
   readonly siteName = "JobStreet";
-  readonly siteUrl = "https://my.employer.seek.com";
+  readonly siteUrl = JOBSTREET_BASE_URL;
 
   async search(jd: ParsedJD, maxResults: number): Promise<CrawlResult> {
     const candidates: Candidate[] = [];

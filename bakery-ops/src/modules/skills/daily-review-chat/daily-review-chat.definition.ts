@@ -7,6 +7,9 @@ import { lightragClient } from "../../domain/knowledge/lightrag-client";
 import { aiProvider } from "../../domain/ai/ai-provider";
 import { query } from "../../shared/db/postgres";
 import { getProductForecast } from "../../domain/forecast/forecast.service";
+import { queryDataForQuestion } from "../../domain/forecast/ops-data-query";
+import { computeStockoutForDate } from "../../domain/forecast/stockout-detector.service";
+import { NORM_SQL, getBeverageItems, normCaliberName } from "../../domain/forecast/beverage-caliber";
 import { logger } from "../../shared/logger";
 
 const SKILL_MD_PATH = resolve(process.cwd(), "src/modules/skills/daily-review-chat/SKILL.md");
@@ -18,6 +21,7 @@ export const dailyReviewChatSkillDefinition: SkillDefinition = {
   name: "每日复盘",
   description: "接收店长每日复盘（特殊情况、问题），结合销售数据给出分析和策略建议，支持多轮对话追问",
   priority: 90,
+  disambiguation: "店长当日复盘+结合销售数据给建议；不是生成明日预估(forecast_order)，也不是员工数据统计(knowledge_query)",
   triggerKeywords: [
     "复盘", "今日复盘", "日复盘", "当日总结", "今天总结",
     "review", "daily review", "今天情况",
@@ -47,16 +51,66 @@ async function getTodayDate(): Promise<string> {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * 把各种日期写法规范成 YYYY-MM-DD（库里的格式）。支持：
+ * 2026-07-01 / 2026.7.1 / 7-1 / 7.1 / 7/1 / 7月1日 / 07月01号。取不到返回 ""。
+ * 缺年份补当前年（KL 时区）。
+ */
+export function normalizeDate(raw: string): string {
+  if (!raw) return "";
+  const s = raw.trim();
+  const currentYear = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" })).getFullYear();
+  // 带年：2026-07-01 / 2026.7.1 / 2026/7/1
+  let m = s.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  // 中文带年：2025年3月1日
+  m = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  // 中文：7月1日 / 7月1号
+  m = s.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?/);
+  if (m) return `${currentYear}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+  // 短格式：7.1 / 7-1 / 7/1
+  m = s.match(/(?:^|[^\d])(\d{1,2})[.\/-](\d{1,2})(?:[^\d]|$)/);
+  if (m) return `${currentYear}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+  return "";
+}
+
 async function getSalesData(date: string): Promise<string> {
   logger.info("getSalesData called", { date });
   const revenue = await query<any>("SELECT * FROM daily_revenue WHERE date = $1", [date]);
-  const hourly = await query<any>("SELECT hour, bill_count, net_sales, avg_order_net_sales, total_discount FROM hourly_sales_summary WHERE date = $1 ORDER BY hour", [date]);
-  const topItems = await query<any>("SELECT item_name, SUM(qty) as total_qty, SUM(net_sales) as total_sales FROM item_hourly_sales WHERE date = $1 GROUP BY item_name ORDER BY total_sales DESC LIMIT 15", [date]);
+  // 全部分析口径改为「应收金额」= gross_sales（后台的应收，折扣前）。实收(net_sales/revenue)仅作对账。
+  const hourly = await query<any>("SELECT hour, bill_count, gross_sales, net_sales, avg_order_net_sales, total_discount FROM hourly_sales_summary WHERE date = $1 ORDER BY hour", [date]);
+  // 单品按「销量」排，品名转中文(经 name_en 归一化连接 product)；金额仍带出供参考。
+  // 归一化统一走 beverage-caliber.NORM_SQL：Postgres 的 [[:space:]] 不含 U+00A0、btrim 也只去
+  // 半角空格，不先 replace(chr(160),' ') 会漏掉尾部带 tab/NBSP 的 POS 品名（实测近 30 天 400 行，
+  // 含 Berlin Volufra Tomato Beef Pretzel —— 90 天 5427 个的主力烘焙品）。
+  const NORM = NORM_SQL;
+  const topItems = await query<any>(
+    `SELECT COALESCE(p.name, s.item_name) AS name, SUM(s.qty) AS total_qty, SUM(s.gross_sales) AS total_sales
+       FROM item_hourly_sales s
+       LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("s.item_name")}
+      WHERE s.date = $1 GROUP BY COALESCE(p.name, s.item_name) ORDER BY total_qty DESC LIMIT 15`, [date]);
+  // 水吧(饮品)营业额：口径由 bakery-ops 自持 = business_rule.beverageItems（beverage-caliber.ts）。
+  // 【不再读 item_category】—— 该表归财务站所有并被 TRUNCATE 整表重灌，2026-07-07 换成英文
+  // 营销分组后这条 SQL 恒返回 RM0（实测 2026-07-24 正确值 RM7186 = 应收的 11.9%）。
+  // 用 = ANY($2) 参数化而不是 JOIN business_rule：TS 侧「查空回落内置常量」的护栏才覆盖得到这里。
+  const bevNames = (await getBeverageItems()).map(normCaliberName);
+  const WATER_BAR_SQL =
+    `SELECT COALESCE(SUM(s.gross_sales),0) AS gross, COALESCE(SUM(s.qty),0) AS qty
+       FROM item_hourly_sales s
+      WHERE s.date = $1 AND ${NORM("s.item_name")} = ANY($2::text[])`;
+  const waterBar = await query<any>(WATER_BAR_SQL, [date, bevNames]);
   const payment = await query<any>("SELECT * FROM daily_payment_breakdown WHERE date = $1 ORDER BY net_sales DESC", [date]);
   const dining = await query<any>("SELECT * FROM daily_dining_breakdown WHERE date = $1", [date]);
   const pnl = await query<any>("SELECT * FROM daily_pnl WHERE date = $1", [date]);
   const wasteByReason = await query<any>("SELECT waste_reason, SUM(qty) as total_qty, SUM(amount) as total_amount FROM item_waste WHERE date = $1 GROUP BY waste_reason", [date]);
-  const wasteTop = await query<any>("SELECT item_name, waste_reason, qty, amount FROM item_waste WHERE date = $1 ORDER BY amount DESC LIMIT 10", [date]);
+  // 报废王只取「排产报废」(可改进的过量)；试吃(品尝)属品控/推广投入，不进报废王。品名转中文。
+  const wasteTop = await query<any>(
+    `SELECT COALESCE(p.name, w.item_name) AS name, SUM(w.qty) AS qty, SUM(w.amount) AS amount
+       FROM item_waste w
+       LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("w.item_name")}
+      WHERE w.date = $1 AND w.waste_reason = 'scheduling'
+      GROUP BY COALESCE(p.name, w.item_name) ORDER BY amount DESC LIMIT 10`, [date]);
 
   // 上周同天对比
   const lastWeekDate = new Date(date);
@@ -64,28 +118,52 @@ async function getSalesData(date: string): Promise<string> {
   const lwStr = `${lastWeekDate.getFullYear()}-${String(lastWeekDate.getMonth() + 1).padStart(2, "0")}-${String(lastWeekDate.getDate()).padStart(2, "0")}`;
   const lastWeek = await query<any>("SELECT * FROM daily_revenue WHERE date = $1", [lwStr]);
 
-  // 今日应做（forecast目标）
-  let forecastTarget: { targetRevenue: number; targetShipment: number } | null = null;
+  // 今日应做（forecast目标）。携带并显字段：当前生效口径 + 数据驱动(中位数/P85) + 旧预算。
+  let forecastTarget: Awaited<ReturnType<typeof getProductForecast>> | null = null;
   try {
-    const forecast = await getProductForecast(date);
-    forecastTarget = { targetRevenue: forecast.targetRevenue, targetShipment: forecast.targetShipment };
+    forecastTarget = await getProductForecast(date);
   } catch { /* forecast may not be configured */ }
 
   let ctx = "";
   if (revenue.length) {
     const r = revenue[0];
-    ctx += `【${date} 当日数据】\n`;
-    ctx += `营业额: RM${r.revenue} | 客单数: ${r.transaction_count}单 | 客单价: RM${r.avg_transaction_value}\n`;
-    ctx += `毛销售额: RM${r.gross_sales} | 折扣: RM${r.total_discount} (折扣率${((r.discount_rate || 0) * 100).toFixed(1)}%)\n`;
+    // 应收金额 = gross_sales（折扣前）；客单价按应收/客单数算
+    const grossRev = Number(r.gross_sales) || 0;
+    const cnt = Number(r.transaction_count) || 0;
+    const avgGross = cnt > 0 ? (grossRev / cnt).toFixed(1) : "0";
+    const netRev = Number(r.revenue) || 0;
+    const wbGross = Number(waterBar[0]?.gross) || 0;
+    ctx += `【${date} 当日数据｜口径=应收金额(折扣前)】\n`;
+    ctx += `营业额(应收): RM${grossRev.toFixed(2)} | 实收(折后): RM${netRev.toFixed(2)} | 客单数: ${r.transaction_count}单 | 客单价(应收): RM${avgGross}\n`;
+    ctx += `其中 水吧(饮品)营业额: RM${wbGross.toFixed(0)} (占应收 ${grossRev > 0 ? (wbGross / grossRev * 100).toFixed(1) : "0"}%)\n`;
+    ctx += `折扣: RM${r.total_discount} (折扣率${((r.discount_rate || 0) * 100).toFixed(1)}%)\n`;
     ctx += `会员支付占比: ${((r.member_sales_ratio || 0) * 100).toFixed(1)}%\n`;
     if (forecastTarget) {
-      const achieveRate = ((r.revenue / forecastTarget.targetRevenue) * 100).toFixed(1);
-      ctx += `今日应做: RM${forecastTarget.targetRevenue} | 达成率: ${achieveRate}%\n`;
+      const t = forecastTarget;
+      const rate = (rev: number) => (rev > 0 ? ((grossRev / rev) * 100).toFixed(1) : "—");
+      const modeLabel = t.forecastMode === "new" ? "P85目标" : "预算目标";
+      ctx += `今日应做(${modeLabel}): RM${t.targetRevenue} | 达成率(应收): ${rate(t.targetRevenue)}%\n`;
+      // 新旧并显：把另一套目标也列出来供对照（灰度期）
+      if (t.dataDriven) {
+        if (t.forecastMode === "new") {
+          ctx += `  对照 → 需求(中位数): RM${t.dataDriven.medianDemand} | 旧预算: RM${t.legacyBudgetRevenue}(达成率${rate(t.legacyBudgetRevenue)}%)\n`;
+        } else {
+          ctx += `  对照(新法) → P85目标: RM${t.dataDriven.p85Target}(达成率${rate(t.dataDriven.p85Target)}%) | 需求(中位数): RM${t.dataDriven.medianDemand}\n`;
+        }
+      }
     }
     if (lastWeek.length) {
       const lw = lastWeek[0];
-      const revDiff = ((r.revenue - lw.revenue) / lw.revenue * 100).toFixed(1);
-      ctx += `vs 上周同天(${lwStr}): 营业额RM${lw.revenue}(${Number(revDiff) > 0 ? "+" : ""}${revDiff}%), 客单数${lw.transaction_count}, 客单价RM${lw.avg_transaction_value}\n`;
+      const lwGross = Number(lw.gross_sales) || 0;
+      const lwNet = Number(lw.revenue) || 0;
+      // 上周同天水吧营业额(与今日同口径)，好让核心指标表的实收/水吧也有对比+变化
+      /* 复用与今日完全同一条 SQL 和同一份清单，杜绝口径分叉——
+         否则修好今日之后会变成「本周 RM7186 vs 上周 RM0」这种新的误导。 */
+      const lwWbRows = await query<any>(WATER_BAR_SQL, [lwStr, bevNames]);
+      const lwWb = Number(lwWbRows[0]?.gross) || 0;
+      const pct = (now: number, prev: number) => prev > 0 ? `${(now - prev) / prev * 100 >= 0 ? "+" : ""}${((now - prev) / prev * 100).toFixed(1)}%` : "—";
+      const lwAvg = Number(lw.transaction_count) > 0 ? (lwGross / Number(lw.transaction_count)).toFixed(1) : "0";
+      ctx += `vs 上周同天(${lwStr}): 营业额(应收)RM${lwGross.toFixed(0)}(${pct(grossRev, lwGross)})，实收RM${lwNet.toFixed(0)}(${pct(netRev, lwNet)})，水吧RM${lwWb.toFixed(0)}(${pct(wbGross, lwWb)})，客单数${lw.transaction_count}，客单价RM${lwAvg}\n`;
     }
   } else {
     ctx += `【${date} 当日数据】暂无（可能还未同步）\n`;
@@ -113,27 +191,42 @@ async function getSalesData(date: string): Promise<string> {
       ctx += `报废率: ${wasteRate}% (警戒线: 5%)\n`;
     }
     if (wasteTop.length) {
-      ctx += `报废TOP5:\n`;
+      ctx += `排产报废王(只计排产报废=预估过量，可据此判断明日该减产的品；不含试吃):\n`;
       for (const w of wasteTop.slice(0, 5)) {
-        ctx += `  ${w.item_name} (${REASON_LABELS[w.waste_reason] || w.waste_reason}): ${w.qty}个, RM${Number(w.amount).toFixed(0)}\n`;
+        ctx += `  ${w.name}: ${w.qty}个, RM${Number(w.amount).toFixed(0)}\n`;
       }
     }
+    const tasting = wasteByReason.find((x: any) => x.waste_reason === "tasting");
+    if (tasting) ctx += `试吃(品尝)投入: ${tasting.total_qty}个 RM${Number(tasting.total_amount).toFixed(0)}——属品控/推广投入，不列入报废王；仅评估投入是否过量\n`;
   }
 
   if (hourly.length) {
-    ctx += `\n【时段明细】\n`;
+    ctx += `\n【时段明细（营业额=应收）】\n`;
     ctx += `时段 | 客单数 | 营业额 | 客单价 | 折扣\n`;
     for (const h of hourly) {
-      if (Number(h.bill_count) > 0) {
-        ctx += `${String(h.hour).padStart(2, "0")}:00 | ${h.bill_count}单 | RM${Number(h.net_sales).toFixed(0)} | RM${h.avg_order_net_sales} | RM${Number(h.total_discount).toFixed(0)}\n`;
+      const bc = Number(h.bill_count);
+      if (bc > 0) {
+        const hGross = Number(h.gross_sales) || 0;
+        const hAvg = (hGross / bc).toFixed(1);
+        ctx += `${String(h.hour).padStart(2, "0")}:00 | ${h.bill_count}单 | RM${hGross.toFixed(0)} | RM${hAvg} | RM${Number(h.total_discount).toFixed(0)}\n`;
       }
+    }
+    // 峰谷只在营业时段 12:00-22:00 判定；22点及以后是打烊尾单，不计低谷。
+    const op = hourly.filter((h: any) => Number(h.hour) >= 12 && Number(h.hour) < 22 && Number(h.bill_count) > 0);
+    if (op.length) {
+      const g = (h: any) => Number(h.gross_sales) || 0;
+      const peak = op.reduce((a: any, b: any) => (g(b) > g(a) ? b : a));
+      const trough = op.reduce((a: any, b: any) => (g(b) < g(a) ? b : a));
+      ctx += `营业时段峰谷(仅取12:00-22:00，打烊后不计低谷)：高峰 ${peak.hour}点(${peak.bill_count}单/RM${g(peak).toFixed(0)})；低谷 ${trough.hour}点(${trough.bill_count}单/RM${g(trough).toFixed(0)})\n`;
     }
   }
 
   if (topItems.length) {
-    ctx += `\n【单品销量TOP15】\n`;
+    const cntTC = Number(revenue[0]?.transaction_count) || 0;
+    ctx += `\n【单品表现TOP15（按销量排；TC占比=该品销量/客单数=每单渗透率）】\n`;
     for (const item of topItems) {
-      ctx += `${item.item_name}: ${item.total_qty}个, RM${Number(item.total_sales).toFixed(0)}\n`;
+      const tc = cntTC > 0 ? (Number(item.total_qty) / cntTC * 100).toFixed(0) : "0";
+      ctx += `${item.name}: ${item.total_qty}个 (TC ${tc}%), RM${Number(item.total_sales).toFixed(0)}\n`;
     }
   }
 
@@ -151,89 +244,168 @@ async function getSalesData(date: string): Promise<string> {
     }
   }
 
+  // ===== P1 归因分析：品类结构 / 毛利 / 断货损失 / 预估偏差 =====
+  // 这些是「为什么 + 值多少钱」的分析口径；不生成"明日减产X个"这类自动指令，只供归因判断。
+
+  // 营业额构成【保留】用 item_category —— 这是该表在 bakery-ops 侧唯一合法的用途（展示，不承载判定语义）。
+  // LEFT JOIN + COALESCE：分类表里没有的品（如 2026-07-20 上架的 Golden Tropic Cold Brew）
+  // 用 INNER JOIN 会被整段静默吞掉。NORM 已含 chr(160) 处理，捞回尾部带 tab/NBSP 的那批行。
+  const byCat = await query<any>(
+    `SELECT COALESCE(c.category, '未分类') AS cat, SUM(s.gross_sales) AS amt, SUM(s.qty) AS qty
+       FROM item_hourly_sales s
+       LEFT JOIN item_category c ON ${NORM('c.item_name')} = ${NORM('s.item_name')}
+      WHERE s.date = $1 GROUP BY 1 ORDER BY amt DESC`, [date]);
+  if (byCat.length) {
+    const catTotal = byCat.reduce((a: number, r: any) => a + Number(r.amt), 0);
+    ctx += `\n【营业额构成（按 POS 菜单分组｜注意：这是 Restosuite 的营销分组，不是产品品类）】\n`;
+    ctx += `说明：分组里含 TOP list/New items（榜单）、Membership Price（会员价档）这类非品类维度，`;
+    ctx += `不要据此做"哪个品类拉高/拉低客单价"的归因，只可当营业额构成的粗略参考。\n`;
+    for (const r of byCat) {
+      const share = catTotal > 0 ? (Number(r.amt) / catTotal * 100).toFixed(1) : "0";
+      const per = Number(r.qty) > 0 ? (Number(r.amt) / Number(r.qty)).toFixed(1) : "0";
+      ctx += `${r.cat}: RM${Number(r.amt).toFixed(0)} (${share}%), 件均价RM${per}\n`;
+    }
+  }
+
+  // 毛利：热销单品毛利率（成本=食材直接成本，部分品暂无成本已略）
+  const marginTop = await query<any>(
+    `SELECT COALESCE(p.name, s.item_name) AS name, SUM(s.qty) AS qty, SUM(s.gross_sales) AS sales, m.material_cost AS cost, m.confidence AS conf
+       FROM item_hourly_sales s
+       LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("s.item_name")}
+       LEFT JOIN product_material_cost m ON m.product_name = p.name
+      WHERE s.date = $1 GROUP BY COALESCE(p.name, s.item_name), m.material_cost, m.confidence
+      ORDER BY qty DESC LIMIT 12`, [date]);
+  const withCost = marginTop.filter((r: any) => r.cost != null);
+  if (withCost.length) {
+    ctx += `\n【热销单品毛利率（成本=食材直接成本；注意低毛利高销量的隐患品）】\n`;
+    for (const r of withCost) {
+      const price = Number(r.qty) > 0 ? Number(r.sales) / Number(r.qty) : 0;
+      const gm = price > 0 ? ((price - Number(r.cost)) / price * 100).toFixed(0) : "0";
+      ctx += `${r.name}: 毛利率${gm}% (售约RM${price.toFixed(1)}/成本RM${Number(r.cost).toFixed(1)})${r.conf !== "exact" ? "[成本近似]" : ""}\n`;
+    }
+  }
+  // 排产报废的真实成本损失（=浪费掉的食材成本，比售价口径更贴近真金白银）
+  const wasteCost = await query<any>(
+    `SELECT COALESCE(SUM(w.qty * m.material_cost),0) AS loss
+       FROM item_waste w
+       LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("w.item_name")}
+       JOIN product_material_cost m ON m.product_name = p.name
+      WHERE w.date = $1 AND w.waste_reason = 'scheduling'`, [date]);
+  if (Number(wasteCost[0]?.loss) > 0) ctx += `排产报废的食材成本损失(真实亏损)约: RM${Number(wasteCost[0].loss).toFixed(0)}\n`;
+
+  // 断货损失：卖光=少赚的营业额，可解释达成率缺口（同日 stockout 若当晚尚未检测则可能为空）
+  // 取全部断货品(不 LIMIT)——合计要含全部；展示只列损失前6。
+  const oos = await query<any>(
+    `SELECT product_name AS nm, soldout_time AS t, estimated_loss_qty AS q, estimated_loss_amount AS amt
+       FROM out_of_stock_record WHERE date = $1 AND estimated_loss_amount > 0 ORDER BY estimated_loss_amount DESC`, [date]);
+  let oosList = oos.map((r: any) => ({ nm: r.nm, t: r.t, q: Number(r.q), amt: Number(r.amt) }));
+  if (!oosList.length) {
+    // 当日复盘时断货检测(测「昨日」)还没跑到当天 → 实时算一份，保证当天断货损失可见。
+    try {
+      const recs = await computeStockoutForDate(date);
+      oosList = recs.filter((r) => r.estimatedLossAmount > 0)
+        .sort((a, b) => b.estimatedLossAmount - a.estimatedLossAmount)
+        .map((r) => ({ nm: r.productName, t: r.soldoutTime, q: r.estimatedLossQty, amt: r.estimatedLossAmount }));
+    } catch (err) { logger.warn("复盘内联断货计算失败，跳过断货节", { date, error: String(err) }); }
+  }
+  if (oosList.length) {
+    const lossSum = oosList.reduce((a: number, r: any) => a + r.amt, 0); // 全部品合计
+    ctx += `\n【断货损失（卖光=少赚的营业额，用于解释达成率缺口）】\n`;
+    ctx += `断货损失合计约 RM${lossSum.toFixed(0)}（共${oosList.length}品断货，下列损失前6）\n`;
+    for (const r of oosList.slice(0, 6)) ctx += `  ${r.nm}: ${r.t}断货, 估少卖${r.q}个/RM${r.amt.toFixed(0)}\n`;
+  }
+
+  // 预估偏差：计划 vs 实卖（分析用，不出加减产指令；结合排产报废/断货判断真过量还是断货）
+  // 注意：forecast_snapshot.date 是 varchar，item_hourly_sales.date 是 date，共用 $1 需都 ::date。
+  // 只保留「确有销量(sold>0)但明显少于计划」的品——实卖=0 多为下架品/name_en 未对齐，不可信，剔除。
+  const dev = await query<any>(
+    `SELECT s.product_name AS nm, s.suggested_qty AS plan, a.sold AS sold
+       FROM forecast_snapshot s
+       JOIN product p ON p.name = s.product_name
+       JOIN (SELECT ${NORM("item_name")} AS k, SUM(qty) AS sold FROM item_hourly_sales WHERE date = $1::date GROUP BY ${NORM("item_name")}) a
+              ON a.k = ${NORM("p.name_en")}
+      WHERE s.date::date = $1::date AND s.suggested_qty > 0 AND a.sold > 0
+      ORDER BY (s.suggested_qty - a.sold) DESC LIMIT 8`, [date]);
+  const overPlan = dev.filter((r: any) => Number(r.plan) - Number(r.sold) >= Math.max(10, Number(r.plan) * 0.25));
+  if (overPlan.length) {
+    ctx += `\n【预估 vs 实卖（有销量但明显少于计划的品，供归因；有排产报废=真过量，若断货则相反）】\n`;
+    for (const r of overPlan) ctx += `  ${r.nm}: 计划${r.plan} 实卖${r.sold} (差${Number(r.plan) - Number(r.sold)})\n`;
+  }
+
   return ctx;
 }
 
-async function queryDataForQuestion(question: string, date: string): Promise<string> {
-  // LLM 判断用户问的是什么数据，生成对应查询
-  const intentPrompt = `用户在复盘对话中追问了一个问题。判断他需要什么数据，返回JSON。
+// queryDataForQuestion 已抽到 src/modules/domain/forecast/ops-data-query.ts
+// 供 knowledge_query 经营类分支共用 — IMPROVEMENT-PLAN.md F9
 
-用户问题: "${question}"
-当前复盘日期: ${date}
+/**
+ * 生成某日的完整复盘分析文本（getSalesData 应收口径 + 昨日决策闭环 + SKILL.md 提示 → LLM）。
+ * 两处复用：店长交互复盘（handleInitialReview）与每日自动早报（morning-brief.service）。
+ * managerText 为空 = 自动早报：无店长反馈、跳过 RAG 检索、收尾改为前瞻动作而非提问。
+ */
+export async function generateDailyReviewText(date: string, managerText = ""): Promise<string> {
+  const isAuto = !managerText.trim();
 
-返回格式:
-{"type": "hourly_detail" | "item_detail" | "compare_days" | "item_by_hour" | "general", "item_name": "如果问具体产品", "hour": "如果问具体时段", "compare_date": "如果要对比某天"}
-
-只返回JSON，不要其他文字。`;
-
-  let intent: any = { type: "general" };
+  // 昨日决策闭环：SQL 精确读昨日 manager_review.insight（不靠 RAG 模糊检索）
+  const yd = new Date(date);
+  yd.setDate(yd.getDate() - 1);
+  const ydStr = `${yd.getFullYear()}-${String(yd.getMonth() + 1).padStart(2, "0")}-${String(yd.getDate()).padStart(2, "0")}`;
+  let yesterdayInsight = "";
   try {
-    const raw = await aiProvider.chatCompletion(intentPrompt, 200);
-    intent = JSON.parse(raw.replace(/```json?\n?/g, "").replace(/```/g, "").trim());
-  } catch { /* fallback to general */ }
-
-  let data = "";
-  if (intent.type === "item_detail" && intent.item_name) {
-    const rows = await query<any>("SELECT hour, qty, net_sales FROM item_hourly_sales WHERE date = $1 AND item_name ILIKE $2 ORDER BY hour", [date, `%${intent.item_name}%`]);
-    if (rows.length) {
-      data = `【${intent.item_name} 在 ${date} 的时段销量】\n`;
-      for (const r of rows) data += `${r.hour}:00 — ${r.qty}个, RM${Number(r.net_sales).toFixed(0)}\n`;
-      data += `合计: ${rows.reduce((a: number, r: any) => a + Number(r.qty), 0)}个, RM${rows.reduce((a: number, r: any) => a + Number(r.net_sales), 0).toFixed(0)}`;
-    } else {
-      data = `未找到 "${intent.item_name}" 在 ${date} 的数据`;
-    }
-  } else if (intent.type === "hourly_detail" || intent.hour) {
-    const h = intent.hour || 12;
-    const rows = await query<any>("SELECT item_name, qty, net_sales FROM item_hourly_sales WHERE date = $1 AND hour = $2 ORDER BY qty DESC LIMIT 10", [date, h]);
-    const summary = await query<any>("SELECT * FROM hourly_sales_summary WHERE date = $1 AND hour = $2", [date, h]);
-    data = `【${date} ${h}:00-${h + 1}:00 数据】\n`;
-    if (summary.length) data += `客单数: ${summary[0].bill_count} | 营业额: RM${Number(summary[0].net_sales).toFixed(0)} | 客单价: RM${summary[0].avg_order_net_sales}\n`;
-    if (rows.length) { data += `单品:\n`; for (const r of rows) data += `  ${r.item_name}: ${r.qty}个, RM${Number(r.net_sales).toFixed(0)}\n`; }
-  } else if (intent.type === "compare_days" && intent.compare_date) {
-    const rows = await query<any>("SELECT * FROM daily_revenue WHERE date = $1", [intent.compare_date]);
-    if (rows.length) {
-      const r = rows[0];
-      data = `【${intent.compare_date} 数据】\n营业额: RM${r.revenue} | 客单数: ${r.transaction_count} | 客单价: RM${r.avg_transaction_value} | 折扣率: ${((r.discount_rate || 0) * 100).toFixed(1)}%`;
-    }
-  } else if (intent.type === "item_by_hour" && intent.item_name) {
-    const rows = await query<any>("SELECT date, hour, qty, net_sales FROM item_hourly_sales WHERE item_name ILIKE $1 ORDER BY date DESC, hour LIMIT 30", [`%${intent.item_name}%`]);
-    if (rows.length) {
-      data = `【${intent.item_name} 近期销量】\n`;
-      let currentDate = "";
-      for (const r of rows) {
-        const d = String(r.date).slice(0, 10);
-        if (d !== currentDate) { currentDate = d; data += `\n${d}:\n`; }
-        data += `  ${r.hour}:00 — ${r.qty}个\n`;
-      }
-    }
+    const rows = await query<any>("SELECT insight FROM manager_review WHERE date = $1", [ydStr]);
+    if (rows.length && rows[0].insight) yesterdayInsight = String(rows[0].insight);
+  } catch (err) {
+    logger.warn("Yesterday insight lookup failed", { date: ydStr, error: String(err) });
   }
-  return data;
+
+  const salesData = await getSalesData(date);
+
+  // RAG 只在有店长原话时检索（自动早报没有查询串）— naive 拿原始 chunks
+  let ragContext = "";
+  if (!isAuto && (await lightragClient.isAvailable())) {
+    const ragResult = await lightragClient.query(managerText.slice(0, 100), "naive");
+    if (ragResult) ragContext = `\n【历史经验/SOP参考】\n${ragResult}\n（引用以上历史经验时必须注明具体日期）\n`;
+  }
+
+  const yesterdaySection = yesterdayInsight
+    ? `\n【昨日复盘提炼的决策/假设（${ydStr}）】\n${yesterdayInsight}\n`
+    : "";
+  const followUpRequirement = yesterdayInsight
+    ? `报告中必须包含固定小节「【昨日决策跟进】」：逐条对照今日数据说明昨日决策/假设的落地/验证情况。`
+    : "";
+  const feedbackSection = isAuto
+    ? `【说明】这是系统每天自动生成的经营早报（无店长反馈），请仅依据系统销售数据分析。\n`
+    : `【店长今日反馈】\n${managerText}\n`;
+  const closing = isAuto
+    ? `结尾给出明日 1-2 条最关键的经营动作，不要向店长提问。`
+    : `最后问店长还有什么想了解的。`;
+
+  const prompt = `${SKILL_PROMPT}\n\n---\n\n${feedbackSection}\n【系统销售数据】\n${salesData}\n${yesterdaySection}${ragContext}\n\n请按照 SKILL.md 中定义的输出格式生成分析报告。${followUpRequirement}引用历史经验必须注明日期。${closing}`;
+
+  return await aiProvider.chatCompletionLong(prompt);
 }
 
 export class DailyReviewChatSkillHandler implements SkillHandler {
   async execute(input: SkillExecutionInput): Promise<SkillExecutionResult> {
-    const rawText = String(input.input.jdText || input.rawMessage?.text || "");
     const isFollowUp = input.input._isFollowUp === true;
+    // 追问 resume 时 collectedInputs 可能残留首轮 jdText，以本条消息(text)为准 — IMPROVEMENT-PLAN.md B5
+    const rawText = isFollowUp
+      ? String(input.input.text || input.rawMessage?.text || "")
+      : String(input.input.jdText || input.rawMessage?.text || "");
     const conversationHistory = (input.input._history as string) || "";
 
-    // Extract date from multiple possible sources
-    let reviewDate = (input.input._reviewDate as string)
-      || (input.input.date as string)
-      || (input.input.targetDate as string)
-      || "";
-
-    // Try to extract date from raw text if not provided
-    if (!reviewDate) {
-      const dateMatch = rawText.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
-      const shortMatch = rawText.match(/(\d{1,2})[.\/-](\d{1,2})/);
-      if (dateMatch) {
-        reviewDate = `${dateMatch[1]}-${dateMatch[2].padStart(2, "0")}-${dateMatch[3].padStart(2, "0")}`;
-      } else if (shortMatch) {
-        const year = new Date().getFullYear();
-        reviewDate = `${year}-${shortMatch[1].padStart(2, "0")}-${shortMatch[2].padStart(2, "0")}`;
-      }
+    // 日期解析（都走 normalizeDate 规范到 YYYY-MM-DD）：
+    // - 追问：锁定首轮的 _reviewDate（会话日期不变）。
+    // - 初始：【用户原话优先】。意图路由的 LLM 常把用户说的 "6.29"（无年份）猜成错误年份
+    //   （如 2024）塞进 input.date；用户没说年份就用当前年，绝不信 LLM 填的年份。
+    let reviewDate: string;
+    if (isFollowUp) {
+      reviewDate = normalizeDate((input.input._reviewDate as string) || "") || normalizeDate(rawText);
+    } else {
+      reviewDate =
+        normalizeDate(rawText) ||
+        normalizeDate((input.input.date as string) || (input.input.targetDate as string) || "");
     }
-
     if (!reviewDate) reviewDate = await getTodayDate();
 
     logger.info("DailyReviewChat: resolved date", { reviewDate, inputDate: input.input.date, rawText: rawText.slice(0, 50) });
@@ -247,48 +419,54 @@ export class DailyReviewChatSkillHandler implements SkillHandler {
       // First message: generate full review analysis
       return await this.handleInitialReview(rawText, reviewDate);
     } catch (err) {
+      // 原始错误只进日志，用户可见文案固定中文 — IMPROVEMENT-PLAN.md G3f
       logger.error("Daily review chat failed", { error: String(err) });
       return {
         runId: uuidv4(),
         skillId: "daily_review_chat",
         status: "error",
-        summary: `分析失败: ${err instanceof Error ? err.message : String(err)}`,
+        summary: "AI 分析暂时不可用，请稍后再试",
         error: String(err),
       };
     }
   }
 
   private async handleInitialReview(rawText: string, date: string): Promise<SkillExecutionResult> {
-    const salesData = await getSalesData(date);
+    // 复盘分析文本生成（昨日决策闭环 + 应收销售数据 + RAG）抽到 generateDailyReviewText，
+    // 与每日自动早报共用 — IMPROVEMENT-PLAN.md F9/F1
+    const analysis = await generateDailyReviewText(date, rawText);
 
-    // Query RAG for historical context
-    let ragContext = "";
-    const ragAvailable = await lightragClient.isAvailable();
-    if (ragAvailable) {
-      const ragResult = await lightragClient.query(`复盘 运营问题 策略 ${rawText.slice(0, 100)}`, "hybrid");
-      if (ragResult) ragContext = `\n【历史经验/SOP参考】\n${ragResult}\n`;
+    // Ingest this review — fire-and-forget，不阻塞店长收到回复 — IMPROVEMENT-PLAN.md G4-①
+    if (await lightragClient.isAvailable()) {
+      void lightragClient.ingest(`[复盘 ${date}] ${rawText}`, { type: "daily_review", date })
+        .catch((e) => logger.warn("LightRAG ingest failed (fire-and-forget)", { date, error: String(e) }));
     }
 
-    // Ingest this review
-    if (ragAvailable) {
-      await lightragClient.ingest(`[复盘 ${date}] ${rawText}`, { type: "daily_review", date });
-    }
-
-    // Save to daily_review table
+    // 复盘原文落库（真相源）。此前写 daily_review 的 content 列——列不存在且表已被 005
+    // 迁入 forecast schema，INSERT 必败且被静默吞掉，复盘正文一直在丢 — IMPROVEMENT-PLAN.md B7
     try {
-      await query("INSERT INTO daily_review (date, content, created_at) VALUES ($1, $2, NOW()) ON CONFLICT (date) DO UPDATE SET content = $2", [date, rawText]);
-    } catch { /* table might not have unique on date, ignore */ }
+      await query(
+        "INSERT INTO manager_review (date, content) VALUES ($1, $2) ON CONFLICT (date) DO UPDATE SET content = $2, updated_at = NOW()",
+        [date, rawText],
+      );
+    } catch (err) {
+      logger.error("manager_review insert failed — 复盘原文没有落库", { date, error: String(err) });
+    }
 
-    const prompt = `${SKILL_PROMPT}\n\n---\n\n【店长今日反馈】\n${rawText}\n\n【系统销售数据】\n${salesData}\n${ragContext}\n\n请按照 SKILL.md 中定义的输出格式生成分析报告。最后问店长还有什么想了解的。`;
-
-    const analysis = await aiProvider.chatCompletionLong(prompt);
-
+    // 返回 pending 进入多轮追问：orchestrator 存下 data 到 collectedInputs，
+    // 下一条消息 resume 时原样并回 input，execute 里 _isFollowUp 读取即生效 — IMPROVEMENT-PLAN.md B5
     return {
       runId: uuidv4(),
       skillId: "daily_review_chat",
-      status: "success",
-      summary: analysis,
-      data: { date, phase: "initial_review" },
+      status: "pending",
+      summary: `${analysis}\n\n（回复「没了」结束复盘）`,
+      data: {
+        date,
+        phase: "initial_review",
+        _isFollowUp: true,
+        _reviewDate: date,
+        _history: `店长: ${rawText}\n顾问: ${analysis}`,
+      },
     };
   }
 
@@ -317,12 +495,20 @@ ${extraData ? `【系统查询到的数据】\n${extraData}\n` : ""}
 
     const reply = await aiProvider.chatCompletionLong(prompt);
 
+    // 追问阶段不写 manager_review.content（只有 initial 写正文、end 写 insight），
+    // 继续 pending 并把本轮问答追加进 _history — IMPROVEMENT-PLAN.md B5
     return {
       runId: uuidv4(),
       skillId: "daily_review_chat",
-      status: "success",
-      summary: reply,
-      data: { date, phase: "follow_up" },
+      status: "pending",
+      summary: `${reply}\n\n（回复「没了」结束复盘）`,
+      data: {
+        date,
+        phase: "follow_up",
+        _isFollowUp: true,
+        _reviewDate: date,
+        _history: `${history}\n店长: ${question}\n顾问: ${reply}`,
+      },
     };
   }
 
@@ -346,21 +532,39 @@ ${history}
       extractedKnowledge = await aiProvider.chatCompletionLong(extractPrompt);
     } catch { /* non-critical */ }
 
-    // Write to RAG
-    const ragAvailable = await lightragClient.isAvailable();
-    if (ragAvailable && extractedKnowledge) {
-      await lightragClient.ingest(
-        `[复盘总结 ${date}] ${extractedKnowledge}`,
-        { type: "review_insight", date, source: "daily_review_chat" },
-      );
-      logger.info("Review insights ingested to RAG", { date });
+    // 提炼要点先落库（RAG 之外的可靠副本）— IMPROVEMENT-PLAN.md B7
+    let persisted = false;
+    if (extractedKnowledge) {
+      try {
+        await query(
+          "UPDATE manager_review SET insight = $2, updated_at = NOW() WHERE date = $1",
+          [date, extractedKnowledge],
+        );
+        persisted = true;
+      } catch (err) {
+        logger.error("manager_review insight update failed", { date, error: String(err) });
+      }
     }
 
+    // Write to RAG — fire-and-forget，不阻塞回复链路 — IMPROVEMENT-PLAN.md G4-①
+    const ragAvailable = await lightragClient.isAvailable();
+    if (ragAvailable && extractedKnowledge) {
+      void lightragClient.ingest(
+        `[复盘总结 ${date}] ${extractedKnowledge}`,
+        { type: "review_insight", date, source: "daily_review_chat" },
+      ).catch((e) => logger.warn("LightRAG ingest failed (fire-and-forget)", { date, error: String(e) }));
+      logger.info("Review insights ingest dispatched to RAG", { date });
+    }
+
+    // 如实告知存储结果，不在提炼/存档失败时谎称"已存入知识库"
+    const storageNote = extractedKnowledge
+      ? (persisted || ragAvailable ? "这些已经存档，下次复盘时会作为参考。" : "（本次存档失败，已记录日志。）")
+      : "";
     return {
       runId: uuidv4(),
       skillId: "daily_review_chat",
       status: "success",
-      summary: `好的，今天的复盘就到这里。\n\n📝 **已提炼的经验：**\n${extractedKnowledge || "(无新增)"}\n\n这些已经存入知识库，下次复盘时会作为参考。明天见！`,
+      summary: `好的，今天的复盘就到这里。\n\n📝 **已提炼的经验：**\n${extractedKnowledge || "(无新增)"}\n\n${storageNote}明天见！`,
       data: { date, phase: "end", extractedKnowledge },
     };
   }

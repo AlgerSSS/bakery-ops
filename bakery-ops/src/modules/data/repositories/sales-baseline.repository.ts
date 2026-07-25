@@ -44,11 +44,32 @@ export async function getSalesBaselines(): Promise<ProductSalesBaseline[]> {
 }
 
 // ========== Timeslot Sales ==========
+/**
+ * 时段销售基线。
+ *
+ * 【口径】表里的 product_name 是 res_api 写入的英文 POS 名（sync-to-db.js，每晚 TRUNCATE 重灌），
+ * 78 个 distinct 名与 product.name（中文）交集为 0、与 product.name_en 交集 43。
+ * 而本仓库全部下游都按中文 product.name 取键，于是四处同时静默失效：
+ *   · 预估单「预计销售」整行恒 0（use-export.ts），表格等于在说「今天出的货一个都卖不掉」
+ *   · 试吃报废分配的中文 keyword 恒 0 命中
+ *   · product-suggestion 的回落链恒 miss，直接跌到 2026-04-12 冻结的旧基线
+ *   · 人工录入断货的损失估算恒 0
+ * 因此在仓库出口处统一经 product.name_en 归一化翻成中文；翻不出来的保留原名。
+ * **不要把翻译搬到各个调用方**——分散做正是上面那种四处同时失效的形态。
+ */
 export async function getTimeslotSalesRecords(dayType?: string): Promise<TimeslotSalesRecord[]> {
-  let sql = "SELECT * FROM timeslot_sales_record";
+  /* Postgres 的 [[:space:]] 不含 U+00A0、btrim 也只去半角空格，
+     不先 replace(chr(160),' ') 会漏掉尾部带 tab/NBSP 的 POS 品名。 */
+  const NORM = (c: string) =>
+    `lower(btrim(regexp_replace(replace(${c}, chr(160), ' '), '[[:space:]]+', ' ', 'g')))`;
+  let sql =
+    `SELECT t.id, COALESCE(p.name, t.product_name) AS product_name,
+            t.day_type, t.time_slot, t.avg_quantity, t.sample_count
+       FROM timeslot_sales_record t
+       LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("t.product_name")}`;
   const params: string[] = [];
-  if (dayType) { sql += " WHERE day_type = ?"; params.push(dayType); }
-  sql += " ORDER BY product_name, time_slot";
+  if (dayType) { sql += " WHERE t.day_type = ?"; params.push(dayType); }
+  sql += " ORDER BY 2, t.time_slot";
   const rows = await query<TimeslotSalesRow>(sql, params);
   return rows.map((r) => ({
     productName: r.product_name,
@@ -74,6 +95,25 @@ export async function importTimeslotSalesData(records: TimeslotSalesRecord[]): P
   } catch (error) {
     return { success: false, totalRows: 0, importedRows: 0, skippedRows: 0, errors: [String(error)] };
   }
+}
+
+/** 近 4 周同日型的每小时 bill_count 汇总曲线（用于无历史品项的默认上架时段推断）。 */
+export async function getHourlyBillCurve(
+  dayType: "mondayToThursday" | "friday" | "weekend"
+): Promise<{ hour: number; billCount: number }[]> {
+  const dowFilter =
+    dayType === "weekend" ? "IN (0, 6)"
+    : dayType === "friday" ? "= 5"
+    : "BETWEEN 1 AND 4";
+  const rows = await query<{ hour: number; bill_count: number }>(
+    `SELECT hour, SUM(bill_count)::int AS bill_count
+     FROM hourly_sales_summary
+     WHERE date >= CURRENT_DATE - INTERVAL '28 days'
+       AND EXTRACT(DOW FROM date) ${dowFilter}
+     GROUP BY hour
+     ORDER BY hour`
+  );
+  return rows.map((r) => ({ hour: r.hour, billCount: Number(r.bill_count) }));
 }
 
 export async function hasTimeslotSalesData(): Promise<boolean> {

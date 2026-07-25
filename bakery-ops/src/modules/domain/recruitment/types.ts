@@ -51,29 +51,11 @@ export interface CrawlResult {
   errors?: string[];
 }
 
-export interface OutreachResult {
-  candidateId: string;
-  candidateName: string;
-  platform: string;
-  status: "sent" | "failed" | "skipped" | "budget_exceeded";
-  error?: string;
-  sentAt?: string;
-}
-
-export interface OutreachBatchResult {
-  platform: string;
-  total: number;
-  sent: number;
-  failed: number;
-  results: OutreachResult[];
-}
-
 export interface RecruitmentTaskResult {
   jd: ParsedJD;
   totalCrawled: number;
   totalAfterDedup: number;
   topCandidates: ScoredCandidate[];
-  outreach?: OutreachBatchResult[];
 }
 
 // ── 发布职位相关类型 ──
@@ -103,7 +85,7 @@ export interface JobPostingResult {
 
 export interface ActiveJob {
   jobId: string;
-  platform: "JobStreet" | "AJobThing";
+  platform: "JobStreet";
   title: string;
   location: string;
   status: "active" | "draft" | "expired" | "closed";
@@ -114,14 +96,30 @@ export interface ActiveJob {
 
 export interface JobApplicant {
   applicantId: string;
-  platform: "JobStreet" | "AJobThing";
+  platform: "JobStreet";
   jobId: string;
   name: string;
+  phone?: string;        // applicants to our own ad expose phone (E.164-ish, e.g. 60123456789)
+  email?: string;
   currentTitle?: string;
   experienceYears?: number;
   appliedAt?: string;
   resumeUrl?: string;
   profileUrl?: string;
+  candidateId?: string;  // SEEK candidateId (stable id for de-dup)
+  correlationId?: string; // SEEK applicationCorrelationId (= result[].id), opens the profile drawer
+  hasResumeAttachment?: boolean; // 有 RESUME 附件，但 SEEK express 免费套餐无法下载 PDF（付费墙）
+  resumeAttachmentId?: string; // RESUME 附件 id，走 /attachment/applications 端点下载
+}
+
+// SEEK 免费(express)套餐能免费拿到的候选人在线档案（下载 PDF 需付费升级）。
+export interface ApplicantProfile {
+  education: string[];      // "学历 @ 院校"
+  skills: string[];
+  workHistory: string[];    // "职位 @ 公司"
+  rightToWork: string[];
+  nationalities: string[];
+  hasResumeAttachment: boolean;
 }
 
 export interface ActiveJobsState {

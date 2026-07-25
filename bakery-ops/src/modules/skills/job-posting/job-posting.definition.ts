@@ -8,9 +8,10 @@ import * as fs from "fs";
 export const jobPostingSkillDefinition: SkillDefinition = {
   skillId: "job_posting",
   name: "发布职位",
-  description: "将中文岗位需求生成英文 JD，发布到 AJobThing 和 JobStreet 招聘平台",
+  description: "将中文岗位需求生成英文 JD，发布到 JobStreet 招聘平台",
   priority: 90,
-  triggerKeywords: ["发布", "发岗位", "发职位", "post job", "上架", "挂职位", "发布职位", "发一个岗位"],
+  disambiguation: "把岗位发布/上架到招聘网站；不是采集候选人(recruitment_sourcing)，也不是查看已在招岗位(active_jobs)",
+  triggerKeywords: ["发岗位", "发职位", "post job", "上架", "挂职位", "发布职位", "发一个岗位"],
   examples: [
     "帮我发一个收银员岗位",
     "发布一个烘焙师傅的职位，要求3年经验",
@@ -58,7 +59,7 @@ export class JobPostingSkillHandler implements SkillHandler {
       }
 
       // 流程结束
-      const hasPosted = result.state.jsResult?.status === "posted" || result.state.ajtResult?.status === "posted";
+      const hasPosted = result.state.jsResult?.status === "posted";
       return {
         runId: uuidv4(),
         skillId: "job_posting",

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "406994127",
+    "name": "HOT CRUSH BAKERY",
+    "timezone": "Asia/Kuala_Lumpur",
+    "refreshAt": "01:00",
+    "credentials": {
+      "email": "ENV:RESTOSUITE_EMAIL",
+      "password": "ENV:RESTOSUITE_PASSWORD"
+    },
+    "database": "ENV:DATABASE_URL"
+  }
+]

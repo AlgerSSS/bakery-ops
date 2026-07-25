@@ -1,9 +1,22 @@
+import { z } from "zod";
 import { employeeRepository, type EmployeeRow } from "../../data/repositories/employee.repository";
 import { employeeEventRepository } from "../../data/repositories/employee-event.repository";
 import { screeningRuleRepository } from "../../data/repositories/screening-rule.repository";
 import { lightragClient } from "../knowledge/lightrag-client";
 import { aiProvider } from "../ai/ai-provider";
 import { logger } from "../../shared/logger";
+
+// G3b: LLM 输出 upsert 进 screening_rules 前的形状校验。
+// description/evidence 必须是字符串；其余字段与既有 `|| 默认值` 兜底保持一致的宽松度。
+const extractedRuleSchema = z.object({
+  rule_type: z.string().optional(),
+  category: z.string().optional(),
+  description: z.string(),
+  evidence: z.string(),
+  confidence: z.number().optional(),
+  job_titles: z.array(z.string()).optional(),
+});
+const extractedRulesSchema = z.array(extractedRuleSchema);
 
 /**
  * 从员工历史数据中提炼筛选规则。
@@ -41,22 +54,24 @@ export async function extractRules(): Promise<{ rulesExtracted: number; error?: 
     // 4. LLM 分析
     const response = await aiProvider.chatCompletionLong(prompt);
     const jsonStr = response.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
-    let rules: Array<{
-      rule_type: string;
-      category: string;
-      description: string;
-      evidence: string;
-      confidence: number;
-      job_titles: string[];
-    }>;
-
+    let rulesJson: unknown;
     try {
-      rules = JSON.parse(jsonStr);
-      if (!Array.isArray(rules)) rules = [];
+      rulesJson = JSON.parse(jsonStr);
+      if (!Array.isArray(rulesJson)) rulesJson = [];
     } catch {
       logger.error("Failed to parse rule extraction response", { response: jsonStr.slice(0, 200) });
       return { rulesExtracted: 0, error: "LLM response not valid JSON" };
     }
+
+    const validated = extractedRulesSchema.safeParse(rulesJson);
+    if (!validated.success) {
+      logger.error("Rule extraction response failed schema validation", {
+        issues: validated.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
+        response: jsonStr.slice(0, 200),
+      });
+      return { rulesExtracted: 0, error: "LLM response failed schema validation" };
+    }
+    const rules = validated.data;
 
     // 5. 写入 screening_rules 表
     let saved = 0;

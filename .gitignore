@@ -1,2 +1,9 @@
 .DS_Store
 .claude/
+storageState.json
+storageState*.json
+*-session/cookies.json
+*-session/storage.json
+
+# 一次性数据备份(不入库)
+*_backup_*.json

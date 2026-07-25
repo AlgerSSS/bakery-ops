@@ -10,10 +10,28 @@ export interface ConversationState {
   lastActiveAt: number;
 }
 
-const SESSION_TTL_MS = 10 * 60 * 1000; // 10 分钟超时
+// 会话超时，可通过 SESSION_TTL_MINUTES 配置（默认 60 分钟，避免长流程被中途丢弃）
+const SESSION_TTL_MS = Number(process.env.SESSION_TTL_MINUTES || 60) * 60 * 1000;
 
 export class StateManager {
   private sessions: Map<string, ConversationState> = new Map();
+
+  constructor(
+    private repo?: {
+      upsert(state: ConversationState): Promise<void>;
+      delete(conversationId: string): Promise<void>;
+    },
+  ) {}
+
+  /** 冷启动时从持久层恢复未过期的会话到内存（best-effort，失败则忽略） */
+  async hydrate(repo: { getActive(ttlMs: number): Promise<ConversationState[]> }): Promise<void> {
+    const active = await repo.getActive(SESSION_TTL_MS);
+    for (const state of active) {
+      if (!this.sessions.has(state.conversationId)) {
+        this.sessions.set(state.conversationId, state);
+      }
+    }
+  }
 
   load(conversationId: string): ConversationState {
     const existing = this.sessions.get(conversationId);
@@ -37,10 +55,12 @@ export class StateManager {
   save(state: ConversationState): void {
     state.lastActiveAt = Date.now();
     this.sessions.set(state.conversationId, state);
+    this.repo?.upsert(state).catch((err) => logger.warn("session state persist failed", { error: String(err) }));
   }
 
   clear(conversationId: string): void {
     this.sessions.delete(conversationId);
+    void this.repo?.delete(conversationId);
   }
 
   /** 开始一个 Skill 的多轮对话 */

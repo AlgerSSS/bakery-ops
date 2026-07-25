@@ -3,15 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npx esbuild server.ts --bundle --platform=node --outfile=.server.js --external:playwright --external:playwright-core --external:playwright-extra --external:puppeteer-extra-plugin-stealth --external:whatsapp-web.js --external:puppeteer --external:qrcode-terminal --external:pdf-parse --external:@supabase/supabase-js --external:next --format=cjs && node .server.js",
-    "dev:bot": "npx esbuild bot-only.ts --bundle --platform=node --outfile=bot-only.js --external:playwright --external:playwright-core --external:playwright-extra --external:puppeteer-extra-plugin-stealth --external:whatsapp-web.js --external:puppeteer --external:qrcode-terminal --external:pdf-parse --external:@supabase/supabase-js --format=cjs && node bot-only.js",
+    "dev": "node scripts/build-server.mjs server.ts .server.js && node .server.js",
+    "dev:bot": "node scripts/build-server.mjs bot-only.ts bot-only.js && node bot-only.js",
     "dev:tsx": "tsx server.ts",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "team:list": "node scripts/team-list.mjs",
+    "team:sync": "node scripts/build-server.mjs scripts/team-sync.ts scripts/.team-sync.cjs && node scripts/.team-sync.cjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.1",
+    "@larksuiteoapi/node-sdk": "^1.68.0",
     "cheerio": "^1.2.0",
     "dayjs": "^1.11.20",
     "dotenv": "^17.4.2",

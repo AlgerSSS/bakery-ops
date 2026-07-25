@@ -9,7 +9,8 @@ export const recruitmentSkillDefinition: SkillDefinition = {
   name: "招聘",
   description: "根据岗位 JD 从招聘网站采集候选人，筛选匹配，推送简历",
   priority: 100,
-  triggerKeywords: ["招聘", "招人", "找人", "候选人", "简历", "JD", "岗位", "求职", "找工", "面试"],
+  disambiguation: "从招聘网站主动采集/搜索新候选人来招人；不是查看已发布岗位(active_jobs)，也不是把岗位发布上架(job_posting)，更不是上传解析简历文件(resume_upload)",
+  triggerKeywords: ["招聘", "招人", "找人", "候选人", "JD", "求职", "找工"],
   examples: [
     "帮我找吉隆坡前场店员，要求会中文，有餐饮经验",
     "招一个后厨师傅，要有烘焙经验",
@@ -21,7 +22,6 @@ export const recruitmentSkillDefinition: SkillDefinition = {
   optionalInputs: [
     { name: "location", type: "string", description: "工作地点" },
     { name: "maxCandidates", type: "number", description: "最多推送候选人数", defaultValue: 10 },
-    { name: "outreach", type: "boolean", description: "是否自动联络候选人", defaultValue: false },
   ],
   permissions: ["recruitment.use"],
   riskLevel: "medium",
@@ -37,10 +37,9 @@ export class RecruitmentSkillHandler implements SkillHandler {
   async execute(input: SkillExecutionInput): Promise<SkillExecutionResult> {
     const jdText = String(input.input.jdText || "");
     const maxCandidates = Number(input.input.maxCandidates) || 10;
-    const outreachEnabled = input.input.outreach === true || input.input.outreach === "true";
 
     try {
-      const result = await runRecruitmentPipeline(jdText, maxCandidates, outreachEnabled);
+      const result = await runRecruitmentPipeline(jdText, maxCandidates);
 
       // 构建文本摘要 — 按来源平台分组
       const lines: string[] = [
@@ -84,22 +83,6 @@ export class RecruitmentSkillHandler implements SkillHandler {
           }
           lines.push("");
         });
-      }
-
-      // 触达结果
-      if (result.outreach && result.outreach.length > 0) {
-        lines.push("━━━ 自动触达结果 ━━━");
-        lines.push("");
-        for (const batch of result.outreach) {
-          const skipped = batch.results.filter((r) => r.status === "skipped").length;
-          const budgetExceeded = batch.results.filter((r) => r.status === "budget_exceeded").length;
-          let detail = `${batch.platform}: 发送 ${batch.sent}/${batch.total}`;
-          if (batch.failed > 0) detail += `, 失败 ${batch.failed}`;
-          if (skipped > 0) detail += `, 跳过 ${skipped}`;
-          if (budgetExceeded > 0) detail += `, 预算超限 ${budgetExceeded}`;
-          lines.push(detail);
-        }
-        lines.push("");
       }
 
       return {

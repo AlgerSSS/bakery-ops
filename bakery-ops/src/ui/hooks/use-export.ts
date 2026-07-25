@@ -2,8 +2,10 @@
 
 import { useCallback } from "react";
 import { useForecastContext } from "@/ui/components/providers/forecast-provider";
+import { getSchedulingWasteRate30d } from "@/app/(forecast)/actions";
 import { DAY_TYPE_LABELS, DOW_LABELS, ALL_SLOTS } from "@/ui/constants";
 import type { TimeSlotSuggestion, ProductSuggestion, TimeslotSalesRecord, Product, DailyTarget } from "@/modules/domain/forecast/types";
+import type { Workbook, Cell } from "exceljs";
 
 export function useExport() {
   const { state } = useForecastContext();
@@ -60,7 +62,14 @@ export function useExport() {
 
     // Time slot sheet — full production estimate format
     if (timeSlotSuggestions.length > 0) {
-      buildTimeSlotSheet(wb, { timeSlotSuggestions, productSuggestions, timeslotSalesRecords, fixedSchedule, products, dailyTargets, selectedDate });
+      // F7-②：近 30 天实测排产报废率（scheduling 报废金额 ÷ 同期营业额），失败/无数据 fallback 默认值
+      let measuredWasteRate: number | null = null;
+      try {
+        measuredWasteRate = await getSchedulingWasteRate30d();
+      } catch {
+        measuredWasteRate = null;
+      }
+      buildTimeSlotSheet(wb, { timeSlotSuggestions, productSuggestions, timeslotSalesRecords, fixedSchedule, products, dailyTargets, selectedDate, measuredWasteRate });
     }
 
     const buf = await wb.xlsx.writeBuffer();
@@ -76,8 +85,7 @@ export function useExport() {
   return { exportToExcel };
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-function buildTimeSlotSheet(wb: any, opts: {
+function buildTimeSlotSheet(wb: Workbook, opts: {
   timeSlotSuggestions: TimeSlotSuggestion[];
   productSuggestions: ProductSuggestion[];
   timeslotSalesRecords: TimeslotSalesRecord[];
@@ -85,8 +93,9 @@ function buildTimeSlotSheet(wb: any, opts: {
   products: Product[];
   dailyTargets: DailyTarget[];
   selectedDate: string;
+  measuredWasteRate: number | null;
 }) {
-  const { timeSlotSuggestions, productSuggestions, timeslotSalesRecords, fixedSchedule, products, dailyTargets, selectedDate } = opts;
+  const { timeSlotSuggestions, productSuggestions, timeslotSalesRecords, fixedSchedule, products, dailyTargets, selectedDate, measuredWasteRate } = opts;
   const ws4 = wb.addWorksheet(`分时段_${selectedDate}`);
   const slotHeaders = ALL_SLOTS.map((s) => s.replace(":00", "点"));
   const COL_OFFSET_QTY = 9;
@@ -116,7 +125,10 @@ function buildTimeSlotSheet(wb: any, opts: {
   const dayRevenue = currentDayTarget?.revenue ?? 0;
   const dayOfWeek = currentDayTarget ? `周${DOW_LABELS[currentDayTarget.dayOfWeek]}` : "";
   const dayTypeLabel = currentDayTarget ? DAY_TYPE_LABELS[currentDayTarget.dayType] : "";
-  const tastingWasteAmount = Math.round(shipmentAmount * 0.06);
+  // F7-②：排产报废率——近 30 天实测，无数据 fallback 默认 0.02；试吃固定 0.04
+  const wasteRate = measuredWasteRate ?? 0.02;
+  const wasteRateLabel = measuredWasteRate != null ? "(实测)" : "(默认)";
+  const tastingWasteAmount = Math.round(shipmentAmount * (0.04 + wasteRate));
 
   // Row 1: Title
   const titleRow = ws4.addRow(["生产预估单"]);
@@ -127,22 +139,22 @@ function buildTimeSlotSheet(wb: any, opts: {
 
   // Row 2: Date & basic info
   const infoRow = ws4.addRow([`日期：${selectedDate}`, "", `${dayOfWeek}（${dayTypeLabel}）`, "", "业绩预估", dayRevenue, "出货金额", shipmentAmount]);
-  infoRow.eachCell((cell: any) => { cell.font = { size: 10 }; cell.border = thinBorder; });
+  infoRow.eachCell((cell: Cell) => { cell.font = { size: 10 }; cell.border = thinBorder; });
   infoRow.getCell(5).font = { bold: true, size: 10 };
   infoRow.getCell(6).font = { bold: true, size: 10, color: { argb: "FFDC2626" } };
   infoRow.getCell(7).font = { bold: true, size: 10 };
   infoRow.getCell(8).font = { bold: true, size: 10, color: { argb: "FFDC2626" } };
 
   // Row 3
-  const infoRow2 = ws4.addRow(["", "", "", "", "试吃+排产", tastingWasteAmount, "试吃占比", "6%"]);
-  infoRow2.eachCell((cell: any) => { cell.font = { size: 10 }; cell.border = thinBorder; });
+  const infoRow2 = ws4.addRow(["", "", "", "", "试吃+排产", tastingWasteAmount, "试吃+排产占比", `${((0.04 + wasteRate) * 100).toFixed(1)}%${wasteRateLabel}`]);
+  infoRow2.eachCell((cell: Cell) => { cell.font = { size: 10 }; cell.border = thinBorder; });
   ws4.addRow([]);
 
   // Header row
   const headerRow = ws4.addRow(["品名", "定位", "冷/热", "单价", "倍数", "满柜", "总数", "金额",
     ...slotHeaders.map((s) => `${s}出货`), ...slotHeaders.map((s) => `${s}金额`),
     "试吃量", "试吃金额", "加货数量", "加货备注", "减货数量", "减货备注"]);
-  headerRow.eachCell((cell: any) => {
+  headerRow.eachCell((cell: Cell) => {
     cell.fill = headerFill; cell.font = { bold: true, size: 9, color: { argb: "FF6B7280" } };
     cell.border = thinBorder; cell.alignment = { horizontal: "center" };
   });
@@ -171,7 +183,7 @@ function buildTimeSlotSheet(wb: any, opts: {
     const slotQtyValues = ALL_SLOTS.map((slot) => { const data = slotMap.get(name)?.get(slot); return data && data.quantity > 0 ? data.quantity : ""; });
     const slotAmtValues = ALL_SLOTS.map((slot) => { const data = slotMap.get(name)?.get(slot); return data && data.amount > 0 ? data.amount : ""; });
     const row = ws4.addRow([name, info?.positioning ?? "", info?.coldHot ?? "", info?.price ?? "", info?.packMultiple ?? "", fullQtyMap.get(name) ?? "", totalQty, totalAmount, ...slotQtyValues, ...slotAmtValues, "", "", "", "", "", ""]);
-    row.eachCell((cell: any, colNumber: number) => { cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; cell.font = { size: 10 }; });
+    row.eachCell((cell: Cell, colNumber: number) => { cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; cell.font = { size: 10 }; });
     ALL_SLOTS.forEach((slot, idx) => {
       if (schedule.includes(slot)) { const cell = row.getCell(COL_OFFSET_QTY + idx); cell.fill = fixedSlotFill; cell.font = { bold: true, size: 10 }; }
     });
@@ -181,7 +193,7 @@ function buildTimeSlotSheet(wb: any, opts: {
   const sumSlotQtyValues = ALL_SLOTS.map((slot) => timeSlotSuggestions.filter((s) => s.timeSlot === slot).reduce((sum, s) => sum + s.quantity, 0) || "");
   const sumSlotAmtValues = ALL_SLOTS.map((slot) => timeSlotSuggestions.filter((s) => s.timeSlot === slot).reduce((sum, s) => sum + s.amount, 0) || "");
   const sumRow = ws4.addRow(["合计", "", "", "", "", "", timeSlotSuggestions.reduce((s, item) => s + item.quantity, 0), timeSlotSuggestions.reduce((s, item) => s + item.amount, 0), ...sumSlotQtyValues, ...sumSlotAmtValues]);
-  sumRow.eachCell((cell: any) => { cell.fill = sumRowFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
+  sumRow.eachCell((cell: Cell) => { cell.fill = sumRowFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
   sumRow.getCell(1).alignment = { horizontal: "left" };
 
   // 预计销售 row
@@ -193,7 +205,7 @@ function buildTimeSlotSheet(wb: any, opts: {
     return amt || "";
   });
   const salesRow = ws4.addRow(["预计销售", "", "", "", "", "", "", estimatedSalesTotal || "", ...salesSlotValues]);
-  salesRow.eachCell((cell: any) => { cell.fill = salesRowFill; cell.font = { size: 10, color: { argb: "FF1D4ED8" } }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
+  salesRow.eachCell((cell: Cell) => { cell.fill = salesRowFill; cell.font = { size: 10, color: { argb: "FF1D4ED8" } }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
   salesRow.getCell(1).alignment = { horizontal: "left" };
 
   // 预计剩余 row (cumulative)
@@ -209,7 +221,7 @@ function buildTimeSlotSheet(wb: any, opts: {
     return cumulativeShipment - cumulativeSales;
   });
   const remainRow = ws4.addRow(["预计剩余", "", "", "", "", "", "", shipmentTotal - estimatedSalesTotal, ...remainSlotValues]);
-  remainRow.eachCell((cell: any, colNumber: number) => {
+  remainRow.eachCell((cell: Cell, colNumber: number) => {
     cell.fill = remainRowFill; cell.border = thinBorder; cell.alignment = { horizontal: "center" };
     const val = cell.value as number;
     if (colNumber >= 8 && typeof val === "number") cell.font = { size: 10, color: { argb: val < 0 ? "FFEF4444" : "FF16A34A" } };
@@ -228,7 +240,7 @@ function buildTimeSlotSheet(wb: any, opts: {
   });
   const displayTotal = products.reduce((sum, p) => sum + p.displayFullQuantity * p.price, 0);
   const displayRow = ws4.addRow(["门店陈列(满柜金额)", "", "", "", "", "", "", displayTotal || "", ...displaySlotValues]);
-  displayRow.eachCell((cell: any) => {
+  displayRow.eachCell((cell: Cell) => {
     cell.fill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF0FDF4" } };
     cell.font = { size: 10, color: { argb: "FF16A34A" } }; cell.border = thinBorder; cell.alignment = { horizontal: "center" };
   });
@@ -239,7 +251,6 @@ function buildTimeSlotSheet(wb: any, opts: {
     { name: "马卡龙", keyword: "马卡龙", rate: 0.015 },
     { name: "坚果棒", keyword: "坚果棒", rate: 0.01 },
   ];
-  const wasteRate = 0.02;
   const tastingFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFFFFBEB" } };
   const activeSlots = ALL_SLOTS.filter((s) => s >= "12:00");
   const productSlotSales: Record<string, Record<string, number>> = {};
@@ -279,7 +290,7 @@ function buildTimeSlotSheet(wb: any, opts: {
   }
   ws4.addRow([]);
   const tastingHeaderRow = ws4.addRow(["试吃分配", "", "", "", "", "", "", "", ...slotHeaders]);
-  tastingHeaderRow.eachCell((cell: any) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
+  tastingHeaderRow.eachCell((cell: Cell) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: "center" }; });
   tastingHeaderRow.getCell(1).alignment = { horizontal: "left" };
 
   const tastingPriceMap: Record<string, number> = {};
@@ -290,27 +301,27 @@ function buildTimeSlotSheet(wb: any, opts: {
     const unitPrice = tastingPriceMap[tp.name];
     const slotValues = ALL_SLOTS.map((slot) => { const amt = tastingSlotAmounts[tp.name][slot]; return amt && amt > 0 ? amt : ""; });
     const row = ws4.addRow([tp.name, "", "", "", "", "", "", totalBudget, ...slotValues]);
-    row.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+    row.eachCell((cell: Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
     const totalQty = unitPrice > 0 ? Math.ceil(totalBudget / unitPrice) : 0;
     const qtySlotValues = ALL_SLOTS.map((slot) => { const amt = tastingSlotAmounts[tp.name][slot]; if (!amt || amt <= 0 || unitPrice <= 0) return ""; return Math.ceil(amt / unitPrice); });
     const qtyRow = ws4.addRow([`${tp.name}(个数)`, "", "", "", "", "", "", totalQty || "", ...qtySlotValues]);
-    qtyRow.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10, color: { argb: "FF6B7280" } }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+    qtyRow.eachCell((cell: Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10, color: { argb: "FF6B7280" } }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
   }
 
   const tastingSubtotal = Math.round(shipmentAmount * 0.04);
   const subtotalSlotValues = ALL_SLOTS.map((slot) => { const total = tastingProducts.reduce((sum, tp) => { const amt = tastingSlotAmounts[tp.name][slot]; return sum + (amt && amt > 0 ? amt : 0); }, 0); return total > 0 ? total : ""; });
   const subtotalRow = ws4.addRow(["试吃小计", "", "", "", "", "", "", tastingSubtotal, ...subtotalSlotValues]);
-  subtotalRow.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+  subtotalRow.eachCell((cell: Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
 
   const tastingSalesRow = ws4.addRow(["该时段预计销售", "", "", "", "", "", "", estimatedSalesTotal || "", ...salesSlotValues]);
-  tastingSalesRow.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10, color: { argb: "FF1D4ED8" } }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+  tastingSalesRow.eachCell((cell: Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10, color: { argb: "FF1D4ED8" } }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
 
   const wasteAmount = Math.round(shipmentAmount * wasteRate);
-  const wasteRow = ws4.addRow(["排产报废", "", "", "", "", "", "", wasteAmount]);
-  wasteRow.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+  const wasteRow = ws4.addRow([`排产报废${wasteRateLabel}`, "", "", "", "", "", "", wasteAmount]);
+  wasteRow.eachCell((cell: Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
 
-  const totalLoss = Math.round(shipmentAmount * 0.06);
-  const lossRow = ws4.addRow(["损耗合计", "", "", "", "", "", "", totalLoss]);
-  lossRow.eachCell((cell: any, colNumber: number) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
+  // F7-②：损耗合计 = 试吃 0.04 + 实测排产报废率（原写死 0.06 = 0.04 + 0.02）
+  const totalLoss = Math.round(shipmentAmount * (0.04 + wasteRate));
+  const lossRow = ws4.addRow([`损耗合计${wasteRateLabel}`, "", "", "", "", "", "", totalLoss]);
+  lossRow.eachCell((cell: Cell, colNumber: number) => { cell.fill = tastingFill; cell.font = { bold: true, size: 10 }; cell.border = thinBorder; cell.alignment = { horizontal: colNumber <= 1 ? "left" : "center" }; });
 }
-/* eslint-enable @typescript-eslint/no-explicit-any */

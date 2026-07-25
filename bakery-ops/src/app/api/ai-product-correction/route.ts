@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { query } from "@/modules/shared/db/postgres";
 import { buildPrompt } from "@/modules/domain/forecast/prompt-engine";
 import { generateJsonFromPrompt } from "@/modules/domain/forecast/gemini-client";
+import { roundCorrections, rebalanceToTarget } from "@/modules/domain/forecast/correction-math";
+import { DAY_TYPE_LABELS } from "@/modules/domain/forecast/constants";
+import {
+  NORM_SQL,
+  getBeverageItems,
+  getNonProductionItems,
+  normCaliberName,
+} from "@/modules/domain/forecast/beverage-caliber";
 
 interface BaselineRow {
   product_name: string;
@@ -27,11 +35,6 @@ interface ProductInput {
   adjustedQuantity?: number;
 }
 
-const DAY_TYPE_LABELS: Record<string, string> = {
-  mondayToThursday: "周一至周四",
-  friday: "周五",
-  weekend: "周六周日",
-};
 
 const DAY_TYPE_COL: Record<string, string> = {
   mondayToThursday: "avg_monday_to_thursday",
@@ -70,10 +73,21 @@ export async function POST(req: NextRequest) {
     const stockoutStart = new Date();
     stockoutStart.setDate(stockoutStart.getDate() - 30);
     const stockoutStartStr = stockoutStart.toISOString().split("T")[0];
+    /* 必须在查询侧显式排除现制饮品与周边：2026-07-07 到 2026-07-25 之间，断货检测因口径失效
+       已经积下 101 条误报（近 30 天 326 条里的 31%）。这些历史行不会自己消失，
+       而这段 prompt 紧跟着一句「断货频繁的产品应适当增加排产」——等于让 LLM 每天读到
+       「Rose Latte 断货 13 次，应增加排产」，方向与减少报废正相反。
+       口径与断货检测同源（business_rule），不再依赖财务站的 item_category。 */
+    const excludedNames = [
+      ...(await getBeverageItems()),
+      ...(await getNonProductionItems()),
+    ].map(normCaliberName);
     const stockoutRows = await query<{ product_name: string; cnt: number; total_loss_qty: number; total_loss_amount: number }>(
       `SELECT product_name, COUNT(*) as cnt, SUM(estimated_loss_qty) as total_loss_qty, SUM(estimated_loss_amount) as total_loss_amount
-       FROM out_of_stock_record WHERE date >= ? GROUP BY product_name ORDER BY cnt DESC`,
-      [stockoutStartStr]
+       FROM out_of_stock_record
+       WHERE date >= ? AND ${NORM_SQL("product_name")} <> ALL(?::text[])
+       GROUP BY product_name ORDER BY cnt DESC`,
+      [stockoutStartStr, excludedNames]
     );
     let stockoutContext = "";
     if (stockoutRows.length > 0) {
@@ -134,65 +148,10 @@ export async function POST(req: NextRequest) {
       productMap.set(p.productName, p);
     }
 
-    const corrections = parsed.corrections.map((c: { productName: string; suggestedQuantity: number; reason: string }) => {
-      const product = productMap.get(c.productName);
-      let qty = Math.max(0, Math.round(c.suggestedQuantity));
-      if (product && product.unitType === "batch" && product.packMultiple > 1) {
-        qty = Math.round(qty / product.packMultiple) * product.packMultiple;
-      }
-      return { productName: c.productName, suggestedQuantity: qty, reason: c.reason || "" };
-    });
-
-    const correctionMap = new Map<string, number>();
-    for (const c of corrections) {
-      correctionMap.set(c.productName, c.suggestedQuantity);
-    }
-    let correctedTotal = 0;
-    for (const p of products) {
-      const qty = correctionMap.get(p.productName) ?? (p.adjustedQuantity ?? p.roundedQuantity);
-      correctedTotal += qty * p.price;
-    }
+    const corrections = roundCorrections(parsed.corrections, productMap);
 
     // 金额兜底
-    const diff = shipmentAmount - correctedTotal;
-    const tolerance = shipmentAmount * 0.02;
-    if (Math.abs(diff) > tolerance) {
-      const adjustable = corrections
-        .map((c: { productName: string; suggestedQuantity: number; reason: string }) => ({
-          correction: c,
-          product: productMap.get(c.productName),
-        }))
-        .filter((x: { product: ProductInput | undefined }) => x.product)
-        .sort((a: { product: ProductInput }, b: { product: ProductInput }) => {
-          const posOrder: Record<string, number> = { "TOP": 0, "潜在TOP": 1, "其他": 2 };
-          const pa = posOrder[a.product.positioning] ?? 2;
-          const pb = posOrder[b.product.positioning] ?? 2;
-          if (pa !== pb) return pa - pb;
-          return b.product.price - a.product.price;
-        });
-
-      let remaining = diff;
-      for (const { correction: c, product: p } of adjustable) {
-        if (Math.abs(remaining) <= tolerance) break;
-        if (!p) continue;
-        const unit = (p.unitType === "batch" && p.packMultiple > 1) ? p.packMultiple : 1;
-        const stepAmount = unit * p.price;
-        if (remaining > 0 && stepAmount <= remaining * 1.5) {
-          c.suggestedQuantity += unit;
-          remaining -= stepAmount;
-          correctionMap.set(c.productName, c.suggestedQuantity);
-        } else if (remaining < 0 && c.suggestedQuantity > unit) {
-          c.suggestedQuantity -= unit;
-          remaining += stepAmount;
-          correctionMap.set(c.productName, c.suggestedQuantity);
-        }
-      }
-      correctedTotal = 0;
-      for (const p of products) {
-        const qty = correctionMap.get(p.productName) ?? (p.adjustedQuantity ?? p.roundedQuantity);
-        correctedTotal += qty * p.price;
-      }
-    }
+    const correctedTotal = rebalanceToTarget(corrections, products, productMap, shipmentAmount);
 
     return NextResponse.json({
       corrections,

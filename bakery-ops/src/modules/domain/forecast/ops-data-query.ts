@@ -7,6 +7,26 @@
 
 import { aiProvider } from "@/modules/domain/ai/ai-provider";
 import { query } from "@/modules/shared/db/postgres";
+import { NORM_SQL } from "./beverage-caliber";
+
+/**
+ * 店长问的是中文（「蛋挞今天卖了多少」），item_hourly_sales.item_name 从 2026-07 起是英文 POS 名。
+ * 直接 ILIKE '%蛋挞%' 恒 0 行，而且返回的是「未找到数据」而不是报错——看起来像那天真没卖。
+ *
+ * 两座桥都要走，缺一不可：
+ *   · item_alias（en→cn，104 行）覆盖近 90 天在售 93 品里的 86 品，**且覆盖饮品**
+ *   · product（name↔name_en，54 行）只有排产用的烘焙品，查「拿铁」是 0 条
+ * 同时保留对 item_name 本身的匹配，这样店长直接输英文也能查到。
+ */
+const ITEM_NAME_MATCH = (dollarWord: string) => `(
+     s.item_name ILIKE ${dollarWord}
+  OR ${NORM_SQL("s.item_name")} IN (
+       SELECT ${NORM_SQL("a.en")} FROM item_alias a WHERE a.cn ILIKE ${dollarWord}
+       UNION
+       SELECT ${NORM_SQL("p.name_en")} FROM product p
+        WHERE p.name ILIKE ${dollarWord} AND p.name_en IS NOT NULL
+     )
+)`;
 
 export async function queryDataForQuestion(question: string, date: string): Promise<string> {
   // LLM 判断用户问的是什么数据，生成对应查询
@@ -29,7 +49,10 @@ export async function queryDataForQuestion(question: string, date: string): Prom
   // 口径与复盘一致：营业额/单品金额用应收(gross_sales)，客单价按 应收÷单数 算。
   let data = "";
   if (intent.type === "item_detail" && intent.item_name) {
-    const rows = await query<any>("SELECT hour, qty, gross_sales FROM item_hourly_sales WHERE date = $1 AND item_name ILIKE $2 ORDER BY hour", [date, `%${intent.item_name}%`]);
+    const rows = await query<any>(
+      `SELECT s.hour, s.qty, s.gross_sales FROM item_hourly_sales s
+        WHERE s.date = $1 AND ${ITEM_NAME_MATCH("$2")} ORDER BY s.hour`,
+      [date, `%${intent.item_name}%`]);
     if (rows.length) {
       data = `【${intent.item_name} 在 ${date} 的时段销量】\n`;
       for (const r of rows) data += `${r.hour}:00 — ${r.qty}个, RM${Number(r.gross_sales).toFixed(0)}\n`;
@@ -58,7 +81,10 @@ export async function queryDataForQuestion(question: string, date: string): Prom
       data = `【${intent.compare_date} 数据】\n营业额: RM${r.gross_sales} | 客单数: ${r.transaction_count} | 客单价: RM${avg} | 折扣率: ${((r.discount_rate || 0) * 100).toFixed(1)}%`;
     }
   } else if (intent.type === "item_by_hour" && intent.item_name) {
-    const rows = await query<any>("SELECT date, hour, qty, net_sales FROM item_hourly_sales WHERE item_name ILIKE $1 ORDER BY date DESC, hour LIMIT 30", [`%${intent.item_name}%`]);
+    const rows = await query<any>(
+      `SELECT s.date, s.hour, s.qty, s.net_sales FROM item_hourly_sales s
+        WHERE ${ITEM_NAME_MATCH("$1")} ORDER BY s.date DESC, s.hour LIMIT 30`,
+      [`%${intent.item_name}%`]);
     if (rows.length) {
       data = `【${intent.item_name} 近期销量】\n`;
       let currentDate = "";

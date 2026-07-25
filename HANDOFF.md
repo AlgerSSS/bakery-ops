@@ -11,28 +11,9 @@
 | | |
 |---|---|
 | 最后更新 | 2026-07-25 by Claude Code |
-| 当前分支 | `refactor/architecture-review`（领先 `origin/main` 2 个提交） |
-| 工作区 | **不干净 —— 有他人未提交的在途改动，见下** |
+| 当前分支 | `main`（已合并全部修复并部署） |
+| 工作区 | 干净 |
 | 线上（Contabo） | 未知，无法从 git 得知（`/opt/hotcrush/*` 下没有 `.git`） |
-
----
-
-## ⚠ 在途未提交改动（不是我留的，动之前先确认归属）
-
-7/21 之后无人再碰，至今 4 天。**在搞清楚这是谁的、做到哪一步之前，不要 `git checkout`、不要 `git stash`、不要跑 `./deploy.sh`。**
-
-```
- M bakery-ops/src/__tests__/unit/daily-push.test.ts
- M bakery-ops/src/bootstrap.ts
- M bakery-ops/src/modules/domain/forecast/stockout-detector.service.ts
- M bakery-ops/src/modules/domain/notifications/morning-brief.service.ts
-?? bakery-ops/src/__tests__/unit/stockout-store-only.test.ts
-共 165 行新增 / 54 行删除
-```
-
-看起来是**断货检测 + 晨报推送**方向的改动，与分支上已提交的两个「复盘拒绝陈旧输入」提交是同一条线索。真实意图不明——原作者没有留下任何记录，这正是本文件要杜绝的情况。
-
-另有 **164 个未跟踪文件**，绝大多数是 `res_api/_*.mjs`、`res_api/_*.png` 这类调试草稿。`deploy.sh` 已经用 `--exclude '_*'` 把它们排除在部署之外，所以不影响上线，但它们让 `git status` 无法一眼看清真正的改动。建议清理或加进 `.gitignore`。
 
 ---
 
@@ -41,26 +22,6 @@
 （当前没有由 Claude Code 发起的进行中任务）
 
 ---
-
-## ⚠ 待执行：改名切换窗口（顺序不能反）
-
-分支 `claude/rename-ops-tables` 已把三处表名改成新名，`tsc` 通过、501 个测试全绿，
-但**尚未部署**。数据库侧 `stores → ops_store` 已完成（旧名 `stores` 保留为兼容视图），
-`users` / `audit_log` 还没改。
-
-**必须先跑迁移，再部署。反过来会让 WhatsApp 认人直接报 `relation does not exist`。**
-
-```
-1. 在财务仓库把 048 加进 scripts/apply-migrations.js 的 MIGRATION_FILES
-2. node scripts/apply-migrations.js          ← users → ops_user、audit_log → ops_audit_log
-3. 立刻 cd ~/hot && git merge claude/rename-ops-tables && ./deploy.sh core
-4. 看 Contabo 日志确认无 relation does not exist / ON CONFLICT 报错
-```
-
-第 2 步到第 3 步之间有几分钟窗口：旧代码读走兼容视图正常，**写会失败**——
-因为 PostgreSQL 的视图不支持 `ON CONFLICT`。两处 upsert 都包在 try/catch 里只记日志
-（`user.repository.ts:84`、`audit-log.repository.ts:35`），所以窗口内最坏结果是
-用户资料不刷新、审计日志少几条，**不会中断服务**。建议在 KL 时间上午做。
 
 ## 下一步
 
@@ -78,12 +39,12 @@
 
 ## 坑（别人容易踩的）
 
-0. **POS 商品命名 2026-07 从中文换成英文，所有跨表关联必须走 `product.name_en` 桥。**
-   已修的六处都用同一套归一化（`beverage-caliber.ts` 的 `NORM_SQL` / `normCaliberName`，
-   含 `chr(160)` 处理——Postgres 的 `[[:space:]]` 不含 U+00A0，不处理会漏掉尾部带 tab 的品名）。
-   **写任何按商品名 JOIN 的新代码前，先确认两侧语种一致。**
-   还没修、优先级较低的三处：`ops-data-query.ts:32`（经营问答 ILIKE 中文恒 0 行）、
-   `use-review.ts:134`（人工录入断货损失恒 0）、财务站 `sql/alias.js`（7 款改名后的品缺中文名）。
+0. **POS 商品命名 2026-07 从中文换成英文，所有跨表关联必须走桥。**
+   两座桥各管一半，缺一不可：`item_alias`（en→cn，覆盖近 90 天 93 品里的 88 品，**含饮品**）、
+   `product.name_en`（只有排产用的烘焙品，查「拿铁」是 0 条）。
+   归一化统一用 `beverage-caliber.ts` 的 `NORM_SQL` / `normCaliberName`，含 `chr(160)` 处理——
+   Postgres 的 `[[:space:]]` 不含 U+00A0，不处理会漏掉尾部带 tab 的品名。
+   **写任何按商品名 JOIN 的新代码前，先确认两侧语种一致。** 已知的九处全部修完并部署。
 
 1. **`timeslot_sales_record` 现在每天在丢数据。** 三个写入点全是「清空再写」，跨两个仓库：
    - `res_api/sync-to-db.js:134` —— `TRUNCATE ... RESTART IDENTITY`，每晚 KL 23:00 跑
@@ -111,6 +72,7 @@
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-07-25 | Claude Code | 补完剩余 3 处：经营问答中文查询（蛋挞 0→58 行）、item_alias 补 5 款改名品、res_api 草稿加 .gitignore（164→0 未跟踪） |
 | 2026-07-25 | Claude Code | 修复 POS 改名引发的 6 处静默失效：饮品误报断货、预测复盘实卖恒 0、排产报废告警不触发、水吧营业额恒 RM0、预估单预计销售恒 0、AI 加产指令被误报污染；拆掉两处 daily_sales_record 整表删除 |
 | 2026-07-25 | Claude Code | 建立交接机制（本文件 + AGENTS.md 第 0 节）；审查并重写数据库治理方案 v2 |
 | 2026-07-21 | 未记录 | `refactor/architecture-review` 分支两个提交：复盘拒绝陈旧输入；之后留下 165 行未提交改动 |

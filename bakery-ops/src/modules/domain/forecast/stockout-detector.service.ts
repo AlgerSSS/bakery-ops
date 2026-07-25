@@ -11,9 +11,11 @@
 // 单价取该品近 4 周 net_sales/qty 实际成交均价（product 表是中文标准名，POS 英文名大多对不上价）。
 // 落库经 forecast-calc.repository saveOutOfStockRecords；out_of_stock_record 表无来源
 // 字段，取最接近的 input_name 标 'auto'（手工录入该字段是老板原始输入文本）。
-// 落库幂等：当日已有同名 product_name 记录则跳过（同时保护网页手工记录）。
+// 落库幂等：当日已有同名 product_name 记录则跳过，定时任务重跑不会写重复行。
 // 定时任务只落库，不主动推送；数据保留供后续复盘与分析使用。
-// 手工录入（网页端复盘）保留为纠错通道。
+// 断货记录只有这一个来源。网页复盘页的人工录入已于 2026-07-25 下线——
+// 它提交时会 deleteOutOfStockByDate 整天清空再写，自动检测上线后会抹掉当天全部自动结果，
+// 而该通道自 2026-04-12 起已无人使用。
 
 import { query } from "@/modules/shared/db/postgres";
 import { logger } from "@/modules/shared/logger";
@@ -336,7 +338,7 @@ export async function runStockoutDetection(): Promise<void> {
     return;
   }
 
-  // 落库（当日已有同名记录则跳过，保护手工记录）
+  // 落库（当日已有同名记录则跳过，保证定时任务重跑幂等）
   try {
     const existing = await getOutOfStockRecords(yesterday);
     const existingNames = new Set(existing.map((r) => r.productName));

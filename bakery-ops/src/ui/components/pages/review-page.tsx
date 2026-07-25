@@ -6,22 +6,10 @@ import type { PageId } from "@/ui/constants";
 
 const WEATHER_OPTIONS = ["晴天", "多云", "阴天", "小雨", "大雨", "雷暴", "炎热", "凉爽"];
 
-const STOCKOUT_TIME_OPTIONS = (() => {
-  const options: string[] = [];
-  for (let h = 12; h <= 21; h++) {
-    for (const m of ["00", "15", "30", "45"]) {
-      options.push(`${String(h).padStart(2, "0")}:${m}`);
-    }
-  }
-  return options;
-})();
-
 export function ReviewPage({ navigate }: { navigate: (page: PageId) => void }) {
   const { showToast } = useToastContext();
   const {
     reviewDate, setReviewDate, reviewActualRevenue, setReviewActualRevenue,
-    stockoutEntries, addStockoutEntry, removeStockoutEntry, updateStockoutEntry,
-    parsedStockouts, productNames,
     reviewResult, reviewLoading, submitReview, adoptReview,
     transactionCount, setTransactionCount,
     avgTransactionValue, setAvgTransactionValue,
@@ -81,38 +69,9 @@ export function ReviewPage({ navigate }: { navigate: (page: PageId) => void }) {
             <input type="text" value={specialNotes} onChange={(e) => setSpecialNotes(e.target.value)} placeholder="如：商场活动、附近竞品开业..." className={inputClass} />
           </div>
         </div>
-        {/* Row 4: Stockout entries */}
-        <div className="mb-4">
-          <label className="text-sm font-medium text-[#1d1d1f]">断货记录</label>
-          <div className="mt-2 space-y-2">
-            {stockoutEntries.map((entry, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <select value={entry.productName} onChange={(e) => updateStockoutEntry(i, "productName", e.target.value)} className={`${inputClass} min-w-0 w-[70%]`}>
-                  <option value="">-- 选择产品 --</option>
-                  {productNames.map((name) => (<option key={name} value={name}>{name}</option>))}
-                </select>
-                <select value={entry.soldoutTime} onChange={(e) => updateStockoutEntry(i, "soldoutTime", e.target.value)} className={`${inputClass} min-w-0 w-[25%]`}>
-                  <option value="">-- 时间 --</option>
-                  {STOCKOUT_TIME_OPTIONS.map((t) => (<option key={t} value={t}>{t}</option>))}
-                </select>
-                <button type="button" onClick={() => removeStockoutEntry(i)} className="text-red-400 hover:text-red-600 text-lg shrink-0 px-1 transition-colors" title="删除">×</button>
-              </div>
-            ))}
-          </div>
-          <button type="button" onClick={addStockoutEntry} className="mt-2 text-sm text-[#0071e3] hover:text-[#005bb5] font-medium transition-colors">+ 添加断货产品</button>
-        </div>
-        {parsedStockouts.length > 0 && (
-          <div className="mb-4 p-3 bg-[#0071e3]/10 rounded-2xl">
-            <p className="text-xs font-medium text-[#1d1d1f] mb-2">解析预览：</p>
-            <div className="flex flex-wrap gap-2">
-              {parsedStockouts.map((s, i) => (
-                <span key={i} className="text-xs bg-white px-2 py-1 rounded-lg shadow-sm">
-                  {s.productName} {s.soldoutTime} → 损失时段: {s.lossSlots.join(", ") || "无"}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* 断货记录不再人工录入：stockout-detector 每晚从 item_last_sale / item_hourly_sales
+            自动检测（最后成交时间 vs 打烊时间），并按近 4 周同日型历史估算损失后落库。
+            人工录入曾会整天覆盖自动结果，2026-04-12 后也再无人使用，故整块下线。 */}
         <button onClick={() => submitReview(showToast)} disabled={reviewLoading} className="bg-[#0071e3] text-white px-6 py-2.5 rounded-xl hover:bg-[#005bb5] hover:scale-[1.03] active:scale-[0.97] disabled:opacity-50 font-medium transition-all duration-200">
           {reviewLoading ? "AI 分析中..." : "提交复盘"}
         </button>

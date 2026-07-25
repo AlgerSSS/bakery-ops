@@ -144,8 +144,8 @@ async function runBootstrap() {
   }, TZ);
 
   // ── core 角色的定时任务（Lark/内部推送/预测/数据；跑云上）──
-  // 7. 每周日凌晨 3 点触发规则提炼
-  if (onCore) cron.schedule("0 3 * * 0", wrapCron("weekly_rule_extraction", async () => {
+  // 7. 每周日凌晨 3:20 触发规则提炼（与 03:00 组织同步错开）
+  if (onCore) cron.schedule("20 3 * * 0", wrapCron("weekly_rule_extraction", async () => {
     logger.info("Weekly rule extraction triggered");
     const result = await extractRules();
     logger.info("Weekly rule extraction completed", result);
@@ -154,8 +154,10 @@ async function runBootstrap() {
   // 9. 每日检查 POS 数据新鲜度（默认关闭，DATA_FRESHNESS_CHECK=true 启用）
   if (onCore) cron.schedule("0 9 * * *", wrapCron("data_freshness_check", checkDataFreshness), TZ);
 
-  // 9a. 每日 07:00 后厨生产计划推送：主厨 + 抄送老板，幂等(kind, recipient, date)
-  if (onCore) cron.schedule("0 7 * * *", wrapCron("production_plan_push", runProductionPlanPush), TZ);
+  // 9a. 每日 07:00 后厨生产计划推送：默认暂停；显式设 true 后恢复。
+  if (onCore && process.env.PRODUCTION_PLAN_PUSH_ENABLED === "true") {
+    cron.schedule("0 7 * * *", wrapCron("production_plan_push", runProductionPlanPush), TZ);
+  }
 
   // 9b. 每晚 23:30 今日复盘：收件人读 team_member 订阅（Lark 发送），无数据记 cron 失败
   if (onCore) cron.schedule("30 23 * * *", wrapCron("morning_brief", runMorningBrief), TZ);
@@ -172,8 +174,10 @@ async function runBootstrap() {
   // 14. 每晚 23:30 断货检测（检测口径为"昨日"）
   if (onCore) cron.schedule("30 23 * * *", wrapCron("stockout_detect", runStockoutDetection), TZ);
 
-  // 15. 工作日 16:00 订货提醒（F4，Lark 发送）
-  if (onCore) cron.schedule("0 16 * * 1-5", wrapCron("order_reminder", runOrderReminder), TZ);
+  // 15. 工作日 16:00 订货提醒：默认暂停；显式设 true 后恢复。
+  if (onCore && process.env.ORDER_REMINDER_ENABLED === "true") {
+    cron.schedule("0 16 * * 1-5", wrapCron("order_reminder", runOrderReminder), TZ);
+  }
 
   // 15a. 每日 14:30 加减货建议：据今日到 14:20 实际销量(res_api intraday 14:20 拉)判加/减，
   //      Lark 订阅制('restock_advice')，测试期只发 owner。数据不全时引擎自带护栏返回空。

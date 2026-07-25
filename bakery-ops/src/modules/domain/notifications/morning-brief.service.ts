@@ -2,7 +2,7 @@
 //
 // 23:30 (Asia/Kuala_Lumpur) cron：23:00 数据刷新后推送当天复盘。口径=应收(gross_sales)。
 // 主：完整 AI 复盘（复用 daily-review-chat 的 generateDailyReviewText）；
-// AI 失败时回落固定中文模板（营业额/单数/客单价/折扣率 + 上周同日 + Top5 单品 + 报废）。
+// AI 失败时回落固定中文模板（营业额/单数/客单价/折扣率 + 上周同日 + Top5 单品 + 报废 + 断货）。
 // 收件人：config/team.json 里订阅 daily_review 的成员（名字→Lark open_id，直发卡片）。
 // 幂等：daily_push_log (kind='morning_brief', recipient=open_id, date)，发送成功才写。
 // 当天 daily_revenue 无行时抛错，让 cron 记录失败并触发运维关注。
@@ -12,6 +12,10 @@ import { logger } from "@/modules/shared/logger";
 import { sendLarkToUser } from "@/modules/channel/lark/lark-messenger";
 import { teamRepository } from "@/modules/data/repositories/team.repository";
 import { localDate } from "@/modules/channel/whatsapp/outbound.config";
+import {
+  computeStockoutForDate,
+  hasValidStockoutSalesSource,
+} from "@/modules/domain/forecast/stockout-detector.service";
 import { generateDailyReviewText } from "@/modules/skills/daily-review-chat/daily-review-chat.definition";
 import { hasPushLog, recordPushLog } from "./push-log";
 
@@ -36,6 +40,32 @@ export interface MorningBriefData {
     wasteRate: number; // 0-1，金额/营业额
     topItems: Array<{ itemName: string; reason: string; qty: number; amount: number }>;
   } | null;
+  stockout: {
+    totalLossAmount: number;
+    items: Array<{ productName: string; soldoutTime: string; lossQty: number; lossAmount: number }>;
+  } | null;
+}
+
+interface StoredStockoutRow {
+  product_name: string;
+  soldout_time: string;
+  estimated_loss_qty: number | string;
+  estimated_loss_amount: number | string;
+}
+
+function buildStockoutBriefText(stockout: MorningBriefData["stockout"]): string {
+  const lines = [`📉 断货损失`];
+  if (stockout === null) {
+    lines.push(`断货数据暂不可用`);
+  } else if (!stockout.items.length) {
+    lines.push(`今日无可估损断货记录`);
+  } else {
+    lines.push(`合计约 RM${stockout.totalLossAmount.toFixed(0)} | 共${stockout.items.length}品`);
+    stockout.items.slice(0, 6).forEach((item) => {
+      lines.push(`${item.productName}: ${item.soldoutTime}断货, 估少卖${item.lossQty}个/RM${item.lossAmount.toFixed(0)}`);
+    });
+  }
+  return lines.join("\n");
 }
 
 /** 固定中文模板（纯函数，单测覆盖阈值/对比分支）。 */
@@ -75,7 +105,47 @@ export function buildMorningBriefText(data: MorningBriefData): string {
     lines.push(`昨日无报废记录`);
   }
 
+  lines.push("");
+  lines.push(buildStockoutBriefText(data.stockout));
+
   return lines.join("\n");
+}
+
+/** 优先当天已落库记录，未落库则实时计算，避免 23:30 同时序漏项。 */
+async function fetchReviewStockout(date: string): Promise<NonNullable<MorningBriefData["stockout"]>> {
+  const stored = await query<StoredStockoutRow>(
+    `SELECT product_name, soldout_time, estimated_loss_qty, estimated_loss_amount
+       FROM out_of_stock_record
+      WHERE date = $1 AND estimated_loss_amount > 0
+      ORDER BY estimated_loss_amount DESC`,
+    [date],
+  );
+  let records: NonNullable<MorningBriefData["stockout"]>["items"];
+  if (stored.length) {
+    records = stored.map((row) => ({
+      productName: String(row.product_name),
+      soldoutTime: String(row.soldout_time),
+      lossQty: Number(row.estimated_loss_qty) || 0,
+      lossAmount: Number(row.estimated_loss_amount) || 0,
+    }));
+  } else {
+    if (!(await hasValidStockoutSalesSource(date))) {
+      throw new Error(`Today review: no valid stockout sales source data for ${date}`);
+    }
+    records = (await computeStockoutForDate(date))
+      .filter((row) => row.estimatedLossAmount > 0)
+      .sort((a, b) => b.estimatedLossAmount - a.estimatedLossAmount)
+      .map((row) => ({
+        productName: row.productName,
+        soldoutTime: row.soldoutTime,
+        lossQty: row.estimatedLossQty,
+        lossAmount: row.estimatedLossAmount,
+      }));
+  }
+  return {
+    totalLossAmount: records.reduce((sum: number, row: { lossAmount: number }) => sum + row.lossAmount, 0),
+    items: records,
+  };
 }
 
 /** 取数（SQL 参照 daily-review-chat getSalesData）。昨日无 daily_revenue 时返回 null。 */
@@ -143,6 +213,7 @@ async function fetchBriefData(date: string): Promise<MorningBriefData | null> {
             })),
           }
         : null,
+    stockout: null,
   };
 }
 
@@ -161,15 +232,22 @@ export async function runMorningBrief(): Promise<void> {
     throw new Error(`Today review: no daily_revenue for date ${today}`);
   }
 
+  let reviewData = data;
+  try {
+    reviewData = { ...data, stockout: await fetchReviewStockout(today) };
+  } catch (stockoutErr) {
+    logger.warn("Today review: stockout data unavailable", { date: today, error: String(stockoutErr) });
+  }
+
   // 主：完整 AI 复盘（应收口径）；失败回落固定模板，保证复盘每天必到。
   let text: string;
   try {
     const review = await generateDailyReviewText(today);
     if (!review || !review.trim()) throw new Error("empty review");
-    text = `📊 **今日复盘** ${today}\n\n${review}`;
+    text = `📊 **今日复盘** ${today}\n\n${review}\n\n${buildStockoutBriefText(reviewData.stockout)}`;
   } catch (err) {
     logger.error("Today review: AI review failed, falling back to template", { date: today, error: String(err) });
-    text = buildMorningBriefText(data);
+    text = buildMorningBriefText(reviewData);
   }
 
   // 收件人 = team_member 表里订阅 daily_review 的在职成员（open_id 直发卡片）。

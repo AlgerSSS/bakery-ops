@@ -31,6 +31,13 @@ vi.mock("@/modules/skills/daily-review-chat/daily-review-chat.definition", () =>
   generateDailyReviewText: (...args: unknown[]) => generateReviewMock(...args),
 }));
 
+const computeStockoutMock = vi.fn();
+const hasValidStockoutSourceMock = vi.fn();
+vi.mock("@/modules/domain/forecast/stockout-detector.service", () => ({
+  computeStockoutForDate: (...args: unknown[]) => computeStockoutMock(...args),
+  hasValidStockoutSalesSource: (...args: unknown[]) => hasValidStockoutSourceMock(...args),
+}));
+
 // 收件人来自 team_member（订阅 daily_review）；发送走 sendLarkToUser（按 open_id 发卡片）。
 const getSubscriberOpenIdsMock = vi.fn();
 vi.mock("@/modules/data/repositories/team.repository", () => ({
@@ -53,10 +60,11 @@ const REVENUE_ROW = {
 };
 
 /** 按 SQL 文本路由 query mock 的返回值。 */
-function setupQueryMock(opts: { revenueRows?: unknown[]; pushLogRows?: unknown[]; wasteTotal?: number }) {
+function setupQueryMock(opts: { revenueRows?: unknown[]; pushLogRows?: unknown[]; wasteTotal?: number; stockoutRows?: unknown[] }) {
   queryMock.mockImplementation(async (sql: string) => {
     if (sql.includes("FROM daily_revenue")) return opts.revenueRows ?? [REVENUE_ROW];
     if (sql.includes("FROM daily_push_log")) return opts.pushLogRows ?? [];
+    if (sql.includes("FROM out_of_stock_record")) return opts.stockoutRows ?? [];
     if (sql.includes("SUM(amount)")) return [{ total_amount: opts.wasteTotal ?? 0 }];
     return [];
   });
@@ -71,6 +79,7 @@ const briefData = (overrides: Partial<MorningBriefData> = {}): MorningBriefData 
   lastWeek: null,
   topItems: [],
   waste: null,
+  stockout: { totalLossAmount: 0, items: [] },
   ...overrides,
 });
 
@@ -83,6 +92,8 @@ beforeEach(() => {
   generateReviewMock.mockResolvedValue("🔍 AI复盘正文");
   getSubscriberOpenIdsMock.mockResolvedValue(["ou_owner"]);
   sendLarkToUserMock.mockResolvedValue(true);
+  computeStockoutMock.mockResolvedValue([]);
+  hasValidStockoutSourceMock.mockResolvedValue(true);
 });
 
 describe("buildMorningBriefText 模板", () => {
@@ -108,6 +119,19 @@ describe("buildMorningBriefText 模板", () => {
     );
     expect(text).toContain("昨日无报废记录");
     expect(text).toContain("vs 上周同日(2026-06-24): RM800 (+25.0%)");
+  });
+
+  it("固定模板包含断货损失数据", () => {
+    const text = buildMorningBriefText(
+      briefData({
+        stockout: {
+          totalLossAmount: 120,
+          items: [{ productName: "可颂", soldoutTime: "16:30", lossQty: 12, lossAmount: 120 }],
+        },
+      }),
+    );
+    expect(text).toContain("断货损失");
+    expect(text).toContain("可颂: 16:30断货, 估少卖12个/RM120");
   });
 });
 
@@ -145,20 +169,41 @@ describe("runMorningBrief 该不该发/幂等", () => {
 
   it("发的是完整 AI 复盘（带今日复盘抬头），不是固定模板", async () => {
     setupQueryMock({});
+    computeStockoutMock.mockResolvedValue([
+      { productName: "可颂", soldoutTime: "16:30", estimatedLossQty: 12, estimatedLossAmount: 120 },
+    ]);
     await runMorningBrief();
     expect(generateReviewMock).toHaveBeenCalled();
     const sentText = String(sendLarkToUserMock.mock.calls[0][1]);
     expect(sentText).toContain("今日复盘");
     expect(sentText).toContain("🔍 AI复盘正文");
+    expect(sentText).toContain("可颂: 16:30断货, 估少卖12个/RM120");
   });
 
   it("AI 复盘失败 -> 回落固定模板，复盘仍发出", async () => {
     setupQueryMock({});
     generateReviewMock.mockRejectedValue(new Error("LLM down"));
+    computeStockoutMock.mockResolvedValue([
+      { productName: "蛋挞", soldoutTime: "17:15", estimatedLossQty: 8, estimatedLossAmount: 64 },
+    ]);
     await runMorningBrief();
     const sentText = String(sendLarkToUserMock.mock.calls[0][1]);
     expect(sentText).toContain("今日复盘"); // buildMorningBriefText 抬头
     expect(sentText).not.toContain("🔍 AI复盘正文");
+    expect(sentText).toContain("蛋挞: 17:15断货, 估少卖8个/RM64");
+  });
+
+  it("AI 复盘失败且断货源数据为空 -> 明确显示数据不可用", async () => {
+    setupQueryMock({});
+    generateReviewMock.mockRejectedValue(new Error("LLM down"));
+    hasValidStockoutSourceMock.mockResolvedValue(false);
+
+    await runMorningBrief();
+
+    const sentText = String(sendLarkToUserMock.mock.calls[0][1]);
+    expect(sentText).toContain("断货数据暂不可用");
+    expect(sentText).not.toContain("今日无可估损断货记录");
+    expect(computeStockoutMock).not.toHaveBeenCalled();
   });
 
   it("daily_push_log 已有记录 -> 跳过不重发", async () => {

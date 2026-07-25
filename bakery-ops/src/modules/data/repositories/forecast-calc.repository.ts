@@ -272,27 +272,18 @@ export async function autoImportFromDataDir(): Promise<{
     setDatabaseAliases(dbAliases);
     const buf = await readFile(path.join(dataDir, "单品销售数量1.1-4.2.xlsx"));
     const { records, unmatchedProducts } = await parseSalesData(buf.buffer as ArrayBuffer, products);
-    const businessRules = await getBusinessRulesFromDB();
-    const stockoutRecords = await getOutOfStockRecords();
-    const baselines = calculateSalesBaselines(records, products, businessRules.baselineOverrides, stockoutRecords);
-    await withTransaction(async ({ execute }) => {
-      await execute("DELETE FROM daily_sales_record");
-      const BATCH = 500;
-      for (let i = 0; i < records.length; i += BATCH) {
-        const batch = records.slice(i, i + BATCH);
-        const placeholders = batch.map(() => "(?, ?, ?, ?, ?)").join(",");
-        const flat = batch.flatMap((r) => [r.productName, r.standardName, r.quantity, r.date, r.dayOfWeek]);
-        await execute(`INSERT INTO daily_sales_record (product_name, standard_name, quantity, date, day_of_week) VALUES ${placeholders}`, flat);
-      }
-      await execute("DELETE FROM product_sales_baseline");
-      for (const b of baselines) {
-        await execute(
-          `INSERT INTO product_sales_baseline (product_name, avg_monday_to_thursday, avg_friday, avg_weekend, total_sales, day_count) VALUES (?, ?, ?, ?, ?, ?)`,
-          [b.productName, b.avgMondayToThursday, b.avgFriday, b.avgWeekend, b.totalSales, b.dayCount]
-        );
-      }
-    });
-    salesResult = { success: true, totalRows: records.length, importedRows: records.length, skippedRows: 0, errors: [], unmatchedProducts };
+    // 【已摘除两处整表写入】原本这里在一个事务里做：
+    //   DELETE FROM daily_sales_record  + 逐批 INSERT
+    //   DELETE FROM product_sales_baseline + 逐行 INSERT
+    // 两处都必须拆掉：
+    //   · daily_sales_record 的唯一合法写者是 res_api/sync-to-db.js（按 date 逐日重写）。
+    //     整表清空会抹掉爬虫写的半年 POS 数据（2026-01-01 起 10364 行），
+    //     而设置页「自动导入」按钮任何人点一下就会触发。
+    //   · product_sales_baseline 已被 item_hourly_sales 的实时中位数取代
+    //     （product-demand.ts / getProductSalesStats），停写让它冻结在 2026-04-12，
+    //     等观察期满、确认无读者后再单独提 DROP 迁移。
+    // Excel 导入保留解析与未匹配品名校验（unmatchedProducts 仍会回报），但不再落库。
+    salesResult = { success: true, totalRows: records.length, importedRows: 0, skippedRows: records.length, errors: [], unmatchedProducts };
   } catch (e) {
     salesResult = { success: false, totalRows: 0, importedRows: 0, skippedRows: 0, errors: [String(e)] };
   }

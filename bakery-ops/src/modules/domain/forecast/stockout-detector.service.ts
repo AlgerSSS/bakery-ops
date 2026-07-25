@@ -12,16 +12,17 @@
 // 落库经 forecast-calc.repository saveOutOfStockRecords；out_of_stock_record 表无来源
 // 字段，取最接近的 input_name 标 'auto'（手工录入该字段是老板原始输入文本）。
 // 落库幂等：当日已有同名 product_name 记录则跳过（同时保护网页手工记录）。
-// 推给 team_member 订阅 'stockout' 的人（Lark 直发，对内只走 Lark），无检出不发；
-// 推送幂等 daily_push_log kind='stockout_detect'（recipient=open_id）。
+// 定时任务只落库，不主动推送；数据保留供后续复盘与分析使用。
 // 手工录入（网页端复盘）保留为纠错通道。
 
 import { query } from "@/modules/shared/db/postgres";
 import { logger } from "@/modules/shared/logger";
-import { sendLarkToUser } from "@/modules/channel/lark/lark-messenger";
-import { teamRepository } from "@/modules/data/repositories/team.repository";
+import {
+  getBeverageNameSet,
+  getNonProductionNameSet,
+  detectBeverageCaliberDrift,
+} from "./beverage-caliber";
 import { localDate } from "@/modules/channel/whatsapp/outbound.config";
-import { hasPushLog, recordPushLog } from "@/modules/domain/notifications/push-log";
 import { getProducts, getProductAliases } from "@/modules/data/repositories/product.repository";
 import { getOutOfStockRecords, saveOutOfStockRecords } from "@/modules/data/repositories/forecast-calc.repository";
 import { calculateLossSlots, calculateStockoutLoss, calculateStockoutLossWithTraffic } from "./engine/stockout-calculator";
@@ -49,12 +50,15 @@ export interface StockoutDetectionInput {
   hasSchedulingWaste: boolean;
   /** 是否饮品类（现制，永不做断货检测） */
   isBeverage: boolean;
+  /** 周边商品等非生产品：不会「卖完」，与饮品同样跳过检测。缺省 false 以兼容既有单测。 */
+  isNonProduction?: boolean;
 }
 
 /** 返回断货时间（= 最后成交分钟数）；非断货返回 null。 */
 export function detectStockout(input: StockoutDetectionInput): number | null {
-  const { lastSaleMinutes, closeMinutes, hasSchedulingWaste, isBeverage } = input;
+  const { lastSaleMinutes, closeMinutes, hasSchedulingWaste, isBeverage, isNonProduction } = input;
   if (isBeverage) return null; // 饮品(现制) → 不适用断货检测
+  if (isNonProduction) return null; // 周边商品(香卡/冰箱贴/杯子) → 不是生产品，卖完不补也不算断货
   if (hasSchedulingWaste) return null; // 有排产报废 → 有剩余 → 没断货
   if (lastSaleMinutes == null) return null; // 当天无销量
   if (lastSaleMinutes >= closeMinutes) return null; // 卖到打烊 → 不算提前断货
@@ -126,6 +130,25 @@ function resolveStandardName(
 /** 品名归一化（折叠空白含 U+00A0 + trim + 小写），与 item_category 落库口径一致，用于品类匹配。 */
 function normItemName(s: string): string {
   return s.replace(/[\s ]+/g, " ").trim().toLowerCase();
+}
+
+/** 定时落库前确认昨日确有可用成交源；避免把“上游未到”误记为“零断货成功”。 */
+export async function hasValidStockoutSalesSource(date: string): Promise<boolean> {
+  const rows = await query<{ has_source: boolean }>(
+    `SELECT (
+       EXISTS (
+         SELECT 1 FROM item_last_sale
+          WHERE date = $1 AND last_sale_time IS NOT NULL
+            AND NULLIF(BTRIM(item_name), '') IS NOT NULL
+       ) OR EXISTS (
+         SELECT 1 FROM item_hourly_sales
+          WHERE date = $1 AND qty > 0 AND hour BETWEEN 0 AND 23
+            AND NULLIF(BTRIM(item_name), '') IS NOT NULL
+       )
+     ) AS has_source`,
+    [date],
+  );
+  return rows[0]?.has_source === true;
 }
 
 async function detectForDate(date: string, dayType: OutOfStockRecord["dayType"]): Promise<{ detected: DetectedItem[]; txCount: number; histDays: number } | null> {
@@ -211,13 +234,17 @@ async function detectForDate(date: string, dayType: OutOfStockRecord["dayType"])
   );
   const schedulingWasteSet = new Set(wasteRows.map((r) => r.item_name));
 
-  // 饮品类（item_category 品类含"饮品"，如 咖啡饮品/特调饮品）→ 永不做断货检测（现制，用户 2026-07-05）。
-  // 与销售品名做归一化匹配。item_category 缺失/未映射的新品不视为饮品（仍会检测，需补品类）。
-  const bevRows = await query<{ item_name: string }>(
-    "SELECT item_name FROM item_category WHERE category LIKE '%饮品%'",
-    [],
-  );
-  const beverageSet = new Set(bevRows.map((r) => normItemName(r.item_name)));
+  // 现制饮品 → 永不做断货检测（用户 2026-07-05）；周边商品 → 不是生产品，同样不检测。
+  // 口径归 bakery-ops 自持（business_rule），不再依赖财务站的 item_category：那张表
+  // 2026-07-07 被整表重灌成英文营销分组后，原来的 '%饮品%' 判据静默返回 0 行，
+  // 近 30 天 326 条断货记录里 100 条是饮品误报。详见 beverage-caliber.ts 头注释。
+  // 清单查空或解析失败会回落内置常量，绝不退化成空集——空集等于全量误报。
+  const [beverageSet, nonProductionSet] = await Promise.all([
+    getBeverageNameSet(),
+    getNonProductionNameSet(),
+  ]);
+  // 只提示不判决：新品与疑似漏配的饮品写进日志，等人确认后补进 business_rule。
+  void detectBeverageCaliberDrift(date);
 
   const histByItem = new Map<string, ItemHistory>();
   for (const r of histRows) {
@@ -237,6 +264,7 @@ async function detectForDate(date: string, dayType: OutOfStockRecord["dayType"])
       closeMinutes,
       hasSchedulingWaste: schedulingWasteSet.has(itemName),
       isBeverage: beverageSet.has(normItemName(itemName)),
+      isNonProduction: nonProductionSet.has(normItemName(itemName)),
     });
     if (soldoutMinutes === null) continue;
     detected.push({ itemName, soldoutMinutes, history: histByItem.get(itemName) || EMPTY_HIST });
@@ -244,10 +272,9 @@ async function detectForDate(date: string, dayType: OutOfStockRecord["dayType"])
   return { detected, txCount, histDays };
 }
 
-/** 入口 — 由接线 agent 挂 cron。无数据/未连接/已推送时安全 no-op。 */
 /**
  * 计算某日的断货记录（含损失估算 + 标准名解析），不落库、不推送。
- * 供 runStockoutDetection（昨日→落库+推送）与「当日复盘内联实时断货损失」共用，避免时序依赖。
+ * 供 runStockoutDetection（昨日→落库）与「当日复盘内联实时断货损失」共用，避免时序依赖。
  */
 export async function computeStockoutForDate(date: string): Promise<OutOfStockRecord[]> {
   const dayType = getDayType(date);
@@ -296,20 +323,20 @@ export async function runStockoutDetection(): Promise<void> {
 
   let records: OutOfStockRecord[];
   try {
+    if (!(await hasValidStockoutSalesSource(yesterday))) {
+      throw new Error(`Stockout detect: no valid sales source data for ${yesterday}`);
+    }
     records = await computeStockoutForDate(yesterday);
   } catch (err) {
     logger.error("Stockout detect: detection failed", { date: yesterday, error: String(err) });
-    return;
+    throw err;
   }
   if (!records.length) {
-    logger.info("Stockout detect: no suspects, nothing to send", { date: yesterday });
+    logger.info("Stockout detect: no suspects, nothing to save", { date: yesterday });
     return;
   }
 
-  const suspects: StockoutSuspect[] = records.map((r) => ({
-    productName: r.productName, soldoutTime: r.soldoutTime, lossQty: r.estimatedLossQty, lossAmount: r.estimatedLossAmount,
-  }));
-  // 落库（当日已有同名记录则跳过，保护手工记录；推送仍汇总全部检出）
+  // 落库（当日已有同名记录则跳过，保护手工记录）
   try {
     const existing = await getOutOfStockRecords(yesterday);
     const existingNames = new Set(existing.map((r) => r.productName));
@@ -320,36 +347,6 @@ export async function runStockoutDetection(): Promise<void> {
     }
   } catch (err) {
     logger.error("Stockout detect: save failed", { date: yesterday, error: String(err) });
-    return;
-  }
-
-  if (!suspects.length) {
-    logger.info("Stockout detect: 检出均无可估损失，跳过推送", { date: yesterday });
-    return;
-  }
-
-  // 推给 team_member 订阅 'stockout' 的人（Lark 直发，对内只走 Lark；幂等 kind='stockout_detect'）
-  const openIds = await teamRepository.getSubscriberOpenIds("stockout");
-  if (!openIds.length) {
-    logger.error("Stockout detect: 无有效收件人(team_member 无 stockout 订阅者)");
-    return;
-  }
-  const text = buildStockoutDetectText(yesterday, suspects);
-  for (const openId of openIds) {
-    try {
-      if (await hasPushLog("stockout_detect", openId, yesterday)) {
-        logger.info("Stockout detect: already sent, skipping", { openId, date: yesterday });
-        continue;
-      }
-      const sent = await sendLarkToUser(openId, text);
-      if (sent) {
-        await recordPushLog("stockout_detect", openId, yesterday);
-        logger.info("Stockout detect: sent", { openId, date: yesterday, suspects: suspects.length });
-      } else {
-        logger.error("Stockout detect: send failed", { openId });
-      }
-    } catch (err) {
-      logger.error("Stockout detect: push failed", { openId, error: String(err) });
-    }
+    throw err;
   }
 }

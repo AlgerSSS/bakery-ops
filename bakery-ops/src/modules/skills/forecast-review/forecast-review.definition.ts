@@ -1,15 +1,19 @@
 // forecast-review.definition.ts — 预测复盘（IMPROVEMENT-PLAN.md F6-②）。
 //
 // JOIN forecast_snapshot（生成时落的快照，见 forecast.service saveForecastSnapshot）
-// × daily_sales_record（standard_name，别名风险小）
-// × item_waste（scheduling；item_name 是 POS 名，需过 product_alias 匹配，匹配不上跳过并注明）
+// × item_hourly_sales（经 product.name_en 归一到中文标准名）
+// × item_waste（scheduling；同样经 product.name_en 归一，翻不出来的保留 POS 原名并注明）
 // × out_of_stock_record，输出昨日 建议 vs 实卖 vs 报废 vs 断货 偏差 Top5。
 // 只读，不推送。【未注册】——统一由接线 agent 注册到 skills/index.ts。
+//
+// 【2026-07-25 口径修正】原先实卖读 daily_sales_record.standard_name、报废过 product_alias，
+// 两者都是中文键打英文 POS 名，交集为 0：全部品 actual=0、报废恒 0。改走 product.name_en 桥。
 
 import type { SkillDefinition, SkillExecutionInput, SkillExecutionResult, SkillHandler } from "../../shared/types";
 import { v4 as uuidv4 } from "uuid";
 import dayjs from "dayjs";
 import { query } from "../../shared/db/postgres";
+import { NORM_SQL } from "../../domain/forecast/beverage-caliber";
 
 export const forecastReviewSkillDefinition: SkillDefinition = {
   skillId: "forecast_review",
@@ -128,11 +132,24 @@ export class ForecastReviewSkillHandler implements SkillHandler {
         query<{ product_name: string; suggested_qty: number }>(
           "SELECT product_name, suggested_qty FROM forecast_snapshot WHERE date = ?", [date]
         ),
+        /* 实卖改走 item_hourly_sales × product.name_en —— 唯一还活着的中英文桥。
+           原先读 daily_sales_record.standard_name：那列是 res_api 写入的 POS 英文名恒等副本，
+           与 forecast_snapshot 的中文 product_name 交集为 0，于是全部品 actual=0，
+           「偏差 Top5」永远等于建议量最大的 5 个品，读起来像全线滞销——静默的反向结论。 */
         query<{ product_name: string; qty: string | number }>(
-          "SELECT standard_name AS product_name, SUM(quantity) AS qty FROM daily_sales_record WHERE date = ? AND standard_name IS NOT NULL GROUP BY standard_name", [date]
+          `SELECT p.name AS product_name, SUM(s.qty) AS qty
+             FROM item_hourly_sales s
+             JOIN product p ON ${NORM_SQL("p.name_en")} = ${NORM_SQL("s.item_name")}
+            WHERE s.date = ? GROUP BY p.name`, [date]
         ),
+        /* 报废侧同理：先在 SQL 里经 product.name_en 归一到中文标准名再交给 matchWasteToProducts。
+           原先靠 product_alias（97 行全中文别名）匹配英文 POS 名，3393 行命中 0，
+           于是复盘同时输出「实卖 0」和「无报废」两个互相矛盾的假事实。 */
         query<{ item_name: string; qty: string | number; amount: string | number }>(
-          "SELECT item_name, SUM(qty) AS qty, SUM(amount) AS amount FROM item_waste WHERE date = ? AND waste_reason = 'scheduling' GROUP BY item_name", [date]
+          `SELECT COALESCE(p.name, w.item_name) AS item_name, SUM(w.qty) AS qty, SUM(w.amount) AS amount
+             FROM item_waste w
+             LEFT JOIN product p ON ${NORM_SQL("p.name_en")} = ${NORM_SQL("w.item_name")}
+            WHERE w.date = ? AND w.waste_reason = 'scheduling' GROUP BY 1`, [date]
         ),
         query<{ alias: string; standard_name: string }>("SELECT alias, standard_name FROM product_alias"),
         query<{ product_name: string; soldout_time: string }>(

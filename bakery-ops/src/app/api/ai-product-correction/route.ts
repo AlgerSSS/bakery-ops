@@ -4,6 +4,12 @@ import { buildPrompt } from "@/modules/domain/forecast/prompt-engine";
 import { generateJsonFromPrompt } from "@/modules/domain/forecast/gemini-client";
 import { roundCorrections, rebalanceToTarget } from "@/modules/domain/forecast/correction-math";
 import { DAY_TYPE_LABELS } from "@/modules/domain/forecast/constants";
+import {
+  NORM_SQL,
+  getBeverageItems,
+  getNonProductionItems,
+  normCaliberName,
+} from "@/modules/domain/forecast/beverage-caliber";
 
 interface BaselineRow {
   product_name: string;
@@ -67,10 +73,21 @@ export async function POST(req: NextRequest) {
     const stockoutStart = new Date();
     stockoutStart.setDate(stockoutStart.getDate() - 30);
     const stockoutStartStr = stockoutStart.toISOString().split("T")[0];
+    /* 必须在查询侧显式排除现制饮品与周边：2026-07-07 到 2026-07-25 之间，断货检测因口径失效
+       已经积下 101 条误报（近 30 天 326 条里的 31%）。这些历史行不会自己消失，
+       而这段 prompt 紧跟着一句「断货频繁的产品应适当增加排产」——等于让 LLM 每天读到
+       「Rose Latte 断货 13 次，应增加排产」，方向与减少报废正相反。
+       口径与断货检测同源（business_rule），不再依赖财务站的 item_category。 */
+    const excludedNames = [
+      ...(await getBeverageItems()),
+      ...(await getNonProductionItems()),
+    ].map(normCaliberName);
     const stockoutRows = await query<{ product_name: string; cnt: number; total_loss_qty: number; total_loss_amount: number }>(
       `SELECT product_name, COUNT(*) as cnt, SUM(estimated_loss_qty) as total_loss_qty, SUM(estimated_loss_amount) as total_loss_amount
-       FROM out_of_stock_record WHERE date >= ? GROUP BY product_name ORDER BY cnt DESC`,
-      [stockoutStartStr]
+       FROM out_of_stock_record
+       WHERE date >= ? AND ${NORM_SQL("product_name")} <> ALL(?::text[])
+       GROUP BY product_name ORDER BY cnt DESC`,
+      [stockoutStartStr, excludedNames]
     );
     let stockoutContext = "";
     if (stockoutRows.length > 0) {

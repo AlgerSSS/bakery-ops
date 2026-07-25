@@ -9,6 +9,7 @@ import { query } from "../../shared/db/postgres";
 import { getProductForecast } from "../../domain/forecast/forecast.service";
 import { queryDataForQuestion } from "../../domain/forecast/ops-data-query";
 import { computeStockoutForDate } from "../../domain/forecast/stockout-detector.service";
+import { NORM_SQL, getBeverageItems, normCaliberName } from "../../domain/forecast/beverage-caliber";
 import { logger } from "../../shared/logger";
 
 const SKILL_MD_PATH = resolve(process.cwd(), "src/modules/skills/daily-review-chat/SKILL.md");
@@ -80,17 +81,25 @@ async function getSalesData(date: string): Promise<string> {
   // 全部分析口径改为「应收金额」= gross_sales（后台的应收，折扣前）。实收(net_sales/revenue)仅作对账。
   const hourly = await query<any>("SELECT hour, bill_count, gross_sales, net_sales, avg_order_net_sales, total_discount FROM hourly_sales_summary WHERE date = $1 ORDER BY hour", [date]);
   // 单品按「销量」排，品名转中文(经 name_en 归一化连接 product)；金额仍带出供参考。
-  const NORM = (c: string) => `lower(btrim(regexp_replace(${c}, '[[:space:]]+', ' ', 'g')))`;
+  // 归一化统一走 beverage-caliber.NORM_SQL：Postgres 的 [[:space:]] 不含 U+00A0、btrim 也只去
+  // 半角空格，不先 replace(chr(160),' ') 会漏掉尾部带 tab/NBSP 的 POS 品名（实测近 30 天 400 行，
+  // 含 Berlin Volufra Tomato Beef Pretzel —— 90 天 5427 个的主力烘焙品）。
+  const NORM = NORM_SQL;
   const topItems = await query<any>(
     `SELECT COALESCE(p.name, s.item_name) AS name, SUM(s.qty) AS total_qty, SUM(s.gross_sales) AS total_sales
        FROM item_hourly_sales s
        LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("s.item_name")}
       WHERE s.date = $1 GROUP BY COALESCE(p.name, s.item_name) ORDER BY total_qty DESC LIMIT 15`, [date]);
-  // 水吧(饮品)营业额：item_hourly_sales × item_category（品类含"饮品"=咖啡饮品+特调饮品）
-  const waterBar = await query<any>(
+  // 水吧(饮品)营业额：口径由 bakery-ops 自持 = business_rule.beverageItems（beverage-caliber.ts）。
+  // 【不再读 item_category】—— 该表归财务站所有并被 TRUNCATE 整表重灌，2026-07-07 换成英文
+  // 营销分组后这条 SQL 恒返回 RM0（实测 2026-07-24 正确值 RM7186 = 应收的 11.9%）。
+  // 用 = ANY($2) 参数化而不是 JOIN business_rule：TS 侧「查空回落内置常量」的护栏才覆盖得到这里。
+  const bevNames = (await getBeverageItems()).map(normCaliberName);
+  const WATER_BAR_SQL =
     `SELECT COALESCE(SUM(s.gross_sales),0) AS gross, COALESCE(SUM(s.qty),0) AS qty
-       FROM item_hourly_sales s JOIN item_category c ON lower(btrim(s.item_name)) = lower(btrim(c.item_name))
-      WHERE s.date = $1 AND c.category LIKE '%饮品%'`, [date]);
+       FROM item_hourly_sales s
+      WHERE s.date = $1 AND ${NORM("s.item_name")} = ANY($2::text[])`;
+  const waterBar = await query<any>(WATER_BAR_SQL, [date, bevNames]);
   const payment = await query<any>("SELECT * FROM daily_payment_breakdown WHERE date = $1 ORDER BY net_sales DESC", [date]);
   const dining = await query<any>("SELECT * FROM daily_dining_breakdown WHERE date = $1", [date]);
   const pnl = await query<any>("SELECT * FROM daily_pnl WHERE date = $1", [date]);
@@ -148,10 +157,9 @@ async function getSalesData(date: string): Promise<string> {
       const lwGross = Number(lw.gross_sales) || 0;
       const lwNet = Number(lw.revenue) || 0;
       // 上周同天水吧营业额(与今日同口径)，好让核心指标表的实收/水吧也有对比+变化
-      const lwWbRows = await query<any>(
-        `SELECT COALESCE(SUM(s.gross_sales),0) AS gross FROM item_hourly_sales s
-           JOIN item_category c ON lower(btrim(s.item_name)) = lower(btrim(c.item_name))
-          WHERE s.date = $1 AND c.category LIKE '%饮品%'`, [lwStr]);
+      /* 复用与今日完全同一条 SQL 和同一份清单，杜绝口径分叉——
+         否则修好今日之后会变成「本周 RM7186 vs 上周 RM0」这种新的误导。 */
+      const lwWbRows = await query<any>(WATER_BAR_SQL, [lwStr, bevNames]);
       const lwWb = Number(lwWbRows[0]?.gross) || 0;
       const pct = (now: number, prev: number) => prev > 0 ? `${(now - prev) / prev * 100 >= 0 ? "+" : ""}${((now - prev) / prev * 100).toFixed(1)}%` : "—";
       const lwAvg = Number(lw.transaction_count) > 0 ? (lwGross / Number(lw.transaction_count)).toFixed(1) : "0";
@@ -239,14 +247,19 @@ async function getSalesData(date: string): Promise<string> {
   // ===== P1 归因分析：品类结构 / 毛利 / 断货损失 / 预估偏差 =====
   // 这些是「为什么 + 值多少钱」的分析口径；不生成"明日减产X个"这类自动指令，只供归因判断。
 
-  // 品类结构（客单价归因）：各品类营业额占比 + 品类均价
+  // 营业额构成【保留】用 item_category —— 这是该表在 bakery-ops 侧唯一合法的用途（展示，不承载判定语义）。
+  // LEFT JOIN + COALESCE：分类表里没有的品（如 2026-07-20 上架的 Golden Tropic Cold Brew）
+  // 用 INNER JOIN 会被整段静默吞掉。NORM 已含 chr(160) 处理，捞回尾部带 tab/NBSP 的那批行。
   const byCat = await query<any>(
-    `SELECT c.category AS cat, SUM(s.gross_sales) AS amt, SUM(s.qty) AS qty
-       FROM item_hourly_sales s JOIN item_category c ON lower(btrim(s.item_name)) = lower(btrim(c.item_name))
-      WHERE s.date = $1 GROUP BY c.category ORDER BY amt DESC`, [date]);
+    `SELECT COALESCE(c.category, '未分类') AS cat, SUM(s.gross_sales) AS amt, SUM(s.qty) AS qty
+       FROM item_hourly_sales s
+       LEFT JOIN item_category c ON ${NORM('c.item_name')} = ${NORM('s.item_name')}
+      WHERE s.date = $1 GROUP BY 1 ORDER BY amt DESC`, [date]);
   if (byCat.length) {
     const catTotal = byCat.reduce((a: number, r: any) => a + Number(r.amt), 0);
-    ctx += `\n【品类结构（营业额占比｜看哪个品类拉高/拉低客单价）】\n`;
+    ctx += `\n【营业额构成（按 POS 菜单分组｜注意：这是 Restosuite 的营销分组，不是产品品类）】\n`;
+    ctx += `说明：分组里含 TOP list/New items（榜单）、Membership Price（会员价档）这类非品类维度，`;
+    ctx += `不要据此做"哪个品类拉高/拉低客单价"的归因，只可当营业额构成的粗略参考。\n`;
     for (const r of byCat) {
       const share = catTotal > 0 ? (Number(r.amt) / catTotal * 100).toFixed(1) : "0";
       const per = Number(r.qty) > 0 ? (Number(r.amt) / Number(r.qty)).toFixed(1) : "0";

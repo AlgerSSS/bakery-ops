@@ -23,6 +23,7 @@ import {
 import { query, execute } from "@/modules/shared/db/postgres";
 import { computeDataDrivenTarget, type DataDrivenTarget } from "./data-driven-target";
 import { getProductSalesStats } from "./product-demand";
+import { NORM_SQL } from "./beverage-caliber";
 import { logger } from "@/modules/shared/logger";
 import type {
   MonthlyTarget,
@@ -85,15 +86,19 @@ export async function saveForecastSnapshot(
 // ========== Scheduling Waste Alerts (F7-①) ==========
 /**
  * 近 7 天 scheduling 报废累计金额超阈值（env WASTE_WARN_RM 默认 100）的单品 → { 标准品名: 金额 }。
- * item_waste.item_name 是 POS 名，经 product_alias 归一到标准名。失败返回 undefined（只提示不改数，绝不阻塞）。
+ * item_waste.item_name 是 POS 英文名，经 product.name_en 归一到中文标准名。
+ * 【2026-07-25 修正】原先用 product_alias（97 行全中文别名）匹配英文 POS 名，3393 行命中 0——
+ * 告警 key 全是英文，而调用侧按中文 product.name 查，于是挂在具体 TOP 品下的
+ * 「近7天排产报废 RMx，建议下调」一次都没触发过，近 7 天 RM1.4 万报废全被降级成末尾一句英文清单。
+ * 失败返回 undefined（只提示不改数，绝不阻塞）。
  */
 async function getSchedulingWasteAlerts(): Promise<Record<string, number> | undefined> {
   const threshold = Number(process.env.WASTE_WARN_RM) || 100;
   try {
     const rows = await query<{ name: string; total: string | number }>(
-      `SELECT COALESCE(pa.standard_name, iw.item_name) AS name, SUM(iw.amount) AS total
+      `SELECT COALESCE(p.name, iw.item_name) AS name, SUM(iw.amount) AS total
        FROM item_waste iw
-       LEFT JOIN product_alias pa ON pa.alias = iw.item_name
+       LEFT JOIN product p ON ${NORM_SQL('p.name_en')} = ${NORM_SQL('iw.item_name')}
        WHERE iw.waste_reason = 'scheduling' AND iw.date >= CURRENT_DATE - 7
        GROUP BY 1
        HAVING SUM(iw.amount) > ?`,

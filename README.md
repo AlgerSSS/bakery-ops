@@ -2,7 +2,7 @@
 
 Hot Crush 连锁烘焙店的统一运营平台。单进程 Node.js monolith，WhatsApp AI Agent + Web 仪表盘共享同一套业务逻辑。
 
-架构详见 [structure.md](./structure.md)。
+架构评审见 `git log` 历史中的 `architecture-review.md`（2026-05-22，已归档）。
 
 ## 技术栈
 

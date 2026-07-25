@@ -46,6 +46,37 @@
   `~/Downloads/企业级数据库重构与全代码数据访问改造总控Prompt.md`（v2）。
 - 爬虫写入窗口是 KL 时间每晚 23:00 前后，DDL 避开，建议 01:00–13:00。
 
+### 0.5 数据库命名约定
+
+这个库被 4 个代码库共用，105 张表在一个 `public` schema 里。**不分 schema**，靠命名前缀分域。
+
+新建表必须带域前缀，格式 `<域>_<实体>`，域按**谁写这张表**划分：
+
+| 前缀 | 域 | 写者 |
+|---|---|---|
+| `pos_` | POS 事实：营收、单品、报废、时段 | `~/hot/res_api` 爬虫 |
+| `ops_` | 运营复盘、预测、排产、推送 | `~/hot/bakery-ops`（本仓库） |
+| `hr_` | 招聘：候选人、面试、试岗、offer | 本仓库 |
+| `scm_` | 供应链：供应商、订货、到货 | 本仓库 |
+| `mkt_` | 营销：KOL、活动、赋能 | 本仓库 |
+| `msg_` | 消息通道：WhatsApp 队列、会话、发送日志 | 本仓库 |
+| `ai_` | AI 调用日志、prompt 片段与模板 | 本仓库 |
+| `finance_` `cost_card_` `app_` | 财务、成本卡、账号权限 | Vercel 上的财务网站，**本仓库不要写** |
+
+历史表未加前缀的不做美容式改名，等它们本来就要改结构时顺手改。
+
+**每张新表必须写注释**，否则不允许合并：
+
+```sql
+COMMENT ON TABLE <表名> IS '装什么、粒度是什么、谁写；若有易混淆的兄弟表，点名说清区别';
+```
+
+**改名必须用兼容视图**：同一事务内 `ALTER TABLE ... RENAME TO` + `CREATE VIEW <旧名>`（零窗口），
+逐仓库改完调用点后才 `DROP VIEW`。
+
+> ⚠ **PostgreSQL 的视图不支持 `ON CONFLICT`。** 有 upsert 写入的表，兼容视图救不了——
+> 必须把改名和代码发布放进同一个维护窗口。动手前先 grep `ON CONFLICT` + 表名。
+
 ---
 
 Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.

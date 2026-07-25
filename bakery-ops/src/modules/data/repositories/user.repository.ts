@@ -6,7 +6,7 @@ export class UserRepository {
   async getAll(): Promise<User[]> {
     try {
       const rows = await query<Record<string, unknown>>(
-        "SELECT * FROM users WHERE is_active = true"
+        "SELECT * FROM ops_user WHERE is_active = true"
       );
       return rows.map(this.toUser);
     } catch (error) {
@@ -18,7 +18,7 @@ export class UserRepository {
   async getByPhone(phone: string): Promise<User | null> {
     try {
       const rows = await query<Record<string, unknown>>(
-        "SELECT * FROM users WHERE (phone = ? OR lid = ?) AND is_active = true LIMIT 1",
+        "SELECT * FROM ops_user WHERE (phone = ? OR lid = ?) AND is_active = true LIMIT 1",
         [phone, phone]
       );
       if (rows.length === 0) return null;
@@ -32,7 +32,7 @@ export class UserRepository {
   async getByUserId(userId: string): Promise<User | null> {
     try {
       const rows = await query<Record<string, unknown>>(
-        "SELECT * FROM users WHERE user_id = ? AND is_active = true LIMIT 1",
+        "SELECT * FROM ops_user WHERE user_id = ? AND is_active = true LIMIT 1",
         [userId],
       );
       if (rows.length === 0) return null;
@@ -46,7 +46,7 @@ export class UserRepository {
   async getByRoleAndStore(role: UserRole, storeCode: string): Promise<User | null> {
     try {
       const rows = await query<Record<string, unknown>>(
-        "SELECT * FROM users WHERE role = ? AND ? = ANY (store_ids) AND is_active = true LIMIT 1",
+        "SELECT * FROM ops_user WHERE role = ? AND ? = ANY (store_ids) AND is_active = true LIMIT 1",
         [role, storeCode],
       );
       if (rows.length === 0) return null;
@@ -60,7 +60,7 @@ export class UserRepository {
   async upsert(user: User): Promise<void> {
     try {
       await execute(
-        `INSERT INTO users (user_id, phone, lid, name, role, permissions, store_ids, updated_at)
+        `INSERT INTO ops_user (user_id, phone, lid, name, role, permissions, store_ids, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (user_id) DO UPDATE SET
            phone = EXCLUDED.phone,

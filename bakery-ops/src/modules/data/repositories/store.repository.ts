@@ -37,7 +37,7 @@ export class StoreRepository {
   async getByCode(storeCode: string): Promise<StoreRow | null> {
     try {
       const rows = await query<StoreRow>(
-        `SELECT ${SELECT_COLS} FROM stores WHERE store_code = ?`,
+        `SELECT ${SELECT_COLS} FROM ops_store WHERE store_code = ?`,
         [storeCode],
       );
       return rows[0] ? mapRow(rows[0]) : null;
@@ -50,7 +50,7 @@ export class StoreRepository {
   async listActive(): Promise<StoreRow[]> {
     try {
       const rows = await query<StoreRow>(
-        `SELECT ${SELECT_COLS} FROM stores WHERE active = true ORDER BY store_code`,
+        `SELECT ${SELECT_COLS} FROM ops_store WHERE active = true ORDER BY store_code`,
       );
       return rows.map(mapRow);
     } catch (error) {
@@ -64,7 +64,7 @@ export class StoreRepository {
   ): Promise<{ managerUserId: string | null; headChefUserId: string | null }> {
     try {
       const rows = await query<{ manager_user_id: string | null; head_chef_user_id: string | null }>(
-        "SELECT manager_user_id, head_chef_user_id FROM stores WHERE store_code = ?",
+        "SELECT manager_user_id, head_chef_user_id FROM ops_store WHERE store_code = ?",
         [storeCode],
       );
       const row = rows[0];

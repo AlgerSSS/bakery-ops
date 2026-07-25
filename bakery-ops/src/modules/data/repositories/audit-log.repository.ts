@@ -6,7 +6,7 @@ export class AuditLogRepository {
   async upsert(run: SkillRun): Promise<void> {
     try {
       await execute(
-        `INSERT INTO audit_log (run_id, skill_id, user_id, channel, status, input, output, error, started_at, finished_at, duration_ms)
+        `INSERT INTO ops_audit_log (run_id, skill_id, user_id, channel, status, input, output, error, started_at, finished_at, duration_ms)
          VALUES (?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?, ?)
          ON CONFLICT (run_id) DO UPDATE SET
            skill_id = EXCLUDED.skill_id,
@@ -45,7 +45,7 @@ export class AuditLogRepository {
         `SELECT COUNT(*)::int AS total,
                 COUNT(*) FILTER (WHERE status = 'success')::int AS success,
                 COUNT(*) FILTER (WHERE status = 'error')::int AS error
-         FROM audit_log
+         FROM ops_audit_log
          WHERE channel = ? AND started_at >= ?`,
         [channel, sinceIso]
       );

@@ -42,6 +42,26 @@
 
 ---
 
+## ⚠ 待执行：改名切换窗口（顺序不能反）
+
+分支 `claude/rename-ops-tables` 已把三处表名改成新名，`tsc` 通过、501 个测试全绿，
+但**尚未部署**。数据库侧 `stores → ops_store` 已完成（旧名 `stores` 保留为兼容视图），
+`users` / `audit_log` 还没改。
+
+**必须先跑迁移，再部署。反过来会让 WhatsApp 认人直接报 `relation does not exist`。**
+
+```
+1. 在财务仓库把 048 加进 scripts/apply-migrations.js 的 MIGRATION_FILES
+2. node scripts/apply-migrations.js          ← users → ops_user、audit_log → ops_audit_log
+3. 立刻 cd ~/hot && git merge claude/rename-ops-tables && ./deploy.sh core
+4. 看 Contabo 日志确认无 relation does not exist / ON CONFLICT 报错
+```
+
+第 2 步到第 3 步之间有几分钟窗口：旧代码读走兼容视图正常，**写会失败**——
+因为 PostgreSQL 的视图不支持 `ON CONFLICT`。两处 upsert 都包在 try/catch 里只记日志
+（`user.repository.ts:84`、`audit-log.repository.ts:35`），所以窗口内最坏结果是
+用户资料不刷新、审计日志少几条，**不会中断服务**。建议在 KL 时间上午做。
+
 ## 下一步
 
 - **数据库治理 P0 切片**，方案见 `~/Downloads/企业级数据库重构与全代码数据访问改造总控Prompt.md`（v2 修订版）。

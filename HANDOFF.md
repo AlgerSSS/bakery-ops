@@ -78,6 +78,13 @@
 
 ## 坑（别人容易踩的）
 
+0. **POS 商品命名 2026-07 从中文换成英文，所有跨表关联必须走 `product.name_en` 桥。**
+   已修的六处都用同一套归一化（`beverage-caliber.ts` 的 `NORM_SQL` / `normCaliberName`，
+   含 `chr(160)` 处理——Postgres 的 `[[:space:]]` 不含 U+00A0，不处理会漏掉尾部带 tab 的品名）。
+   **写任何按商品名 JOIN 的新代码前，先确认两侧语种一致。**
+   还没修、优先级较低的三处：`ops-data-query.ts:32`（经营问答 ILIKE 中文恒 0 行）、
+   `use-review.ts:134`（人工录入断货损失恒 0）、财务站 `sql/alias.js`（7 款改名后的品缺中文名）。
+
 1. **`timeslot_sales_record` 现在每天在丢数据。** 三个写入点全是「清空再写」，跨两个仓库：
    - `res_api/sync-to-db.js:134` —— `TRUNCATE ... RESTART IDENTITY`，每晚 KL 23:00 跑
    - `bakery-ops/src/modules/data/repositories/sales-baseline.repository.ts:64` —— `DELETE FROM`
@@ -104,6 +111,7 @@
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-07-25 | Claude Code | 修复 POS 改名引发的 6 处静默失效：饮品误报断货、预测复盘实卖恒 0、排产报废告警不触发、水吧营业额恒 RM0、预估单预计销售恒 0、AI 加产指令被误报污染；拆掉两处 daily_sales_record 整表删除 |
 | 2026-07-25 | Claude Code | 建立交接机制（本文件 + AGENTS.md 第 0 节）；审查并重写数据库治理方案 v2 |
 | 2026-07-21 | 未记录 | `refactor/architecture-review` 分支两个提交：复盘拒绝陈旧输入；之后留下 165 行未提交改动 |
 | 2026-07-06 | 未记录 | 核心指标表补全实收/水吧的上周同天+变化 |

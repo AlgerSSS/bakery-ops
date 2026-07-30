@@ -1,0 +1,109 @@
+@font-face {
+  font-family: "Neutra Text";
+  src: url("https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com/designer/Font/NeutraTextDemiAlt.woff2")
+    format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OPPO Sans";
+  src: url("https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com/designer/Font/OPPOSans-M-2.woff2")
+    format("woff2");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+:root {
+  --cream: #f9f2e3;
+  --cream-deep: #efe3cf;
+  --flesh: #efcbc6;
+  --flesh-light: #fae9e6;
+  --cocoa-dark: #59231b;
+  --cocoa: #84534d;
+  --pistachio: #b4c876;
+  --ink-soft: #6f463f;
+  --white-glass: rgba(255, 252, 246, 0.74);
+  --shadow-soft: 0 20px 56px rgba(89, 35, 27, 0.1);
+  --font-brand: "Neutra Text", "Avenir Next", "Helvetica Neue", sans-serif;
+  --font-copy: "Neutra Text", "OPPO Sans", "PingFang SC", "Microsoft YaHei",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  min-height: 100%;
+  background: var(--cream);
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100%;
+  overflow-x: hidden;
+  color: var(--cocoa-dark);
+  background: var(--cream);
+  font-family: var(--font-copy);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+select {
+  color: inherit;
+  font: inherit;
+}
+
+button {
+  border: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+a,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--cocoa-dark), white 35%);
+  outline-offset: 4px;
+}
+
+h1[tabindex="-1"]:focus {
+  outline: none;
+}
+
+::selection {
+  color: var(--cocoa-dark);
+  background: var(--pistachio);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

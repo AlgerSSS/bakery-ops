@@ -17,6 +17,16 @@ export class WhatsAppAdapter {
   }
 
   start(): void {
+    // WHATSAPP_ENABLED=false 时完全不启动客户端。
+    // 背景：对外的 WhatsApp 通道尚未启用；内部通知走 Lark（channel/internal-notify.ts，
+    // INTERNAL_NOTIFY_CHANNEL=lark 两台机器都是），wa_send_log 最后一条停在 2026-06-19。
+    // 启动客户端会拉起一个 Chrome 反复重连一个失效 session —— 在无 swap 的服务器上是纯浪费内存。
+    // 未设置该变量时行为与原来完全一致（照常启动），所以这是一个纯新增的可选开关。
+    if (process.env.WHATSAPP_ENABLED === "false") {
+      logger.info("WhatsApp adapter 未启动：WHATSAPP_ENABLED=false（内部通知走 Lark）");
+      return;
+    }
+
     const client = getWhatsAppClient();
 
     // 防止重复注册事件监听器

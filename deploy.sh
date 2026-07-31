@@ -26,11 +26,17 @@ if [ "$SKIP_GATE" = "0" ]; then
 fi
 
 if [ "$TARGET" = "core" ] || [ "$TARGET" = "both" ]; then
-  echo "==> rsync bakery-ops → Contabo（排除 .env / node_modules，保住 core 角色）"
+  echo "==> rsync bakery-ops → Contabo（排除 .env / node_modules / 各类会话态）"
+  # whatsapp-session / jobstreet-session / lightrag_data 都是「服务器那份才是权威」的运行态目录，
+  # 绝不能被本地覆盖。2026-07-26 之前它们没被排除，每次 deploy 都在用 Mac 的 Chrome profile
+  # 盖掉服务器的（服务器那份 347MB、时间戳停在 07-02，就是这么来的）。
+  # whatsapp 角色迁到服务器之后，覆盖 = 顶掉已配对的登录态 = 要重新扫码。
   rsync -az -e "$SSHC" \
     --exclude node_modules --exclude .next --exclude .git --exclude logs \
     --exclude output --exclude .env --exclude 'storageState*.json' \
     --exclude '*.log' --exclude '.DS_Store' --exclude '_*' \
+    --exclude 'whatsapp-session' --exclude 'jobstreet-session' \
+    --exclude 'services/lightrag' \
     "$BK/" "$CONTABO:/opt/hotcrush/bakery-ops/"
   echo "==> rsync res_api → Contabo"
   rsync -az -e "$SSHC" \

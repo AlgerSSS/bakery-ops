@@ -1,7 +1,42 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { removeGeneratedFile } from './lib/generated-output.js';
+import { refreshBusinessDate } from './lib/business-date.js';
 
 const outRoot = 'output/sales';
+const readableDir = path.join(outRoot, 'readable');
+const GENERATED = ['items_by_hour_long.csv', 'items_by_hour_qty.csv', 'items_by_hour_sales.csv'];
+
+// HIGH-3：delete-first 必须排在所有可抛点之前。
+//
+// 这三个 CSV 是生成物，server.js 用 statSync().mtimeMs 对外报 modified。
+// 原来这里是三条无条件 writeFileSync：scrape-items-by-hour 会话失效 exit(2) 之后 rows.json
+// 保持几天前的内容，而本脚本照跑一遍，把今晚的 mtime 盖在几天前的数据上 ——
+// /v1/items/by-hour* 于是声称数据是今晚刷新的。这是纯粹的「伪造新鲜度」。
+// 现在：先删（「文件不存在」是诚实的），再校验来源新鲜度，通过了才重建。
+fs.mkdirSync(readableDir, { recursive: true });
+for (const name of GENERATED) removeGeneratedFile(path.join(readableDir, name));
+
+const BUSINESS_DATE = refreshBusinessDate();
+const src = path.join(outRoot, 'items-by-hour', 'rows.json');
+const metaFile = path.join(outRoot, 'items-by-hour', 'rows.meta.json');
+
+function refuse(reason) {
+  console.error(`[apply-items-by-hour] 拒绝重建：${reason}`);
+  console.error(`  已删除 ${GENERATED.join(' / ')}；下游看到的是「文件不存在」而不是「几天前的数据配今晚的 mtime」。`);
+  process.exit(1);
+}
+
+if (!fs.existsSync(src)) refuse('rows.json 不存在（scrape-items-by-hour 未产出正式文件）');
+if (!fs.existsSync(metaFile)) {
+  refuse('缺少 rows.meta.json —— 无法证明 rows.json 是本轮抓的（rows.json 的 mtime 不能自证新鲜度）');
+}
+const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+if (meta.complete !== true) refuse(`rows.json 被标记为不完整：${meta.failure || 'complete!==true'}`);
+if (meta.businessDate !== BUSINESS_DATE) {
+  refuse(`rows.json 是 ${meta.businessDate} 那一轮抓的，本轮业务日是 ${BUSINESS_DATE}（scrapedAt=${meta.scrapedAt}）`);
+}
+
 const T = JSON.parse(fs.readFileSync(path.join(outRoot, 'translations.json')));
 
 // Mirror of additional mappings used by apply-translations.js (kept in sync manually).
@@ -9,12 +44,10 @@ T.dimOptions = T.dimOptions || {};
 const SHOP_MAP = { '406994127': 'HOT CRUSH BAKERY' };
 T.dimOptions.D_shopId = { ...SHOP_MAP, ...(T.dimOptions.D_shopId || {}) };
 
-const src = path.join(outRoot, 'items-by-hour', 'rows.json');
-if (!fs.existsSync(src)) {
-  console.error('rows.json not found. Run scrape-items-by-hour.js first.');
-  process.exit(1);
-}
 const rows = JSON.parse(fs.readFileSync(src));
+if (meta.rowCount !== rows.length) {
+  refuse(`rows.meta.json 记的是 ${meta.rowCount} 行，rows.json 实际 ${rows.length} 行（两者不同步）`);
+}
 
 const dimMap = {
   D_menuItemId: 'D_itemName',          // menuItemId is short id; D_itemName mapping is by long id, but row D_itemName uses long id form
@@ -96,8 +129,6 @@ function toCsv(rows) {
   return [keys.join(','), ...rows.map((r) => keys.map((k) => esc(r[k])).join(','))].join('\n');
 }
 
-const readableDir = path.join(outRoot, 'readable');
-fs.mkdirSync(readableDir, { recursive: true });
 fs.writeFileSync(path.join(readableDir, 'items_by_hour_long.csv'), toCsv(longRows));
 fs.writeFileSync(path.join(readableDir, 'items_by_hour_qty.csv'), toCsv(wideQty));
 fs.writeFileSync(path.join(readableDir, 'items_by_hour_sales.csv'), toCsv(wideSales));

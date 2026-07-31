@@ -43,9 +43,28 @@ if (!onLoginPage) {
   console.log('[login] already authenticated, skipping form fill');
 } else {
   // Step 1: username + Next
+  // 登录是整条链的 gate：它失败 = 当晚全部步骤 SKIP。实测 2026-07-26 在 Contabo 上
+  // 出现过一次「landed on /login 但用户名框 15s 没出现」（同时页面报 IndexedDB VersionError），
+  // 单独重跑即成功——是偶发的首屏渲染慢，不是配置问题。所以这里重载重试而不是一次定生死。
   console.log('[login] step 1: filling username');
   const usernameInput = page.locator('#username, input[name="username"]').first();
-  await usernameInput.waitFor({ timeout: 15000 });
+  let usernameReady = false;
+  for (let attempt = 1; attempt <= 3 && !usernameReady; attempt++) {
+    try {
+      await usernameInput.waitFor({ timeout: 15000, state: 'visible' });
+      usernameReady = true;
+    } catch (e) {
+      console.log(`[login] username field not ready (attempt ${attempt}/3): ${e.message.split('\n')[0]}`);
+      if (attempt === 3) {
+        await page.screenshot({ path: 'output/login-step1-missing-username.png', fullPage: true }).catch(() => {});
+        console.error('[login] username field never appeared. See output/login-step1-missing-username.png');
+        await browser.close();
+        process.exit(2);
+      }
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
+      await page.waitForLoadState('networkidle').catch(() => {});
+    }
+  }
   await usernameInput.fill(email);
 
   const nextBtn = page.locator('button[type="submit"]:has-text("Next"), button:has-text("Next")').first();

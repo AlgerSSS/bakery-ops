@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import { businessDateToLocalMidnight, refreshBusinessDate } from './lib/business-date.js';
 
 const BASE = 'https://bo.sea.restosuite.ai';
 
@@ -15,15 +16,14 @@ const outDir = 'output/sales/items-by-hour';
 fs.mkdirSync(outDir, { recursive: true });
 fs.mkdirSync(path.join(outDir, 'raw'), { recursive: true });
 
-// last 30 days relative to today, in the shop's timezone (Asia/Kuala_Lumpur).
-const tz = 'Asia/Kuala_Lumpur';
-const today = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
-today.setHours(0, 0, 0, 0);
+// last 30 days relative to the business date pinned for this refresh (Asia/Kuala_Lumpur).
+const BUSINESS_DATE = refreshBusinessDate();
+const today = businessDateToLocalMidnight(BUSINESS_DATE);
 const from = new Date(today); from.setDate(from.getDate() - 29);
 const pad = (n) => String(n).padStart(2, '0');
 const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const RANGE = [fmt(from), fmt(today)];
-console.log('[items-by-hour] date range:', RANGE.join(' .. '));
+console.log(`[items-by-hour] business date: ${BUSINESS_DATE}; date range: ${RANGE.join(' .. ')}`);
 
 const browser = await chromium.launch({ headless: true });
 const ctx = await browser.newContext({ storageState: 'storageState.json' });
@@ -103,13 +103,18 @@ async function callApi(path, payload) {
 }
 
 // Pull page 1, then keep paging while we have a full page.
+// 分页中断（某一页失败 / 撞到安全上限）必须留下痕迹：以前是 break 之后照样写 rows.json 并 exit 0，
+// 也就是「截断的结果被当成完整结果」。apply-items-by-hour 再把它盖成今天的 CSV，
+// server.js 的 modified 就成了伪造的新鲜度。现在截断 => 只写 rows.partial.json + exit 1。
 const allRows = [];
 let pageNo = 1;
+let truncatedReason = null;
 while (true) {
   body.page.pageNo = pageNo;
   const r = await callApi('/api/report/data/queryData', body);
   if (r.status !== 200 || r.body?.code !== '000') {
     console.error(`  page ${pageNo} failed:`, r.status, r.body?.code, r.body?.msg);
+    truncatedReason = `page ${pageNo} failed: status=${r.status} code=${r.body?.code} msg=${r.body?.msg || ''}`;
     break;
   }
   const rows = r.body?.data?.rows || r.body?.data?.list || [];
@@ -118,7 +123,11 @@ while (true) {
   allRows.push(...rows);
   if (rows.length < body.page.pageSize) break;
   pageNo++;
-  if (pageNo > 50) { console.warn('  safety stop at 50 pages'); break; }
+  if (pageNo > 50) {
+    console.warn('  safety stop at 50 pages');
+    truncatedReason = 'safety stop at 50 pages (结果必然被截断)';
+    break;
+  }
 }
 
 console.log(`[items-by-hour] total rows: ${allRows.length}`);
@@ -133,7 +142,34 @@ function flat(row) {
   return o;
 }
 const flatRows = allRows.map(flat);
+
+// 30 天窗口零行 = 不可能的正常结果（查询成功但内容为空 = 后端/过滤条件出问题）。
+if (!truncatedReason && !flatRows.length) truncatedReason = '30 天窗口零行（查询成功但结果为空）';
+
+const meta = {
+  scrapedAt: new Date().toISOString(),
+  businessDate: BUSINESS_DATE,
+  dateRange: RANGE,
+  rowCount: flatRows.length,
+  pages: pageNo,
+  complete: !truncatedReason,
+  ...(truncatedReason ? { failure: truncatedReason } : {}),
+};
+
+if (truncatedReason) {
+  fs.writeFileSync(path.join(outDir, 'rows.partial.json'), JSON.stringify(flatRows, null, 2));
+  fs.writeFileSync(path.join(outDir, 'rows.partial.meta.json'), JSON.stringify(meta, null, 2));
+  console.error(`[items-by-hour] ABORT: ${truncatedReason}`);
+  console.error('[items-by-hour] 已写 rows.partial.json 供排查；未覆盖 rows.json（陈旧的 rows.json 会被 apply-items-by-hour 拒收）');
+  await browser.close();
+  process.exit(1);
+}
+
 fs.writeFileSync(path.join(outDir, 'rows.json'), JSON.stringify(flatRows, null, 2));
+// rows.json 自己不带时间戳，新鲜度靠这个 sidecar 证明（mtime 不能自证：任何一次写入都会刷新它）。
+fs.writeFileSync(path.join(outDir, 'rows.meta.json'), JSON.stringify(meta, null, 2));
+fs.rmSync(path.join(outDir, 'rows.partial.json'), { force: true });
+fs.rmSync(path.join(outDir, 'rows.partial.meta.json'), { force: true });
 
 // Write untranslated CSV for now; apply-translations will produce the readable version.
 function toCsv(rows) {

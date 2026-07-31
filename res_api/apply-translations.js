@@ -3,6 +3,43 @@ import path from 'node:path';
 import { removeGeneratedFile } from './lib/generated-output.js';
 
 const outRoot = 'output/sales';
+const headlineDir = path.join(outRoot, 'readable');
+
+// Headline files are generated artifacts. Remove yesterday's copies first so a
+// missing live query cannot be mistaken for a successful current-day refresh.
+//
+// MEDIUM-1：这段删除必须排在**所有可抛点之前**。原来它在文件中段，前面已经有两处会抛：
+//   1) JSON.parse(readFileSync(translations.json))  —— fetch-translations 失败/写坏就抛
+//   2) readdirSync(<slug>/replay-30d)               —— 目录不存在就 ENOENT
+// 任一抛出都会让 12 个陈旧 CSV 原样存活，而 server.js 照常把它们当当前数据发出去
+//（沙盒实测：删掉 replay-30d 目录后运行 -> ENOENT 未捕获退出 -> 陈旧 CSV 全部存活）。
+const headlineMap = {
+  'kpi_overview_core.csv': ['sales-overview', (b) => b.reportId === '123' && !b.page && b.selectFields?.includes('M_Order_SUM_netSales') && !b.selectFields?.includes('D_shopName')],
+  'kpi_summary_totals.csv': ['sales-summary', (b) => b.reportId === '888001' && !b.selectFields?.includes('D_businessDate')],
+  'sales_by_business_date.csv': ['sales-summary', (b) => b.reportId === '888001' && b.selectFields?.includes('D_businessDate')],
+  'items_totals.csv': ['items-breakdown', (b) => b.reportId === '211' && !b.selectFields?.includes('D_category')],
+  'items_by_category.csv': ['items-breakdown', (b) => b.reportId === '211' && b.selectFields?.includes('D_category')],
+  'items_by_dish_unit_30d.csv': ['sales-overview', (b) => b.reportId === '211' && b.selectFields?.includes('D_Combined_D_itemName_And_D_unit') && b.page],
+  'orders_by_dining_option.csv': ['sales-overview', (b) => b.reportId === '123' && b.selectFields?.includes('D_diningOption')],
+  'payment_by_payer_type.csv': ['sales-overview', (b) => b.reportId === '198'],
+  'items_by_category_overview.csv': ['sales-overview', (b) => b.reportId === '211' && b.selectFields?.includes('D_category') && b.page],
+};
+
+fs.mkdirSync(headlineDir, { recursive: true });
+for (const outName of Object.keys(headlineMap)) {
+  removeGeneratedFile(path.join(headlineDir, outName));
+}
+
+/** replay-30d 目录缺失/不可读时返回空列表并告警，而不是让 ENOENT 把进程带走。 */
+function listReplayJson(dir) {
+  try {
+    return fs.readdirSync(dir).filter((x) => x.endsWith('.json'));
+  } catch (e) {
+    console.error(`  [warn] 无法读取 ${dir}（${e.code || e.message}），按「本页零产物」处理`);
+    return [];
+  }
+}
+
 const T = JSON.parse(fs.readFileSync(path.join(outRoot, 'translations.json')));
 
 // Ensure core dim mappings exist even if live API lookups failed.
@@ -95,7 +132,7 @@ for (const slug of slugs) {
   const dst = path.join(outRoot, slug, 'readable');
   fs.mkdirSync(dst, { recursive: true });
 
-  for (const f of fs.readdirSync(src).filter((x) => x.endsWith('.json'))) {
+  for (const f of listReplayJson(src)) {
     const j = JSON.parse(fs.readFileSync(path.join(src, f)));
     const rows = extractRows(j.result.body);
     if (!rows?.length) continue;
@@ -124,7 +161,7 @@ for (const slug of slugs) {
 // Rebuild headline CSVs with translated titles/values.
 function findFirstRows(slug, pred) {
   const dir = path.join(outRoot, slug, 'replay-30d');
-  for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.json'))) {
+  for (const f of listReplayJson(dir)) {
     const j = JSON.parse(fs.readFileSync(path.join(dir, f)));
     if (!pred(j.reqBody)) continue;
     const rows = extractRows(j.result.body);
@@ -145,34 +182,38 @@ function findFirstRows(slug, pred) {
   return null;
 }
 
-const headlineDir = path.join(outRoot, 'readable');
-fs.mkdirSync(headlineDir, { recursive: true });
-
-const headlineMap = {
-  'kpi_overview_core.csv': ['sales-overview', (b) => b.reportId === '123' && !b.page && b.selectFields?.includes('M_Order_SUM_netSales') && !b.selectFields?.includes('D_shopName')],
-  'kpi_summary_totals.csv': ['sales-summary', (b) => b.reportId === '888001' && !b.selectFields?.includes('D_businessDate')],
-  'sales_by_business_date.csv': ['sales-summary', (b) => b.reportId === '888001' && b.selectFields?.includes('D_businessDate')],
-  'items_totals.csv': ['items-breakdown', (b) => b.reportId === '211' && !b.selectFields?.includes('D_category')],
-  'items_by_category.csv': ['items-breakdown', (b) => b.reportId === '211' && b.selectFields?.includes('D_category')],
-  'items_by_dish_unit_30d.csv': ['sales-overview', (b) => b.reportId === '211' && b.selectFields?.includes('D_Combined_D_itemName_And_D_unit') && b.page],
-  'orders_by_dining_option.csv': ['sales-overview', (b) => b.reportId === '123' && b.selectFields?.includes('D_diningOption')],
-  'payment_by_payer_type.csv': ['sales-overview', (b) => b.reportId === '198'],
-  'items_by_category_overview.csv': ['sales-overview', (b) => b.reportId === '211' && b.selectFields?.includes('D_category') && b.page],
-};
-
-// Headline files are generated artifacts. Remove yesterday's copies first so a
-// missing live query cannot be mistaken for a successful current-day refresh.
-for (const outName of Object.keys(headlineMap)) {
-  removeGeneratedFile(path.join(headlineDir, outName));
-}
+// 文件开头已经先把旧文件删掉了（delete-first 排在所有可抛点之前，见顶部注释），缺一个就等于「昨天的文件被删 + 今天没重建」= 文件彻底消失。
+// 这里只把「数据库表唯一（或唯一精确）来源」的两个列为必需，缺失即非 0 退出：
+//   sales_by_business_date.csv  -> daily_revenue 精确源 + daily_payment_breakdown 唯一源
+//   orders_by_dining_option.csv -> daily_dining_breakdown 唯一源
+// 其余 headline 只喂 server.js 的只读 REST 接口，缺失大声告警但不中断入库 ——
+// 否则一张次要报表坏掉就会让当晚 item_hourly_sales / hourly_sales_summary 全都不写。
+const REQUIRED_HEADLINES = new Set([
+  'sales_by_business_date.csv',
+  'orders_by_dining_option.csv',
+]);
+const missingHeadlines = [];
 
 for (const [outName, [slug, pred]] of Object.entries(headlineMap)) {
   const found = findFirstRows(slug, pred);
-  if (!found) { console.log(`  (missing) ${outName}`); continue; }
+  if (!found) {
+    if (REQUIRED_HEADLINES.has(outName)) {
+      console.error(`  (MISSING, required) ${outName}`);
+      missingHeadlines.push(outName);
+    } else {
+      console.error(`  (missing, optional) ${outName}`);
+    }
+    continue;
+  }
   const csv = toCsv(found.rows, found.order);
   fs.writeFileSync(path.join(headlineDir, outName), csv);
   console.log(`  wrote ${outName} (${found.rows.length} rows)`);
 }
+
+// 注意：必需 headline 缺失的非 0 退出放在脚本最末尾，不在这里。
+// 早退会连 README.txt 都不写，而且这个脚本剩下的工作对下游只有好处没有坏处 ——
+// 「失败得响亮」不该等于「能做的也不做」。退出码由 run-refresh.mjs 聚合，
+// 不再中断 scrape-daily / sync-to-db 这些与 headline CSV 无关的步骤。
 
 // Write a README-style summary pointing users to the right file.
 const manifestLines = [
@@ -198,3 +239,11 @@ const manifestLines = [
 ];
 fs.writeFileSync(path.join(outRoot, 'README.txt'), manifestLines.join('\n'));
 console.log('\n[apply] done -> output/sales/readable/');
+
+if (missingHeadlines.length) {
+  console.error(`[apply-translations] FAILED: 必需 headline CSV 缺失 -> ${missingHeadlines.join(', ')}`);
+  console.error('  旧文件已在上一步被删除，所以下游看到的是「文件不存在」而不是「昨天的数据」。');
+  console.error('  sync-to-db 仍会照常执行：daily.json 那 5 张表与 headline CSV 无关，');
+  console.error('  而 daily_payment_breakdown 会因为源缺失自己报错（sync-to-db 内部同样是聚合退出码）。');
+  process.exit(1);
+}

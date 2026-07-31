@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { parseCsv } from './lib/csv-parser.js';
+import { kualaLumpurDate } from './lib/business-date.js';
 
 const PORT = Number(process.env.PORT || 8787);
 const API_KEY = process.env.API_KEY || (() => {
@@ -124,11 +125,16 @@ function runRefresh() {
       ['sync-to-db', 'sync-to-db.js'],
     ];
 
+    // 业务日在这一轮开始时锁定一次，整条链共用（与 daily-refresh.sh 一致）：
+    // 否则 POST /v1/refresh 一旦跨过 KL 00:00，sync-to-db 的 EXPECTED_DATE 会翻成 D+1，
+    // 而前面几步抓的全是 D 的数据。见 lib/business-date.js。
+    const refreshEnv = { ...process.env, REFRESH_BUSINESS_DATE: kualaLumpurDate() };
+
     (async () => {
       for (const [label, script] of steps) {
         logLines.push(`\n# ${label}`);
         const code = await new Promise((res) => {
-          const child = spawn(process.execPath, [script], { env: process.env });
+          const child = spawn(process.execPath, [script], { env: refreshEnv });
           child.stdout.on('data', (b) => logLines.push(b.toString()));
           child.stderr.on('data', (b) => logLines.push(b.toString()));
           child.on('close', res);

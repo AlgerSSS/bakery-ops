@@ -3,6 +3,8 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
 import postgres from 'postgres';
+import { businessDateToLocalMidnight, refreshBusinessDate } from './lib/business-date.js';
+import { classifyQueryOutcome, summarizeQueryStatus } from './lib/daily-queries.js';
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => { const [k, v] = a.replace(/^--/, '').split('='); return [k, v]; }));
 
@@ -17,9 +19,10 @@ if (!fs.existsSync(stateFile)) {
 
 const BASE = 'https://bo.sea.restosuite.ai';
 
-const tz = 'Asia/Kuala_Lumpur';
-const today = new Date(new Date().toLocaleString('en-US', { timeZone: tz }));
-today.setHours(0, 0, 0, 0);
+// 业务日锁定在本轮刷新起跑那一刻（daily-refresh.sh export REFRESH_BUSINESS_DATE）。
+// 跨过 KL 00:00 的重试仍然抓 D 的窗口，与 sync-to-db 的 EXPECTED_DATE 永远一致。
+const BUSINESS_DATE = refreshBusinessDate();
+const today = businessDateToLocalMidnight(BUSINESS_DATE);
 const from = new Date(today);
 from.setDate(from.getDate() - 29);
 const pad = (n) => String(n).padStart(2, '0');
@@ -27,7 +30,7 @@ const fmtDash = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getD
 const fmtSlash = (d) => `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
 const RANGE_DASH = [fmtDash(from), fmtDash(today)];
 const RANGE_SLASH = [fmtSlash(from), fmtSlash(today)];
-console.log(`[scrape-daily] date range: ${RANGE_DASH.join(' .. ')}`);
+console.log(`[scrape-daily] business date: ${BUSINESS_DATE}; date range: ${RANGE_DASH.join(' .. ')}`);
 
 // ---- 增量窗口：per-day 明细(hourlyByDate / itemsByDateHour / itemWaste)过了当天就基本定型，
 // 无需每次重抓整 30 天。默认只抓最近 SCRAPE_INCREMENTAL_DAYS 天(应对当日/迟到流水)，并查库把
@@ -262,20 +265,24 @@ const queries = {
 
 // PLACEHOLDER_RESULTS
 
-// 核心销售数据：任一失败都不能让 pipeline 继续 sync（否则脏/缺数据入库）。
-// itemWaste(100280) 等增强报表可缺失，不计入必需。
-const REQUIRED_QUERIES = ['summary', 'hourly', 'items'];
-const failedRequired = [];
+// 必需清单 / 成败判定都在 lib/daily-queries.js（那里有为什么是这六个的完整理由）。
+// 这里只负责把每个查询的 status 记进 queryStatus，失败面最后统一从 queryStatus 推导 ——
+// 落盘给 sync-to-db 的那份就是判定依据本身，不再有第二份可能悄悄不一致的 failedRequired。
+//
+// 每个查询当晚的成败随产物一起落盘，消费方（sync-to-db）能按段判定，
+// 而不是只能靠「字段在不在」猜——空数组和查询失败在 JSON 里长得一模一样。
+const queryStatus = {};
 
 const results = {};
 
 for (const [name, body] of Object.entries(queries)) {
   console.log(`  querying: ${name}`);
   const r = await callApi('/api/report/data/queryData', body);
-  if (r.status !== 200 || r.body?.code !== '000') {
+  const outcome = classifyQueryOutcome(r);
+  queryStatus[name] = outcome.status;
+  if (!outcome.ok) {
     console.error(`  ${name} failed: status=${r.status} code=${r.body?.code} msg=${r.body?.msg}`);
     results[name] = { error: true, status: r.status, code: r.body?.code, msg: r.body?.msg };
-    if (REQUIRED_QUERIES.includes(name)) failedRequired.push(name);
     continue;
   }
   const data = r.body?.data;
@@ -309,7 +316,13 @@ function translatePayerType(code) {
 
 const DINING_MAP = { '10': 'Dine-in', '20': 'Takeaway', '30': 'Delivery', '40': 'Pickup' };
 
-const output = { dateRange: RANGE_DASH, scrapedAt: new Date().toISOString() };
+const output = {
+  dateRange: RANGE_DASH,
+  businessDate: BUSINESS_DATE,
+  perDayRange: INC_RANGE_DASH,
+  scrapedAt: new Date().toISOString(),
+  queryStatus,
+};
 
 // Summary
 if (Array.isArray(results.summary) && results.summary.length) {
@@ -439,15 +452,30 @@ if (Array.isArray(results.itemWaste)) {
   }));
 }
 
-fs.writeFileSync(path.join(outDir, 'daily.json'), JSON.stringify(output, null, 2));
-console.log(`[scrape-daily] saved output/daily/daily.json`);
-
 await browser.close();
-console.log('[scrape-daily] done');
 
-// 必需查询失败时以非零退出，使 scheduler / refresh 链在 sync-to-db 之前中止，
-// 避免把残缺数据同步入库（daily.json 仍已写出，供排查）。
+const finalFile = path.join(outDir, 'daily.json');
+const partialFile = path.join(outDir, 'daily.partial.json');
+
+// 必需查询失败 => 绝不覆盖正式文件。
+//
+// 以前这里是「先无条件写 daily.json，再 exit 1」，靠 `&&` 链让 sync-to-db 不执行。
+// 第二轮把 && 链换成 run-refresh.mjs（一步失败不阻断后续）之后，这个安排变成了最坏组合：
+// 残缺文件已经落盘，而 sync-to-db 照跑。现在改成写 daily.partial.json 供排查，
+// 正式文件保持上一份完整产物；sync-to-db 那边会因为 scrapedAt/dateRange 陈旧而
+// 拒绝重写（lib/daily-freshness.js），两侧互为兜底。
+const { failedRequired, failedOptional } = summarizeQueryStatus(queryStatus);
 if (failedRequired.length) {
-  console.error(`[scrape-daily] ABORT: required quer${failedRequired.length > 1 ? 'ies' : 'y'} failed: ${failedRequired.join(', ')}. Halting before sync.`);
+  output.failedRequired = failedRequired;
+  fs.writeFileSync(partialFile, JSON.stringify(output, null, 2));
+  console.error(`[scrape-daily] ABORT: required quer${failedRequired.length > 1 ? 'ies' : 'y'} failed: ${failedRequired.join(', ')}`);
+  console.error(`[scrape-daily] 已写 ${partialFile} 供排查；未覆盖 daily.json（陈旧的正式文件会被 sync-to-db 拒收）`);
   process.exit(1);
 }
+
+fs.writeFileSync(finalFile, JSON.stringify(output, null, 2));
+// 上一轮失败留下的 partial 会误导排查（看起来像「今晚也失败了」），成功时清掉。
+fs.rmSync(partialFile, { force: true });
+console.log(`[scrape-daily] saved ${finalFile}`);
+if (failedOptional.length) console.warn(`[scrape-daily] WARN: 非必需查询失败 -> ${failedOptional.join(', ')}`);
+console.log('[scrape-daily] done');

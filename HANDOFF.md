@@ -12,12 +12,177 @@
 |---|---|
 | 最后更新 | 2026-07-30 by Codex |
 | 当前分支 | `codex/hbti-launch-ready` |
-| 工作区 | HBTI 应用与方案已提交为 `a98fbe9`，本交接已更新；另有既存 res_api、bakery-ops、deploy.sh 在途改动，勿混在一起回退或提交 |
+| 工作区 | HBTI 公开 OTP 自动建会员与 HOT CRUSH 品牌改版已完成本地门禁、尚未部署；另有既存 res_api、bakery-ops、deploy.sh 在途改动，勿混在一起回退或提交 |
 | 线上（Contabo） | res_api = 2026-07-27 爬虫改造版；bakery-ops = `INSTANCE_ROLE=all` |
+
+> **2026-07-31 by Claude Code —— 本地视觉预览用的假环境文件正在生效，注意别被它坑到。**
+> 新增 `hbti-web/.env.development.local`（gitignored，全部假值）。Next 的加载优先级是
+> `.env.development.local` > `.env.local`，所以**只要这个文件还在，`npm run dev` 就跑在假配置上**：
+> Mongo 指向没人监听的 `127.0.0.1:27099`，`RES_BASE_URL` / `RES_H5_BASE_URL` 被故意设成通不过
+> `server-config.ts` 校验的值，于是发短信、建会员、发券三条路在发出任何网络请求之前就抛错。
+> 实测 `/api/health` 返回 503 degraded，dev 启动日志确认 `Environments: .env.development.local, .env.local`。
+> **要用真配置调试就先 `rm hbti-web/.env.development.local`。** 未改任何应用代码，未部署。
+>
+> 顺带处理的两件事：① 杀掉了 Codex 会话遗留的孤儿 dev server（PID 41382，7-30 19:21 起在 3200 端口
+> 挂着**真实生产凭证**跑了约 40 小时）；② `rm -rf hbti-web/.next` 清掉 Turbopack 陈旧缓存 ——
+> 症状是 `/` 报 `Could not find the module ".../global-error.js#default" in the React Client Manifest`
+> 并白屏，清缓存重启即恢复，**是 dev bundler 的已知问题，不是应用 bug**。
+> 另：dev 下 console 恒有一条 `eval() is not supported…` 报错，是 React 开发模式撞上应用自设的 CSP，
+> 生产不出现，不用管。
+
+### 零之二、HBTI「每屏一页可见、无需滚动」改造（2026-07-31，本地完成、未部署）
+
+用户反馈：每一屏都要稍微下滑才能看全，但页面还有大片空白。查下来是**同一个 bug 的两面**。
+
+**根因（已修）**：`.journeyFrame` 用 `min-height: calc(100svh - 6.25rem)`、`.landing` 用 `- 7rem`，
+硬编码地假设上方 chrome 只有 100/112px；实际是 header 72 + `/demo` 提示条 73 + pageFrame 内边距 45
+≈ 190px。于是容器**永远比可用高度高 89px**（真实登录页 17px），既造成溢出，又因为容器内做垂直居中
+而在内容上方留下约 150px 空白。`.authJourneyFrame` 里还有一份同样的重复定义（连同它在 JSX 里
+唯一的用途一并删除）。改成让布局引擎自己算：
+
+```css
+.pageFrame   { display: flex; flex-direction: column; min-height: 100svh; }
+.landing,
+.journeyFrame { flex: 1 0 auto; }   /* 长内容仍撑开页面正常滚动，不会被 siteShell 的 overflow:hidden 裁掉 */
+```
+
+**第二个坑**：`@media (max-width:359px)` 把 `.colorGrid` 压成**单列**（9 个颜色 = 9 行 563px），
+`.optionalFields` 在 390px 以下拆成上下两行。这两条规则占了 320 尺寸下 915px 溢出的一大半，已删除。
+色块网格现为 3 列（9 个 → 3 行）。
+
+**其余为纯间距/字号收紧**，分三层：基础层（全尺寸）、`@media (max-width:390px)`、
+`@media (max-height:760px)`；矮屏才压缩，高屏保留原本的宽松呼吸感。只有一处内容变化：
+`.detailsBody` 那句辅助说明在 ≤390px 隐藏（标题已表达同样意思），`.detailsPanel > .eyebrow` 同理。
+所有点击目标保持 ≥44px。结果页那张与上一屏重复的 `.resultColorPreview` 压成一行信息条
+（`header` 隐藏），但**保留元素本身**——e2e 断言它的 `data-testid` 与 `data-color`。
+
+**实测结果（溢出 px，0 = 一屏可见无需滚动）**：真实顾客流程（`/`，无 demo 提示条）在
+320×740 / 375×812 / 430×932 三种尺寸 × 中英马三语 × 全部 6 个阶段（含选色后 Save/Share 出现的最高态）
+**全部为 0**。`/demo` 因多一条 73px 访客横幅，320 上选色页仍有约 30px，属预览工具而非顾客体验。
+
+**门禁**：tsc ✅、eslint ✅、170 项 Vitest ✅、42 项 Playwright（320/375/430 三档）✅、`next build` ✅。
+**未改任何业务逻辑**，改动集中在 `hbti-web/src/components/hbti.module.css`，
+外加 `HbtiExperience.tsx` 删掉 `authJourneyFrame` 这一个已失效的 className 分支。
+
+**追加：底部控件区重做（同日）**。上面把每屏压到正好一个视口后，暴露了一个**被压缩放大的旧问题**：
+`.ambientWash::after`（那条装饰用的酒红吧台）是 `position: fixed` 贴在视口底部、可见高度 49.6px，
+内容从不为它预留空间。以前页面更高、需要滚动时不易察觉；每屏贴底之后，**每一屏的底部 CTA 都落进了它**。
+叠加 `.primaryButton:disabled` 用的是 `opacity: 0.38`——整个按钮半透明，深色吧台直接透上来，
+于是答题页的 Next 呈现出浑浊的两截色。三处修改：
+
+1. `:disabled` 不再用 opacity，改为**不透明**的金属描边"熄灯招牌"样式（`--chrome-dark` 边框 +
+   奶油渐变 + 内嵌金属高光），彻底杜绝背景透色；
+2. 吧台可见高度 49.6px → **1.5rem 踢脚线**（矮屏 1rem），`.pageFrame` 的 `padding-bottom` 相应
+   预留"踢脚线 + 间隙"，任何 CTA 不再压到它上面；
+3. 答题页的空白重新分配：原来 `.progressWrap` 下方固定 7vh、剩余空间**全部**堆在按钮上方（155px），
+   看起来像出错。改成进度条下方给固定小间距，并在问题块上方也加一个 `margin-top: auto`——
+   两个 auto 让 flex 把剩余高度**均分**，问题块因而在进度条与导航之间居中，导航仍留在拇指可及的底部。
+
+复测（三尺寸 × 三语言 × 全部阶段）：溢出仍全为 0，且底部 CTA 与踢脚线的间隙最小 22px、无一重叠。
+
+**「1 Issue」浮标已消除（不是靠放宽生产策略）**。它是 React 开发构建需要 `eval()` 重建调用栈，
+撞上 `next.config.ts` 里不含 `unsafe-eval` 的 CSP（那条策略是正确的加固，不该为它让步）。
+改法是把 `script-src` 改成按环境拼接：
+
+```ts
+const isDevServer = process.env.NODE_ENV !== "production";
+`script-src 'self' 'unsafe-inline'${isDevServer ? " 'unsafe-eval'" : ""}`
+```
+
+**两边都实测过**：`next dev` 下发 `script-src 'self' 'unsafe-inline' 'unsafe-eval'`，控制台不再有报错；
+`next build` + `next start` 下发 `script-src 'self' 'unsafe-inline'`，**与改动前完全一致**。
+改 `next.config.ts` 必须重启 dev server 才生效。测试里没有任何一处断言 CSP。
+
+**国家区号选择器的箭头**（用户反馈"像 bug"）：`.phoneRow` 原本是 `minmax(6.7rem, auto)`，
+把选择框撑到 118px，而「MY +60」只有 55px，于是浏览器把**原生**箭头顶到框最右边，
+文字与箭头之间空出 23px，看起来像没对齐。改为 `grid-template-columns: auto minmax(0, 1fr)` 让它贴合内容
+（96px），并用 `appearance: none` + 内联 SVG data-URI 换成品牌酒红色箭头，间距降到 3px；
+电话输入框反而从 229px 变宽到 251px。同一个箭头也应用到选色页的性别/年龄下拉，保持一致。
+⚠ 注意：`.optionalFields select` 和 `:focus` 的背景必须写 `background-color` 而非 `background` 简写——
+简写会把箭头用的 `background-image` 一起清掉。三尺寸 × 三语言实测无横向/纵向溢出。
+
+### 零之三、手机号区号扩容：从 MY/CN 扩到 12 个市场（2026-07-31，本地完成、未部署）
+
+**关键认知：限制在 MY/CN 完全是 hbti-web 自己造成的，不是 RES 的限制。**
+RES 的 H5 注册/登录接口只校验 `isoCode` 为 2-3 个字母、`countryCode` 为 1-4 位数字、`phone` 为 4-15 位，
+从不枚举国家（`h5-member-auth.ts:641-656`）。收窄只发生在两处：`src/lib/auth/phone.ts` 的双字面量
+zod union，和 `MemberSignIn.tsx` 的 `countries` 数组。
+
+**RES 的权威列表在 `POST /operation-manager/format/listPhoneFormatAll`**（BO 接口，需 vulcan-token，
+`client.ts:272-304` 已在消费它，返回 `{internationalPhoneAreaCode, applyCountry}` 对）。
+**仓库里从未抓取过它的响应，也没有缓存**——要拿到必须做一次认证只读 POST。本轮尝试调用被权限分类器
+拦下，用户选择改用「已有会员数据实证」方案，故该接口**至今没有被调用过**。
+
+**列表依据**：`res_api/output/member-probe/phone_shape.json` + `member/snapshot.json`（4,824 条真实会员）
+统计出 19 个在用区号。取「≥2 名真实会员」的 9 个，再补 HK/VN/PH 三个门店必然覆盖的邻近市场，共 12 条：
+MY(4625) SG(81) ID(58) CN(26) AU(9) TW(5) TH(4) US(4) BN(2) + HK/VN/PH。
+只有 1 人的长尾（EG/FI/FR/AE/GB/DE/KR/KH）判为游客噪音，未收录。
+⚠ 这些条目的 **ISO 字母是按 E.164 推断的，不是 RES 返回值**——RES 列表接口的 `isoCode` 全为空，
+且 `+1` 无法从区号区分 US/CA（现按 US 处理，与 `res-client.test.ts:80` 的 fixture 一致）。
+**将来若要对齐 RES 权威列表，仍需跑一次 listPhoneFormatAll。**
+
+**改法**：新增 `src/lib/auth/countries.ts` 作为**唯一**国家表，UI 与服务端校验共用，杜绝两边漂移。
+`phone.ts` 的双字面量 union 换成查表**配对**校验（先按 isoCode 找行 → 要求 countryCode 与该行一致 →
+再用该行 pattern 校验号码）。于是 `auth-routes.test.ts:236` 与 `auth-http-helpers.test.ts:119` 断言的
+「`{countryCode:"60", isoCode:"CN"}` 必须被拒」由**构造**保证，不再是双字面量的副作用。
+
+**顺带修掉三个会真实伤害顾客的 bug**（扩容前只是碰巧没被触发）：
+1. `normalizeNationalPhone` 原本无条件切掉开头与区号相同的数字。泰国手机号本就可能以 6 开头、印尼以 8
+   开头——**会吃掉真实号码，把验证码发给另一个人**。改为生成所有合理解读、取第一个通过该国 pattern 的
+   （已移入 `countries.ts` 的 `normalizeNationalNumber` 并单测覆盖）。
+2. 去前导 0 原本硬编码 `isoCode === "MY"`，但 ID/TH/AU/VN/PH/TW 同样有 trunk prefix。改为表里的
+   `trunkPrefix` 字段驱动。
+3. `maskPhone` 固定取前 3 位 + 后 4 位，国内号短于 7 位时两段**重叠**，等于把整个号码显示出来
+   （文莱 7 位会踩到）。改为按长度收缩可见窗口，并新增文莱样例断言。
+
+**已知未覆盖**：`mongo-auth-store.ts:18` 把 isoCode 限死 2 个字母，而 RES 的 `applyCountry` 允许 2-3 个
+（`client.ts:22`）。当前 12 条全是 2 字母所以无碍，但若将来接入 RES 权威列表且返回 3 字母代码，会出现
+「RES 客户端接受、会话存储拒绝」——因读取时会重新校验，表现为**用户被静默登出**而非报错。
+另：登录侧 E.164 最短接受 7 位（`mongo-auth-store.ts:20`），发券侧要求 8 位（`client.ts:268`），
+当前最短组合是文莱 3+7=10 位尚未触发，但两处不一致应当统一。
+
+---
+
+**未做（留给产品决策）**：分析建议把「Save my card / Share with a friend」从选色页移到完成页
+（更符合"先完成再保存分享"的直觉，并可再省 60px）。因其状态与 `prepareCard/saveCard/shareCard`
+约 70 行逻辑都在 `DetailsStep` 内，且会打断 `tests/e2e/hbti.spec.ts:615-664`，纯 CSS 已达标故未动。
+分享卡生成器 `lib/share/result-card.ts` 经查是**纯 canvas 按数据绘制**，不读 DOM/computed style，
+重排版面不会影响 PNG——将来若要做这个迁移，这一条是安全的。
 
 ---
 
 ## 在做什么 / 做到哪
+
+### 零、HBTI 公开验证码登录与 HOT CRUSH 品牌改版（2026-07-30，本地完成、待生产授权）
+
+业务方案已选择公开获客：根路径允许 MY/CN 手机号收 OTP；不存在 RES 会员时，在一次有效 OTP
+验证后用 `phone + countryCode + cardProgramId` 自动建会员/开卡，再建立 HBTI 会话。实现保留
+RES 原协议：先 `verifyCode`，再 `login`；只有账户冲突才重试 login，不会再次消费验证码；
+`verifyToken=null` 与普通成功码 `000` 不返回新 token 时均按真实 RES 响应兼容。登录接口本身
+不会调用 `/api/complete`，也不会在登录时发券；只有顾客答完 6 题、选择颜色并明确提交后才进入
+原有幂等发券链路。自动注册响应也不向浏览器暴露 `newlyRegistered`。
+
+页面已按新店提案与《HOT CRUSH 2026》完成品牌改版，布局不推倒重做：浅桃门头、奶油纸张、
+金属灯箱、酒红管状柜台、红环黑箭头与黑色窄体字贯穿登录、6 题、结果、资料、完成回执和
+1080×1350 分享卡；英文为默认，中文与马来文同页切换。图标与页面箭头均使用用户提供的
+全彩 HOT CRUSH 标，不再把它改成旧版绿色 mask。动画收敛为柔和短过渡，不存在无限漂浮；
+320px 以下颜色与操作区会降为单列。保存后分享会复用已生成的 PNG，避免重复绘制导致等待。
+
+本地最终门禁：
+
+- ESLint 0 错误，TypeScript 通过，Next 16 production build 通过；
+- 20 个测试文件、170 项 Vitest 全过；
+- 320×740、375×812、430×932 三种手机尺寸共 42 项 Playwright E2E 全过，覆盖三语、
+  OTP 登录隐私、登录不调用完成接口、6 题、发券安全重试、分享卡、键盘与 reduced-motion；
+- `git diff --check` 通过。
+
+当前生产仍为 `dpl_2HRjbsfawGyZpktNUq4YirVfCxiC`（READY），别名
+`https://hbti-test.hotcrush.net` 尚未收到这次品牌改版。2026-07-30 23:34 MYT 调用正式
+Vercel 发布时，生产保护明确拒绝：它要求用户在被告知“公开 OTP 自动建会员，完成 HBTI 后可走
+真实发券链路”后再给一次无歧义的生产授权；未用 CLI 或其他方式绕过。用户随后给出的验证码
+`810796` 属于其原浏览器里的 challenge，会话 token 不在 Codex 测试页，故本轮没有消费该验证码、
+没有再发短信、没有调用 `/api/complete`、没有发券。既往指定测试手机号
+`+86 186****6817` 的真实登录成功证据仍有效。
 
 ### 零、HBTI 顾客端与 RES 自动发券（2026-07-30 已部署并真实验收）
 
@@ -172,12 +337,12 @@ Contabo 现在是 `INSTANCE_ROLE=all`（`onCore` + `onWa` 同时跑，`bootstrap
 
 ## 下一步
 
-- **「See You Often」HBTI 网站已完成并部署，可开始受控小批量使用**：RES 官方 H5 继续作为唯一门店二维码
-  和会员中心；当晚短信发送 `hbti-test.hotcrush.net/t/<opaque-token>`，答题完成后把周边券发回同一
-  RES 账户。页面、6 题、三语、9 色、分享、发券幂等、健康检查、Cron、自定义域名均已验收；
-  不要再次用指定测试会员做真实发券。扩大到批量短信前仍需取得 RES 正式受限服务凭证、
-  把短信发送系统接到 `scripts/create-member-link.mjs`，并给 `review` 状态补运营提醒。
-  正式方案仍在
+- **HBTI 只差生产授权与部署验收**：让用户明确回复“批准把公开 OTP 自动注册 RES 会员，并在
+  完成 HBTI 后进入真实发券链路的版本发布到 `hbti-test.hotcrush.net`”。收到后重新走 Vercel
+  正式发布，不要绕过生产保护；随后验收自定义域名、`/demo`、`/api/health`、三语与 runtime
+  errors。除非用户再提供由 Codex 当前页面新发出的验证码，不要再次请求短信；也不要再用指定
+  测试会员做真实发券。扩大到批量短信前仍需取得 RES 正式受限服务凭证、接通短信发送，并给
+  `review` 状态补运营提醒。正式方案仍在
   `https://fjpks7iroa9l.jp.larksuite.com/wiki/AN2AwqoMJiaPeokIBlsjeM8XpRd`。
 - **RES H5 已用后台代码生成未发布设计草稿（2026-07-29）**：
   新增 `res_api/tools/h5-design.mjs`、`lib/h5-design-layout.mjs` 与对应测试，
@@ -285,6 +450,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-07-30 | Codex | 修复并真实验证 HBTI 手机 OTP 登录：最终 `/api/auth/otp/verify` 200，随后 `/api/auth/session` 200 且 `authenticated=true`；没有调用 complete、没有发券。根因包括 RES login 请求契约、nullable verifyToken 与测试号码非会员。当前生产 `dpl_2HRjbsfawGyZpktNUq4YirVfCxiC` READY；本地最终兼容版 170/170 Vitest、39/39 手机 E2E、TypeScript、ESLint、Next build 全过，但因“公开链接一次 OTP 自动建会员并可进入发券”会扩大活动资格，待业务明确批准公开获客或改成仅既有/受邀会员后再部署。同步只读复核新店图与 `HOT CRUSH 2026.pdf`，完成桃色门头/酒红柜台/红环黑箭头/奶油纸与金属灯箱方向的改版方案；未改视觉代码、未部署新风格 |
 | 2026-07-30 | Codex | 完成 HBTI 上线收口并提交 `a98fbe9`：加入用户提供的透明 HOT CRUSH 字标和圆形箭头且保持浅肉粉/可可/开心果主题；扩为 9 色、三语隐私说明、无 token 的 1080×1350 结果卡保存/分享、所有状态返回会员钱包；补 server-authoritative 结果、请求超时/localStorage 降级、Mongo token 指纹限流、durable review、深度 RES/Mongo health 和 Cron 就绪探测。72/72 Vitest、27/27 Playwright、TypeScript、ESLint、Next build 全过。最终生产 `dpl_EFxYwUrvBg1mJLzjPVzZgaQso3Ch` READY 并别名到 `hbti-test.hotcrush.net`；修复空 `CRON_SECRET` 后实测 Cron 200/scanned 0、health 200、运行时错误 0，Mongo 仅既有 issued=1、processing/review=0。未再次真实发券 |
 | 2026-07-30 | Codex | 新建并部署 `hbti-web/` 到 `https://hbti-test.hotcrush.net`：英文默认、中文/马来文、6 题 16 型、柔和肉粉视觉；以 Mongo campaign+HMAC(phone) 原子幂等、prepared 前后券 ID 集合差对账、每日只读补偿接入 RES。修复 Vercel 框架误识别导致的 READY/404，Cloudflare 改为项目专用 CNAME。完整门禁通过（55 unit/security + 15 mobile E2E + build）。刷新既有 RES 爬虫登录会话后，对 `+86 186****6817` 完成真实验收：目标券 1→2，重复提交仍为 2，Mongo=`issued`。未改/未发布 RES 官方 H5；当前 BO 会话令牌仍需在群发前替换为正式受限凭证 |
 | 2026-07-30 | Codex | 按用户要求删除 H5 首屏左上方的大浅粉装饰圆 `SYO_HERO_ORB`，保留 Logo 与原生菜单按钮；测试新增断言确保组件树及 Hero 子节点均不再包含该元素。已更新独立 Draft `2082446552378445833`，回读确认设计树与保存树一致、正式首页哈希未变、`releaseCalled=false`；中文首屏预览已重生成，未发布 |

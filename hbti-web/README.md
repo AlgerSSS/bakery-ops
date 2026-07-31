@@ -100,8 +100,10 @@ The Vercel project is `hotcrush-hbti`, with
 full release gate passes. Save the resulting deployment ID in `HANDOFF.md`.
 
 For rollback, promote the last verified Vercel deployment and re-run the health
-check. A rollback does not reverse coupons already issued in RES or completion
-records already stored in MongoDB.
+check. A rollback does not reverse coupons already issued in RES, nor completion
+records already written to `hbti_completion`. Migration 063 is additive — new
+tables and nullable columns only — so rolling the application back never
+requires touching the database.
 
 ## Safety boundary
 

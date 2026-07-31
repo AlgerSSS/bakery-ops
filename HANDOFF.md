@@ -61,18 +61,28 @@
 > ⚠️ `/api/health` 现在**同时**探 Postgres 与 RES。下面那条 `RES_VULCAN_TOKEN` 过期的问题
 > 不修的话，即使切库全部成功，health 仍会是 503。别把它误判成迁移失败。
 
-> 🔴 **生产未决问题：`RES_VULCAN_TOKEN` 已过期，发券链路是断的。**
-> 部署后验收发现 `/api/health` 返回 503。实测该令牌对 BO 接口返回 **HTTP 401「未授权」**。
-> 令牌是 2026-07-30 16:23 抓的后台会话，约 23 小时后自然失效——HANDOFF 早就警告过它「会过期、
-> 不是长期服务凭证」。**与本次部署无关**，部署前就已经是坏的。
+> ✅ **已解决（2026-07-31 15:5x）：`RES_VULCAN_TOKEN` 过期已换新，`/api/health` 从 503 回到 200。**
+> 旧令牌是 2026-07-30 16:23 抓的后台会话，约 24 小时后自然失效，对 BO 接口返回 401。
+> 影响面确认过：顾客登录/OTP 走 H5 每请求现取的访客令牌，**不依赖这个后台令牌**，所以登录和答题一直是好的；
+> 断的只是提交之后的发券，以及做券模板只读探测的 `/api/health`。
 >
-> 影响面：登录/OTP 走 H5 的每请求访客令牌，**不依赖这个后台令牌**，且 Vercel 上 `RES_H5_*` 四个变量
-> 齐全（19 小时前设置），所以顾客能登录、能答题；但提交后**发券会失败**。按既有设计这会安全失败
-> （锁清理或转人工复核），不会重复发券，但顾客拿不到奖励。
+> 处置过程中发现旧的换令牌脚本（`/tmp/sync-fresh-res-token-to-vercel.mjs`）**本身有个会挡住修复的 bug**：
+> 它断言「抓到的会话头 == 配置的头」，而**刚 `login.js` 完的会话落在集团级作用域**
+> （`organization-type=0`、没有 `brand-id`），于是每次重新登录后都会拒绝写入一个完全可用的令牌。
+> 这个前提本来就不成立——hbti-web 在 `src/lib/res/client.ts:317-321` 是拿自己 env 里的作用域头发请求的，
+> 只有 `vulcan-token` 来自会话。已改写并落进仓库：**`hbti-web/scripts/refresh-res-token.mjs`**
+> （只校验租户边界 `corporation-id` + `shop-id`，真正把关交给「用运行时头查券模板」的只读验证，支持 `--dry-run`）。
 >
-> 处置：用 `res_api/login.js` 重新登录抓取新令牌（需 `RESTOSUITE_EMAIL` / `RESTOSUITE_PASSWORD`，
-> 走 Playwright 真实登录），再 `vercel env rm RES_VULCAN_TOKEN production` + `vercel env add` 更新，
-> 然后重新部署。**根治方案仍是向 RES 申请受限服务凭证**，别再依赖会过期的后台会话。
+> 以后换令牌就三步：
+> ```bash
+> node ~/hot/res_api/login.js
+> cd ~/hot/hbti-web && node --env-file=.env.local scripts/refresh-res-token.mjs
+> npx vercel redeploy <当前生产 URL> --scope algersss-projects
+> ```
+> ⚠ 第三步**必须用 `redeploy`**，不要在 hbti-web 目录跑 `vercel --prod`——那会从本地工作树重新打包，
+> 在迁移 063 执行之前会把 Postgres 版推上生产、整站挂掉。`redeploy` 只复用源码重新注入环境变量。
+>
+> **根治方案仍是向 RES 申请受限服务凭证**，别再依赖每天要人工续一次、且没有任何告警的后台会话。
 
 > **2026-07-31 by Claude Code —— 本地视觉预览用的假环境文件正在生效，注意别被它坑到。**
 > 新增 `hbti-web/.env.development.local`（gitignored，全部假值）。Next 的加载优先级是

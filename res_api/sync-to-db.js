@@ -189,20 +189,25 @@ async function syncDailySalesRecord() {
     itemNames = t.dimOptions?.D_itemName || {};
   }
 
-  // Sum real qty per (date, product); dedupe date|hour|name like syncItemHourlySales
+  // 按 **稳定键** 去重，不是按显示名。r.name 就是 RES 的 menuItemNameKey
+  // （形如 {orgId}-{orgType}-{menuItemId}），显示名只是它的翻译。
+  // 实测有 3 组不同商品共用同一显示名，按名字去重会把第二个商品的销量整份丢掉。
   const seen = new Set();
   const byDate = new Map();
   for (const r of daily.itemsByDateHour) {
     if (!r.date || !r.name) continue;
-    const name = itemNames[r.name] || r.name;
-    const uid = `${r.date}|${r.hour}|${name}`;
+    const itemKey = r.name;
+    const name = itemNames[itemKey] || itemKey;
+    const uid = `${r.date}|${r.hour}|${itemKey}`;
     if (seen.has(uid)) continue;
     seen.add(uid);
     const qty = num(r.qty);
     if (!qty || qty <= 0) continue;
     if (!byDate.has(r.date)) byDate.set(r.date, new Map());
     const m = byDate.get(r.date);
-    m.set(name, (m.get(name) || 0) + qty);
+    // 按键分组：同名不同品必须是两行，合并会让单品销量凭空翻倍/消失。
+    const prev = m.get(itemKey);
+    m.set(itemKey, { name, qty: (prev?.qty || 0) + qty });
   }
 
   let count = 0;
@@ -210,12 +215,13 @@ async function syncDailySalesRecord() {
     for (const [date, products] of byDate) {
       const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
       await sql`DELETE FROM daily_sales_record WHERE date = ${date}`;
-      const batch = [...products].map(([name, qty]) => ({
-        product_name: name, standard_name: name, quantity: qty, date, day_of_week: dayOfWeek,
+      const batch = [...products].map(([itemKey, v]) => ({
+        item_key: itemKey, product_name: v.name, standard_name: v.name,
+        quantity: v.qty, date, day_of_week: dayOfWeek,
       }));
       for (let i = 0; i < batch.length; i += 200) {
         const chunk = batch.slice(i, i + 200);
-        await sql`INSERT INTO daily_sales_record ${sql(chunk, 'product_name', 'standard_name', 'quantity', 'date', 'day_of_week')}`;
+        await sql`INSERT INTO daily_sales_record ${sql(chunk, 'item_key', 'product_name', 'standard_name', 'quantity', 'date', 'day_of_week')}`;
       }
       count += batch.length;
     }
@@ -309,11 +315,13 @@ async function syncItemHourlySales() {
   const batch = [];
   for (const r of daily.itemsByDateHour) {
     if (!r.date || !r.name) continue;
-    const name = itemNames[r.name] || r.name;
-    const uid = `${r.date}|${r.hour}|${name}`;
+    // r.name 是 RES 的稳定商品键；显示名会重复也会改，只能当展示用。
+    const itemKey = r.name;
+    const name = itemNames[itemKey] || itemKey;
+    const uid = `${r.date}|${r.hour}|${itemKey}`;
     if (seen.has(uid)) continue;
     seen.add(uid);
-    batch.push({ date: r.date, hour: Number(r.hour), item_name: name, qty: r.qty || 0, net_sales: r.netSales || 0, gross_sales: r.grossSales || 0 });
+    batch.push({ date: r.date, hour: Number(r.hour), item_key: itemKey, item_name: name, qty: r.qty || 0, net_sales: r.netSales || 0, gross_sales: r.grossSales || 0 });
   }
 
   // Clear and bulk insert in chunks — atomic per run so a mid-sync crash
@@ -349,7 +357,7 @@ async function syncItemHourlySales() {
     }
     for (let i = 0; i < batch.length; i += 500) {
       const chunk = batch.slice(i, i + 500);
-      await sql`INSERT INTO item_hourly_sales ${sql(chunk, 'date', 'hour', 'item_name', 'qty', 'net_sales', 'gross_sales')}`;
+      await sql`INSERT INTO item_hourly_sales ${sql(chunk, 'date', 'hour', 'item_key', 'item_name', 'qty', 'net_sales', 'gross_sales')}`;
     }
   });
   // 当天无法证明是零流水日时记 PARTIAL：其他日期已经写进去了，但第 5 步不许据此重建基线
@@ -488,12 +496,13 @@ async function syncItemWaste() {
   const batch = [];
   for (const r of daily.itemWaste) {
     if (!r.date || !r.name) continue;
-    const name = itemNames[r.name] || r.name;
+    const itemKey = r.name;
+    const name = itemNames[itemKey] || itemKey;
     const reason = REASON_MAP[r.reason] || r.reason || 'other';
-    const uid = `${r.date}|${name}|${reason}`;
+    const uid = `${r.date}|${itemKey}|${reason}`;
     if (seen.has(uid)) continue;
     seen.add(uid);
-    batch.push({ date: r.date, item_name: name, waste_reason: reason, qty: r.qty || 0, amount: r.amount || 0 });
+    batch.push({ date: r.date, item_key: itemKey, item_name: name, waste_reason: reason, qty: r.qty || 0, amount: r.amount || 0 });
   }
 
   // Delete existing and bulk insert — atomic per run (IMPROVEMENT-PLAN.md A4)
@@ -504,7 +513,7 @@ async function syncItemWaste() {
     }
     for (let i = 0; i < batch.length; i += 500) {
       const chunk = batch.slice(i, i + 500);
-      await sql`INSERT INTO item_waste ${sql(chunk, 'date', 'item_name', 'waste_reason', 'qty', 'amount')}`;
+      await sql`INSERT INTO item_waste ${sql(chunk, 'date', 'item_key', 'item_name', 'waste_reason', 'qty', 'amount')}`;
     }
   });
   return batch.length;
@@ -530,11 +539,12 @@ async function syncItemLastSale() {
   const byKey = new Map();
   for (const r of data.rows) {
     if (!r.date || !r.id || !r.lastTime) continue;
-    const name = itemNames[r.id] || r.id;
-    const key = `${r.date}|${name}`;
+    const itemKey = r.id;
+    const name = itemNames[itemKey] || itemKey;
+    const key = `${r.date}|${itemKey}`;
     const cur = byKey.get(key);
     if (!cur || r.lastTime > cur.last_sale_time) {
-      byKey.set(key, { date: r.date, item_name: name, last_sale_time: r.lastTime, day_qty: (cur?.day_qty || 0) + (Number(r.dayQty) || 0) });
+      byKey.set(key, { date: r.date, item_key: itemKey, item_name: name, last_sale_time: r.lastTime, day_qty: (cur?.day_qty || 0) + (Number(r.dayQty) || 0) });
     } else {
       cur.day_qty += Number(r.dayQty) || 0;
     }
@@ -546,7 +556,7 @@ async function syncItemLastSale() {
     for (const d of dates) await sql`DELETE FROM item_last_sale WHERE date = ${d}`;
     for (let i = 0; i < batch.length; i += 500) {
       const chunk = batch.slice(i, i + 500);
-      await sql`INSERT INTO item_last_sale ${sql(chunk, 'date', 'item_name', 'last_sale_time', 'day_qty')}`;
+      await sql`INSERT INTO item_last_sale ${sql(chunk, 'date', 'item_key', 'item_name', 'last_sale_time', 'day_qty')}`;
     }
   });
   return batch.length;

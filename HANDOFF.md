@@ -11,13 +11,21 @@
 | | |
 |---|---|
 | 最后更新 | 2026-07-31 by Claude Code（Postgres 迁移侧） |
-| 当前分支 | `codex/hbti-launch-ready`（领先 origin/main 6 个提交，**未 push**） |
+| 当前分支 | `codex/hbti-launch-ready`（领先 origin/main 7 个提交，**未 push**） |
 | 工作区 | 干净 |
-| 线上（Vercel） | `hbti-test.hotcrush.net` = `dpl_B5yHQEEENcBZd2ZoStGQcTGprY4R`（**Postgres 版，2026-07-31 16:25 上线**），`/api/health` 200 |
+| 线上（Vercel） | `hbti-test.hotcrush.net` = `hotcrush-hbti-d67rzzup9`（**Postgres 版，已彻底摘除 Mongo**），`/api/health` 200 |
 | 线上（Contabo） | res_api + bakery-ops 已于 2026-07-31 重新 rsync，`hotcrush-core` active，role=all |
 
-> ✅ **HBTI 切库已全部完成并上线（2026-07-31 16:2x）。** 四步清单已执行完毕，详见下节。
-> MongoDB 已不在应用的任何读写路径上；`MONGODB_URI` 仍留在 Vercel 上，只服务于一次性迁移脚本。
+> ✅ **HBTI 切库已全部完成并上线，MongoDB 已彻底摘除（2026-07-31 16:3x）。**
+> 拆除前审计过 Mongo 剩余内容：`completions` 1 条（已迁移且哈希与 `hbti_completion` 一致）、
+> `auth_rate_limits` 2 条（分钟级失效的限流窗口计数）、其余集合皆空——没有任何还有价值的数据。
+> 已删除：Vercel 的 `MONGODB_URI`、`mongodb` devDependency、一次性迁移脚本。
+> **删除后重新部署并验收，`/api/health` 仍为 200** ——这一步是有意为之：`MONGODB_URI` 已不存在，
+> 如果还有任何代码路径依赖它，这次部署就会暴露。
+>
+> ⚠️ 连接串仍保留在**未跟踪的 `hbti-web/.env.local`** 里，这是刻意的：删掉我们最后一份副本
+> 并不会删除 Atlas 上的顾客数据，只会让我们再也够不到它。**等 Atlas 上的库真正销毁之后，
+> 再把 `.env.local` 里那一行删掉。**
 
 ---
 
@@ -50,19 +58,18 @@
 库内状态：`pos_member` 4838 行、画像 0 条、`snapshot_date` 为空 0 行（还没有顾客完成），
 `hbti_completion` 1 条，三张认证/限流表 0 条。
 
-### 没做完的两件事
+### 还剩一件没做完
 
 - **`/api/cron/reconcile` 没能主动验证。** `CRON_SECRET` 在 Vercel 上是 Sensitive 类型，
   `vercel env pull` 拉回来是空值（设计如此，不是故障），所以本地无法带凭证去打它。
   无凭证访问返回 401，说明鉴权分支是通的。它调用的 `reconcilePendingCompletions` 与 `purgeExpired`
   都已在 `tests/pg-stores.integration.test.ts` 里对真实库验证过，且当前 prepared 记录为 0、无事可做。
   **首次真实运行是每天 19:00 UTC（03:00 MYT）的 Vercel Cron——第二天早上去 Vercel 日志确认一次。**
-- **清理未做**（刻意留到观察一段时间之后）：Vercel 上的 `MONGODB_URI`、
-  `package.json` 里的 `mongodb` devDependency、`scripts/migrate-mongo-to-postgres.mjs`。
-  留着它们的成本只是一点噪音，删早了万一要回滚就得重新装。
 
-> **回滚预案**：迁移是纯增量（新表 + 可空新列），所以回滚只需在 Vercel 控制台把上一个 Mongo 版部署
-> Promote 回生产，数据库不用动，也不会丢数据。
+> **回滚预案**：迁移 063 是纯增量（新表 + 可空新列），所以回滚只需在 Vercel 控制台把
+> **上一个 Postgres 版部署**（`hotcrush-hbti-b6iqhi0yi`）Promote 回生产，数据库不用动、不丢数据。
+> ⚠️ **不要再回滚到更早的 Mongo 版部署**：`MONGODB_URI` 已从 Vercel 删除，那些构建启动即失败。
+> 真要退回 Mongo，得先把连接串（还在 `hbti-web/.env.local`）重新加回 Vercel。
 
 > ✅ **已解决（2026-07-31 15:5x）：`RES_VULCAN_TOKEN` 过期已换新，`/api/health` 从 503 回到 200。**
 > 旧令牌是 2026-07-30 16:23 抓的后台会话，约 24 小时后自然失效，对 BO 接口返回 401。

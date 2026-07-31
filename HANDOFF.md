@@ -11,55 +11,58 @@
 | | |
 |---|---|
 | 最后更新 | 2026-07-31 by Claude Code（Postgres 迁移侧） |
-| 当前分支 | `codex/hbti-launch-ready`（领先 origin/main 5 个提交，**未 push**） |
+| 当前分支 | `codex/hbti-launch-ready`（领先 origin/main 6 个提交，**未 push**） |
 | 工作区 | 干净 |
-| 线上（Vercel） | `hbti-test.hotcrush.net` = `dpl_BukUV8gDmLXws8GuxFQTZ4kr8BUw`（Mongo 版）。**Postgres 版已就绪但未部署** |
+| 线上（Vercel） | `hbti-test.hotcrush.net` = `dpl_B5yHQEEENcBZd2ZoStGQcTGprY4R`（**Postgres 版，2026-07-31 16:25 上线**），`/api/health` 200 |
 | 线上（Contabo） | res_api + bakery-ops 已于 2026-07-31 重新 rsync，`hotcrush-core` active，role=all |
 
-> ⚠️ **hbti-web 的存储层已从 MongoDB 换成共享 Supabase，代码已提交但没有部署，
-> 而且它依赖一条还没执行的数据库迁移。** 在迁移 063 执行、Vercel 环境变量补齐之前，
-> 不要部署 hbti-web —— 现在部署会让所有 `hbti_*` 表查询报 42P01（表不存在），
-> 顾客端从登录起就全线不可用。展开步骤见下面「HBTI 切库：剩余人工步骤」。
->
-> 迁移方（本条作者）已接手并完成代码侧，上面那三条提醒的落实情况：
-> ① Vercel 变量还没配，是下面清单的第 2 步；② `.env.development.local` 确认已不存在，
-> 本地 `npm run dev` 直连生产库，点击时注意别真发短信；③ 端口 3000 未占用。
+> ✅ **HBTI 切库已全部完成并上线（2026-07-31 16:2x）。** 四步清单已执行完毕，详见下节。
+> MongoDB 已不在应用的任何读写路径上；`MONGODB_URI` 仍留在 Vercel 上，只服务于一次性迁移脚本。
 
 ---
 
-## HBTI 切库：剩余人工步骤
+## HBTI 切库：四步已全部执行（2026-07-31）
 
-代码全部完成并通过门禁，**四步都要做完才能部署**，顺序不能换：
+1. **迁移 063 已执行** —— `schema_migrations` 62 → 63，public 表 105 → 109，
+   `pos_member` 26 → 34 列，行数仍 4838。只统计原有 26 列的全表 digest 执行前后完全相同
+   （`4ebcc95a3c2f66d0b0d6e2d807db09b3`），**既有数据零变化**。四张新表 RLS 开启、零 policy、匿名零权限。
+   `node test/db-integration.js --all` 通过。
+   执行时间 KL 16:19，超出文档建议窗口——判断依据与前后对照见财务仓库 HANDOFF「迁移 063 执行记录」。
 
-1. **执行迁移 063**（KL 01:00–13:00，避开 23:00 爬虫与 14:20 intraday）：
-   ```bash
-   cd /tmp/hotcrush-finance-semi-price-fix   # 分支 claude/hbti-member-profile
-   node --env-file=<有 DATABASE_URL 的 .env> scripts/apply-migrations.js
-   ```
-   执行前可以再跑一次只读回滚验收：`DATABASE_URL=… node test/verify-063-rollback.mjs`（21/21）。
+2. **Vercel 变量已配** —— `DATABASE_URL` 已加到 **Production + Development**。
+   Preview 未加：Vercel 要求 preview 变量绑定到具体 git 分支，生产部署用不到。
+   `HBTI_MEMBER_STORE` **刻意不设**：已核实 `res_api/.env` 没有覆盖 `MEMBER_STORE`，
+   走的是 `sync-member.mjs:24` 的默认值 `吉隆坡Pavilion门店`，而库里 4838 行的 `store` 也全是这个值——
+   两侧默认值一致，多设一个变量只会多一个漂移点。
 
-2. **给 Vercel 项目 `hotcrush-hbti` 加变量**（Production / Preview / Development 三个环境）：
-   - `DATABASE_URL` —— 与财务站、res_api 同一个共享库、同一个 `postgres` 角色。
-   - `HBTI_MEMBER_STORE` —— 可选，留空即默认 `吉隆坡Pavilion门店`。
-     **必须与 `res_api` 的 `MEMBER_STORE` 完全一致**，否则同一个会员会被写成两行。
-   - `MONGODB_URI` 先留着别删，第 3 步还要用。
+3. **历史幂等记录已搬** —— Mongo 里那 1 条 `issued`（`2026-08-pistachio-v1` /
+   `Pistachio Green Jewel`，确认于 2026-07-30 16:29 MYT）已进 `hbti_completion`。
+   `member_id` 为空，符合预期：`rewardContext` 只存在于 prepared 态，issued 记录里本来就没有会员 ID，
+   手机号又是 HMAC、反查不回来。它的作用是防重复发券，这一点不受影响。
+   同键重放实测 0 行受影响，脚本可安全重跑。
 
-3. **搬历史幂等记录**（生产 Mongo 里目前只有 1 条 `issued`，但它是防重复发券的凭证，丢不得）：
-   ```bash
-   cd hbti-web
-   node --env-file=.env.local scripts/migrate-mongo-to-postgres.mjs --dry-run
-   node --env-file=.env.local scripts/migrate-mongo-to-postgres.mjs --apply
-   ```
-   Mongo 侧只读，Postgres 侧 `ON CONFLICT DO NOTHING`，可以重复跑。
-   只搬 `completions`；challenge / session / rate-limit 都是分钟到小时级的工作态，
-   最坏影响是切换瞬间正在答题的顾客要重新登录一次。
+4. **已部署** —— `dpl_B5yHQEEENcBZd2ZoStGQcTGprY4R`，已别名到 `hbti-test.hotcrush.net`。
 
-4. **部署**，然后验收 `/api/health`、OTP 登录、答题、`/api/cron/reconcile`。
-   确认无误后再从 Vercel 删掉 `MONGODB_URI`，并把 `mongodb` 从 devDependencies 和
-   `scripts/migrate-mongo-to-postgres.mjs` 一起删掉。
+**上线后验收**：`/api/health` 连测三次全 200 —— 这条是决定性证据，因为它执行的是
+`SELECT 1 FROM hbti_completion`，**只有 Postgres 版真的上线且连上库才可能返回 200**。
+`/`、`/demo` 200；`/api/session` 410（已退役的 token 入口）；`/api/auth/session` 无 cookie 返回
+`{"authenticated":false}`；`/api/complete` 空请求体 400。
+库内状态：`pos_member` 4838 行、画像 0 条、`snapshot_date` 为空 0 行（还没有顾客完成），
+`hbti_completion` 1 条，三张认证/限流表 0 条。
 
-> ⚠️ `/api/health` 现在**同时**探 Postgres 与 RES。下面那条 `RES_VULCAN_TOKEN` 过期的问题
-> 不修的话，即使切库全部成功，health 仍会是 503。别把它误判成迁移失败。
+### 没做完的两件事
+
+- **`/api/cron/reconcile` 没能主动验证。** `CRON_SECRET` 在 Vercel 上是 Sensitive 类型，
+  `vercel env pull` 拉回来是空值（设计如此，不是故障），所以本地无法带凭证去打它。
+  无凭证访问返回 401，说明鉴权分支是通的。它调用的 `reconcilePendingCompletions` 与 `purgeExpired`
+  都已在 `tests/pg-stores.integration.test.ts` 里对真实库验证过，且当前 prepared 记录为 0、无事可做。
+  **首次真实运行是每天 19:00 UTC（03:00 MYT）的 Vercel Cron——第二天早上去 Vercel 日志确认一次。**
+- **清理未做**（刻意留到观察一段时间之后）：Vercel 上的 `MONGODB_URI`、
+  `package.json` 里的 `mongodb` devDependency、`scripts/migrate-mongo-to-postgres.mjs`。
+  留着它们的成本只是一点噪音，删早了万一要回滚就得重新装。
+
+> **回滚预案**：迁移是纯增量（新表 + 可空新列），所以回滚只需在 Vercel 控制台把上一个 Mongo 版部署
+> Promote 回生产，数据库不用动，也不会丢数据。
 
 > ✅ **已解决（2026-07-31 15:5x）：`RES_VULCAN_TOKEN` 过期已换新，`/api/health` 从 503 回到 200。**
 > 旧令牌是 2026-07-30 16:23 抓的后台会话，约 24 小时后自然失效，对 BO 接口返回 401。

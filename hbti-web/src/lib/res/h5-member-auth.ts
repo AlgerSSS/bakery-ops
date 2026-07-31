@@ -321,8 +321,8 @@ export class ResH5MemberAuthClient {
       rawLogin,
       "login_response",
     );
-    assertLoginSuccess(login, rawLogin);
-    const resToken =
+    assertAccountSuccess(login, rawLogin, "login_rejected");
+    let resToken =
       login.code === "CRM-00-0000"
         ? parseExternal(
             rotatedLoginEnvelopeSchema,
@@ -372,11 +372,22 @@ export class ResH5MemberAuthClient {
       registrationPayload,
       "register_response",
     );
-    assertSuccess(
+    assertAccountSuccess(
       registration,
       registrationPayload,
       "register_rejected",
     );
+
+    // Registering rotates the session token the same way logging in does, and
+    // the pre-registration token stops resolving the account once it has. Read
+    // the member back with the token RES just handed us, not the stale one.
+    if (registration.code === "CRM-00-0000") {
+      resToken = parseExternal(
+        rotatedLoginEnvelopeSchema,
+        registrationPayload,
+        "register_response",
+      ).data.token;
+    }
 
     const registeredUserInfo = await this.getUserInfo(
       resToken,
@@ -520,16 +531,23 @@ function assertSuccess(
   }
 }
 
-function assertLoginSuccess(
+/**
+ * RES answers the account endpoints with either "000" or "CRM-00-0000", and
+ * "CRM-00-0000" additionally carries a rotated session token in data.token.
+ * Both mean success; only the auth surface uses this second form.
+ */
+function isAccountSuccessCode(code: string): boolean {
+  return code === "000" || code === "CRM-00-0000";
+}
+
+function assertAccountSuccess(
   response: { code: string },
   payload: ResH5HttpPayload,
+  stage: ResH5AuthDiagnosticStage,
 ): void {
-  if (
-    response.code !== "000" &&
-    response.code !== "CRM-00-0000"
-  ) {
+  if (!isAccountSuccessCode(response.code)) {
     throw createDiagnosticError(
-      "login_rejected",
+      stage,
       payload,
       "RES H5 returned an unsuccessful response.",
     );

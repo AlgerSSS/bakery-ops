@@ -300,6 +300,78 @@ describe("ResH5MemberAuthClient", () => {
     });
   });
 
+  // Production regression, 2026-07-31. Every brand-new phone number failed with
+  // stage "register_rejected" while the one already-registered test account
+  // sailed through, because register was only accepting "000". Real RES answers
+  // register the same way it answers login: "CRM-00-0000" plus a rotated token.
+  // The mock below is the exact envelope observed in the Vercel logs.
+  it("accepts the CRM-00-0000 register envelope and reads the member back with the rotated token", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: "000",
+          data: { verificationId: "verification-1" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: "CRM-00-0000",
+          data: {
+            authorizeInfo: { customer: true },
+            token: "login-rotated-token",
+            verifyToken: "register-proof",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: "000",
+          data: { customerId: null, isMember: false },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: "CRM-00-0000",
+          data: {
+            authorizeInfo: { customer: true },
+            token: "register-rotated-token",
+            verifyToken: null,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          code: "000",
+          data: { customerId: 9002, isMember: true },
+        }),
+      );
+    const client = new ResH5MemberAuthClient(config, fetcher);
+
+    await expect(
+      client.verifyLoginAndEnsureMember({
+        session: { deviceId: "device-123", token: "guest-token" },
+        phone: {
+          phone: "1161234567",
+          isoCode: "MY",
+          countryCode: "60",
+        },
+        code: "451801",
+      }),
+    ).resolves.toEqual({
+      memberId: "9002",
+      resToken: "register-rotated-token",
+      newlyRegistered: true,
+    });
+
+    // The read-back must use the token register just issued. Sending the
+    // pre-registration token here is what made the member look absent and
+    // turned a successful registration into a 503.
+    expect(fetcher.mock.calls[4][1]?.headers).toMatchObject({
+      token: "register-rotated-token",
+    });
+  });
+
   it("registers a verified non-member once and then requires member readback", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

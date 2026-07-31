@@ -16,6 +16,20 @@
 | 线上（Vercel） | `hbti-test.hotcrush.net` = `dpl_BukUV8gDmLXws8GuxFQTZ4kr8BUw`（2026-07-31 部署，READY） |
 | 线上（Contabo） | res_api + bakery-ops 已于 2026-07-31 重新 rsync，`hotcrush-core` active，role=all |
 
+> ⚠️ **正在进行中：另一个工具在做 MongoDB → Postgres 迁移（2026-07-31 14:56 起）。**
+> 本节以下内容由 Claude Code 于 14:38 提交、14:50 部署，**早于该迁移 6 分钟**，
+> 线上 `dpl_BukUV8gDmLXws8GuxFQTZ4kr8BUw` 跑的是 Mongo 版，不含任何迁移中间态（已核对构建日志时间戳）。
+> 迁移方的未提交改动（`pg-auth-store.ts` / `pg-completion-store.ts` / `pg-rate-limit.ts` / `src/lib/db/`，
+> 以及被删除的三个 mongo-* 存储）**我一律没有碰、没有提交**。
+>
+> 给迁移方三条：
+> 1. **部署前必须先在 Vercel 配好 Postgres 连接变量**。当前生产只有 `MONGODB_URI`
+>    （`vercel env ls production` 可查）。切到 pg 存储后若不加变量，登录与发券会一起挂。
+> 2. 我原本放了一个 `hbti-web/.env.development.local`（全假值，用于本地预览时不碰生产库）。
+>    **它会静默盖掉 `MONGODB_URI`，对正在调数据库的人是陷阱，已于 14:38 后删除。**
+>    现在 `npm run dev` 会直接连生产库——本地点击注意别真发短信。
+> 3. Next 16 不允许两个 dev server 并存。我的已停，端口 3000 空着。
+
 > 🔴 **生产未决问题：`RES_VULCAN_TOKEN` 已过期，发券链路是断的。**
 > 部署后验收发现 `/api/health` 返回 503。实测该令牌对 BO 接口返回 **HTTP 401「未授权」**。
 > 令牌是 2026-07-30 16:23 抓的后台会话，约 23 小时后自然失效——HANDOFF 早就警告过它「会过期、

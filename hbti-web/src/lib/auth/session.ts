@@ -1,7 +1,7 @@
 import {
   createAuthStoreFromEnv,
   type AuthSession,
-} from "@/lib/auth/mongo-auth-store";
+} from "@/lib/auth/pg-auth-store";
 import { readHbtiSessionCookie } from "@/lib/auth/session-cookie";
 
 export async function readHbtiAuthSession(

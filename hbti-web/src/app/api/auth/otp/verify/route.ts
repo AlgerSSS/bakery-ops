@@ -4,8 +4,8 @@ import { z } from "zod";
 import { getJsonMutationRejection, noStoreJson } from "@/lib/auth/http";
 import {
   createAuthStoreFromEnv,
-  type MongoAuthStore,
-} from "@/lib/auth/mongo-auth-store";
+  type PgAuthStore,
+} from "@/lib/auth/pg-auth-store";
 import { maskAuthPhone } from "@/lib/auth/phone";
 import { createResH5MemberAuthClientFromEnv } from "@/lib/auth/res-auth-client";
 import { setHbtiSessionCookie } from "@/lib/auth/session-cookie";
@@ -27,7 +27,7 @@ const requestSchema = z.strictObject({
 });
 
 interface AcquiredChallenge {
-  store: MongoAuthStore;
+  store: PgAuthStore;
   token: string;
 }
 

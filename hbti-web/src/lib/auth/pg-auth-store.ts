@@ -6,8 +6,21 @@ import {
   randomBytes,
 } from "node:crypto";
 
-import { MongoClient, type Collection } from "mongodb";
 import { z } from "zod";
+
+import { getDb, type SqlRunner } from "@/lib/db/postgres";
+
+/**
+ * OTP 挑战与登录会话存在 `hbti_auth_challenge` / `hbti_auth_session`（迁移 063）。
+ *
+ * ⚠ 加密没有随迁库一起去掉，这是有意的。payload 仍然是用 HBTI_AUTH_SECRET 派生密钥做的
+ * AES-256-GCM 密文，明文含手机号与 RES token。这个库同时被财务站、爬虫、bakery-ops 和
+ * Contabo 的脚本连着——把 RES 后台会话令牌以明文摊在上面，等于把发券权限交给任何一个
+ * 拿到只读连接串的人。行主键存的也只是令牌的 sha256，不是令牌本身。
+ *
+ * Mongo 的 findOneAndUpdate 条件更新在这里对应「UPDATE ... WHERE <判词> RETURNING」，
+ * 单条语句内原子，语义与原来一一对应。
+ */
 
 export const AUTH_CHALLENGE_TTL_MS = 10 * 60 * 1_000;
 export const AUTH_SESSION_TTL_MS = 2 * 60 * 60 * 1_000;
@@ -40,46 +53,29 @@ const encryptedPayloadSchema = z.strictObject({
   ciphertext: z.string().regex(/^[A-Za-z0-9_-]+$/),
 });
 
-const authChallengeDocumentSchema = encryptedPayloadSchema.extend({
-  _id: z.string().regex(/^[a-f0-9]{64}$/),
+const challengeRowSchema = z.strictObject({
+  token_hash: z.string().regex(/^[a-f0-9]{64}$/),
   state: z.enum(["pending", "verifying", "consumed"]),
   attempts: z.number().int().min(0).max(AUTH_MAX_VERIFY_ATTEMPTS),
-  createdAt: z.date(),
-  expiresAt: z.date(),
+  payload: encryptedPayloadSchema,
+  created_at: z.date(),
+  expires_at: z.date(),
 });
 
-const authSessionDocumentSchema = encryptedPayloadSchema.extend({
-  _id: z.string().regex(/^[a-f0-9]{64}$/),
-  createdAt: z.date(),
-  expiresAt: z.date(),
+const sessionRowSchema = z.strictObject({
+  token_hash: z.string().regex(/^[a-f0-9]{64}$/),
+  payload: encryptedPayloadSchema,
+  created_at: z.date(),
+  expires_at: z.date(),
 });
 
 export type AuthPhoneIdentity = z.infer<typeof authPhoneIdentitySchema>;
 export type PendingAuthPayload = z.infer<typeof pendingAuthPayloadSchema>;
 export type AuthSessionPayload = z.infer<typeof authSessionPayloadSchema>;
 
-interface EncryptedPayload {
-  version: 1;
-  iv: string;
-  tag: string;
-  ciphertext: string;
-}
+type EncryptedPayload = z.infer<typeof encryptedPayloadSchema>;
 
-interface AuthChallengeDocument extends EncryptedPayload {
-  _id: string;
-  state: "pending" | "verifying" | "consumed";
-  attempts: number;
-  createdAt: Date;
-  expiresAt: Date;
-}
-
-interface AuthSessionDocument extends EncryptedPayload {
-  _id: string;
-  createdAt: Date;
-  expiresAt: Date;
-}
-
-export interface MongoAuthStoreOptions {
+export interface PgAuthStoreOptions {
   now?: () => number;
 }
 
@@ -106,17 +102,16 @@ export interface AuthSession {
   draftKey: string;
 }
 
-export class MongoAuthStore {
+export class PgAuthStore {
   private readonly challengeEncryptionKey: Buffer;
   private readonly sessionEncryptionKey: Buffer;
   private readonly draftHmacKey: Buffer;
   private readonly now: () => number;
 
   constructor(
-    private readonly challenges: Collection<AuthChallengeDocument>,
-    private readonly sessions: Collection<AuthSessionDocument>,
+    private readonly sql: SqlRunner,
     secret: string,
-    options: MongoAuthStoreOptions = {},
+    options: PgAuthStoreOptions = {},
   ) {
     const secretBytes = Buffer.from(secret, "utf8");
     if (secretBytes.byteLength < 32) {
@@ -130,10 +125,7 @@ export class MongoAuthStore {
       secretBytes,
       "hbti-auth:v1:session-encryption",
     );
-    this.draftHmacKey = deriveKey(
-      secretBytes,
-      "hbti-auth:v1:draft-hmac",
-    );
+    this.draftHmacKey = deriveKey(secretBytes, "hbti-auth:v1:draft-hmac");
     this.now = options.now ?? Date.now;
   }
 
@@ -144,14 +136,15 @@ export class MongoAuthStore {
     const token = randomToken();
     const createdAt = validNow(this.now());
     const expiresAt = new Date(createdAt.getTime() + AUTH_CHALLENGE_TTL_MS);
-    await this.challenges.insertOne({
-      _id: tokenHash(token),
-      state: "pending",
-      attempts: 0,
-      createdAt,
-      expiresAt,
-      ...encryptPayload(parsedPayload, this.challengeEncryptionKey),
-    });
+    const encrypted = encryptPayload(
+      parsedPayload,
+      this.challengeEncryptionKey,
+    );
+    await this.sql`
+      INSERT INTO hbti_auth_challenge (token_hash, state, attempts, payload, created_at, expires_at)
+      VALUES (${tokenHash(token)}, 'pending', 0, ${this.sql.json(encrypted)},
+              ${createdAt}, ${expiresAt})
+    `;
     return { token, expiresAt };
   }
 
@@ -160,30 +153,28 @@ export class MongoAuthStore {
       return null;
     }
     const now = validNow(this.now());
-    const document = await this.challenges.findOneAndUpdate(
-      {
-        _id: tokenHash(token),
-        state: "pending",
-        attempts: { $lt: AUTH_MAX_VERIFY_ATTEMPTS },
-        expiresAt: { $gt: now },
-      },
-      {
-        $set: { state: "verifying" },
-        $inc: { attempts: 1 },
-      },
-      { returnDocument: "after" },
-    );
-    const parsedDocument = authChallengeDocumentSchema.safeParse(document);
+    // 单条语句里同时占用 pending 态并自增 attempts —— 对应 Mongo 的 findOneAndUpdate。
+    // 拆成先读后写会让两个并发请求各拿一次尝试次数，把 5 次上限变成实际无上限。
+    const rows = await this.sql`
+      UPDATE hbti_auth_challenge
+         SET state = 'verifying', attempts = attempts + 1
+       WHERE token_hash = ${tokenHash(token)}
+         AND state = 'pending'
+         AND attempts < ${AUTH_MAX_VERIFY_ATTEMPTS}
+         AND expires_at > ${now}
+      RETURNING token_hash, state, attempts, payload, created_at, expires_at
+    `;
+    const parsed = challengeRowSchema.safeParse(rows[0]);
     if (
-      !parsedDocument.success ||
-      parsedDocument.data._id !== tokenHash(token) ||
-      parsedDocument.data.state !== "verifying" ||
-      parsedDocument.data.expiresAt <= now
+      !parsed.success ||
+      parsed.data.token_hash !== tokenHash(token) ||
+      parsed.data.state !== "verifying" ||
+      parsed.data.expires_at <= now
     ) {
       return null;
     }
     const payload = decryptAndValidate(
-      parsedDocument.data,
+      parsed.data.payload,
       this.challengeEncryptionKey,
       pendingAuthPayloadSchema,
     );
@@ -192,8 +183,8 @@ export class MongoAuthStore {
     }
     return {
       payload,
-      attempts: parsedDocument.data.attempts,
-      expiresAt: parsedDocument.data.expiresAt,
+      attempts: parsed.data.attempts,
+      expiresAt: parsed.data.expires_at,
     };
   }
 
@@ -201,16 +192,14 @@ export class MongoAuthStore {
     if (!isRawToken(token)) {
       return false;
     }
-    const result = await this.challenges.updateOne(
-      {
-        _id: tokenHash(token),
-        state: "verifying",
-        attempts: { $lt: AUTH_MAX_VERIFY_ATTEMPTS },
-        expiresAt: { $gt: validNow(this.now()) },
-      },
-      { $set: { state: "pending" } },
-    );
-    return result.modifiedCount === 1;
+    const result = await this.sql`
+      UPDATE hbti_auth_challenge SET state = 'pending'
+       WHERE token_hash = ${tokenHash(token)}
+         AND state = 'verifying'
+         AND attempts < ${AUTH_MAX_VERIFY_ATTEMPTS}
+         AND expires_at > ${validNow(this.now())}
+    `;
+    return result.count === 1;
   }
 
   async markConflict(token: string, code: string): Promise<boolean> {
@@ -218,23 +207,23 @@ export class MongoAuthStore {
       return false;
     }
     const now = validNow(this.now());
-    const expectedId = tokenHash(token);
-    const document = await this.challenges.findOne({
-      _id: expectedId,
-      state: "verifying",
-      expiresAt: { $gt: now },
-    });
-    const parsedDocument = authChallengeDocumentSchema.safeParse(document);
+    const expectedHash = tokenHash(token);
+    const rows = await this.sql`
+      SELECT token_hash, state, attempts, payload, created_at, expires_at
+        FROM hbti_auth_challenge
+       WHERE token_hash = ${expectedHash} AND state = 'verifying' AND expires_at > ${now}
+    `;
+    const parsed = challengeRowSchema.safeParse(rows[0]);
     if (
-      !parsedDocument.success ||
-      parsedDocument.data._id !== expectedId ||
-      parsedDocument.data.state !== "verifying" ||
-      parsedDocument.data.expiresAt <= now
+      !parsed.success ||
+      parsed.data.token_hash !== expectedHash ||
+      parsed.data.state !== "verifying" ||
+      parsed.data.expires_at <= now
     ) {
       return false;
     }
     const payload = decryptAndValidate(
-      parsedDocument.data,
+      parsed.data.payload,
       this.challengeEncryptionKey,
       pendingAuthPayloadSchema,
     );
@@ -245,49 +234,43 @@ export class MongoAuthStore {
       { ...payload, verifiedCode: code },
       this.challengeEncryptionKey,
     );
-    const result = await this.challenges.updateOne(
-      {
-        _id: expectedId,
-        state: "verifying",
-        expiresAt: { $gt: now },
-        ciphertext: parsedDocument.data.ciphertext,
-      },
-      {
-        $set: {
-          state: "pending",
-          ...encrypted,
-        },
-      },
-    );
-    return result.modifiedCount === 1;
+    // 比对旧密文是乐观锁：读到写之间若有别的请求改过这条挑战，这次就不该覆盖它。
+    const result = await this.sql`
+      UPDATE hbti_auth_challenge
+         SET state = 'pending', payload = ${this.sql.json(encrypted)}
+       WHERE token_hash = ${expectedHash}
+         AND state = 'verifying'
+         AND expires_at > ${now}
+         AND payload->>'ciphertext' = ${parsed.data.payload.ciphertext}
+    `;
+    return result.count === 1;
   }
 
   async consumeChallenge(token: string): Promise<boolean> {
     if (!isRawToken(token)) {
       return false;
     }
-    const result = await this.challenges.updateOne(
-      {
-        _id: tokenHash(token),
-        state: "verifying",
-        expiresAt: { $gt: validNow(this.now()) },
-      },
-      { $set: { state: "consumed" } },
-    );
-    return result.modifiedCount === 1;
+    const result = await this.sql`
+      UPDATE hbti_auth_challenge SET state = 'consumed'
+       WHERE token_hash = ${tokenHash(token)}
+         AND state = 'verifying'
+         AND expires_at > ${validNow(this.now())}
+    `;
+    return result.count === 1;
   }
 
-  async createSession(payload: AuthSessionPayload): Promise<CreatedAuthSession> {
+  async createSession(
+    payload: AuthSessionPayload,
+  ): Promise<CreatedAuthSession> {
     const parsedPayload = authSessionPayloadSchema.parse(payload);
     const token = randomToken();
     const createdAt = validNow(this.now());
     const expiresAt = new Date(createdAt.getTime() + AUTH_SESSION_TTL_MS);
-    await this.sessions.insertOne({
-      _id: tokenHash(token),
-      createdAt,
-      expiresAt,
-      ...encryptPayload(parsedPayload, this.sessionEncryptionKey),
-    });
+    const encrypted = encryptPayload(parsedPayload, this.sessionEncryptionKey);
+    await this.sql`
+      INSERT INTO hbti_auth_session (token_hash, payload, created_at, expires_at)
+      VALUES (${tokenHash(token)}, ${this.sql.json(encrypted)}, ${createdAt}, ${expiresAt})
+    `;
     return {
       token,
       expiresAt,
@@ -300,19 +283,22 @@ export class MongoAuthStore {
       return null;
     }
     const now = validNow(this.now());
-    const expectedId = tokenHash(token);
-    const document = await this.sessions.findOne({ _id: expectedId });
-    const parsedDocument = authSessionDocumentSchema.safeParse(document);
+    const expectedHash = tokenHash(token);
+    const rows = await this.sql`
+      SELECT token_hash, payload, created_at, expires_at
+        FROM hbti_auth_session WHERE token_hash = ${expectedHash}
+    `;
+    const parsed = sessionRowSchema.safeParse(rows[0]);
     if (
-      !parsedDocument.success ||
-      parsedDocument.data._id !== expectedId ||
-      parsedDocument.data.expiresAt <= now ||
-      parsedDocument.data.createdAt >= parsedDocument.data.expiresAt
+      !parsed.success ||
+      parsed.data.token_hash !== expectedHash ||
+      parsed.data.expires_at <= now ||
+      parsed.data.created_at >= parsed.data.expires_at
     ) {
       return null;
     }
     const payload = decryptAndValidate(
-      parsedDocument.data,
+      parsed.data.payload,
       this.sessionEncryptionKey,
       authSessionPayloadSchema,
     );
@@ -321,7 +307,7 @@ export class MongoAuthStore {
     }
     return {
       payload,
-      expiresAt: parsedDocument.data.expiresAt,
+      expiresAt: parsed.data.expires_at,
       draftKey: deriveDraftKey(payload.memberId, this.draftHmacKey),
     };
   }
@@ -330,78 +316,19 @@ export class MongoAuthStore {
     if (!isRawToken(token)) {
       return false;
     }
-    const result = await this.sessions.deleteOne({ _id: tokenHash(token) });
-    return result.deletedCount === 1;
+    const result = await this.sql`
+      DELETE FROM hbti_auth_session WHERE token_hash = ${tokenHash(token)}
+    `;
+    return result.count === 1;
   }
 }
 
-let mongoClientPromise: Promise<MongoClient> | undefined;
-let authIndexesPromise: Promise<void> | undefined;
-
-export async function createAuthStoreFromEnv(): Promise<MongoAuthStore> {
-  const secret = requireAuthSecret();
-  const { challenges, sessions } = await getAuthCollections();
-  return new MongoAuthStore(challenges, sessions, secret);
-}
-
-async function getAuthCollections(): Promise<{
-  challenges: Collection<AuthChallengeDocument>;
-  sessions: Collection<AuthSessionDocument>;
-}> {
-  const client = await getMongoClient();
-  const database = client.db("hotcrush_hbti");
-  const challenges =
-    database.collection<AuthChallengeDocument>("auth_challenges");
-  const sessions = database.collection<AuthSessionDocument>("auth_sessions");
-  authIndexesPromise ??= Promise.all([
-    challenges.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
-    sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
-  ])
-    .then(() => undefined)
-    .catch((error) => {
-      authIndexesPromise = undefined;
-      throw error;
-    });
-  await authIndexesPromise;
-  return { challenges, sessions };
-}
-
-async function getMongoClient(): Promise<MongoClient> {
-  const connectionString = process.env.MONGODB_URI?.trim();
-  if (
-    !connectionString ||
-    (!connectionString.startsWith("mongodb://") &&
-      !connectionString.startsWith("mongodb+srv://"))
-  ) {
-    throw new Error("MONGODB_URI is invalid.");
-  }
-
-  mongoClientPromise ??= new MongoClient(connectionString, {
-    appName: "hotcrush-hbti-auth",
-    maxPoolSize: 2,
-    maxIdleTimeMS: 10_000,
-    serverSelectionTimeoutMS: 8_000,
-    retryWrites: true,
-    writeConcern: {
-      w: "majority",
-      j: true,
-    },
-  })
-    .connect()
-    .catch((error) => {
-      mongoClientPromise = undefined;
-      throw error;
-    });
-
-  return mongoClientPromise;
-}
-
-function requireAuthSecret(): string {
+export async function createAuthStoreFromEnv(): Promise<PgAuthStore> {
   const secret = process.env.HBTI_AUTH_SECRET;
   if (!secret || Buffer.byteLength(secret, "utf8") < 32) {
     throw new Error("HBTI_AUTH_SECRET must contain at least 32 bytes.");
   }
-  return secret;
+  return new PgAuthStore(getDb(), secret);
 }
 
 function deriveKey(secret: Buffer, label: string): Buffer {
@@ -468,7 +395,7 @@ function tokenHash(token: string): string {
 
 function validNow(now: number): Date {
   if (!Number.isFinite(now)) {
-    throw new Error("Auth store clock returned an invalid time.");
+    throw new Error("Invalid clock reading.");
   }
   return new Date(now);
 }

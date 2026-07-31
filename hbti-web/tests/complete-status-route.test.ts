@@ -21,7 +21,7 @@ vi.mock("@/lib/completion/complete-hbti", async () => {
   };
 });
 
-vi.mock("@/lib/store/mongo-completion-store", () => ({
+vi.mock("@/lib/store/pg-completion-store", () => ({
   createCompletionStoreFromEnv: routeMocks.createCompletionStoreFromEnv,
 }));
 

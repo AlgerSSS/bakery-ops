@@ -16,7 +16,7 @@ vi.mock("@/lib/completion/complete-hbti", async () => {
   return { ...actual, completeHbti: routeMocks.completeHbti };
 });
 
-vi.mock("@/lib/store/mongo-completion-store", () => ({
+vi.mock("@/lib/store/pg-completion-store", () => ({
   createCompletionStoreFromEnv: routeMocks.createCompletionStoreFromEnv,
 }));
 
@@ -24,7 +24,7 @@ vi.mock("@/lib/res/client", () => ({
   createResApiClientFromEnv: routeMocks.createResApiClientFromEnv,
 }));
 
-vi.mock("@/lib/rate-limit/mongo-rate-limit", () => ({
+vi.mock("@/lib/rate-limit/pg-rate-limit", () => ({
   consumeTokenRateLimit: routeMocks.consumeTokenRateLimit,
 }));
 
@@ -140,7 +140,7 @@ describe("complete route", () => {
     },
   );
 
-  it("rejects an untrusted Origin before decrypting or calling RES and Mongo", async () => {
+  it("rejects an untrusted Origin before decrypting or calling RES and the database", async () => {
     const response = await POST(
       completionRequest(
         {
@@ -162,7 +162,7 @@ describe("complete route", () => {
     expect(routeMocks.consumeTokenRateLimit).not.toHaveBeenCalled();
   });
 
-  it("returns 429 with Retry-After before creating RES or Mongo dependencies", async () => {
+  it("returns 429 with Retry-After before creating RES or database dependencies", async () => {
     routeMocks.consumeTokenRateLimit.mockResolvedValue({
       allowed: false,
       retryAfterSeconds: 91,

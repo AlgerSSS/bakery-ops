@@ -10,25 +10,56 @@
 
 | | |
 |---|---|
-| 最后更新 | 2026-07-31 by Claude Code |
-| 当前分支 | `codex/hbti-launch-ready`（领先 origin/main 4 个提交，**未 push**） |
-| 工作区 | **干净**。此前 84 个未提交文件已分 4 个提交落地 |
-| 线上（Vercel） | `hbti-test.hotcrush.net` = `dpl_BukUV8gDmLXws8GuxFQTZ4kr8BUw`（2026-07-31 部署，READY） |
+| 最后更新 | 2026-07-31 by Claude Code（Postgres 迁移侧） |
+| 当前分支 | `codex/hbti-launch-ready`（领先 origin/main 5 个提交，**未 push**） |
+| 工作区 | 干净 |
+| 线上（Vercel） | `hbti-test.hotcrush.net` = `dpl_BukUV8gDmLXws8GuxFQTZ4kr8BUw`（Mongo 版）。**Postgres 版已就绪但未部署** |
 | 线上（Contabo） | res_api + bakery-ops 已于 2026-07-31 重新 rsync，`hotcrush-core` active，role=all |
 
-> ⚠️ **正在进行中：另一个工具在做 MongoDB → Postgres 迁移（2026-07-31 14:56 起）。**
-> 本节以下内容由 Claude Code 于 14:38 提交、14:50 部署，**早于该迁移 6 分钟**，
-> 线上 `dpl_BukUV8gDmLXws8GuxFQTZ4kr8BUw` 跑的是 Mongo 版，不含任何迁移中间态（已核对构建日志时间戳）。
-> 迁移方的未提交改动（`pg-auth-store.ts` / `pg-completion-store.ts` / `pg-rate-limit.ts` / `src/lib/db/`，
-> 以及被删除的三个 mongo-* 存储）**我一律没有碰、没有提交**。
+> ⚠️ **hbti-web 的存储层已从 MongoDB 换成共享 Supabase，代码已提交但没有部署，
+> 而且它依赖一条还没执行的数据库迁移。** 在迁移 063 执行、Vercel 环境变量补齐之前，
+> 不要部署 hbti-web —— 现在部署会让所有 `hbti_*` 表查询报 42P01（表不存在），
+> 顾客端从登录起就全线不可用。展开步骤见下面「HBTI 切库：剩余人工步骤」。
 >
-> 给迁移方三条：
-> 1. **部署前必须先在 Vercel 配好 Postgres 连接变量**。当前生产只有 `MONGODB_URI`
->    （`vercel env ls production` 可查）。切到 pg 存储后若不加变量，登录与发券会一起挂。
-> 2. 我原本放了一个 `hbti-web/.env.development.local`（全假值，用于本地预览时不碰生产库）。
->    **它会静默盖掉 `MONGODB_URI`，对正在调数据库的人是陷阱，已于 14:38 后删除。**
->    现在 `npm run dev` 会直接连生产库——本地点击注意别真发短信。
-> 3. Next 16 不允许两个 dev server 并存。我的已停，端口 3000 空着。
+> 迁移方（本条作者）已接手并完成代码侧，上面那三条提醒的落实情况：
+> ① Vercel 变量还没配，是下面清单的第 2 步；② `.env.development.local` 确认已不存在，
+> 本地 `npm run dev` 直连生产库，点击时注意别真发短信；③ 端口 3000 未占用。
+
+---
+
+## HBTI 切库：剩余人工步骤
+
+代码全部完成并通过门禁，**四步都要做完才能部署**，顺序不能换：
+
+1. **执行迁移 063**（KL 01:00–13:00，避开 23:00 爬虫与 14:20 intraday）：
+   ```bash
+   cd /tmp/hotcrush-finance-semi-price-fix   # 分支 claude/hbti-member-profile
+   node --env-file=<有 DATABASE_URL 的 .env> scripts/apply-migrations.js
+   ```
+   执行前可以再跑一次只读回滚验收：`DATABASE_URL=… node test/verify-063-rollback.mjs`（21/21）。
+
+2. **给 Vercel 项目 `hotcrush-hbti` 加变量**（Production / Preview / Development 三个环境）：
+   - `DATABASE_URL` —— 与财务站、res_api 同一个共享库、同一个 `postgres` 角色。
+   - `HBTI_MEMBER_STORE` —— 可选，留空即默认 `吉隆坡Pavilion门店`。
+     **必须与 `res_api` 的 `MEMBER_STORE` 完全一致**，否则同一个会员会被写成两行。
+   - `MONGODB_URI` 先留着别删，第 3 步还要用。
+
+3. **搬历史幂等记录**（生产 Mongo 里目前只有 1 条 `issued`，但它是防重复发券的凭证，丢不得）：
+   ```bash
+   cd hbti-web
+   node --env-file=.env.local scripts/migrate-mongo-to-postgres.mjs --dry-run
+   node --env-file=.env.local scripts/migrate-mongo-to-postgres.mjs --apply
+   ```
+   Mongo 侧只读，Postgres 侧 `ON CONFLICT DO NOTHING`，可以重复跑。
+   只搬 `completions`；challenge / session / rate-limit 都是分钟到小时级的工作态，
+   最坏影响是切换瞬间正在答题的顾客要重新登录一次。
+
+4. **部署**，然后验收 `/api/health`、OTP 登录、答题、`/api/cron/reconcile`。
+   确认无误后再从 Vercel 删掉 `MONGODB_URI`，并把 `mongodb` 从 devDependencies 和
+   `scripts/migrate-mongo-to-postgres.mjs` 一起删掉。
+
+> ⚠️ `/api/health` 现在**同时**探 Postgres 与 RES。下面那条 `RES_VULCAN_TOKEN` 过期的问题
+> 不修的话，即使切库全部成功，health 仍会是 503。别把它误判成迁移失败。
 
 > 🔴 **生产未决问题：`RES_VULCAN_TOKEN` 已过期，发券链路是断的。**
 > 部署后验收发现 `/api/health` 返回 503。实测该令牌对 BO 接口返回 **HTTP 401「未授权」**。
@@ -57,6 +88,47 @@
 > 并白屏，清缓存重启即恢复，**是 dev bundler 的已知问题，不是应用 bug**。
 > 另：dev 下 console 恒有一条 `eval() is not supported…` 报错，是 React 开发模式撞上应用自设的 CSP，
 > 生产不出现，不用管。
+
+### 零之〇、hbti-web 存储层 MongoDB → 共享 Postgres（2026-07-31，代码完成、未部署）
+
+HBTI 原本自带一个 MongoDB，而这门生意里其他所有系统都跑在同一个 Supabase 上。多一套备份面、
+多一份要轮换的凭证；真正卡住事的是**采集到的答案与它所属的会员无法关联**。
+
+**会员画像落在 `pos_member` 的八个 `hbti_` 列上**（迁移 063，在财务仓库）。
+这让 `pos_member` 成为全库唯一一张列级双写者的表，安全性有两条实测依据：
+`res_api/sync-member.mjs:6-7` 明令禁止 TRUNCATE / DELETE-then-INSERT，该表纯 upsert 永不删行；
+它的 `DO UPDATE` 列集来自 `member-map.js` 的 `mapMember()`，固定 26 列，与新增八列不相交。
+**两个仓库的 AGENTS.md 都登记了这条约束**，免得下一个改 `mapMember()` 的人事后才知道。
+
+`pos_member.snapshot_date` 放开了 NOT NULL：主漏斗是顾客 OTP 当场注册、几分钟后做完 HBTI，
+离当晚 23:00 的爬虫还有好几个小时。坚持 NOT NULL 就得编一个快照日期，会污染 060 定义的
+失效行识别口径。NULL 现在诚实地表示「HBTI 建的行，POS 快照还没见过它」。
+
+`hbti_completion` 用 `record jsonb` 存判别联合，而不是把五种状态摊成几十个可空列——
+那份契约已经由 TS 侧 Zod 钉死，在 DDL 里再抄一遍必然漂移。只有 CAS 判词和对账扫描真正读的
+字段提升成列。认证表的 payload 仍是 AES-256-GCM 密文：这个库被四个系统连着，
+**迁库没有顺手把这层加密去掉**，否则等于把 RES 后台令牌明文交给任何一个拿到只读连接串的人。
+
+**两个 Mongo → PG 之间不会自己冒出来的坑**（都写进了迁移注释与测试）：
+
+1. PG 的 `ORDER BY` 默认 `NULLS LAST`，Mongo 的 sort 却把缺失字段排最前。对账扫描索引必须显式
+   `NULLS FIRST`，否则**从未对过账的记录永远沉在队尾、轮不到补偿**——而那恰恰是最该先看的一批。
+2. PG 没有 TTL 索引。Mongo 靠 TTL 删过期锁从而允许重新加锁；PG 不会。所以 `acquireProcessing`
+   用 `ON CONFLICT ... DO UPDATE ... WHERE expires_at <= now()` 顶替过期行，且所有读路径都带
+   `expires_at > now()`。否则一条 548 天前的锁会**永久**挡住那个会员。
+
+**验收**：tsc、eslint 零告警、181 项 Vitest、`next build` 全过；另有 21 项集成测试
+（`tests/pg-stores.integration.test.ts`）对**真实生产库**跑通——整轮关在一个事务里、
+迁移 063 也在那个事务里执行、结束强制回滚，`afterAll` 断言库里零残留。
+没有 `DATABASE_URL` 时这组自动跳过，所以默认 `npm test` 不依赖网络；**发布前必须带库跑一次**。
+
+**已知缺口**：历史 `issued` / `review` 记录搬过来后补不出 `pos_member` 画像——`rewardContext`
+只存在于 prepared 态，那些记录里没有 memberId，而手机号是 HMAC、反查不回会员。这是信息本来
+就不存在，不是迁移偷懒。生产 Mongo 目前只有 1 条 issued，影响面就是这一条。
+
+**没动的既有洞**：幂等键仍是 `campaignVersion + HMAC(手机号)`，所以**会员换手机号后可以在同一期
+活动里再领一次券**。改成按 `member_id` 做键能堵上，但加锁发生在 `resolveMemberByPhone` 之前
+（`complete-hbti.ts:158` 早于 `:184`），要动整个状态机和六个测试文件，超出「换库」的范围，单独记在这里。
 
 ### 零之二、HBTI「每屏一页可见、无需滚动」改造（2026-07-31，本地完成、未部署）
 
@@ -478,6 +550,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-07-31 | Claude Code | hbti-web 存储层从 MongoDB 换成共享 Supabase：新增 `src/lib/db/postgres.ts` 与三个 pg store，删掉三个 mongo store，`mongodb` 降为 devDependency（只给一次性数据迁移脚本用）。会员画像写进 `pos_member` 的八个 `hbti_` 列（财务仓库迁移 063，**尚未执行**）。逐条复刻了 Mongo 的原子语义：`insertOne(11000)` → `ON CONFLICT` 无返回行、`replaceOne(matchedCount)` → 条件 UPDATE 的 rowCount、TTL 索引 → 读路径 `expires_at > now()` + 过期锁可顶替。修掉两个跨库语义差：对账扫描索引必须 `NULLS FIRST`（否则从未对账的记录永远轮不到），以及 PG 无 TTL 导致过期锁会永久占位。tsc / eslint / 181 Vitest / next build 全过，另有 21 项集成测试对真实生产库在事务内跑通并强制回滚、零残留。**未部署**，四步人工清单见「HBTI 切库：剩余人工步骤」 |
 | 2026-07-30 | Codex | 修复并真实验证 HBTI 手机 OTP 登录：最终 `/api/auth/otp/verify` 200，随后 `/api/auth/session` 200 且 `authenticated=true`；没有调用 complete、没有发券。根因包括 RES login 请求契约、nullable verifyToken 与测试号码非会员。当前生产 `dpl_2HRjbsfawGyZpktNUq4YirVfCxiC` READY；本地最终兼容版 170/170 Vitest、39/39 手机 E2E、TypeScript、ESLint、Next build 全过，但因“公开链接一次 OTP 自动建会员并可进入发券”会扩大活动资格，待业务明确批准公开获客或改成仅既有/受邀会员后再部署。同步只读复核新店图与 `HOT CRUSH 2026.pdf`，完成桃色门头/酒红柜台/红环黑箭头/奶油纸与金属灯箱方向的改版方案；未改视觉代码、未部署新风格 |
 | 2026-07-30 | Codex | 完成 HBTI 上线收口并提交 `a98fbe9`：加入用户提供的透明 HOT CRUSH 字标和圆形箭头且保持浅肉粉/可可/开心果主题；扩为 9 色、三语隐私说明、无 token 的 1080×1350 结果卡保存/分享、所有状态返回会员钱包；补 server-authoritative 结果、请求超时/localStorage 降级、Mongo token 指纹限流、durable review、深度 RES/Mongo health 和 Cron 就绪探测。72/72 Vitest、27/27 Playwright、TypeScript、ESLint、Next build 全过。最终生产 `dpl_EFxYwUrvBg1mJLzjPVzZgaQso3Ch` READY 并别名到 `hbti-test.hotcrush.net`；修复空 `CRON_SECRET` 后实测 Cron 200/scanned 0、health 200、运行时错误 0，Mongo 仅既有 issued=1、processing/review=0。未再次真实发券 |
 | 2026-07-30 | Codex | 新建并部署 `hbti-web/` 到 `https://hbti-test.hotcrush.net`：英文默认、中文/马来文、6 题 16 型、柔和肉粉视觉；以 Mongo campaign+HMAC(phone) 原子幂等、prepared 前后券 ID 集合差对账、每日只读补偿接入 RES。修复 Vercel 框架误识别导致的 READY/404，Cloudflare 改为项目专用 CNAME。完整门禁通过（55 unit/security + 15 mobile E2E + build）。刷新既有 RES 爬虫登录会话后，对 `+86 186****6817` 完成真实验收：目标券 1→2，重复提交仍为 2，Mongo=`issued`。未改/未发布 RES 官方 H5；当前 BO 会话令牌仍需在群发前替换为正式受限凭证 |

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getJsonMutationRejection, noStoreJson } from "@/lib/auth/http";
-import { createAuthStoreFromEnv } from "@/lib/auth/mongo-auth-store";
+import { createAuthStoreFromEnv } from "@/lib/auth/pg-auth-store";
 import {
   clearHbtiSessionCookie,
   readHbtiSessionCookie,

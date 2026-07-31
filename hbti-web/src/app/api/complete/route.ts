@@ -12,10 +12,10 @@ import {
   CompleteHbtiError,
 } from "@/lib/completion/complete-hbti";
 import { hbtiAnswersSchema } from "@/lib/hbti/schema";
-import { consumeTokenRateLimit } from "@/lib/rate-limit/mongo-rate-limit";
+import { consumeTokenRateLimit } from "@/lib/rate-limit/pg-rate-limit";
 import { createResApiClientFromEnv } from "@/lib/res/client";
 import { readHbtiServerConfig } from "@/lib/server-config";
-import { createCompletionStoreFromEnv } from "@/lib/store/mongo-completion-store";
+import { createCompletionStoreFromEnv } from "@/lib/store/pg-completion-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;

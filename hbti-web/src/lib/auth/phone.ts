@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { findSupportedCountry } from "@/lib/auth/countries";
-import type { AuthPhoneIdentity } from "@/lib/auth/mongo-auth-store";
+import type { AuthPhoneIdentity } from "@/lib/auth/pg-auth-store";
 import type { ResH5PhoneIdentity } from "@/lib/res/h5-member-auth";
 
 /**

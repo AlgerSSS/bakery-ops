@@ -11,7 +11,7 @@ import {
   isTrustedRequestOrigin,
   readHbtiServerConfig,
 } from "@/lib/server-config";
-import { createCompletionStoreFromEnv } from "@/lib/store/mongo-completion-store";
+import { createCompletionStoreFromEnv } from "@/lib/store/pg-completion-store";
 
 import { publicCompletionPayload } from "../route";
 

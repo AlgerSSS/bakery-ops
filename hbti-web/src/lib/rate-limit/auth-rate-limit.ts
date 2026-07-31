@@ -1,12 +1,7 @@
 import { createHmac } from "node:crypto";
 
-import { MongoClient, type Collection } from "mongodb";
-
-interface AuthRateLimitDocument {
-  _id: string;
-  count: number;
-  expiresAt: Date;
-}
+import { getDb, type SqlRunner } from "@/lib/db/postgres";
+import { bumpRateLimitBucket } from "@/lib/rate-limit/pg-rate-limit";
 
 interface AuthRateLimitRule {
   scope: string;
@@ -53,11 +48,15 @@ export interface OtpRequestRateLimitInput {
   now?: number;
 }
 
-export class MongoAuthRateLimiter {
+/**
+ * 发码限流，四条规则同时生效（手机号 1/分、5/天；IP 10/10 分、50/天）。
+ * 计数器存在 `hbti_rate_limit`（迁移 063）；手机号与 IP 只以 HMAC 摘要入库。
+ */
+export class PgAuthRateLimiter {
   private readonly identityKey: Buffer;
 
   constructor(
-    private readonly collection: Collection<AuthRateLimitDocument>,
+    private readonly sql: SqlRunner,
     secret: string,
   ) {
     if (Buffer.byteLength(secret, "utf8") < 32) {
@@ -86,29 +85,18 @@ export class MongoAuthRateLimiter {
       phone: this.hashIdentity("phone", phoneE164),
       ip: this.hashIdentity("ip", ipAddress),
     };
+    // 四条规则全部自增，即使前面已经判定拒绝——与 Mongo 版行为一致。
+    // 只扣第一条会让攻击者靠触发最严格的那条来规避其余窗口的计数。
     const decisions = await Promise.all(
       OTP_REQUEST_RULES.map(async (rule) => {
         const windowStart = Math.floor(now / rule.windowMs) * rule.windowMs;
-        const result = await this.collection.findOneAndUpdate(
-          {
-            _id: `${rule.scope}:${windowStart}:${identities[rule.identity]}`,
-          },
-          {
-            $inc: { count: 1 },
-            $setOnInsert: {
-              expiresAt: new Date(windowStart + rule.windowMs),
-            },
-          },
-          {
-            upsert: true,
-            returnDocument: "after",
-          },
+        const count = await bumpRateLimitBucket(
+          this.sql,
+          `${rule.scope}:${windowStart}:${identities[rule.identity]}`,
+          new Date(windowStart + rule.windowMs),
         );
-        if (!result) {
-          throw new Error("Auth rate-limit counter was not returned.");
-        }
         return {
-          allowed: result.count <= rule.limit,
+          allowed: count <= rule.limit,
           retryAfterSeconds: Math.max(
             1,
             Math.ceil((windowStart + rule.windowMs - now) / 1_000),
@@ -123,9 +111,7 @@ export class MongoAuthRateLimiter {
       retryAfterSeconds:
         denied.length === 0
           ? 0
-          : Math.max(
-              ...denied.map((decision) => decision.retryAfterSeconds),
-            ),
+          : Math.max(...denied.map((decision) => decision.retryAfterSeconds)),
     };
   }
 
@@ -137,14 +123,10 @@ export class MongoAuthRateLimiter {
   }
 }
 
-let mongoClientPromise: Promise<MongoClient> | undefined;
-let rateLimitIndexPromise: Promise<string> | undefined;
-
 export async function createAuthRateLimiterFromEnv(
   secret: string,
-): Promise<MongoAuthRateLimiter> {
-  const collection = await getAuthRateLimitCollection();
-  return new MongoAuthRateLimiter(collection, secret);
+): Promise<PgAuthRateLimiter> {
+  return new PgAuthRateLimiter(getDb(), secret);
 }
 
 export function readClientIp(request: Request): string {
@@ -157,47 +139,4 @@ export function readClientIp(request: Request): string {
   }
   const realIp = request.headers.get("x-real-ip")?.trim();
   return realIp ? realIp.slice(0, 512) : "unknown";
-}
-
-async function getAuthRateLimitCollection(): Promise<
-  Collection<AuthRateLimitDocument>
-> {
-  const connectionString = process.env.MONGODB_URI?.trim();
-  if (
-    !connectionString ||
-    (!connectionString.startsWith("mongodb://") &&
-      !connectionString.startsWith("mongodb+srv://"))
-  ) {
-    throw new Error("MONGODB_URI is invalid.");
-  }
-
-  mongoClientPromise ??= new MongoClient(connectionString, {
-    appName: "hotcrush-hbti-auth-rate-limit",
-    maxPoolSize: 2,
-    maxIdleTimeMS: 10_000,
-    serverSelectionTimeoutMS: 8_000,
-    retryWrites: true,
-    writeConcern: {
-      w: "majority",
-      j: true,
-    },
-  })
-    .connect()
-    .catch((error) => {
-      mongoClientPromise = undefined;
-      throw error;
-    });
-
-  const client = await mongoClientPromise;
-  const collection = client
-    .db("hotcrush_hbti")
-    .collection<AuthRateLimitDocument>("auth_rate_limits");
-  rateLimitIndexPromise ??= collection
-    .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })
-    .catch((error) => {
-      rateLimitIndexPromise = undefined;
-      throw error;
-    });
-  await rateLimitIndexPromise;
-  return collection;
 }

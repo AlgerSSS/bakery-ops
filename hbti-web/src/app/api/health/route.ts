@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createResApiClientFromEnv } from "@/lib/res/client";
 import { readHbtiServerConfig } from "@/lib/server-config";
-import { checkCompletionStoreFromEnv } from "@/lib/store/mongo-completion-store";
+import { checkCompletionStoreFromEnv } from "@/lib/store/pg-completion-store";
 
 export const runtime = "nodejs";
 

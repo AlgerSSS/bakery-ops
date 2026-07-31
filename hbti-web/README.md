@@ -56,7 +56,13 @@ secret store. Never commit either the RES credential or generated member links.
 - `HBTI_CAMPAIGN_VERSION`: stable campaign identifier.
 - `HBTI_LINK_BASE_URL`: canonical HTTPS origin.
 - `HBTI_LINK_TTL_SECONDS`: personal-link lifetime.
-- `MONGODB_URI`: durable completion, review, and rate-limit storage.
+- `DATABASE_URL`: the shared Supabase Postgres. Completion locks, OTP
+  challenges, sessions and rate-limit counters live in the `hbti_*` tables from
+  migration `063_hbti_member_profile.sql`; the collected HBTI profile is written
+  onto `pos_member.hbti_*` for the member it belongs to.
+- `HBTI_MEMBER_STORE`: the store name half of `pos_member`'s composite key. It
+  must match `MEMBER_STORE` in `~/hot/res_api`, or the same member is written
+  twice instead of being enriched. Defaults to `吉隆坡Pavilion门店`.
 - `CRON_SECRET`: protects the reconciliation endpoint; at least 32 characters.
 - `RES_VULCAN_TOKEN`: approved service credential for RES.
 - `RES_*`: tenant, organisation, brand, shop, coupon-template, and verified
@@ -66,7 +72,7 @@ Local secret-bearing files should be mode `0600`.
 
 ## Operations
 
-- `GET /api/health` performs a read-only MongoDB check and an authenticated,
+- `GET /api/health` performs a read-only Postgres check and an authenticated,
   read-only RES coupon-template lookup. HTTP 200 means both dependencies are
   ready; HTTP 503 means the site must not send a new SMS batch.
 - `GET /api/cron/reconcile` is protected by `CRON_SECRET`. Vercel invokes it

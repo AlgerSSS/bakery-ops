@@ -33,7 +33,7 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/lib/auth/mongo-auth-store", () => ({
+vi.mock("@/lib/auth/pg-auth-store", () => ({
   createAuthStoreFromEnv: mocks.createAuthStoreFromEnv,
 }));
 

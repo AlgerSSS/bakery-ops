@@ -10,10 +10,24 @@
 
 | | |
 |---|---|
-| 最后更新 | 2026-07-30 by Codex |
-| 当前分支 | `codex/hbti-launch-ready` |
-| 工作区 | HBTI 公开 OTP 自动建会员与 HOT CRUSH 品牌改版已完成本地门禁、尚未部署；另有既存 res_api、bakery-ops、deploy.sh 在途改动，勿混在一起回退或提交 |
-| 线上（Contabo） | res_api = 2026-07-27 爬虫改造版；bakery-ops = `INSTANCE_ROLE=all` |
+| 最后更新 | 2026-07-31 by Claude Code |
+| 当前分支 | `codex/hbti-launch-ready`（领先 origin/main 4 个提交，**未 push**） |
+| 工作区 | **干净**。此前 84 个未提交文件已分 4 个提交落地 |
+| 线上（Vercel） | `hbti-test.hotcrush.net` = `dpl_BukUV8gDmLXws8GuxFQTZ4kr8BUw`（2026-07-31 部署，READY） |
+| 线上（Contabo） | res_api + bakery-ops 已于 2026-07-31 重新 rsync，`hotcrush-core` active，role=all |
+
+> 🔴 **生产未决问题：`RES_VULCAN_TOKEN` 已过期，发券链路是断的。**
+> 部署后验收发现 `/api/health` 返回 503。实测该令牌对 BO 接口返回 **HTTP 401「未授权」**。
+> 令牌是 2026-07-30 16:23 抓的后台会话，约 23 小时后自然失效——HANDOFF 早就警告过它「会过期、
+> 不是长期服务凭证」。**与本次部署无关**，部署前就已经是坏的。
+>
+> 影响面：登录/OTP 走 H5 的每请求访客令牌，**不依赖这个后台令牌**，且 Vercel 上 `RES_H5_*` 四个变量
+> 齐全（19 小时前设置），所以顾客能登录、能答题；但提交后**发券会失败**。按既有设计这会安全失败
+> （锁清理或转人工复核），不会重复发券，但顾客拿不到奖励。
+>
+> 处置：用 `res_api/login.js` 重新登录抓取新令牌（需 `RESTOSUITE_EMAIL` / `RESTOSUITE_PASSWORD`，
+> 走 Playwright 真实登录），再 `vercel env rm RES_VULCAN_TOKEN production` + `vercel env add` 更新，
+> 然后重新部署。**根治方案仍是向 RES 申请受限服务凭证**，别再依赖会过期的后台会话。
 
 > **2026-07-31 by Claude Code —— 本地视觉预览用的假环境文件正在生效，注意别被它坑到。**
 > 新增 `hbti-web/.env.development.local`（gitignored，全部假值）。Next 的加载优先级是

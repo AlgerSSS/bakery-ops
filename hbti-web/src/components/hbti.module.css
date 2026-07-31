@@ -3,6 +3,7 @@
   min-height: 100svh;
   overflow: hidden;
   isolation: isolate;
+  background: var(--flesh);
 }
 
 .ambientWash {
@@ -10,58 +11,84 @@
   z-index: -2;
   inset: 0;
   background:
-    radial-gradient(
-      circle at 88% 6%,
-      rgba(239, 203, 198, 0.72) 0 11rem,
-      transparent 26rem
+    linear-gradient(180deg, rgba(255, 247, 234, 0.72), transparent 11rem),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 3rem,
+      rgba(21, 19, 19, 0.025) 3rem 3.06rem
     ),
-    radial-gradient(
-      circle at 8% 92%,
-      rgba(180, 200, 118, 0.23) 0 8rem,
-      transparent 26rem
-    ),
-    var(--cream);
+    linear-gradient(156deg, #f8dfcf 0%, var(--flesh) 52%, #edc3b5 100%);
 }
 
 .ambientWash::before,
 .ambientWash::after {
   position: absolute;
   content: "";
-  opacity: 0.34;
-  border: 1px solid rgba(132, 83, 77, 0.18);
-  border-radius: 50%;
-  animation: ambientFloat 16s ease-in-out infinite alternate;
 }
 
 .ambientWash::before {
-  width: 19rem;
-  height: 19rem;
-  top: 11%;
-  right: -13rem;
+  height: 4.75rem;
+  inset: 0 0 auto;
+  border-bottom: 1px solid rgba(21, 19, 19, 0.2);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.78),
+      rgba(191, 195, 198, 0.48) 44%,
+      rgba(255, 255, 255, 0.72)
+    );
+  box-shadow: 0 8px 22px rgba(56, 28, 22, 0.1);
 }
 
+/* The counter band is fixed to the bottom of the viewport, so it overlays
+   whatever the page ends with. Every screen now ends in a CTA, so it shows
+   only a 1.5rem plinth and .pageFrame reserves that height plus a gap below
+   the last control — see the padding-bottom there. */
 .ambientWash::after {
-  width: 11rem;
-  height: 11rem;
-  bottom: 7%;
-  left: -7rem;
-  animation-delay: -5s;
+  height: 8rem;
+  inset: auto 0 -6.5rem;
+  background:
+    repeating-linear-gradient(
+      180deg,
+      #7c271c 0 1.45rem,
+      var(--cocoa) 1.45rem 2.45rem,
+      #45120d 2.45rem 2.75rem
+    );
+  box-shadow: 0 -12px 32px rgba(52, 12, 9, 0.18);
 }
 
 .pageFrame {
-  width: min(100%, 760px);
+  display: flex;
+  width: min(100%, 720px);
   min-height: 100svh;
+  flex-direction: column;
   margin: 0 auto;
-  padding: max(1rem, env(safe-area-inset-top)) clamp(1.15rem, 4vw, 2rem)
-    max(2rem, env(safe-area-inset-bottom));
+  /* Bottom = 1.5rem counter plinth + 1.25rem clearance, so the last control
+     always sits above the band instead of cutting into it. */
+  padding: max(0.8rem, env(safe-area-inset-top)) clamp(1rem, 4vw, 2rem)
+    max(2.75rem, calc(env(safe-area-inset-bottom) + 1.5rem));
 }
 
 .brandHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 3.25rem;
+  min-height: 4rem;
   gap: 1rem;
+  padding: 0.55rem 0.6rem 0.55rem 0.8rem;
+  border: 1px solid var(--chrome-dark);
+  border-radius: 0.72rem;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92),
+      var(--cream) 46%,
+      #f5eadb
+    );
+  box-shadow:
+    inset 0 0 0 3px rgba(255, 255, 255, 0.48),
+    0 10px 24px rgba(56, 28, 22, 0.12);
+  animation: lightboxOn 560ms var(--ease-storefront) both;
 }
 
 .wordmark {
@@ -78,16 +105,14 @@
   width: clamp(7.2rem, 29vw, 8.4rem);
   aspect-ratio: 305 / 38;
   flex: 0 0 auto;
-  background: var(--cocoa-dark);
-  -webkit-mask: url("/hot-crush-wordmark.png") center / contain no-repeat;
-  mask: url("/hot-crush-wordmark.png") center / contain no-repeat;
+  background: url("/hot-crush-wordmark.png") center / contain no-repeat;
 }
 
 .wordmarkRule {
   width: 1.3rem;
-  height: 2px;
+  height: 3px;
   margin-inline: 0.45rem;
-  background: var(--pistachio);
+  background: var(--hot-red);
 }
 
 .wordmarkSub {
@@ -102,12 +127,12 @@
 .languageSwitcher {
   display: flex;
   flex: 0 0 auto;
-  gap: 0.12rem;
+  gap: 1px;
   padding: 0.2rem;
-  border: 1px solid rgba(132, 83, 77, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 252, 246, 0.48);
-  backdrop-filter: blur(12px);
+  border: 1px solid var(--chrome-dark);
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(145deg, var(--chrome-light), var(--chrome));
 }
 
 .languageButton {
@@ -115,9 +140,9 @@
   min-height: 2.75rem;
   padding: 0.25rem 0.5rem;
   cursor: pointer;
-  border-radius: 999px;
+  border-radius: 0.34rem;
   color: var(--cocoa);
-  background: transparent;
+  background: var(--cream);
   font-family: var(--font-brand);
   font-size: 0.68rem;
   font-weight: 700;
@@ -126,10 +151,6 @@
     color 180ms ease,
     background 180ms ease,
     transform 180ms ease;
-}
-
-.languageButton:hover {
-  transform: translateY(-1px);
 }
 
 .languageButton[data-active="true"] {
@@ -150,18 +171,24 @@
 
 .landing,
 .journeyFrame {
-  animation: pageIn 700ms cubic-bezier(0.22, 0.68, 0.2, 1) both;
+  animation: pageIn 560ms var(--ease-storefront) both;
 }
 
 .landing {
   display: flex;
-  min-height: calc(100svh - 7rem);
+  /* Grow into whatever the header leaves behind; never shrink below content, so
+     a screen taller than the viewport still scrolls instead of being clipped by
+     .siteShell's overflow: hidden. */
+  flex: 1 0 auto;
   flex-direction: column;
   justify-content: center;
   padding-block: 3.5rem 2rem;
 }
 
 .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   color: var(--cocoa);
   font-family: var(--font-brand);
   font-size: 0.74rem;
@@ -169,6 +196,14 @@
   letter-spacing: 0.16em;
   line-height: 1.35;
   text-transform: uppercase;
+}
+
+.eyebrow::before {
+  width: 1.7rem;
+  height: 3px;
+  flex: 0 0 auto;
+  background: var(--hot-red);
+  content: "";
 }
 
 .landingTitle {
@@ -253,39 +288,22 @@
 }
 
 .steamMark {
-  display: flex;
-  align-items: flex-end;
-  width: 3rem;
-  height: 3.8rem;
-  gap: 0.3rem;
-  margin-bottom: 1.4rem;
+  display: block;
+  width: 4.4rem;
+  height: 4.4rem;
+  margin-bottom: 1rem;
+  background: url("/hot-crush-arrow.png") center / contain no-repeat;
+  animation: signIn 560ms var(--ease-storefront) both;
 }
 
 .steamMark i {
-  width: 0.42rem;
-  height: 2.8rem;
-  border-radius: 999px;
-  background: var(--flesh);
-  transform: rotate(12deg);
-  animation: steamRise 2.8s ease-in-out infinite alternate;
-}
-
-.steamMark i:nth-child(2) {
-  height: 3.6rem;
-  background: var(--pistachio);
-  animation-delay: -1.2s;
-}
-
-.steamMark i:nth-child(3) {
-  height: 2.15rem;
-  background: var(--cocoa);
-  animation-delay: -2s;
+  display: none;
 }
 
 .journeyFrame {
   display: flex;
-  min-height: calc(100svh - 6.25rem);
-  padding-block: 1.5rem 0.5rem;
+  flex: 1 0 auto;
+  padding-block: 1.35rem 0.5rem;
 }
 
 .journeyFrame > section {
@@ -293,19 +311,382 @@
 }
 
 .introPanel,
+.authPanel,
 .questionPanel,
 .resultPanel,
 .detailsPanel,
 .completionPanel,
 .centerState {
-  animation: panelIn 460ms cubic-bezier(0.22, 0.68, 0.2, 1) both;
+  animation: panelIn 320ms var(--ease-storefront) both;
+}
+
+.authPanel {
+  display: flex;
+  align-self: center;
+  flex-direction: column;
+  padding-block: 1rem 1.25rem;
+}
+
+.authTitle {
+  max-width: 12ch;
+  margin-top: 0.75rem;
+  color: var(--cocoa-dark);
+  font-family: var(--font-brand);
+  font-size: clamp(2.65rem, 10vw, 4.85rem);
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.authBody {
+  max-width: 31rem;
+  margin-top: 1rem;
+  color: var(--ink-soft);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.authCard {
+  position: relative;
+  width: min(100%, 33rem);
+  margin-top: 1.25rem;
+  padding: 1.2rem;
+  overflow: hidden;
+  border: 1px solid var(--chrome-dark);
+  border-radius: 0.68rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), transparent 4.5rem),
+    var(--cream);
+  box-shadow:
+    inset 0 0 0 4px rgba(191, 195, 198, 0.32),
+    var(--shadow-soft);
+}
+
+.memberPass {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 1.1rem;
+  color: var(--cocoa-dark);
+  font-family: var(--font-brand);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.memberPass i {
+  height: 2px;
+  flex: 1;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      var(--hot-red) 0 0.35rem,
+      transparent 0.35rem 0.65rem
+    );
+}
+
+.authForm {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.authForm > label {
+  color: var(--cocoa-dark);
+  font-family: var(--font-brand);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.phoneRow {
+  display: grid;
+  /* Hug the country code. A wider column parks the chevron far to the right of
+     "MY +60" and the gap reads as a misaligned control. */
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.55rem;
+}
+
+.countrySelect select,
+.textInput {
+  width: 100%;
+  min-height: 3.5rem;
+  border: 1px solid rgba(21, 19, 19, 0.28);
+  border-radius: 0.42rem;
+  color: var(--cocoa-dark);
+  background: #fffdf8;
+  font-size: 1rem;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+/* Own chevron instead of the OS one: the native control parks its arrow against
+   the right edge whatever the box width, and it ignores the brand palette. */
+.countrySelect select,
+.optionalFields select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236a1c13' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 0.62rem auto;
+}
+
+.countrySelect select {
+  padding: 0.75rem 1.65rem 0.75rem 0.75rem;
+  cursor: pointer;
+  background-position: right 0.6rem center;
+  font-family: var(--font-brand);
+  font-weight: 700;
+}
+
+.textInput {
+  padding: 0.75rem 0.9rem;
+  font-family: var(--font-copy);
+}
+
+.countrySelect select:focus,
+.textInput:focus {
+  border-color: var(--hot-red);
+  background-color: #fffdf8;
+  box-shadow: 0 0 0 3px rgba(197, 31, 44, 0.18);
+  outline: none;
+}
+
+.textInput::placeholder {
+  color: rgba(111, 70, 63, 0.46);
+}
+
+.codeInput {
+  letter-spacing: 0.42em;
+  text-align: center;
+}
+
+.fieldSupport {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.membershipConsent {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 0.55rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid rgba(106, 28, 19, 0.16);
+  border-radius: 0.42rem;
+  color: var(--ink-soft);
+  background: rgba(243, 208, 184, 0.35);
+  font-size: 0.72rem;
+  line-height: 1.48;
+}
+
+.membershipConsent span {
+  display: grid;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-top: 0.04rem;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--hot-red);
+  color: var(--cocoa-dark);
+  background: var(--cream);
+  font-size: 0.64rem;
+}
+
+.authForm .inlineError {
+  margin-bottom: 0;
+}
+
+.codeSentRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.75rem 0.8rem;
+  border-left: 3px solid var(--hot-red);
+  border-radius: 0 0.42rem 0.42rem 0;
+  background: var(--flesh-light);
+}
+
+.codeSentRow > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.12rem;
+}
+
+.codeSentRow span {
+  color: var(--cocoa);
+  font-size: 0.68rem;
+}
+
+.codeSentRow strong {
+  overflow: hidden;
+  font-family: var(--font-brand);
+  font-size: 0.9rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codeSentRow button,
+.resendButton {
+  min-height: 2.75rem;
+  padding: 0.4rem 0.3rem;
+  cursor: pointer;
+  color: var(--cocoa);
+  background: transparent;
+  font-family: var(--font-brand);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: rgba(132, 83, 77, 0.35);
+  text-underline-offset: 0.25rem;
+}
+
+.resendButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.confirmationPanel {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+}
+
+.confirmationGlyph {
+  display: grid;
+  width: 3.4rem;
+  height: 3.4rem;
+  place-items: center;
+  border: 3px solid var(--hot-red);
+  border-radius: 50%;
+  color: var(--cocoa-dark);
+  background: var(--cream);
+  font-size: 1.2rem;
+}
+
+.confirmationPanel h2 {
+  max-width: 18ch;
+  margin-top: 0.8rem;
+  font-family: var(--font-brand);
+  font-size: 1.55rem;
+  font-weight: 600;
+  line-height: 1.05;
+}
+
+.confirmationPanel p {
+  max-width: 27rem;
+  margin-block: 0.65rem 1rem;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.confirmationPanel .primaryButton {
+  width: 100%;
+}
+
+.memberChip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.65rem;
+  width: min(100%, 31rem);
+  margin: 1rem auto 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--chrome-dark);
+  border-radius: 0.5rem;
+  background: var(--cream);
+  box-shadow: 0 8px 20px rgba(56, 28, 22, 0.1);
+  animation: panelIn 320ms var(--ease-storefront) both;
+}
+
+.memberChip > span {
+  display: grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--hot-red);
+  color: var(--cocoa-dark);
+  background: var(--cream);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.memberChip strong {
+  display: block;
+  font-family: var(--font-brand);
+  font-size: 0.76rem;
+}
+
+.memberChip p {
+  margin-top: 0.06rem;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  line-height: 1.35;
+}
+
+.memberChip button {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding-inline: 0.55rem;
+  cursor: pointer;
+  border-radius: 0.35rem;
+  color: var(--cocoa-dark);
+  background: var(--flesh);
+  font-family: var(--font-brand);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.demoChip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.65rem;
+  width: min(100%, 31rem);
+  margin: 1rem auto 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--chrome-dark);
+  border-radius: 0.5rem;
+  background: var(--cream);
+  box-shadow: 0 8px 20px rgba(56, 28, 22, 0.1);
+  animation: panelIn 320ms var(--ease-storefront) both;
+}
+
+.demoChip > span {
+  display: grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--hot-red);
+  color: var(--cocoa-dark);
+  background: var(--cream);
+  font-size: 0.78rem;
+}
+
+.demoChip strong {
+  display: block;
+  font-family: var(--font-brand);
+  font-size: 0.76rem;
+}
+
+.demoChip p {
+  margin-top: 0.06rem;
+  color: var(--ink-soft);
+  font-size: 0.68rem;
+  line-height: 1.35;
 }
 
 .introPanel {
   display: flex;
   align-self: center;
   flex-direction: column;
-  padding-block: 2rem;
+  padding-block: 1.4rem 2rem;
 }
 
 .introTitle {
@@ -314,9 +695,9 @@
   color: var(--cocoa-dark);
   font-family: var(--font-brand);
   font-size: clamp(2.85rem, 10.5vw, 5.15rem);
-  font-weight: 600;
-  letter-spacing: -0.05em;
-  line-height: 0.94;
+  font-weight: 700;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
 }
 
 .introBody {
@@ -332,9 +713,16 @@
   max-width: 31rem;
   gap: 0.65rem;
   margin-block: 1.8rem 2rem;
-  padding-block: 1rem;
-  border-block: 1px solid rgba(132, 83, 77, 0.2);
-  color: var(--cocoa);
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--chrome-dark);
+  border-radius: 0.42rem;
+  color: var(--cocoa-dark);
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.65), transparent 55%),
+    var(--cream);
+  box-shadow:
+    inset 0 0 0 3px rgba(191, 195, 198, 0.28),
+    0 8px 18px rgba(56, 28, 22, 0.08);
   font-size: 0.86rem;
 }
 
@@ -353,42 +741,54 @@
   align-self: stretch;
   gap: 0.7rem;
   padding: 0.9rem 1.25rem;
+  border: 1px solid #44110c;
   border-radius: 999px;
   color: var(--cream);
-  background: var(--cocoa-dark);
-  box-shadow: 0 12px 30px rgba(89, 35, 27, 0.18);
+  background:
+    linear-gradient(180deg, #84291d, var(--cocoa) 62%, #57150f);
+  box-shadow: var(--shadow-counter);
   font-family: var(--font-brand);
   font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: 0.03em;
   transition:
-    transform 200ms ease,
-    box-shadow 200ms ease,
-    opacity 200ms ease;
-}
-
-.primaryButton:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 34px rgba(89, 35, 27, 0.23);
+    transform 180ms var(--ease-storefront),
+    box-shadow 180ms var(--ease-storefront),
+    opacity 180ms ease;
 }
 
 .primaryButton:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(2px);
+  box-shadow:
+    0 4px 0 #51130d,
+    0 8px 0 #35100d,
+    0 14px 24px rgba(52, 12, 9, 0.2);
 }
 
+/* Opaque on purpose. A translucent CTA lets the counter band behind it bleed
+   through the lower edge, which reads as a rendering fault rather than a
+   disabled control. This is an unlit version of the same sign instead. */
 .primaryButton:disabled {
   cursor: not-allowed;
-  opacity: 0.38;
+  border-color: var(--chrome-dark);
+  color: rgba(78, 59, 55, 0.78);
+  background: linear-gradient(180deg, #f6efe3, #e4d7c6 62%, #d9cab6);
+  box-shadow:
+    inset 0 0 0 2px rgba(191, 195, 198, 0.34),
+    0 3px 0 rgba(133, 137, 140, 0.4),
+    0 8px 18px rgba(56, 28, 22, 0.08);
+}
+
+.primaryButton:disabled .forwardIcon {
+  opacity: 0.4;
 }
 
 .forwardIcon {
   display: inline-block;
-  width: 1.55rem;
-  height: 1.55rem;
+  width: 1.8rem;
+  height: 1.8rem;
   flex: 0 0 auto;
-  background: var(--pistachio);
-  -webkit-mask: url("/hot-crush-arrow.png") center / contain no-repeat;
-  mask: url("/hot-crush-arrow.png") center / contain no-repeat;
+  background: url("/hot-crush-arrow.png") center / contain no-repeat;
 }
 
 .savedNote {
@@ -409,22 +809,39 @@
   grid-template-columns: 1fr auto;
   align-items: center;
   gap: 0.85rem;
-  margin-bottom: clamp(2rem, 7vh, 4.5rem);
+  margin-bottom: clamp(1.25rem, 3vh, 2rem);
 }
 
 .progressTrack {
-  height: 3px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgba(132, 83, 77, 0.14);
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.35rem;
+  height: 1.15rem;
+  background: transparent;
 }
 
 .progressTrack span {
   display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--cocoa-dark);
-  transition: width 450ms cubic-bezier(0.22, 0.68, 0.2, 1);
+  min-width: 0;
+  height: 0.7rem;
+  align-self: center;
+  border: 2px solid rgba(106, 28, 19, 0.28);
+  border-radius: 999px;
+  background: var(--cream);
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 180ms var(--ease-storefront);
+}
+
+.progressTrack span[data-active="true"] {
+  border-color: var(--hot-red);
+  background: var(--hot-red);
+}
+
+.progressTrack span[data-current="true"] {
+  transform: scaleY(1.45);
+  box-shadow: inset 0 0 0 2px var(--cream);
 }
 
 .progressWrap p {
@@ -473,32 +890,42 @@
   gap: 0.9rem;
   padding: 1rem;
   cursor: pointer;
-  border: 1px solid rgba(89, 35, 27, 0.11);
-  border-radius: 1.25rem;
+  overflow: hidden;
+  border: 1px solid rgba(21, 19, 19, 0.24);
+  border-radius: 0.42rem;
   color: var(--cocoa-dark);
-  background: rgba(255, 252, 246, 0.67);
-  box-shadow: 0 8px 24px rgba(89, 35, 27, 0.05);
+  background: var(--cream);
+  box-shadow: 0 7px 0 rgba(106, 28, 19, 0.12);
   font-size: 1rem;
   line-height: 1.4;
   text-align: left;
-  backdrop-filter: blur(12px);
   transition:
-    transform 200ms ease,
-    border-color 200ms ease,
-    background 200ms ease,
-    box-shadow 200ms ease;
+    transform 180ms var(--ease-storefront),
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
 }
 
-.answerCard:hover {
-  transform: translateY(-2px);
-  border-color: rgba(89, 35, 27, 0.26);
-  box-shadow: 0 13px 26px rgba(89, 35, 27, 0.08);
+.answerCard::before {
+  position: absolute;
+  width: 0.28rem;
+  inset: 0 auto 0 0;
+  background: var(--hot-red);
+  content: "";
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 180ms var(--ease-storefront);
 }
 
 .answerCard[data-selected="true"] {
-  border-color: var(--cocoa-dark);
-  background: var(--flesh-light);
-  box-shadow: 0 13px 28px rgba(89, 35, 27, 0.1);
+  border-color: var(--hot-red);
+  background: #fffaf1;
+  box-shadow: 0 7px 0 rgba(106, 28, 19, 0.2);
+  transform: translateY(1px);
+}
+
+.answerCard[data-selected="true"]::before {
+  transform: scaleY(1);
 }
 
 .answerEmoji {
@@ -506,9 +933,11 @@
   width: 3rem;
   height: 3rem;
   place-items: center;
-  border-radius: 0.9rem;
-  background: var(--cream);
-  font-size: 1.42rem;
+  border: 1px solid var(--chrome);
+  border-radius: 0.3rem;
+  background:
+    linear-gradient(150deg, var(--chrome-light), var(--chrome));
+  font-size: 1.22rem;
 }
 
 .answerCheck {
@@ -532,13 +961,21 @@
   background: var(--cocoa-dark);
 }
 
+/* Two auto margins — one here, one above the question block — so flexbox splits
+   the leftover height evenly instead of dumping all of it into one slab above
+   the controls. The question then reads as centred between the progress bar and
+   the nav, and the nav stays in thumb reach at the bottom. */
+.questionPanel > .eyebrow {
+  margin-top: auto;
+}
+
 .stepActions {
   display: grid;
   grid-template-columns: auto minmax(9rem, 1fr);
   align-items: center;
   gap: 1rem;
   margin-top: auto;
-  padding-top: clamp(1.6rem, 5vh, 3rem);
+  padding-top: clamp(1rem, 2.5vh, 1.6rem);
 }
 
 .backButton,
@@ -563,7 +1000,7 @@
   align-items: center;
   align-self: flex-start;
   gap: 0.4rem;
-  margin-bottom: 1.8rem;
+  margin-bottom: 0.4rem;
   padding-block: 0.4rem;
 }
 
@@ -572,43 +1009,55 @@
 .completionPanel {
   display: flex;
   flex-direction: column;
-  padding-block: 0.35rem 1rem;
+  padding-block: 0.2rem 0.4rem;
 }
 
 .resultLead {
   margin-top: 0.55rem;
   font-family: var(--font-brand);
   font-size: clamp(2rem, 7vw, 3.2rem);
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.04em;
   line-height: 1;
 }
 
 .typeTicket {
   position: relative;
-  margin-block: 1.5rem;
-  padding: 1rem 1.1rem 1.2rem;
+  margin-block: 1.05rem;
+  padding: 0.85rem 1.1rem 1rem;
   overflow: hidden;
-  border: 1px solid rgba(89, 35, 27, 0.13);
-  border-radius: 1.6rem;
+  border: 1px solid var(--chrome-dark);
+  border-radius: 0.58rem;
   background:
     linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.45),
-      transparent 44%
+      145deg,
+      rgba(255, 255, 255, 0.94),
+      rgba(191, 195, 198, 0.72) 38%,
+      rgba(238, 240, 240, 0.96) 66%,
+      rgba(133, 137, 140, 0.5)
     ),
-    var(--flesh-light);
-  box-shadow: var(--shadow-soft);
+    var(--chrome);
+  box-shadow:
+    inset 0 0 0 4px rgba(255, 255, 255, 0.46),
+    0 18px 42px rgba(44, 22, 18, 0.18);
+  animation: receiptRise 520ms var(--ease-storefront) both;
+}
+
+.typeTicket::after {
+  position: absolute;
+  width: 8.5rem;
+  height: 8.5rem;
+  top: 4.2rem;
+  right: -2.5rem;
+  background: url("/hot-crush-arrow.png") center / contain no-repeat;
+  content: "";
+  opacity: 0.1;
+  pointer-events: none;
 }
 
 .ticketNotchLeft,
 .ticketNotchRight {
-  position: absolute;
-  width: 1.4rem;
-  height: 1.4rem;
-  top: 10.2rem;
-  border-radius: 50%;
-  background: var(--cream);
+  display: none;
 }
 
 .ticketNotchLeft {
@@ -622,9 +1071,9 @@
 .ticketHeader {
   display: flex;
   justify-content: space-between;
-  padding-bottom: 0.8rem;
-  border-bottom: 1px dashed rgba(89, 35, 27, 0.2);
-  color: var(--cocoa);
+  padding-bottom: 0.55rem;
+  border-bottom: 2px solid var(--cocoa-dark);
+  color: var(--cocoa-dark);
   font-family: var(--font-brand);
   font-size: 0.61rem;
   font-weight: 700;
@@ -634,41 +1083,39 @@
 .typeCode {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 0.35rem;
-  margin-top: 1rem;
+  gap: 0;
+  margin-top: 0.7rem;
+  padding: 0.45rem;
+  border: 1px solid rgba(21, 19, 19, 0.34);
+  border-radius: 0.32rem;
+  background: var(--cream);
+  box-shadow: inset 0 0 0 3px rgba(243, 208, 184, 0.38);
 }
 
 .typeCode span {
   display: grid;
-  min-height: 5rem;
+  min-height: 4.1rem;
   place-items: center;
-  border-radius: 1rem 1rem 0.35rem 0.35rem;
+  border-left: 1px solid rgba(21, 19, 19, 0.14);
+  border-radius: 0;
   color: var(--cocoa-dark);
-  background: var(--cream);
+  background: transparent;
   font-family: var(--font-brand);
   font-size: clamp(2.2rem, 11vw, 4.2rem);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
 }
 
-.typeCode span:nth-child(2) {
-  background: var(--pistachio);
-}
-
-.typeCode span:nth-child(3) {
-  background: var(--flesh);
-}
-
-.typeCode span:nth-child(4) {
-  color: var(--cream);
-  background: var(--cocoa);
+.typeCode span:first-child {
+  border-left: 0;
 }
 
 .typeTicket h2 {
-  margin-top: 1.2rem;
+  margin-top: 0.8rem;
   font-family: var(--font-brand);
   font-size: clamp(1.75rem, 6vw, 2.55rem);
-  font-weight: 600;
+  color: var(--cocoa);
+  font-weight: 700;
   letter-spacing: -0.035em;
   line-height: 1;
 }
@@ -677,32 +1124,33 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.42rem;
-  margin-top: 0.85rem;
+  margin-top: 0.6rem;
 }
 
 .traitLine span {
   padding: 0.32rem 0.6rem;
-  border: 1px solid rgba(89, 35, 27, 0.16);
-  border-radius: 999px;
-  color: var(--cocoa);
-  background: rgba(255, 252, 246, 0.5);
+  border: 1px solid rgba(21, 19, 19, 0.2);
+  border-radius: 0.25rem;
+  color: var(--cocoa-dark);
+  background: rgba(255, 247, 234, 0.82);
   font-size: 0.7rem;
 }
 
 .resultDescription {
-  margin-top: 1rem;
-  color: var(--ink-soft);
+  margin-top: 0.75rem;
+  color: var(--cocoa-dark);
   font-size: 0.92rem;
-  line-height: 1.63;
+  line-height: 1.5;
 }
 
 .signatureOrder {
   display: grid;
   gap: 0.22rem;
-  margin-top: 1.1rem;
-  padding: 0.8rem 0.9rem;
-  border-radius: 0.9rem;
-  background: rgba(255, 252, 246, 0.67);
+  margin-top: 0.8rem;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid var(--hot-red);
+  border-radius: 0 0.35rem 0.35rem 0;
+  background: rgba(255, 247, 234, 0.92);
 }
 
 .signatureOrder span,
@@ -722,7 +1170,7 @@
 .textButton {
   min-height: 2.75rem;
   align-self: center;
-  margin-top: 1rem;
+  margin-top: 0.45rem;
   padding: 0.55rem;
   text-decoration: underline;
   text-decoration-color: rgba(132, 83, 77, 0.35);
@@ -731,51 +1179,52 @@
 
 .detailsTitle {
   max-width: 15ch;
-  margin-top: 0.55rem;
+  margin-top: 0.35rem;
   font-family: var(--font-brand);
-  font-size: clamp(2.3rem, 8.5vw, 3.8rem);
-  font-weight: 600;
+  font-size: clamp(1.7rem, 5.6vw, 2.3rem);
+  font-weight: 700;
   letter-spacing: -0.045em;
   line-height: 0.98;
 }
 
 .detailsBody {
   max-width: 33rem;
-  margin-top: 1.15rem;
+  margin-top: 0.45rem;
   color: var(--ink-soft);
-  font-size: 0.93rem;
-  line-height: 1.55;
+  font-size: 0.83rem;
+  line-height: 1.4;
 }
 
 .resultColorPreview {
+  --choice-color: var(--flesh);
+  position: relative;
   width: min(100%, 30rem);
-  margin-top: 1.45rem;
-  padding: 1rem;
-  border: 1px solid rgba(89, 35, 27, 0.13);
-  border-radius: 1.3rem;
+  margin-top: 0.45rem;
+  padding: 0.55rem 0.8rem 0.6rem;
+  overflow: hidden;
+  border: 1px solid var(--chrome-dark);
+  border-radius: 0.52rem;
   color: var(--cocoa-dark);
-  background: var(--flesh-light);
-  box-shadow: var(--shadow-soft);
-  transition:
-    color 420ms cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 420ms cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--cream);
+  box-shadow:
+    inset 0 0 0 3px rgba(191, 195, 198, 0.28),
+    0 12px 28px rgba(56, 28, 22, 0.12);
 }
 
-.resultColorPreview:not([data-color="neutral"]) {
-  animation: cardBreathe 5.5s ease-in-out infinite;
+.resultColorPreview::before {
+  position: absolute;
+  height: 0.55rem;
+  inset: 0 0 auto;
+  background: var(--choice-color);
+  content: "";
+  transition: background 180ms ease;
 }
 
+/* The customer already saw the full result ticket on the previous screen, so
+   this is only a colour-feedback chip: the ::before bar carries the choice and
+   the ticket header would just repeat the code sitting right below it. */
 .resultColorPreview header {
-  display: flex;
-  justify-content: space-between;
-  padding-bottom: 0.65rem;
-  border-bottom: 1px dashed currentColor;
-  font-family: var(--font-brand);
-  font-size: 0.58rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  opacity: 0.68;
+  display: none;
 }
 
 .resultColorPreview > div {
@@ -783,89 +1232,76 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 0.8rem;
-  margin-top: 0.8rem;
+  margin-top: 0.35rem;
 }
 
 .resultColorPreview strong {
   font-family: var(--font-brand);
-  font-size: clamp(1.7rem, 8vw, 2.6rem);
+  font-size: clamp(1.2rem, 5vw, 1.55rem);
   font-weight: 600;
   letter-spacing: 0.08em;
 }
 
 .resultColorPreview > div > span {
   font-family: var(--font-brand);
-  font-size: 1rem;
+  font-size: 0.86rem;
   font-weight: 600;
   text-align: right;
 }
 
 .resultColorPreview p {
-  margin-top: 0.45rem;
-  font-size: 0.75rem;
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
   opacity: 0.76;
 }
 
 .resultColorPreview[data-color="pistachio"],
 .rewardCard[data-color="pistachio"] {
-  background: #e3e9cf;
+  --choice-color: #b4c876;
 }
 
 .resultColorPreview[data-color="cherry"],
 .rewardCard[data-color="cherry"] {
-  background: #f8dfdc;
+  --choice-color: #b95f58;
 }
 
 .resultColorPreview[data-color="blush"],
 .rewardCard[data-color="blush"] {
-  background: #f6deda;
+  --choice-color: #efcbc6;
 }
 
 .resultColorPreview[data-color="apricot"],
 .rewardCard[data-color="apricot"] {
-  background: #f7e2cf;
+  --choice-color: #d99364;
 }
 
 .resultColorPreview[data-color="sunshine"],
 .rewardCard[data-color="sunshine"] {
-  background: #f4e9c9;
+  --choice-color: #d7b65a;
 }
 
 .resultColorPreview[data-color="sky"],
 .rewardCard[data-color="sky"] {
-  background: #dfe9eb;
+  --choice-color: #8fb6bd;
 }
 
 .resultColorPreview[data-color="lavender"],
 .rewardCard[data-color="lavender"] {
-  background: #e9e1ed;
+  --choice-color: #aa91b2;
 }
 
 .resultColorPreview[data-color="cream"],
 .rewardCard[data-color="cream"] {
-  background: #efe2ce;
+  --choice-color: #e8dbc4;
 }
 
 .resultColorPreview[data-color="cocoa"],
 .rewardCard[data-color="cocoa"] {
-  border-color: transparent;
-  color: var(--cream);
-  background: var(--cocoa);
-}
-
-.rewardCard[data-color="cocoa"] > span,
-.rewardCard[data-color="cocoa"] p {
-  color: #fff8ed;
-  opacity: 1;
-}
-
-.resultColorPreview[data-color="cocoa"] header,
-.resultColorPreview[data-color="cocoa"] p {
-  opacity: 0.96;
+  --choice-color: #84534d;
 }
 
 .detailFieldset {
-  margin-top: 1.7rem;
+  margin-top: 0.45rem;
 }
 
 .detailFieldset legend {
@@ -876,21 +1312,23 @@
 
 .colorGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.6rem;
-  margin-top: 0.7rem;
+  /* Three across turns nine swatches from five rows into three. Below 360px the
+     labels no longer fit on one line, so narrow phones drop back to two. */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-top: 0.55rem;
 }
 
 .colorChoice {
   display: flex;
-  min-height: 3.3rem;
+  min-height: 2.9rem;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.65rem 0.75rem;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
   cursor: pointer;
-  border: 1px solid rgba(89, 35, 27, 0.12);
-  border-radius: 0.95rem;
-  background: rgba(255, 252, 246, 0.62);
+  border: 1px solid rgba(21, 19, 19, 0.22);
+  border-radius: 0.36rem;
+  background: var(--cream);
   font-size: 0.78rem;
   text-align: left;
   transition:
@@ -899,13 +1337,10 @@
     transform 180ms ease;
 }
 
-.colorChoice:hover {
-  transform: translateY(-1px);
-}
-
 .colorChoice[data-selected="true"] {
-  border-color: var(--cocoa-dark);
-  background: var(--flesh-light);
+  border-color: var(--hot-red);
+  background: #fffaf1;
+  box-shadow: inset 4px 0 0 var(--hot-red);
 }
 
 .colorChoice > span {
@@ -963,17 +1398,17 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.65rem;
-  margin-top: 1rem;
+  margin-top: 0.35rem;
 }
 
 .secondaryButton {
-  min-height: 3.1rem;
-  padding: 0.7rem 0.8rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.8rem;
   cursor: pointer;
-  border: 1px solid rgba(89, 35, 27, 0.2);
-  border-radius: 999px;
+  border: 1px solid rgba(21, 19, 19, 0.3);
+  border-radius: 0.4rem;
   color: var(--cocoa-dark);
-  background: rgba(255, 252, 246, 0.58);
+  background: var(--cream);
   font-family: var(--font-brand);
   font-size: 0.78rem;
   font-weight: 700;
@@ -981,12 +1416,6 @@
     transform 180ms ease,
     border-color 180ms ease,
     background 180ms ease;
-}
-
-.secondaryButton:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(89, 35, 27, 0.36);
-  background: rgba(255, 252, 246, 0.88);
 }
 
 .secondaryButton:disabled {
@@ -1005,12 +1434,12 @@
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.75rem;
-  margin-block: 1.4rem;
+  margin-block: 0.3rem;
 }
 
 .optionalFields label {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.28rem;
 }
 
 .optionalFields label > span {
@@ -1028,26 +1457,29 @@
 
 .optionalFields select {
   width: 100%;
-  min-height: 3rem;
-  padding: 0.5rem 2rem 0.5rem 0.75rem;
-  border: 1px solid rgba(89, 35, 27, 0.15);
-  border-radius: 0.85rem;
+  min-height: 2.75rem;
+  padding: 0.4rem 1.9rem 0.4rem 0.75rem;
+  border: 1px solid rgba(21, 19, 19, 0.24);
+  border-radius: 0.4rem;
   color: var(--cocoa-dark);
-  background: rgba(255, 252, 246, 0.74);
+  /* background-color, not the shorthand — the shared rule above paints the
+     chevron via background-image and a shorthand here would erase it. */
+  background-color: rgba(255, 252, 246, 0.74);
+  background-position: right 0.7rem center;
   font-size: 1rem;
 }
 
 .privacyNote {
   display: grid;
-  gap: 0.45rem;
-  margin-bottom: 1.15rem;
-  padding: 0.85rem 0.9rem;
-  border-left: 3px solid var(--pistachio);
-  border-radius: 0 0.8rem 0.8rem 0;
+  gap: 0.25rem;
+  margin-bottom: 0.25rem;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--hot-red);
+  border-radius: 0 0.42rem 0.42rem 0;
   color: var(--cocoa);
-  background: rgba(255, 252, 246, 0.45);
-  font-size: 0.72rem;
-  line-height: 1.5;
+  background: rgba(255, 247, 234, 0.75);
+  font-size: 0.68rem;
+  line-height: 1.42;
 }
 
 .inlineError {
@@ -1092,45 +1524,23 @@
   width: 3.5rem;
   height: 3.5rem;
   place-items: center;
-  border: 1px solid rgba(89, 35, 27, 0.18);
-  border-radius: 1rem;
-  color: var(--cream);
-  background: var(--cocoa);
+  border: 3px solid var(--hot-red);
+  border-radius: 50%;
+  color: var(--cocoa-dark);
+  background: var(--cream);
   font-size: 1.4rem;
 }
 
 .brewLoader {
-  position: relative;
   width: 4.2rem;
-  height: 3.2rem;
+  height: 4.2rem;
   margin-bottom: 1rem;
-  border: 2px solid var(--cocoa-dark);
-  border-top: 0;
-  border-radius: 0.3rem 0.3rem 1.4rem 1.4rem;
-}
-
-.brewLoader::after {
-  position: absolute;
-  width: 1.2rem;
-  height: 1.4rem;
-  top: 0.35rem;
-  right: -1.2rem;
-  content: "";
-  border: 2px solid var(--cocoa-dark);
-  border-left: 0;
-  border-radius: 0 999px 999px 0;
+  background: url("/hot-crush-arrow.png") center / contain no-repeat;
+  animation: signIn 560ms var(--ease-storefront) both;
 }
 
 .brewLoader i {
-  position: absolute;
-  width: 0.35rem;
-  height: 1.65rem;
-  bottom: calc(100% + 0.25rem);
-  left: 1.25rem;
-  border-radius: 999px;
-  background: var(--flesh);
-  box-shadow: 0.8rem 0 var(--pistachio);
-  animation: steamRise 1.4s ease-in-out infinite alternate;
+  display: none;
 }
 
 .completionPanel {
@@ -1146,17 +1556,20 @@
   height: 4.2rem;
   margin-bottom: 1.4rem;
   place-items: center;
-  border: 1px solid rgba(89, 35, 27, 0.13);
-  border-radius: 1.25rem;
+  border: 3px solid var(--hot-red);
+  border-radius: 50%;
   color: var(--cocoa-dark);
-  background: var(--flesh);
-  box-shadow: var(--shadow-soft);
+  background: var(--cream);
+  box-shadow: 0 10px 24px rgba(56, 28, 22, 0.12);
   font-size: 1.55rem;
-  transform: rotate(-4deg);
 }
 
 .giftStamp[data-issued="true"] {
-  background: var(--pistachio);
+  color: transparent;
+  background:
+    url("/hot-crush-arrow.png") center / 112% no-repeat,
+    var(--cream);
+  animation: signIn 560ms var(--ease-storefront) both;
 }
 
 .completionBody {
@@ -1168,14 +1581,28 @@
 }
 
 .rewardCard {
+  --choice-color: var(--flesh);
+  position: relative;
   width: min(100%, 30rem);
   margin-top: 1.7rem;
-  padding: 1.25rem;
-  border: 1px solid rgba(89, 35, 27, 0.13);
-  border-radius: 1.3rem;
-  background: var(--flesh-light);
-  box-shadow: var(--shadow-soft);
+  padding: 1.4rem 1.25rem 1.2rem;
+  overflow: hidden;
+  border: 1px solid var(--chrome-dark);
+  border-radius: 0.5rem;
+  color: var(--cocoa-dark);
+  background: var(--cream);
+  box-shadow:
+    inset 0 0 0 3px rgba(191, 195, 198, 0.28),
+    0 14px 34px rgba(56, 28, 22, 0.14);
   text-align: left;
+}
+
+.rewardCard::before {
+  position: absolute;
+  height: 0.55rem;
+  inset: 0 0 auto;
+  background: var(--choice-color);
+  content: "";
 }
 
 .rewardCard strong {
@@ -1200,7 +1627,11 @@
   justify-content: center;
   gap: 0.6rem;
   margin-top: 0.9rem;
+  padding: 0.65rem;
+  border: 1px solid rgba(21, 19, 19, 0.18);
+  border-radius: 0.35rem;
   color: var(--cocoa);
+  background: rgba(255, 247, 234, 0.78);
   font-size: 0.76rem;
 }
 
@@ -1284,10 +1715,8 @@
   width: 1.25rem;
   height: 1.25rem;
   flex: 0 0 auto;
-  background: currentColor;
+  background: url("/hot-crush-arrow.png") center / contain no-repeat;
   content: "";
-  -webkit-mask: url("/hot-crush-arrow.png") center / contain no-repeat;
-  mask: url("/hot-crush-arrow.png") center / contain no-repeat;
 }
 
 .landing .memberReturn {
@@ -1307,7 +1736,7 @@
 @keyframes panelIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(6px);
   }
   to {
     opacity: 1;
@@ -1315,33 +1744,57 @@
   }
 }
 
-@keyframes steamRise {
+@keyframes lightboxOn {
   from {
-    opacity: 0.52;
-    transform: translateY(0) rotate(9deg);
+    opacity: 0;
+    filter: brightness(0.82);
   }
   to {
     opacity: 1;
-    transform: translateY(-0.38rem) rotate(15deg);
+    filter: brightness(1);
   }
 }
 
-@keyframes ambientFloat {
+@keyframes signIn {
   from {
-    transform: translate3d(0, 0, 0);
+    opacity: 0;
+    transform: scale(0.92);
   }
   to {
-    transform: translate3d(-1.1rem, 1.2rem, 0);
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
-@keyframes cardBreathe {
-  0%,
-  100% {
-    box-shadow: 0 18px 50px rgba(89, 35, 27, 0.08);
+@keyframes receiptRise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
   }
-  50% {
-    box-shadow: 0 22px 58px rgba(89, 35, 27, 0.14);
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (hover: hover) {
+  .languageButton:hover,
+  .colorChoice:hover,
+  .secondaryButton:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .answerCard:hover {
+    transform: translateY(-2px);
+    border-color: var(--cocoa);
+  }
+
+  .primaryButton:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow:
+      0 9px 0 #51130d,
+      0 15px 0 #35100d,
+      0 28px 40px rgba(52, 12, 9, 0.25);
   }
 }
 
@@ -1422,14 +1875,330 @@
   }
 
   .typeTicket {
-    padding-inline: 0.8rem;
+    margin-block: 0.65rem;
+    padding: 0.65rem 0.8rem 0.7rem;
   }
 
   .typeCode span {
-    min-height: 4.2rem;
+    min-height: 3.4rem;
+  }
+
+  /* Small phones have ~120px less to work with than a 430pt screen, so the
+     result ticket and the colour form each give back a notch of leading,
+     padding and type size. Nothing is removed except the colour-screen helper
+     line, which only repeats what the heading already says. */
+  .journeyFrame {
+    padding-block: 0.75rem 0.25rem;
+  }
+
+  .resultLead {
+    margin-top: 0.35rem;
+    font-size: clamp(1.65rem, 7.4vw, 2.3rem);
+  }
+
+  .ticketHeader {
+    padding-bottom: 0.4rem;
+  }
+
+  .typeCode {
+    margin-top: 0.5rem;
+    padding: 0.28rem;
+  }
+
+  .typeTicket h2 {
+    margin-top: 0.55rem;
+    font-size: clamp(1.4rem, 6.2vw, 2.1rem);
+  }
+
+  .traitLine {
+    margin-top: 0.4rem;
+  }
+
+  .traitLine span {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.66rem;
+  }
+
+  .resultDescription {
+    margin-top: 0.55rem;
+    font-size: 0.84rem;
+    line-height: 1.42;
+  }
+
+  .signatureOrder {
+    margin-top: 0.5rem;
+    padding: 0.45rem 0.8rem;
+  }
+
+  .textButton {
+    margin-top: 0.25rem;
+  }
+
+  .detailsTitle {
+    font-size: clamp(1.5rem, 5.4vw, 2rem);
+  }
+
+  .detailsBody {
+    display: none;
+  }
+
+  .resultColorPreview {
+    margin-top: 0.35rem;
+    padding: 0.4rem 0.7rem 0.45rem;
+  }
+
+  .colorChoice {
+    gap: 0.4rem;
+    padding: 0.45rem 0.45rem;
+    font-size: 0.66rem;
   }
 
   .optionalFields {
-    grid-template-columns: 1fr;
+    margin-block: 0.2rem;
+  }
+
+  .optionalFields select {
+    min-height: 2.6rem;
+  }
+
+  .privacyNote {
+    margin-bottom: 0.2rem;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.64rem;
+    line-height: 1.35;
+  }
+
+  .primaryButton {
+    min-height: 3.1rem;
+    padding-block: 0.6rem;
+  }
+
+  /* The heading directly below already says "choose a colour" — on a small
+     screen the eyebrow above it is the most expendable 16px on the panel. */
+  .detailsPanel > .eyebrow {
+    display: none;
+  }
+
+  .topBack {
+    margin-bottom: 0.2rem;
+  }
+
+  .detailsTitle {
+    margin-top: 0.2rem;
+  }
+
+  .detailFieldset {
+    margin-top: 0.4rem;
+  }
+
+  .cardActions {
+    margin-top: 0.2rem;
+  }
+}
+
+@media (max-width: 359px) {
+  .pageFrame {
+    padding-inline: 1rem;
+  }
+
+  .brandHeader {
+    gap: 0.55rem;
+    padding-left: 0.65rem;
+  }
+
+  .brandLogo {
+    width: 6rem;
+  }
+
+  .languageButton {
+    min-width: 2.75rem;
+    padding-inline: 0.28rem;
+  }
+
+  .authTitle,
+  .introTitle {
+    font-size: 2.65rem;
+  }
+}
+
+/* Short viewports: tighten the sign-in screen so it still lands in one screenful.
+   Keyed on height, not width, because this is a vertical-fit problem — tall
+   phones keep the roomier spacing above. */
+@media (max-height: 880px) {
+  .authPanel {
+    padding-block: 0.75rem 1rem;
+  }
+
+  .steamMark {
+    width: 3.4rem;
+    height: 3.4rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .authTitle {
+    margin-top: 0.5rem;
+    font-size: clamp(2.1rem, 9vw, 3.4rem);
+  }
+
+  .authBody {
+    margin-top: 0.8rem;
+    font-size: 0.94rem;
+    line-height: 1.5;
+  }
+
+  .authCard {
+    margin-top: 1rem;
+    padding: 1rem;
+  }
+}
+
+/* Smallest supported phone (320x740). One more notch of tightening so the
+   sign-in card, its consent notice and the CTA all still land above the fold. */
+@media (max-height: 760px) {
+  .authPanel {
+    padding-block: 0.5rem 0.4rem;
+  }
+
+  .steamMark {
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .authTitle {
+    margin-top: 0.4rem;
+    font-size: clamp(1.95rem, 9vw, 3rem);
+  }
+
+  .authBody {
+    margin-top: 0.7rem;
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  .authCard {
+    margin-top: 0.85rem;
+    padding: 0.85rem;
+  }
+
+  .memberPass {
+    margin-bottom: 0.5rem;
+  }
+
+  .authForm {
+    gap: 0.55rem;
+  }
+
+  .membershipConsent {
+    padding: 0.6rem 0.7rem;
+  }
+
+  /* Same idea for the rest of the journey: the shortest phones give back one
+     more notch of frame padding, ticket leading and control height. The 44px
+     tap-target floor is the hard stop — nothing below drops under it. */
+  /* Shortest phones: the plinth shrinks with the clearance so the pairing
+     stays correct — 1rem band + 1.25rem gap. */
+  .ambientWash::after {
+    inset: auto 0 -7rem;
+  }
+
+  .pageFrame {
+    padding-bottom: max(2.25rem, calc(env(safe-area-inset-bottom) + 1.25rem));
+  }
+
+  .journeyFrame {
+    padding-block: 0.5rem 0.2rem;
+  }
+
+  .typeCode span {
+    min-height: 2.9rem;
+  }
+
+  .typeTicket {
+    margin-block: 0.5rem;
+    padding: 0.55rem 0.75rem 0.6rem;
+  }
+
+  .resultDescription {
+    font-size: 0.8rem;
+    line-height: 1.38;
+  }
+
+  .signatureOrder {
+    margin-top: 0.35rem;
+    padding: 0.35rem 0.75rem;
+  }
+
+  .traitLine span {
+    padding: 0.16rem 0.42rem;
+    font-size: 0.62rem;
+  }
+
+  .detailsTitle {
+    font-size: clamp(1.4rem, 5.4vw, 1.8rem);
+  }
+
+  .detailFieldset {
+    margin-top: 0.3rem;
+  }
+
+  .detailFieldset legend {
+    font-size: 0.78rem;
+  }
+
+  .resultColorPreview {
+    margin-top: 0.3rem;
+  }
+
+  .optionalFields {
+    margin-block: 0.15rem;
+  }
+
+  .resultColorPreview strong {
+    font-size: clamp(1.05rem, 4.4vw, 1.3rem);
+  }
+
+  .privacyNote {
+    margin-bottom: 0.15rem;
+    padding: 0.35rem 0.6rem;
+    font-size: 0.6rem;
+    line-height: 1.3;
+  }
+
+  .cardActions {
+    margin-top: 0.15rem;
+  }
+
+  .resultColorPreview p {
+    font-size: 0.64rem;
+  }
+
+  .optionalFields label > span {
+    font-size: 0.72rem;
+  }
+
+  .colorChoice {
+    min-height: 2.75rem;
+  }
+
+  .optionalFields select {
+    min-height: 2.75rem;
+  }
+
+  .primaryButton {
+    min-height: 2.85rem;
+    padding-block: 0.5rem;
+  }
+
+  .answerCard {
+    min-height: 4.6rem;
+  }
+
+  /* /demo only. The guest banner costs 73px that a real customer never pays,
+     so on the shortest screens it shrinks rather than pushing the preview of
+     the actual page out of one screenful. */
+  .demoChip {
+    margin-top: 0.5rem;
+    padding: 0.45rem 0.65rem;
   }
 }

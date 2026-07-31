@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { BrandHeader } from "@/components/BrandHeader";
+import { MemberSignIn } from "@/components/MemberSignIn";
 import { questions } from "@/content/questions";
 import { results } from "@/content/results";
 import type {
@@ -43,13 +44,14 @@ const MEMBER_WALLET_URL =
   "https://f4klzbmr9n2d.m.sea.restosuite.ai/couponIndex";
 
 type JourneyStage = "intro" | "quiz" | "result" | "details";
-type ValidationState = "checking" | "valid" | "invalid" | "error";
+type AuthState = "checking" | "signedOut" | "signedIn" | "error";
 type SubmissionState =
   | "idle"
   | "submitting"
   | "issued"
   | "processing"
   | "review"
+  | "demo"
   | "error";
 
 interface HbtiDraft {
@@ -73,15 +75,28 @@ interface CompletionResponse {
   };
 }
 
-interface HbtiExperienceProps {
-  token: string;
+interface AuthenticatedMember {
+  maskedPhone: string;
+  draftKey: string;
 }
 
-export function HbtiExperience({ token }: HbtiExperienceProps) {
+interface SessionResponse {
+  authenticated?: boolean;
+  maskedPhone?: string;
+  draftKey?: string;
+}
+
+export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
   const { locale, changeLocale } = useLocale();
   const copy = uiCopy[locale];
-  const [validation, setValidation] =
-    useState<ValidationState>("checking");
+  const [authState, setAuthState] = useState<AuthState>(
+    demoMode ? "signedIn" : "checking",
+  );
+  const [member, setMember] = useState<AuthenticatedMember | undefined>(
+    demoMode
+      ? { maskedPhone: "", draftKey: "public-demo" }
+      : undefined,
+  );
   const [stage, setStage] = useState<JourneyStage>("intro");
   const [answers, setAnswers] = useState<Partial<HbtiAnswers>>({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -99,43 +114,54 @@ export function HbtiExperience({ token }: HbtiExperienceProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const advanceTimerRef = useRef<number | null>(null);
 
-  const validateInvitation = useCallback(async () => {
-    setValidation("checking");
+  const checkSession = useCallback(async () => {
+    setAuthState("checking");
 
     try {
-      const response = await fetch("/api/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+      const response = await fetch("/api/auth/session", {
+        method: "GET",
         cache: "no-store",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
-
-      if (!response.ok) {
-        setValidation(
-          response.status === 400 || response.status === 410
-            ? "invalid"
-            : "error",
-        );
+      if (response.status === 401) {
+        setMember(undefined);
+        setAuthState("signedOut");
         return;
       }
-
-      const payload: unknown = await response.json();
-      setValidation(
-        isValidSessionPayload(payload) ? "valid" : "invalid",
-      );
+      if (!response.ok) {
+        setAuthState("error");
+        return;
+      }
+      const payload = (await response.json()) as SessionResponse;
+      if (
+        payload.authenticated === true &&
+        typeof payload.maskedPhone === "string" &&
+        typeof payload.draftKey === "string"
+      ) {
+        setMember({
+          maskedPhone: payload.maskedPhone,
+          draftKey: payload.draftKey,
+        });
+        setAuthState("signedIn");
+        return;
+      }
+      setMember(undefined);
+      setAuthState("signedOut");
     } catch {
-      setValidation("error");
+      setAuthState("error");
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
+    if (demoMode) {
+      return;
+    }
     const timer = window.setTimeout(() => {
-      void validateInvitation();
+      void checkSession();
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [validateInvitation]);
+  }, [checkSession, demoMode]);
 
   useEffect(
     () => () => {
@@ -147,35 +173,27 @@ export function HbtiExperience({ token }: HbtiExperienceProps) {
   );
 
   useEffect(() => {
-    let cancelled = false;
-
-    void createDraftKey(token)
-      .then((nextDraftKey) => {
-        if (cancelled) {
-          return;
-        }
-        setDraftKey(nextDraftKey);
-        const draft = readDraft(nextDraftKey);
-        if (draft) {
-          setAnswers(draft.answers);
-          setCurrentQuestion(draft.currentQuestion);
-          setStage(draft.stage);
-          setColor(draft.color);
-          setGender(draft.gender);
-          setAge(draft.age);
-        }
-        setDraftLoaded(true);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDraftLoaded(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
+    if (authState !== "signedIn" || !member) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const nextDraftKey = createDraftStorageKey(member.draftKey);
+      const draft = nextDraftKey ? readDraft(nextDraftKey) : null;
+      setDraftKey(nextDraftKey);
+      setAnswers(draft?.answers ?? {});
+      setCurrentQuestion(draft?.currentQuestion ?? 0);
+      setStage(draft?.stage ?? "intro");
+      setColor(draft?.color);
+      setGender(draft?.gender);
+      setAge(draft?.age);
+      setSubmission("idle");
+      setConfirmedCode(undefined);
+      setConfirmedColor(undefined);
+      setMemberWalletUrl(undefined);
+      setDraftLoaded(Boolean(nextDraftKey));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [authState, member]);
 
   useEffect(() => {
     if (!draftLoaded || !draftKey || submission === "issued") {
@@ -206,10 +224,10 @@ export function HbtiExperience({ token }: HbtiExperienceProps) {
   ]);
 
   useEffect(() => {
-    if (validation === "checking") {
+    if (authState === "checking") {
       return;
     }
-    if (validation === "valid") {
+    if (authState === "signedIn") {
       window.scrollTo({ top: 0, behavior: "auto" });
     }
     const timer = window.setTimeout(
@@ -218,7 +236,7 @@ export function HbtiExperience({ token }: HbtiExperienceProps) {
     );
 
     return () => window.clearTimeout(timer);
-  }, [currentQuestion, stage, submission, validation]);
+  }, [authState, currentQuestion, stage, submission]);
 
   useEffect(() => {
     if (submission === "issued" && draftKey) {
@@ -226,17 +244,35 @@ export function HbtiExperience({ token }: HbtiExperienceProps) {
     }
   }, [draftKey, submission]);
 
-  useEffect(() => {
-    if (validation === "invalid" && draftKey) {
-      removeDraft(draftKey);
-    }
-  }, [draftKey, validation]);
-
   const score = useMemo(
     () => (hasCompleteAnswers(answers) ? scoreHbti(answers) : null),
     [answers],
   );
   const result = score ? results[score.code][locale] : null;
+
+  const acceptCompletion = useCallback((payload: CompletionResponse) => {
+    if (isHbtiCode(payload.code)) {
+      setConfirmedCode(payload.code);
+    }
+    if (isColorChoice(payload.color)) {
+      setConfirmedColor(payload.color);
+    }
+    if (payload.reward?.couponTemplateName) {
+      setRewardName(payload.reward.couponTemplateName);
+    }
+    if (isSafeWalletUrl(payload.memberWalletUrl)) {
+      setMemberWalletUrl(payload.memberWalletUrl);
+    }
+    if (
+      payload.status === "issued" ||
+      payload.status === "processing" ||
+      payload.status === "review"
+    ) {
+      setSubmission(payload.status);
+      return true;
+    }
+    return false;
+  }, []);
 
   function chooseAnswer(
     question: HbtiQuestion,
@@ -259,7 +295,7 @@ export function HbtiExperience({ token }: HbtiExperienceProps) {
         setCurrentQuestion(questionIndex + 1);
       }
       advanceTimerRef.current = null;
-    }, 420);
+    }, 220);
   }
 
   function goNext() {
@@ -303,13 +339,20 @@ export function HbtiExperience({ token }: HbtiExperienceProps) {
       return;
     }
 
+    if (demoMode) {
+      const demoScore = scoreHbti(answers);
+      setConfirmedCode(demoScore.code);
+      setConfirmedColor(color);
+      setSubmission("demo");
+      return;
+    }
+
     setSubmission("submitting");
     try {
       const response = await fetch("/api/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          token,
           answers,
           color,
           ...(gender ? { gender } : {}),
@@ -319,63 +362,149 @@ export function HbtiExperience({ token }: HbtiExperienceProps) {
       });
 
       if (!response.ok) {
-        if (response.status === 410) {
-          setValidation("invalid");
+        if (response.status === 401) {
+          setMember(undefined);
+          setAuthState("signedOut");
         }
         setSubmission("error");
         return;
       }
 
       const payload = (await response.json()) as CompletionResponse;
-      if (isHbtiCode(payload.code)) {
-        setConfirmedCode(payload.code);
-      }
-      if (isColorChoice(payload.color)) {
-        setConfirmedColor(payload.color);
-      }
-      if (payload.reward?.couponTemplateName) {
-        setRewardName(payload.reward.couponTemplateName);
-      }
-      if (isSafeWalletUrl(payload.memberWalletUrl)) {
-        setMemberWalletUrl(payload.memberWalletUrl);
-      }
-
-      if (
-        payload.status === "issued" ||
-        payload.status === "processing" ||
-        payload.status === "review"
-      ) {
-        setSubmission(payload.status);
+      if (acceptCompletion(payload)) {
         return;
       }
       setSubmission("error");
     } catch {
       setSubmission("error");
     }
-  }, [age, answers, color, gender, token]);
+  }, [acceptCompletion, age, answers, color, demoMode, gender]);
+
+  const pollCompletionStatus = useCallback(async () => {
+    try {
+      const response = await fetch("/api/complete/status", {
+        method: "GET",
+        cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (response.status === 401) {
+        setMember(undefined);
+        setAuthState("signedOut");
+        setSubmission("error");
+        return;
+      }
+      if (!response.ok) {
+        return;
+      }
+      acceptCompletion((await response.json()) as CompletionResponse);
+    } catch {
+      // Keep the safe processing state; the next read-only poll can retry.
+    }
+  }, [acceptCompletion]);
+
+  const changeAccount = useCallback(async () => {
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+        cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+    } catch {
+      return;
+    }
+
+    if (advanceTimerRef.current !== null) {
+      window.clearTimeout(advanceTimerRef.current);
+      advanceTimerRef.current = null;
+    }
+    setMember(undefined);
+    setAuthState("signedOut");
+    setStage("intro");
+    setAnswers({});
+    setCurrentQuestion(0);
+    setColor(undefined);
+    setGender(undefined);
+    setAge(undefined);
+    setDraftKey(undefined);
+    setDraftLoaded(false);
+    setSubmission("idle");
+    setRewardName(copy.rewardName);
+    setMemberWalletUrl(undefined);
+    setConfirmedCode(undefined);
+    setConfirmedColor(undefined);
+  }, [copy.rewardName]);
 
   useEffect(() => {
     if (submission !== "processing") {
       return;
     }
-    const timer = window.setTimeout(() => {
-      void submitCompletion();
+
+    let cancelled = false;
+    let timer: number | undefined;
+    const pollAgain = async () => {
+      await pollCompletionStatus();
+      if (!cancelled) {
+        timer = window.setTimeout(() => {
+          void pollAgain();
+        }, 2_500);
+      }
+    };
+
+    timer = window.setTimeout(() => {
+      void pollAgain();
     }, 2_500);
-    return () => window.clearTimeout(timer);
-  }, [submission, submitCompletion]);
+
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [pollCompletionStatus, submission]);
 
   return (
     <main className={styles.siteShell}>
       <div className={styles.ambientWash} aria-hidden="true" />
       <div className={styles.pageFrame}>
         <BrandHeader locale={locale} onLocaleChange={changeLocale} />
+        {demoMode ? (
+          <div className={styles.demoChip} role="status">
+            <span aria-hidden="true">✦</span>
+            <div>
+              <strong>{copy.demoModeTitle}</strong>
+              <p>{copy.demoModeBody}</p>
+            </div>
+          </div>
+        ) : authState === "signedIn" && member ? (
+          <div className={styles.memberChip}>
+            <span aria-hidden="true">✓</span>
+            <div role="status">
+              <strong>{copy.memberLinked}</strong>
+              <p>{copy.memberLinkedBody(member.maskedPhone)}</p>
+            </div>
+            <button type="button" onClick={() => void changeAccount()}>
+              {copy.changePhone}
+            </button>
+          </div>
+        ) : null}
         <div className={styles.journeyFrame}>
-          {validation !== "valid" ? (
-            <InvitationState
-              state={validation}
-              onRetry={validateInvitation}
+          {authState === "checking" || authState === "error" ? (
+            <AccountCheckState
+              state={authState}
+              onRetry={checkSession}
               copy={copy}
               headingRef={headingRef}
+            />
+          ) : authState === "signedOut" ? (
+            <MemberSignIn
+              copy={copy}
+              headingRef={headingRef}
+              onAuthenticated={(authenticatedMember) => {
+                setMember(authenticatedMember);
+                setAuthState("signedIn");
+              }}
             />
           ) : submission !== "idle" && submission !== "error" ? (
             <CompletionState
@@ -389,7 +518,7 @@ export function HbtiExperience({ token }: HbtiExperienceProps) {
               rewardName={rewardName}
               memberWalletUrl={memberWalletUrl}
               color={confirmedColor ?? color}
-              onRetry={submitCompletion}
+              onRetry={pollCompletionStatus}
               copy={copy}
               headingRef={headingRef}
             />
@@ -448,9 +577,11 @@ export function HbtiExperience({ token }: HbtiExperienceProps) {
             />
           )}
         </div>
-        <a className={styles.memberReturn} href={MEMBER_WALLET_URL}>
-          {copy.returnToMembership}
-        </a>
+        {!demoMode && authState !== "signedOut" && (
+          <a className={styles.memberReturn} href={MEMBER_WALLET_URL}>
+            {copy.returnToMembership}
+          </a>
+        )}
       </div>
     </main>
   );
@@ -461,13 +592,13 @@ interface CopyProp {
   headingRef: React.RefObject<HTMLHeadingElement | null>;
 }
 
-function InvitationState({
+function AccountCheckState({
   state,
   onRetry,
   copy,
   headingRef,
 }: CopyProp & {
-  state: ValidationState;
+  state: Extract<AuthState, "checking" | "error">;
   onRetry: () => void;
 }) {
   if (state === "checking") {
@@ -476,26 +607,23 @@ function InvitationState({
         <div className={styles.brewLoader} aria-hidden="true">
           <i />
         </div>
-        <p>{copy.validating}</p>
+        <p>{copy.checkingAccount}</p>
       </section>
     );
   }
 
-  const isInvalid = state === "invalid";
   return (
     <section className={styles.centerState} role="alert" aria-live="assertive">
       <span className={styles.stateGlyph} aria-hidden="true">
-        {isInvalid ? "↗" : "…"}
+        …
       </span>
       <h1 ref={headingRef} tabIndex={-1}>
-        {isInvalid ? copy.invalidTitle : copy.networkError}
+        {copy.authErrorTitle}
       </h1>
-      <p>{isInvalid ? copy.invalidBody : copy.networkError}</p>
-      {!isInvalid && (
-        <button className={styles.primaryButton} type="button" onClick={onRetry}>
-          {copy.retry}
-        </button>
-      )}
+      <p>{copy.authNetworkError}</p>
+      <button className={styles.primaryButton} type="button" onClick={onRetry}>
+        {copy.retry}
+      </button>
     </section>
   );
 }
@@ -508,7 +636,11 @@ function Intro({
 }: CopyProp & { hasDraft: boolean; onBegin: () => void }) {
   return (
     <section className={styles.introPanel}>
-      <div className={styles.steamMark} aria-hidden="true">
+      <div
+        className={styles.steamMark}
+        data-brand-mark="arrow"
+        aria-hidden="true"
+      >
         <i />
         <i />
         <i />
@@ -633,7 +765,14 @@ function Progress({
         aria-valuemax={total}
         aria-label={label}
       >
-        <span style={{ width: `${(current / total) * 100}%` }} />
+        {Array.from({ length: total }, (_, index) => (
+          <span
+            key={index}
+            data-active={index < current}
+            data-current={index === current - 1}
+            aria-hidden="true"
+          />
+        ))}
       </div>
       <p>{label}</p>
     </div>
@@ -664,7 +803,10 @@ function ResultStep({
       <h1 ref={headingRef} tabIndex={-1} className={styles.resultLead}>
         {copy.resultTitle}
       </h1>
-      <article className={styles.typeTicket}>
+      <article
+        className={styles.typeTicket}
+        data-surface="result-lightbox"
+      >
         <div className={styles.ticketNotchLeft} aria-hidden="true" />
         <div className={styles.ticketNotchRight} aria-hidden="true" />
         <header className={styles.ticketHeader}>
@@ -738,6 +880,11 @@ function DetailsStep({
   const [cardAction, setCardAction] = useState<
     "idle" | "saving" | "sharing" | "saved" | "shared" | "copied" | "error"
   >("idle");
+  const preparedCardRef = useRef<{
+    key: string;
+    blob: Blob;
+    publicUrl: string;
+  } | null>(null);
 
   async function prepareCard(): Promise<{
     blob: Blob;
@@ -747,6 +894,10 @@ function DetailsStep({
       throw new Error("Result card is incomplete.");
     }
     const publicUrl = new URL("/", window.location.origin).toString();
+    const key = `${resultCode}:${color}:${locale}:${publicUrl}`;
+    if (preparedCardRef.current?.key === key) {
+      return preparedCardRef.current;
+    }
     const blob = await createResultCardPng({
       code: resultCode,
       result,
@@ -755,7 +906,8 @@ function DetailsStep({
       signatureLabel: copy.signatureLabel,
       publicUrl,
     });
-    return { blob, publicUrl };
+    preparedCardRef.current = { key, blob, publicUrl };
+    return preparedCardRef.current;
   }
 
   async function saveCard() {
@@ -1016,32 +1168,49 @@ function CompletionState({
 
   const isIssued = state === "issued";
   const isProcessing = state === "processing";
+  const isDemo = state === "demo";
   return (
     <section className={styles.completionPanel} aria-live="polite">
-      <div className={styles.giftStamp} data-issued={isIssued} aria-hidden="true">
-        {isIssued ? "✓" : "…"}
+      <div
+        className={styles.giftStamp}
+        data-issued={isIssued || isDemo}
+        aria-hidden="true"
+      >
+        {isIssued || isDemo ? "✓" : "…"}
       </div>
       <p className={styles.eyebrow}>
-        {isIssued ? copy.successEyebrow : copy.resultEyebrow}
+        {isDemo
+          ? copy.demoCompleteEyebrow
+          : isIssued
+            ? copy.successEyebrow
+            : copy.resultEyebrow}
       </p>
       <h1 ref={headingRef} tabIndex={-1}>
-        {isIssued
-          ? copy.successTitle
-          : isProcessing
-            ? copy.processingTitle
-            : copy.reviewTitle}
+        {isDemo
+          ? copy.demoCompleteTitle
+          : isIssued
+            ? copy.successTitle
+            : isProcessing
+              ? copy.processingTitle
+              : copy.reviewTitle}
       </h1>
       <p className={styles.completionBody}>
-        {isIssued
-          ? copy.successBody
-          : isProcessing
-            ? copy.processingBody
-            : copy.reviewBody}
+        {isDemo
+          ? copy.demoCompleteBody
+          : isIssued
+            ? copy.successBody
+            : isProcessing
+              ? copy.processingBody
+              : copy.reviewBody}
       </p>
-      <div className={styles.rewardCard} data-color={color ?? "neutral"}>
-        <span>{copy.rewardLabel}</span>
+      <div
+        className={styles.rewardCard}
+        data-surface="reward-receipt"
+        data-color={color ?? "neutral"}
+      >
+        <span>{isDemo ? copy.demoRewardLabel : copy.rewardLabel}</span>
         <strong>{rewardName || copy.rewardName}</strong>
-        <p>{copy.rewardNote}</p>
+        <p>{isDemo ? copy.demoRewardNote : copy.rewardNote}</p>
       </div>
       {resultCode && resultName && (
         <div
@@ -1067,7 +1236,13 @@ function CompletionState({
 }
 
 function ForwardIcon() {
-  return <span className={styles.forwardIcon} aria-hidden="true" />;
+  return (
+    <span
+      className={styles.forwardIcon}
+      data-brand-arrow="true"
+      aria-hidden="true"
+    />
+  );
 }
 
 function hasCompleteAnswers(
@@ -1077,17 +1252,6 @@ function hasCompleteAnswers(
     const value = answers[question.id];
     return question.options.some((option) => option.value === value);
   });
-}
-
-function isValidSessionPayload(
-  payload: unknown,
-): payload is { valid: true } {
-  return (
-    typeof payload === "object" &&
-    payload !== null &&
-    "valid" in payload &&
-    payload.valid === true
-  );
 }
 
 function isSafeWalletUrl(value: unknown): value is string {
@@ -1116,15 +1280,10 @@ function isColorChoice(value: unknown): value is ColorChoice {
   );
 }
 
-async function createDraftKey(token: string): Promise<string> {
-  const digest = await window.crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(token),
-  );
-  const fingerprint = Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
-  return `${DRAFT_KEY_PREFIX}:${fingerprint}`;
+function createDraftStorageKey(draftKey: string): string | undefined {
+  return /^[A-Za-z0-9_-]{16,128}$/.test(draftKey)
+    ? `${DRAFT_KEY_PREFIX}:${draftKey}`
+    : undefined;
 }
 
 function readDraft(storageKey: string): HbtiDraft | null {

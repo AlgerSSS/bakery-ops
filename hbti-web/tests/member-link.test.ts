@@ -176,9 +176,8 @@ describe("member link tokens", () => {
     }
   });
 
-  it("creates one safe URL line from environment variables", () => {
+  it("prints only the OTP sign-in and no-coupon demo URLs", () => {
     const scriptPath = resolve("scripts/create-member-link.mjs");
-    const before = Math.floor(Date.now() / 1_000);
     const result = spawnSync(process.execPath, [scriptPath], {
       cwd: process.cwd(),
       encoding: "utf8",
@@ -195,23 +194,13 @@ describe("member link tokens", () => {
     expect(result.status, result.stderr).toBe(0);
     expect(result.stderr).toBe("");
     expect(result.stdout).not.toContain("2025550123");
-
-    const output = result.stdout.trim();
-    const url = new URL(output);
-    expect(result.stdout).toBe(`${url.toString()}\n`);
-    expect(url.origin).toBe("https://hbti.example.test");
-    expect(url.pathname).toMatch(/^\/t\/[A-Za-z0-9_-]+$/);
-
-    const payload = verifyMemberLinkToken({
-      token: url.pathname.slice("/t/".length),
-      secret: SECRET,
-      expectedCampaignVersion: CAMPAIGN_VERSION,
-      now: before,
-    });
-    expect(payload.phone).toBe("+12025550123");
-    expect(payload.expiresAt).toBeGreaterThanOrEqual(before + 120);
-    expect(payload.expiresAt).toBeLessThanOrEqual(
-      Math.floor(Date.now() / 1_000) + 120,
+    expect(result.stdout).not.toContain("/t/");
+    expect(result.stdout).toBe(
+      [
+        "Member sign-in (OTP): https://hbti.example.test/",
+        "Demo only (no coupon is issued): https://hbti.example.test/demo",
+        "",
+      ].join("\n"),
     );
   });
 
@@ -232,7 +221,7 @@ describe("member link tokens", () => {
     expect(result.status).toBe(1);
     expect(result.stdout).toBe("");
     expect(result.stderr).toBe(
-      "Unable to create member link. Check the HBTI environment variables.\n",
+      "Unable to print HBTI URLs. Check HBTI_LINK_BASE_URL.\n",
     );
     expect(result.stderr).not.toContain("2025550123");
   });

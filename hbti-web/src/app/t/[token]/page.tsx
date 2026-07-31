@@ -1,17 +1,5 @@
-import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-import { HbtiExperience } from "@/components/HbtiExperience";
-
-export const metadata: Metadata = {
-  title: "Your HBTI",
-};
-
-export default async function HbtiTokenPage({
-  params,
-}: {
-  params: Promise<{ token: string }>;
-}) {
-  const { token } = await params;
-
-  return <HbtiExperience token={token} />;
+export default function RetiredMemberLinkPage() {
+  redirect("/");
 }

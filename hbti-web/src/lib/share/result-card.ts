@@ -24,6 +24,16 @@ interface CardPalette {
   quietInk: string;
 }
 
+const BRAND = {
+  peach: "#f3d0b8",
+  paper: "#fff7ea",
+  oxblood: "#6a1c13",
+  red: "#c51f2c",
+  ink: "#151313",
+  metal: "#bfc3c6",
+  quietInk: "#4e3b37",
+} as const;
+
 const CARD_PALETTES: Record<ColorChoice, CardPalette> = {
   cherry: {
     background: "#f8dfdc",
@@ -121,76 +131,128 @@ export async function createResultCardPng({
   }
 
   const palette = CARD_PALETTES[color];
-  const gradient = context.createLinearGradient(0, 0, 1080, 1350);
-  gradient.addColorStop(0, palette.background);
-  gradient.addColorStop(1, palette.panel);
-  context.fillStyle = gradient;
+  context.fillStyle = BRAND.peach;
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  context.fillStyle = palette.accent;
+  const metal = context.createLinearGradient(0, 0, 1080, 0);
+  metal.addColorStop(0, "#eef0f0");
+  metal.addColorStop(0.38, BRAND.metal);
+  metal.addColorStop(0.62, "#f5f6f6");
+  metal.addColorStop(1, "#8f9396");
+  context.fillStyle = metal;
+  context.fillRect(0, 0, 1080, 160);
+
+  context.fillStyle = BRAND.paper;
   context.beginPath();
-  context.arc(930, 120, 180, 0, Math.PI * 2);
+  context.roundRect(48, 184, 984, 1046, 18);
   context.fill();
 
-  context.fillStyle = palette.ink;
+  context.fillStyle = palette.accent;
+  context.fillRect(48, 184, 984, 22);
+
+  drawBrandMark(context, 922, 83, 54);
+
+  context.fillStyle = BRAND.ink;
   context.font = '700 32px "Neutra Text", "Avenir Next", sans-serif';
   context.letterSpacing = "5px";
-  context.fillText("HOT CRUSH · HBTI", 72, 98);
+  context.fillText("HOT CRUSH · HBTI", 56, 94);
   context.letterSpacing = "0px";
 
-  context.font = '600 172px "Neutra Text", "Avenir Next", sans-serif';
-  context.fillText(code, 72, 320);
+  context.fillStyle = BRAND.oxblood;
+  context.font = '700 24px "Neutra Text", "Avenir Next", sans-serif';
+  context.letterSpacing = "5px";
+  context.fillText("FRESH OUT / YOUR HBTI", 80, 260);
+  context.letterSpacing = "0px";
 
-  context.font = fontForLocale(locale, 62, 600);
-  context.fillText(result.name, 72, 410);
+  context.fillStyle = BRAND.ink;
+  context.font = '700 172px "Neutra Text", "Avenir Next", sans-serif';
+  context.fillText(code, 80, 440);
+
+  context.fillStyle = BRAND.oxblood;
+  context.font = fontForLocale(locale, 62, 700);
+  context.fillText(result.name, 80, 526);
 
   context.font = fontForLocale(locale, 28, 600);
-  context.fillStyle = palette.quietInk;
-  context.fillText(result.traits.join("  ·  "), 72, 468);
+  context.fillStyle = BRAND.quietInk;
+  context.fillText(result.traits.join("  ·  "), 80, 582);
 
-  context.strokeStyle = palette.accent;
-  context.lineWidth = 3;
+  context.strokeStyle = BRAND.red;
+  context.lineWidth = 5;
   context.beginPath();
-  context.moveTo(72, 520);
-  context.lineTo(1008, 520);
+  context.moveTo(80, 628);
+  context.lineTo(1000, 628);
   context.stroke();
 
-  context.fillStyle = palette.ink;
+  context.fillStyle = BRAND.ink;
   context.font = fontForLocale(locale, 38, 400);
   const descriptionBottom = drawWrappedText(
     context,
     result.description,
-    72,
-    600,
+    80,
+    704,
     920,
     56,
   );
 
-  const orderTop = Math.max(descriptionBottom + 60, 940);
-  context.fillStyle = palette.panel;
+  const orderTop = Math.max(descriptionBottom + 54, 974);
+  context.fillStyle = "#eef0f0";
   context.beginPath();
-  context.roundRect(72, orderTop, 936, 190, 38);
+  context.roundRect(80, orderTop, 920, 174, 12);
   context.fill();
+  context.fillStyle = palette.accent;
+  context.fillRect(80, orderTop, 16, 174);
 
-  context.fillStyle = palette.quietInk;
+  context.fillStyle = BRAND.quietInk;
   context.font = fontForLocale(locale, 22, 700);
-  context.fillText(signatureLabel.toUpperCase(), 112, orderTop + 58);
-  context.fillStyle = palette.ink;
+  context.fillText(signatureLabel.toUpperCase(), 126, orderTop + 52);
+  context.fillStyle = BRAND.ink;
   context.font = fontForLocale(locale, 34, 600);
   drawWrappedText(
     context,
     result.signatureOrder,
-    112,
-    orderTop + 112,
-    856,
+    126,
+    orderTop + 106,
+    824,
     44,
   );
 
-  context.fillStyle = palette.quietInk;
+  context.fillStyle = BRAND.oxblood;
+  context.fillRect(0, 1252, 1080, 34);
+  context.fillStyle = "#51130d";
+  context.fillRect(0, 1286, 1080, 28);
+  context.fillStyle = "#35100d";
+  context.fillRect(0, 1314, 1080, 36);
+
+  context.fillStyle = BRAND.paper;
   context.font = '500 23px "Neutra Text", "Avenir Next", sans-serif';
-  context.fillText(cleanPublicUrl(publicUrl), 72, 1276);
+  context.fillText(cleanPublicUrl(publicUrl), 56, 1336);
 
   return canvasToPng(canvas);
+}
+
+function drawBrandMark(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+): void {
+  context.strokeStyle = BRAND.red;
+  context.lineWidth = 14;
+  context.beginPath();
+  context.arc(x, y, radius, 0, Math.PI * 2);
+  context.stroke();
+
+  context.fillStyle = BRAND.ink;
+  context.beginPath();
+  context.moveTo(x, y - 34);
+  context.lineTo(x + 31, y - 2);
+  context.lineTo(x + 13, y - 2);
+  context.lineTo(x + 13, y + 34);
+  context.lineTo(x - 13, y + 34);
+  context.lineTo(x - 13, y - 2);
+  context.lineTo(x - 31, y - 2);
+  context.closePath();
+  context.fill();
 }
 
 function drawWrappedText(

@@ -152,6 +152,10 @@ export class ResApiClient implements ResCouponAdapter {
   ): Promise<readonly UsableCoupon[]> {
     const coupons: UsableCoupon[] = [];
     let pageNo = 1;
+    let expectedTotal: number | undefined;
+    let expectedPageCount: number | undefined;
+    let rawRowCount = 0;
+    const seenCouponIds = new Set<string>();
 
     while (pageNo <= MAX_COUPON_PAGES) {
       const response = couponPageEnvelopeSchema.parse(
@@ -163,14 +167,46 @@ export class ResApiClient implements ResCouponAdapter {
         }),
       );
       assertOk(response);
+      if (response.data.page.pageNo !== pageNo) {
+        throw new Error(
+          "RES coupon readback pagination was inconsistent.",
+        );
+      }
+      if (
+        (response.data.page.total === 0) !==
+        (response.data.page.pageCount === 0)
+      ) {
+        throw new Error(
+          "RES coupon readback pagination was inconsistent.",
+        );
+      }
+      if (expectedTotal === undefined) {
+        expectedTotal = response.data.page.total;
+        expectedPageCount = response.data.page.pageCount;
+      } else if (
+        response.data.page.total !== expectedTotal ||
+        response.data.page.pageCount !== expectedPageCount
+      ) {
+        throw new Error(
+          "RES coupon readback pagination was inconsistent.",
+        );
+      }
 
+      rawRowCount += response.data.list.length;
       for (const coupon of response.data.list) {
+        const couponId = String(coupon.couponId);
+        if (seenCouponIds.has(couponId)) {
+          throw new Error(
+            "RES coupon readback contained a duplicate coupon ID.",
+          );
+        }
+        seenCouponIds.add(couponId);
         if (
           String(coupon.couponTemplateId) === query.template.id &&
           coupon.couponTemplateName === query.template.name &&
           coupon.couponStatus === AVAILABLE_COUPON_STATUS
         ) {
-          coupons.push({ id: String(coupon.couponId) });
+          coupons.push({ id: couponId });
         }
       }
 
@@ -178,6 +214,11 @@ export class ResApiClient implements ResCouponAdapter {
         response.data.page.pageCount === 0 ||
         pageNo >= response.data.page.pageCount
       ) {
+        if (rawRowCount !== expectedTotal) {
+          throw new Error(
+            "RES coupon readback pagination was incomplete.",
+          );
+        }
         return coupons;
       }
       pageNo += 1;

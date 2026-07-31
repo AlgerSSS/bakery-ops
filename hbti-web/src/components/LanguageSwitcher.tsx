@@ -18,6 +18,7 @@ export function LanguageSwitcher({
   return (
     <div
       className={styles.languageSwitcher}
+      role="group"
       aria-label={uiCopy[locale].languageLabel}
     >
       {supportedLocales.map((option) => (

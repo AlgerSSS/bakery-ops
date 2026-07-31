@@ -18,13 +18,20 @@ export function BrandHeader({
   const copy = uiCopy[locale];
 
   return (
-    <header className={styles.brandHeader}>
+    <header
+      className={styles.brandHeader}
+      data-surface="brand-lightbox"
+    >
       <div
         className={styles.wordmark}
         role="img"
         aria-label="Hot Crush HBTI"
       >
-        <span className={styles.brandLogo} aria-hidden="true" />
+        <span
+          className={styles.brandLogo}
+          data-brand-wordmark="true"
+          aria-hidden="true"
+        />
         <span className={styles.wordmarkRule} aria-hidden="true" />
         <span className={styles.wordmarkSub}>{copy.hbti}</span>
       </div>

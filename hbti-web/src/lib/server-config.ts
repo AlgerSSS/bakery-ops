@@ -7,6 +7,14 @@ export interface HbtiServerConfig {
   memberWalletUrl: string;
 }
 
+export interface HbtiAuthConfig {
+  authSecret: string;
+  h5BaseUrl: string;
+  corporationId: string;
+  appId: string;
+  cardProgramId: string;
+}
+
 export function readHbtiServerConfig(): HbtiServerConfig {
   const linkSecret = requireEnvironmentVariable("HBTI_LINK_SECRET");
   if (new TextEncoder().encode(linkSecret).byteLength < 32) {
@@ -50,6 +58,50 @@ export function readHbtiServerConfig(): HbtiServerConfig {
     linkBaseUrl: linkBaseUrl.origin,
     memberHashSecret: new TextEncoder().encode(memberHashSecret),
     memberWalletUrl: memberWalletUrl.toString(),
+  };
+}
+
+export function readHbtiAuthConfig(): HbtiAuthConfig {
+  const authSecret = requireEnvironmentVariable("HBTI_AUTH_SECRET");
+  if (new TextEncoder().encode(authSecret).byteLength < 32) {
+    throw new Error("HBTI_AUTH_SECRET must contain at least 32 bytes.");
+  }
+  for (const otherSecretName of [
+    "HBTI_LINK_SECRET",
+    "HBTI_MEMBER_HASH_SECRET",
+  ] as const) {
+    const otherSecret = process.env[otherSecretName]?.trim();
+    if (otherSecret && otherSecret === authSecret) {
+      throw new Error(
+        `HBTI_AUTH_SECRET must be independent from ${otherSecretName}.`,
+      );
+    }
+  }
+
+  const h5BaseUrl = new URL(
+    process.env.RES_H5_BASE_URL?.trim() ??
+      "https://f4klzbmr9n2d.m.sea.restosuite.ai",
+  );
+  if (
+    h5BaseUrl.origin !==
+      "https://f4klzbmr9n2d.m.sea.restosuite.ai" ||
+    h5BaseUrl.pathname !== "/" ||
+    h5BaseUrl.search ||
+    h5BaseUrl.hash
+  ) {
+    throw new Error("RES_H5_BASE_URL must use the verified RES H5 origin.");
+  }
+
+  return {
+    authSecret,
+    h5BaseUrl: h5BaseUrl.origin,
+    corporationId: requireEnvironmentVariable(
+      "RES_H5_CORPORATION_ID",
+    ),
+    appId: requireEnvironmentVariable("RES_H5_APP_ID"),
+    cardProgramId: requireEnvironmentVariable(
+      "RES_H5_CARD_PROGRAM_ID",
+    ),
   };
 }
 

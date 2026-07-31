@@ -1,9 +1,14 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HbtiExperience } from "@/components/HbtiExperience";
-import { PublicLanding } from "@/components/PublicLanding";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
@@ -20,16 +25,22 @@ describe("customer HBTI journey", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
-  it("switches the public landing between English and Chinese", async () => {
+  it("switches the public phone sign-in between English and Chinese", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ authenticated: false })),
+    );
     const user = userEvent.setup();
-    render(<PublicLanding />);
+    render(<HbtiExperience />);
 
     expect(
-      screen.getByRole("heading", {
-        name: "Your coffee personality might know you better than you do.",
+      await screen.findByRole("heading", {
+        name: "Freshly made. Unmistakably you.",
       }),
     ).toBeInTheDocument();
 
@@ -37,16 +48,212 @@ describe("customer HBTI journey", () => {
 
     expect(
       screen.getByRole("heading", {
-        name: "你的咖啡人格，可能比你更懂你。",
+        name: "新鲜出炉，刚好是你。",
       }),
     ).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("zh-CN");
   });
 
+  it("keeps the phone and challenge out of URLs and local storage", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ authenticated: false }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          challengeToken: "c".repeat(43),
+          maskedPhone: "+60 123••6789",
+          retryAfterSeconds: 60,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          authenticated: true,
+          maskedPhone: "+60 123••6789",
+          draftKey: "member-draft-key-123456",
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HbtiExperience />);
+    await user.type(
+      await screen.findByLabelText("Member phone number"),
+      "0123456789",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Send verification code" }),
+    );
+    await user.type(await screen.findByLabelText("Six-digit code"), "123456");
+    await user.click(
+      screen.getByRole("button", { name: "Verify and begin" }),
+    );
+
+    expect(
+      await screen.findByText("Member account verified"),
+    ).toBeInTheDocument();
+    expect(window.location.href).not.toContain("0123456789");
+    expect(JSON.stringify(window.localStorage)).not.toContain("0123456789");
+    expect(JSON.stringify(window.localStorage)).not.toContain("c".repeat(43));
+
+    const otpRequestBody = JSON.parse(
+      String((fetchMock.mock.calls[1][1] as RequestInit).body),
+    );
+    expect(otpRequestBody).toEqual({
+      phone: {
+        countryCode: "60",
+        isoCode: "MY",
+        phone: "123456789",
+      },
+    });
+    const verifyBody = JSON.parse(
+      String((fetchMock.mock.calls[2][1] as RequestInit).body),
+    );
+    expect(verifyBody).toEqual({
+      challengeToken: "c".repeat(43),
+      code: "123456",
+      acceptMembership: true,
+    });
+  });
+
+  it("asks before resolving a member-account conflict", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ authenticated: false }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          challengeToken: "d".repeat(43),
+          maskedPhone: "+60 123••6789",
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          { error: "ACCOUNT_CONFLICT_CONFIRMATION_REQUIRED" },
+          409,
+        ),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          authenticated: true,
+          maskedPhone: "+60 123••6789",
+          draftKey: "member-draft-key-123456",
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HbtiExperience />);
+    await user.type(
+      await screen.findByLabelText("Member phone number"),
+      "0123456789",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Send verification code" }),
+    );
+    await user.type(await screen.findByLabelText("Six-digit code"), "123456");
+    await user.click(
+      screen.getByRole("button", { name: "Verify and begin" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Use this member account?",
+      }),
+    ).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: "Yes, use this account" }),
+    );
+    expect(
+      await screen.findByRole("heading", {
+        name: "What kind of coffee person are you?",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      JSON.parse(String((fetchMock.mock.calls[3][1] as RequestInit).body)),
+    ).toEqual({
+      challengeToken: "d".repeat(43),
+      code: "123456",
+      acceptMembership: true,
+      confirmConflict: true,
+    });
+  });
+
+  it("switches accounts without carrying the previous member draft", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          authenticated: true,
+          maskedPhone: "+60 123••6789",
+          draftKey: "first-member-draft-key",
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ authenticated: false }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          challengeToken: "n".repeat(43),
+          maskedPhone: "+60 198••4321",
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          authenticated: true,
+          maskedPhone: "+60 198••4321",
+          draftKey: "second-member-draft-key",
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<HbtiExperience />);
+    await user.click(
+      await screen.findByRole("button", { name: /Start my HBTI/ }),
+    );
+    await user.click(
+      await screen.findByRole("button", {
+        name: /Condensation beading on the glass/,
+      }),
+    );
+    await waitFor(() => {
+      expect(
+        Object.keys(window.localStorage).some((key) =>
+          key.includes("first-member-draft-key"),
+        ),
+      ).toBe(true);
+    });
+
+    await user.click(screen.getByRole("button", { name: "Change" }));
+    await user.type(
+      await screen.findByLabelText("Member phone number"),
+      "0198764321",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "Send verification code" }),
+    );
+    await user.type(await screen.findByLabelText("Six-digit code"), "123456");
+    await user.click(
+      screen.getByRole("button", { name: "Verify and begin" }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: /Start my HBTI/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Continue where I left off/ }),
+    ).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/auth/logout");
+    expect((fetchMock.mock.calls[1][1] as RequestInit).body).toBe("{}");
+  });
+
   it("uses the server-authoritative result and colour after completion", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(jsonResponse({ valid: true }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          authenticated: true,
+          maskedPhone: "+60 123••6789",
+          draftKey: "member-draft-key-123456",
+        }),
+      )
       .mockResolvedValueOnce(
         jsonResponse({
           status: "issued",
@@ -57,9 +264,8 @@ describe("customer HBTI journey", () => {
       );
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
-    const token = "opaque-private-invitation";
 
-    render(<HbtiExperience token={token} />);
+    render(<HbtiExperience />);
 
     await screen.findByRole("heading", {
       name: "What kind of coffee person are you?",
@@ -91,11 +297,13 @@ describe("customer HBTI journey", () => {
       "pistachio",
     );
     await user.click(
-      screen.getByRole("button", { name: /Send my gift coupon/ }),
+      screen.getByRole("button", { name: /Finish my HBTI/ }),
     );
 
     expect(
-      await screen.findByRole("heading", { name: "Your gift is ready." }),
+      await screen.findByRole("heading", {
+        name: "Your gift is in your member wallet.",
+      }),
     ).toBeInTheDocument();
     expect(screen.getByText("HSDT")).toBeInTheDocument();
     expect(screen.getByText("The Cake Person")).toBeInTheDocument();
@@ -108,7 +316,6 @@ describe("customer HBTI journey", () => {
     const completionRequest = fetchMock.mock.calls[1][1] as RequestInit;
     const completionBody = JSON.parse(String(completionRequest.body));
     expect(completionBody).toMatchObject({
-      token,
       color: "pistachio",
       answers: {
         q1: "iced",
@@ -119,6 +326,8 @@ describe("customer HBTI journey", () => {
         q6: "drink",
       },
     });
+    expect(completionBody).not.toHaveProperty("token");
+    expect(completionBody).not.toHaveProperty("phone");
 
     await waitFor(() => {
       expect(
@@ -127,9 +336,6 @@ describe("customer HBTI journey", () => {
         ),
       ).toHaveLength(0);
     });
-    expect(
-      Object.entries(window.localStorage).flat().join(""),
-    ).not.toContain(token);
   });
 });
 

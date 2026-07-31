@@ -2,28 +2,25 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
+  getJsonMutationRejection,
+  noStoreJson,
+} from "@/lib/auth/http";
+import { readHbtiAuthSession } from "@/lib/auth/session";
+import { readHbtiSessionCookie } from "@/lib/auth/session-cookie";
+import {
   completeHbti,
   CompleteHbtiError,
 } from "@/lib/completion/complete-hbti";
 import { hbtiAnswersSchema } from "@/lib/hbti/schema";
-import {
-  MemberLinkError,
-  verifyMemberLinkToken,
-} from "@/lib/member-link/crypto";
-import { memberLinkTokenSchema } from "@/lib/member-link/schema";
 import { consumeTokenRateLimit } from "@/lib/rate-limit/mongo-rate-limit";
 import { createResApiClientFromEnv } from "@/lib/res/client";
-import {
-  isTrustedRequestOrigin,
-  readHbtiServerConfig,
-} from "@/lib/server-config";
+import { readHbtiServerConfig } from "@/lib/server-config";
 import { createCompletionStoreFromEnv } from "@/lib/store/mongo-completion-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
 
 const requestSchema = z.strictObject({
-  token: memberLinkTokenSchema,
   answers: hbtiAnswersSchema,
   color: z.enum([
     "cherry",
@@ -53,22 +50,32 @@ const requestSchema = z.strictObject({
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
-    const input = requestSchema.parse(await request.json());
     const config = readHbtiServerConfig();
-    if (!isTrustedRequestOrigin(request, config.linkBaseUrl)) {
+    const rejection = getJsonMutationRejection(
+      request,
+      config.linkBaseUrl,
+    );
+    if (rejection) {
+      return rejection;
+    }
+    const input = requestSchema.parse(await request.json());
+    const sessionToken = readHbtiSessionCookie(request);
+    if (!sessionToken) {
       return noStoreJson(
-        { error: "INVALID_ORIGIN", retryable: false },
-        { status: 403 },
+        { error: "AUTHENTICATION_REQUIRED", retryable: false },
+        { status: 401 },
       );
     }
-    const memberLink = verifyMemberLinkToken({
-      token: input.token,
-      secret: config.linkSecret,
-      expectedCampaignVersion: config.campaignVersion,
-    });
+    const session = await readHbtiAuthSession(request);
+    if (!session) {
+      return noStoreJson(
+        { error: "AUTHENTICATION_REQUIRED", retryable: false },
+        { status: 401 },
+      );
+    }
     const rateLimit = await consumeTokenRateLimit({
       scope: "complete",
-      token: input.token,
+      token: sessionToken,
       limit: 60,
       windowMs: 5 * 60_000,
     });
@@ -86,7 +93,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const result = await completeHbti(
       {
-        phone: memberLink.phone,
+        phone: session.payload.identity.e164,
+        expectedMemberId: session.payload.memberId,
         campaignVersion: config.campaignVersion,
         answers: input.answers,
         color: input.color,
@@ -107,13 +115,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
     return response;
   } catch (error) {
-    if (error instanceof MemberLinkError && error.code === "EXPIRED") {
-      return noStoreJson(
-        { error: "LINK_EXPIRED", retryable: false },
-        { status: 410 },
-      );
-    }
-    if (error instanceof MemberLinkError || error instanceof z.ZodError) {
+    if (error instanceof z.ZodError) {
       return noStoreJson(
         { error: "INVALID_REQUEST", retryable: false },
         { status: 400 },
@@ -123,6 +125,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       const status =
         error.code === "INVALID_INPUT"
           ? 400
+          : error.code === "MEMBER_IDENTITY_MISMATCH"
+            ? 403
           : error.code === "INVALID_CONFIGURATION"
             ? 500
             : 503;
@@ -158,13 +162,4 @@ export function publicCompletionPayload(
     },
     memberWalletUrl,
   };
-}
-
-function noStoreJson(
-  body: unknown,
-  init?: ResponseInit,
-): NextResponse {
-  const response = NextResponse.json(body, init);
-  response.headers.set("Cache-Control", "no-store, max-age=0");
-  return response;
 }

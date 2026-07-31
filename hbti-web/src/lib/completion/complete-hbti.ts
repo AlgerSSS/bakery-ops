@@ -28,6 +28,7 @@ const PREPARED_REVIEW_AFTER_MS = 120_000;
 
 const completeHbtiInputSchema = z.strictObject({
   phone: z.string().trim().min(1).max(32),
+  expectedMemberId: z.string().trim().min(1).max(128).optional(),
   campaignVersion: z
     .string()
     .trim()
@@ -38,8 +39,18 @@ const completeHbtiInputSchema = z.strictObject({
   age: metadataSchema.optional(),
 });
 
+const completionStatusInputSchema = z.strictObject({
+  phone: z.string().trim().min(1).max(32),
+  expectedMemberId: z.string().trim().min(1).max(128),
+  campaignVersion: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/),
+});
+
 export interface CompleteHbtiInput {
   phone: string;
+  expectedMemberId?: string;
   campaignVersion: string;
   answers: HbtiAnswersInput;
   color: string;
@@ -61,9 +72,15 @@ export interface ReconcilePreparedDependencies {
   now?: () => Date;
 }
 
+export interface GetHbtiCompletionStatusDependencies
+  extends ReconcilePreparedDependencies {
+  memberHashSecret: string | Uint8Array;
+}
+
 export type CompleteHbtiErrorCode =
   | "INVALID_INPUT"
   | "INVALID_CONFIGURATION"
+  | "MEMBER_IDENTITY_MISMATCH"
   | "STORE_UNAVAILABLE"
   | "RES_UNAVAILABLE";
 
@@ -129,12 +146,11 @@ export async function completeHbti(
     ...(parsed.data.gender ? { gender: parsed.data.gender } : {}),
     ...(parsed.data.age ? { age: parsed.data.age } : {}),
   };
-  const key: CompletionStoreKey = {
+  const key = createCompletionKey({
     campaignVersion: parsed.data.campaignVersion,
-    memberHash: createHmac("sha256", dependencies.memberHashSecret)
-      .update(phoneE164, "utf8")
-      .digest("hex"),
-  };
+    identity: phoneE164,
+    memberHashSecret: dependencies.memberHashSecret,
+  });
   const now = dependencies.now ?? (() => new Date());
   const startedAt = safeIsoTimestamp(now);
   const attemptId = randomUUID();
@@ -172,6 +188,17 @@ export async function completeHbti(
   let beforeCoupons: readonly UsableCoupon[];
   try {
     member = await dependencies.res.resolveMemberByPhone(phoneE164);
+    if (
+      parsed.data.expectedMemberId &&
+      member.id !== parsed.data.expectedMemberId
+    ) {
+      await clearLocked(dependencies.store, key, attemptId);
+      throw new CompleteHbtiError(
+        "MEMBER_IDENTITY_MISMATCH",
+        "Verified member identity does not match the reward account.",
+        false,
+      );
+    }
     template =
       await dependencies.res.resolveEnabledCouponTemplateByName(
         couponTemplateName,
@@ -181,7 +208,10 @@ export async function completeHbti(
       template,
     });
     assertCouponList(beforeCoupons);
-  } catch {
+  } catch (error) {
+    if (error instanceof CompleteHbtiError) {
+      throw error;
+    }
     await clearLocked(dependencies.store, key, attemptId);
     throw new CompleteHbtiError(
       "RES_UNAVAILABLE",
@@ -237,7 +267,10 @@ export async function completeHbti(
   const beforeCount = beforeCoupons.length;
   const afterCount = afterCoupons.length;
   const newCouponIds = findNewCouponIds(beforeCoupons, afterCoupons);
-  if (newCouponIds.length === 1) {
+  if (
+    newCouponIds.length === 1 &&
+    afterCount === beforeCount + 1
+  ) {
     const issued: IssuedCompletionRecord = {
       status: "issued",
       completion,
@@ -253,7 +286,7 @@ export async function completeHbti(
     return finalizeIssued(dependencies.store, key, attemptId, issued);
   }
 
-  if (newCouponIds.length > 1) {
+  if (newCouponIds.length > 0) {
     return markForReview(
       dependencies.store,
       key,
@@ -274,6 +307,75 @@ export async function completeHbti(
     );
   }
   return resultFromRecord(prepared);
+}
+
+export async function getHbtiCompletionStatus(
+  input: {
+    phone: string;
+    expectedMemberId: string;
+    campaignVersion: string;
+  },
+  dependencies: GetHbtiCompletionStatusDependencies,
+): Promise<CompleteHbtiResult | null> {
+  const parsed = completionStatusInputSchema.safeParse(input);
+  if (
+    !parsed.success ||
+    !hasHashSecret(dependencies.memberHashSecret)
+  ) {
+    throw new CompleteHbtiError(
+      "INVALID_INPUT",
+      "Invalid completion status request.",
+      false,
+    );
+  }
+
+  const phoneE164 = normalizeE164(parsed.data.phone);
+  const key = createCompletionKey({
+    campaignVersion: parsed.data.campaignVersion,
+    identity: phoneE164,
+    memberHashSecret: dependencies.memberHashSecret,
+  });
+  const record = await getCompletion(dependencies.store, key);
+  if (!record) {
+    return null;
+  }
+  if (record.status === "processing" && record.phase === "prepared") {
+    const now = dependencies.now ?? (() => new Date());
+    const preparedAgeMs =
+      safeDate(now).getTime() - Date.parse(record.preparedAt);
+    if (
+      Number.isFinite(preparedAgeMs) &&
+      preparedAgeMs >= PREPARED_READBACK_DELAY_MS
+    ) {
+      return reconcilePreparedCompletion({
+        record,
+        dependencies: {
+          store: dependencies.store,
+          res: dependencies.res,
+          now,
+        },
+        key,
+      });
+    }
+  }
+  return resultFromRecord(record);
+}
+
+function createCompletionKey({
+  campaignVersion,
+  identity,
+  memberHashSecret,
+}: {
+  campaignVersion: string;
+  identity: string;
+  memberHashSecret: string | Uint8Array;
+}): CompletionStoreKey {
+  return {
+    campaignVersion,
+    memberHash: createHmac("sha256", memberHashSecret)
+      .update(identity, "utf8")
+      .digest("hex"),
+  };
 }
 
 function normalizeE164(rawPhone: string): string {
@@ -413,7 +515,10 @@ export async function reconcilePreparedCompletion({
     baselineCoupons,
     currentCoupons,
   );
-  if (newCouponIds.length === 1) {
+  if (
+    newCouponIds.length === 1 &&
+    currentCoupons.length === baselineCoupons.length + 1
+  ) {
     const issued: IssuedCompletionRecord = {
       status: "issued",
       completion: record.completion,
@@ -433,7 +538,7 @@ export async function reconcilePreparedCompletion({
     );
   }
 
-  if (newCouponIds.length > 1) {
+  if (newCouponIds.length > 0) {
     return markForReview(
       dependencies.store,
       key,

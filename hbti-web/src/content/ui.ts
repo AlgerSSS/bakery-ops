@@ -6,6 +6,47 @@ export interface UiCopy {
   languageLabel: string;
   questionNavigationLabel: string;
   hbtiTypeLabel: (code: string) => string;
+  authEyebrow: string;
+  authTitle: string;
+  authBody: string;
+  countryLabel: string;
+  phoneLabel: string;
+  phoneHint: string;
+  membershipConsent: string;
+  sendCode: string;
+  sendingCode: string;
+  codeSent: string;
+  changePhone: string;
+  codeLabel: string;
+  verifyCode: string;
+  verifyingCode: string;
+  resendCode: string;
+  resendIn: (seconds: number) => string;
+  invalidPhone: string;
+  invalidCode: string;
+  codeExpired: string;
+  tooManyAttempts: string;
+  rateLimited: string;
+  captchaRequired: string;
+  authErrorTitle: string;
+  authNetworkError: string;
+  conflictTitle: string;
+  conflictBody: string;
+  confirmConflict: string;
+  membershipTitle: string;
+  membershipBody: string;
+  confirmMembership: string;
+  useAnotherPhone: string;
+  checkingAccount: string;
+  memberLinked: string;
+  memberLinkedBody: (maskedPhone: string) => string;
+  demoModeTitle: string;
+  demoModeBody: string;
+  demoCompleteEyebrow: string;
+  demoCompleteTitle: string;
+  demoCompleteBody: string;
+  demoRewardLabel: string;
+  demoRewardNote: string;
   landingEyebrow: string;
   landingTitle: string;
   landingBody: string;
@@ -106,6 +147,55 @@ export const uiCopy: Localized<UiCopy> = {
     languageLabel: "Language",
     questionNavigationLabel: "Question navigation",
     hbtiTypeLabel: (code) => `HBTI type ${code}`,
+    authEyebrow: "Hot Crush · Fresh out",
+    authTitle: "Freshly made. Unmistakably you.",
+    authBody:
+      "Verify the phone number you use with Hot Crush. Your result and gift will stay together in that member account.",
+    countryLabel: "Country or region",
+    phoneLabel: "Member phone number",
+    phoneHint: "We’ll text a six-digit code. Standard SMS rates may apply.",
+    membershipConsent:
+      "By continuing, you agree that we may create a Hot Crush member account for this number if one does not exist yet.",
+    sendCode: "Send verification code",
+    sendingCode: "Sending your code…",
+    codeSent: "Code sent to",
+    changePhone: "Change",
+    codeLabel: "Six-digit code",
+    verifyCode: "Verify and begin",
+    verifyingCode: "Checking your code…",
+    resendCode: "Send a new code",
+    resendIn: (seconds) => `Send a new code in ${seconds}s`,
+    invalidPhone: "Enter a valid mobile number for the selected country.",
+    invalidCode: "Enter the six-digit code from your SMS.",
+    codeExpired: "That code has expired. Send a new code to continue.",
+    tooManyAttempts: "Too many attempts. Send a new code to continue.",
+    rateLimited: "Please wait a moment before requesting another code.",
+    captchaRequired:
+      "Phone verification is temporarily unavailable. Please try again later.",
+    authErrorTitle: "We couldn’t verify your account.",
+    authNetworkError:
+      "We couldn’t connect to member verification. Check your connection and try again.",
+    conflictTitle: "Use this member account?",
+    conflictBody:
+      "RES found another sign-in connected to this phone number. Confirm to keep this phone as the account you use for HBTI.",
+    confirmConflict: "Yes, use this account",
+    membershipTitle: "Join Hot Crush membership?",
+    membershipBody:
+      "This number is not a member yet. Join now so your HBTI gift can be added to the same account.",
+    confirmMembership: "Join and continue",
+    useAnotherPhone: "Use another phone number",
+    checkingAccount: "Checking your Hot Crush member account…",
+    memberLinked: "Member account verified",
+    memberLinkedBody: (maskedPhone) =>
+      `Your HBTI gift will be added to ${maskedPhone}.`,
+    demoModeTitle: "Guest preview",
+    demoModeBody: "Explore the full HBTI journey without signing in.",
+    demoCompleteEyebrow: "Preview complete",
+    demoCompleteTitle: "That’s the full HBTI experience.",
+    demoCompleteBody:
+      "This guest preview does not create a member account or issue a coupon.",
+    demoRewardLabel: "Live member reward",
+    demoRewardNote: "Preview only · no coupon issued",
     landingEyebrow: "Hot Crush · Member experience",
     landingTitle: "Your coffee personality might know you better than you do.",
     landingBody:
@@ -113,7 +203,7 @@ export const uiCopy: Localized<UiCopy> = {
     landingNote:
       "Your personal test link arrives by SMS after you join our member programme.",
     invitationOnly: "Open your SMS invitation to begin",
-    introEyebrow: "A little test, made for you",
+    introEyebrow: "Freshly Crafted Every Day",
     introTitle: "What kind of coffee person are you?",
     introBody:
       "There are no right answers here—only the cup, mood, and company that feel most like you.",
@@ -125,7 +215,7 @@ export const uiCopy: Localized<UiCopy> = {
     next: "Next",
     questionProgress: (current, total) => `Choice ${current} of ${total}`,
     chooseOne: "Choose the answer that feels most natural.",
-    resultEyebrow: "Your coffee personality",
+    resultEyebrow: "Fresh out · Your HBTI",
     resultTitle: "This feels like you.",
     signatureLabel: "Your table order",
     discoverGift: "Receive my member gift",
@@ -168,7 +258,7 @@ export const uiCopy: Localized<UiCopy> = {
       "45-plus": "45+",
       "prefer-not": "Prefer not to say",
     },
-    sendGift: "Send my gift coupon",
+    sendGift: "Finish my HBTI",
     sendingGift: "Adding it to your account…",
     saveCard: "Save my card",
     shareCard: "Share with a friend",
@@ -177,10 +267,10 @@ export const uiCopy: Localized<UiCopy> = {
     shareCopied: "A token-free result link has been copied.",
     cardActionError: "The card could not be prepared. Please try again.",
     returnToMembership: "Back to my Hot Crush member wallet",
-    successEyebrow: "Made for your next visit",
-    successTitle: "Your gift is ready.",
+    successEyebrow: "Fresh out · Made for your next visit",
+    successTitle: "Your gift is in your member wallet.",
     successBody:
-      "We’ve added the coupon to the same Hot Crush member account that received this link.",
+      "It’s ready in the Hot Crush account you just verified.",
     rewardLabel: "Your member reward",
     rewardName: "Pistachio Green Jewel",
     rewardNote: "Physical Gift Coupon · one-time redemption",
@@ -206,12 +296,58 @@ export const uiCopy: Localized<UiCopy> = {
     languageLabel: "语言",
     questionNavigationLabel: "答题导航",
     hbtiTypeLabel: (code) => `HBTI 人格类型 ${code}`,
+    authEyebrow: "Hot Crush · 新鲜出炉",
+    authTitle: "新鲜出炉，刚好是你。",
+    authBody:
+      "请验证你在 Hot Crush 使用的手机号。测试结果和周边兑换券都会进入同一个会员账户。",
+    countryLabel: "国家或地区",
+    phoneLabel: "会员手机号",
+    phoneHint: "我们会发送一条 6 位验证码短信，运营商可能收取短信费用。",
+    membershipConsent:
+      "继续即表示你同意：如果这个手机号还没有 Hot Crush 会员账户，我们可以为你创建一个。",
+    sendCode: "发送验证码",
+    sendingCode: "正在发送验证码…",
+    codeSent: "验证码已发送至",
+    changePhone: "修改",
+    codeLabel: "6 位验证码",
+    verifyCode: "验证并开始",
+    verifyingCode: "正在验证…",
+    resendCode: "重新发送验证码",
+    resendIn: (seconds) => `${seconds} 秒后可重新发送`,
+    invalidPhone: "请输入所选国家或地区的有效手机号。",
+    invalidCode: "请输入短信里的 6 位验证码。",
+    codeExpired: "验证码已经过期，请重新发送。",
+    tooManyAttempts: "尝试次数过多，请重新发送验证码。",
+    rateLimited: "请求太频繁，请稍等片刻再试。",
+    captchaRequired: "手机号验证暂时不可用，请稍后再试。",
+    authErrorTitle: "暂时无法验证你的账户。",
+    authNetworkError: "暂时无法连接会员验证，请检查网络后再试。",
+    conflictTitle: "使用这个会员账户吗？",
+    conflictBody:
+      "RES 发现这个手机号还关联了其他登录方式。确认后，将使用这个手机号对应的账户完成 HBTI。",
+    confirmConflict: "确认使用这个账户",
+    membershipTitle: "加入 Hot Crush 会员吗？",
+    membershipBody:
+      "这个手机号还不是会员。现在加入，HBTI 周边兑换券就会进入同一个账户。",
+    confirmMembership: "加入并继续",
+    useAnotherPhone: "换一个手机号",
+    checkingAccount: "正在确认你的 Hot Crush 会员账户…",
+    memberLinked: "会员账户已验证",
+    memberLinkedBody: (maskedPhone) =>
+      `HBTI 周边兑换券会进入 ${maskedPhone} 的账户。`,
+    demoModeTitle: "访客预览",
+    demoModeBody: "无需登录，即可体验完整 HBTI 流程。",
+    demoCompleteEyebrow: "预览完成",
+    demoCompleteTitle: "这就是完整的 HBTI 体验。",
+    demoCompleteBody: "访客预览不会创建会员账户，也不会发放优惠券。",
+    demoRewardLabel: "正式会员礼物",
+    demoRewardNote: "仅供预览 · 不会发券",
     landingEyebrow: "Hot Crush · 会员体验",
     landingTitle: "你的咖啡人格，可能比你更懂你。",
     landingBody: "六个小选择，看看你喜欢怎样喝、怎样停下来、怎样与人相处。",
     landingNote: "加入会员后，你会通过短信收到专属测试链接。",
     invitationOnly: "请从短信里的专属邀请进入",
-    introEyebrow: "一份只属于你的小测试",
+    introEyebrow: "Freshly Crafted Every Day · 每日新鲜制作",
     introTitle: "你是哪一种咖啡人？",
     introBody: "这里没有正确答案，只有最像你的那杯咖啡、那种心情和那个人。",
     introTime: "6 个选择 · 大约 40 秒",
@@ -222,7 +358,7 @@ export const uiCopy: Localized<UiCopy> = {
     next: "下一题",
     questionProgress: (current, total) => `第 ${current} / ${total} 题`,
     chooseOne: "选择第一感觉最像你的答案。",
-    resultEyebrow: "你的咖啡人格",
+    resultEyebrow: "新鲜出炉 · 你的 HBTI",
     resultTitle: "这很像你。",
     signatureLabel: "你的专属搭配",
     discoverGift: "领取我的会员礼物",
@@ -263,7 +399,7 @@ export const uiCopy: Localized<UiCopy> = {
       "45-plus": "45 岁以上",
       "prefer-not": "不想回答",
     },
-    sendGift: "把礼物券发到我的账户",
+    sendGift: "完成我的 HBTI",
     sendingGift: "正在放进你的账户…",
     saveCard: "保存我的人格卡",
     shareCard: "分享给朋友",
@@ -272,9 +408,9 @@ export const uiCopy: Localized<UiCopy> = {
     shareCopied: "不含私人邀请的结果链接已复制。",
     cardActionError: "暂时无法生成人格卡，请再试一次。",
     returnToMembership: "返回 Hot Crush 会员账户",
-    successEyebrow: "留给下次见面的礼物",
-    successTitle: "你的礼物准备好了。",
-    successBody: "礼物券已经进入收到这条链接的 Hot Crush 会员账户。",
+    successEyebrow: "新鲜出炉 · 留给下次见面的礼物",
+    successTitle: "礼物券已放进你的会员账户。",
+    successBody: "它已经进入你刚刚验证的 Hot Crush 账户。",
     rewardLabel: "你的会员礼物",
     rewardName: "Pistachio Green Jewel",
     rewardNote: "周边实物兑换券 · 仅可兑换一次",
@@ -296,6 +432,56 @@ export const uiCopy: Localized<UiCopy> = {
     languageLabel: "Bahasa",
     questionNavigationLabel: "Navigasi soalan",
     hbtiTypeLabel: (code) => `Jenis HBTI ${code}`,
+    authEyebrow: "Hot Crush · Segar dibuat",
+    authTitle: "Dibuat segar. Seunik diri anda.",
+    authBody:
+      "Sahkan nombor telefon yang anda gunakan dengan Hot Crush. Keputusan dan kupon hadiah anda akan berada dalam akaun ahli yang sama.",
+    countryLabel: "Negara atau rantau",
+    phoneLabel: "Nombor telefon ahli",
+    phoneHint:
+      "Kami akan menghantar kod enam digit melalui SMS. Caj SMS biasa mungkin dikenakan.",
+    membershipConsent:
+      "Dengan meneruskan, anda bersetuju bahawa kami boleh mencipta akaun ahli Hot Crush untuk nombor ini jika akaun belum wujud.",
+    sendCode: "Hantar kod pengesahan",
+    sendingCode: "Sedang menghantar kod…",
+    codeSent: "Kod dihantar ke",
+    changePhone: "Tukar",
+    codeLabel: "Kod enam digit",
+    verifyCode: "Sahkan dan mula",
+    verifyingCode: "Sedang menyemak kod…",
+    resendCode: "Hantar kod baharu",
+    resendIn: (seconds) => `Hantar kod baharu dalam ${seconds}s`,
+    invalidPhone: "Masukkan nombor mudah alih yang sah untuk negara dipilih.",
+    invalidCode: "Masukkan kod enam digit daripada SMS anda.",
+    codeExpired: "Kod itu telah tamat tempoh. Hantar kod baharu untuk teruskan.",
+    tooManyAttempts: "Terlalu banyak percubaan. Hantar kod baharu untuk teruskan.",
+    rateLimited: "Tunggu sebentar sebelum meminta kod baharu.",
+    captchaRequired:
+      "Pengesahan telefon tidak tersedia buat sementara waktu. Cuba lagi kemudian.",
+    authErrorTitle: "Kami tidak dapat mengesahkan akaun anda.",
+    authNetworkError:
+      "Kami tidak dapat menyambung ke pengesahan ahli. Semak sambungan anda dan cuba lagi.",
+    conflictTitle: "Gunakan akaun ahli ini?",
+    conflictBody:
+      "RES menemui log masuk lain yang dikaitkan dengan nombor ini. Sahkan untuk menggunakan akaun telefon ini bagi HBTI.",
+    confirmConflict: "Ya, gunakan akaun ini",
+    membershipTitle: "Sertai keahlian Hot Crush?",
+    membershipBody:
+      "Nombor ini belum menjadi ahli. Sertai sekarang supaya hadiah HBTI anda masuk ke akaun yang sama.",
+    confirmMembership: "Sertai dan teruskan",
+    useAnotherPhone: "Gunakan nombor telefon lain",
+    checkingAccount: "Sedang menyemak akaun ahli Hot Crush anda…",
+    memberLinked: "Akaun ahli telah disahkan",
+    memberLinkedBody: (maskedPhone) =>
+      `Hadiah HBTI anda akan dimasukkan ke ${maskedPhone}.`,
+    demoModeTitle: "Pratonton tetamu",
+    demoModeBody: "Terokai pengalaman HBTI penuh tanpa log masuk.",
+    demoCompleteEyebrow: "Pratonton selesai",
+    demoCompleteTitle: "Itulah pengalaman HBTI yang lengkap.",
+    demoCompleteBody:
+      "Pratonton tetamu ini tidak mencipta akaun ahli atau mengeluarkan kupon.",
+    demoRewardLabel: "Ganjaran ahli sebenar",
+    demoRewardNote: "Pratonton sahaja · tiada kupon dikeluarkan",
     landingEyebrow: "Hot Crush · Pengalaman ahli",
     landingTitle: "Personaliti kopi anda mungkin lebih memahami anda.",
     landingBody:
@@ -303,7 +489,7 @@ export const uiCopy: Localized<UiCopy> = {
     landingNote:
       "Selepas menyertai program ahli, pautan ujian peribadi akan dihantar melalui SMS.",
     invitationOnly: "Buka jemputan SMS anda untuk bermula",
-    introEyebrow: "Ujian kecil, khas untuk anda",
+    introEyebrow: "Freshly Crafted Every Day · Segar setiap hari",
     introTitle: "Anda jenis pencinta kopi yang mana?",
     introBody:
       "Tiada jawapan betul atau salah—hanya cawan, suasana, dan teman yang paling serasi dengan diri anda.",
@@ -315,7 +501,7 @@ export const uiCopy: Localized<UiCopy> = {
     next: "Seterusnya",
     questionProgress: (current, total) => `Pilihan ${current} daripada ${total}`,
     chooseOne: "Pilih jawapan yang terasa paling semula jadi.",
-    resultEyebrow: "Personaliti kopi anda",
+    resultEyebrow: "Segar dibuat · HBTI anda",
     resultTitle: "Inilah diri anda.",
     signatureLabel: "Pesanan khas anda",
     discoverGift: "Terima hadiah ahli saya",
@@ -358,7 +544,7 @@ export const uiCopy: Localized<UiCopy> = {
       "45-plus": "45+",
       "prefer-not": "Tidak mahu nyatakan",
     },
-    sendGift: "Hantar kupon hadiah saya",
+    sendGift: "Lengkapkan HBTI saya",
     sendingGift: "Sedang dimasukkan ke akaun anda…",
     saveCard: "Simpan kad saya",
     shareCard: "Kongsi dengan rakan",
@@ -367,10 +553,10 @@ export const uiCopy: Localized<UiCopy> = {
     shareCopied: "Pautan keputusan tanpa jemputan peribadi telah disalin.",
     cardActionError: "Kad tidak dapat disediakan. Sila cuba lagi.",
     returnToMembership: "Kembali ke dompet ahli Hot Crush",
-    successEyebrow: "Untuk kunjungan anda yang seterusnya",
-    successTitle: "Hadiah anda sudah sedia.",
+    successEyebrow: "Segar dibuat · Untuk kunjungan anda seterusnya",
+    successTitle: "Hadiah anda ada dalam dompet ahli.",
     successBody:
-      "Kupon telah dimasukkan ke akaun ahli Hot Crush yang menerima pautan ini.",
+      "Ia sedia dalam akaun Hot Crush yang baru anda sahkan.",
     rewardLabel: "Ganjaran ahli anda",
     rewardName: "Pistachio Green Jewel",
     rewardNote: "Kupon Hadiah Fizikal · penebusan sekali sahaja",

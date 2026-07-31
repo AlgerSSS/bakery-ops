@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   isTrustedRequestOrigin,
+  readHbtiAuthConfig,
   readHbtiServerConfig,
 } from "@/lib/server-config";
 
@@ -63,6 +64,40 @@ describe("isTrustedRequestOrigin", () => {
     );
 
     expect(() => readHbtiServerConfig()).toThrow(
+      "must be independent from HBTI_LINK_SECRET",
+    );
+  });
+
+  it("reads the pinned RES H5 member-auth configuration", () => {
+    vi.stubEnv("HBTI_AUTH_SECRET", "a".repeat(48));
+    vi.stubEnv("HBTI_LINK_SECRET", "l".repeat(48));
+    vi.stubEnv("HBTI_MEMBER_HASH_SECRET", "m".repeat(48));
+    vi.stubEnv(
+      "RES_H5_BASE_URL",
+      "https://f4klzbmr9n2d.m.sea.restosuite.ai",
+    );
+    vi.stubEnv("RES_H5_CORPORATION_ID", "450020844");
+    vi.stubEnv("RES_H5_APP_ID", "1991043406914285569");
+    vi.stubEnv("RES_H5_CARD_PROGRAM_ID", "1991044916737863680");
+
+    expect(readHbtiAuthConfig()).toEqual({
+      authSecret: "a".repeat(48),
+      h5BaseUrl: "https://f4klzbmr9n2d.m.sea.restosuite.ai",
+      corporationId: "450020844",
+      appId: "1991043406914285569",
+      cardProgramId: "1991044916737863680",
+    });
+  });
+
+  it("requires the auth secret to stay independent", () => {
+    vi.stubEnv("HBTI_AUTH_SECRET", "l".repeat(48));
+    vi.stubEnv("HBTI_LINK_SECRET", "l".repeat(48));
+    vi.stubEnv("HBTI_MEMBER_HASH_SECRET", "m".repeat(48));
+    vi.stubEnv("RES_H5_CORPORATION_ID", "450020844");
+    vi.stubEnv("RES_H5_APP_ID", "1991043406914285569");
+    vi.stubEnv("RES_H5_CARD_PROGRAM_ID", "1991044916737863680");
+
+    expect(() => readHbtiAuthConfig()).toThrow(
       "must be independent from HBTI_LINK_SECRET",
     );
   });

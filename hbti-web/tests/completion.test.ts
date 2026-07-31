@@ -2,7 +2,10 @@ import { createHmac } from "node:crypto";
 
 import { describe, expect, it } from "vitest";
 
-import { completeHbti } from "@/lib/completion/complete-hbti";
+import {
+  completeHbti,
+  getHbtiCompletionStatus,
+} from "@/lib/completion/complete-hbti";
 import type {
   CompletionAcquisition,
   CompletionRecord,
@@ -134,6 +137,7 @@ class FakeResCouponAdapter implements ResCouponAdapter {
       throwOnListCalls?: readonly number[];
       memberLookupError?: string;
       couponsAddedOnGive?: number;
+      couponIdsByListCall?: readonly (readonly string[])[];
     } = {},
   ) {
     this.couponCount = options.initialCouponCount ?? 2;
@@ -157,6 +161,11 @@ class FakeResCouponAdapter implements ResCouponAdapter {
       this.options.throwOnListCalls?.includes(this.listCalls)
     ) {
       throw new Error("wallet readback failed with RES_VULCAN_TOKEN=secret");
+    }
+    const couponIds =
+      this.options.couponIdsByListCall?.[this.listCalls - 1];
+    if (couponIds) {
+      return couponIds.map((id) => ({ id }));
     }
     return Array.from({ length: this.couponCount }, (_, index) => ({
       id: `coupon-${index + 1}`,
@@ -421,6 +430,60 @@ describe("completeHbti", () => {
     expect(res.listCalls).toBe(1);
   });
 
+  it("reviews a prepared ID replacement when the wallet count did not increase", async () => {
+    const store = new FakeCompletionStore();
+    const res = new FakeResCouponAdapter({
+      couponIdsByListCall: [["coupon-2", "coupon-3"]],
+    });
+    const phone = "+12025550123";
+    const campaignVersion = "2026-08-pistachio-v1";
+    const memberHash = createHmac("sha256", "completion-test-secret")
+      .update(phone)
+      .digest("hex");
+    store.records.set(`${campaignVersion}:${memberHash}`, {
+      status: "processing",
+      phase: "prepared",
+      attemptId: "00000000-0000-4000-8000-000000000004",
+      startedAt: "2026-07-30T08:00:00.000Z",
+      preparedAt: "2026-07-30T08:00:01.000Z",
+      baselineCouponIds: ["coupon-1", "coupon-2"],
+      rewardContext: {
+        memberId: "member-1",
+        templateId: "template-1",
+        templateName: "Pistachio Green Jewel",
+      },
+      completion: {
+        code: "ISBA",
+        visitTime: "night",
+        category: "drink",
+        color: "pistachio",
+      },
+    });
+
+    const result = await completeHbti(
+      {
+        phone,
+        expectedMemberId: "member-1",
+        campaignVersion,
+        answers: validAnswers,
+        color: "pistachio",
+      },
+      {
+        store,
+        res,
+        memberHashSecret: "completion-test-secret",
+        couponTemplateName: "Pistachio Green Jewel",
+        now: () => new Date("2026-07-30T08:00:07.000Z"),
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: "review",
+      reason: "readback_mismatch",
+    });
+    expect(res.giveInputs).toHaveLength(0);
+  });
+
   it("returns a stored receipt on a normalized-phone retry without calling RES again", async () => {
     const store = new FakeCompletionStore();
     const res = new FakeResCouponAdapter();
@@ -570,6 +633,38 @@ describe("completeHbti", () => {
     expect(retry).toEqual(first);
     expect(res.giveInputs).toHaveLength(1);
     expect(res.listCalls).toBe(listCallsAtReview);
+  });
+
+  it("reviews an ID replacement when the usable wallet count does not increase", async () => {
+    const store = new FakeCompletionStore();
+    const res = new FakeResCouponAdapter({
+      couponIdsByListCall: [
+        ["coupon-1", "coupon-2"],
+        ["coupon-2", "coupon-3"],
+      ],
+    });
+
+    const result = await completeHbti(
+      {
+        phone: "+12025550123",
+        expectedMemberId: "member-1",
+        campaignVersion: "2026-08-pistachio-v1",
+        answers: validAnswers,
+        color: "pistachio",
+      },
+      {
+        store,
+        res,
+        memberHashSecret: "completion-test-secret",
+        couponTemplateName: "Pistachio Green Jewel",
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: "review",
+      reason: "readback_mismatch",
+    });
+    expect(res.giveInputs).toHaveLength(1);
   });
 
   it("persists review when stale reconciliation cannot read the wallet", async () => {
@@ -859,5 +954,154 @@ describe("completeHbti", () => {
     expect(store.acquiredKeys.map(({ campaignVersion }) => campaignVersion)).toEqual(
       ["campaign-v1", "campaign-v2"],
     );
+  });
+
+  it("keeps a legacy phone-key issuance authoritative after member-login migration", async () => {
+    const store = new FakeCompletionStore();
+    const res = new FakeResCouponAdapter();
+    const campaignVersion = "2026-08-pistachio-v1";
+    const legacyHash = createHmac(
+      "sha256",
+      "completion-test-secret",
+    )
+      .update("+12025550123")
+      .digest("hex");
+    store.records.set(`${campaignVersion}:${legacyHash}`, {
+      status: "issued",
+      completion: {
+        code: "ISBA",
+        visitTime: "night",
+        category: "drink",
+        color: "pistachio",
+      },
+      reward: {
+        couponTemplateName: "Pistachio Green Jewel",
+        newCouponId: "legacy-coupon",
+        usableCouponCountBefore: 1,
+        usableCouponCountAfter: 2,
+        confirmedAt: "2026-07-30T08:00:00.000Z",
+      },
+    });
+
+    const result = await completeHbti(
+      {
+        phone: "+12025550123",
+        expectedMemberId: "member-1",
+        campaignVersion,
+        answers: validAnswers,
+        color: "pistachio",
+      },
+      {
+        store,
+        res,
+        memberHashSecret: "completion-test-secret",
+        couponTemplateName: "Pistachio Green Jewel",
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: "issued",
+      reward: { newCouponId: "legacy-coupon" },
+    });
+    expect(store.acquiredKeys).toHaveLength(0);
+    expect(res.giveInputs).toHaveLength(0);
+  });
+
+  it("keeps the normalized phone HMAC as the sole idempotency key after member login", async () => {
+    const store = new FakeCompletionStore();
+    const res = new FakeResCouponAdapter();
+
+    await completeHbti(
+      {
+        phone: "+12025550123",
+        expectedMemberId: "member-1",
+        campaignVersion: "2026-08-pistachio-v1",
+        answers: validAnswers,
+        color: "pistachio",
+      },
+      {
+        store,
+        res,
+        memberHashSecret: "completion-test-secret",
+        couponTemplateName: "Pistachio Green Jewel",
+      },
+    );
+
+    expect(store.acquiredKeys).toHaveLength(1);
+    expect(store.acquiredKeys[0].memberHash).toBe(
+      createHmac("sha256", "completion-test-secret")
+        .update("+12025550123")
+        .digest("hex"),
+    );
+  });
+
+  it("refuses a phone lookup that disagrees with the authenticated member", async () => {
+    const store = new FakeCompletionStore();
+    const res = new FakeResCouponAdapter();
+
+    await expect(
+      completeHbti(
+        {
+          phone: "+12025550123",
+          expectedMemberId: "another-member",
+          campaignVersion: "2026-08-pistachio-v1",
+          answers: validAnswers,
+          color: "pistachio",
+        },
+        {
+          store,
+          res,
+          memberHashSecret: "completion-test-secret",
+          couponTemplateName: "Pistachio Green Jewel",
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: "MEMBER_IDENTITY_MISMATCH",
+      retryable: false,
+    });
+    expect(store.records.size).toBe(0);
+    expect(res.giveInputs).toHaveLength(0);
+  });
+
+  it("reads the same legacy-first status without issuing another coupon", async () => {
+    const store = new FakeCompletionStore();
+    const res = new FakeResCouponAdapter();
+    const campaignVersion = "2026-08-pistachio-v1";
+    const legacyHash = createHmac(
+      "sha256",
+      "completion-test-secret",
+    )
+      .update("+12025550123")
+      .digest("hex");
+    store.records.set(`${campaignVersion}:${legacyHash}`, {
+      status: "review",
+      completion: {
+        code: "ISBA",
+        visitTime: "night",
+        category: "drink",
+        color: "pistachio",
+      },
+      reason: "readback_mismatch",
+      markedAt: "2026-07-30T08:00:00.000Z",
+    });
+
+    await expect(
+      getHbtiCompletionStatus(
+        {
+          phone: "+12025550123",
+          expectedMemberId: "member-1",
+          campaignVersion,
+        },
+        {
+          store,
+          res,
+          memberHashSecret: "completion-test-secret",
+        },
+      ),
+    ).resolves.toMatchObject({
+      status: "review",
+      reason: "readback_mismatch",
+    });
+    expect(res.giveInputs).toHaveLength(0);
   });
 });

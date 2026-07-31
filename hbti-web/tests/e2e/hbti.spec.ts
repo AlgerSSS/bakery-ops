@@ -5,14 +5,20 @@ import { expect, test, type Page } from "@playwright/test";
 const localOrigin = "http://127.0.0.1:3199";
 const resFontOrigin =
   "https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com";
-const invitationToken = "e2e-opaque-invitation";
+const privateMarker = "e2e-private-member-marker";
 
 type SessionReply =
-  | { status: 200; body: { valid: true } }
   | {
-      status: 410;
-      body: { valid: false; error: "LINK_EXPIRED" };
-    };
+      status: 200;
+      body:
+        | {
+            authenticated: true;
+            maskedPhone: string;
+            draftKey: string;
+          }
+        | { authenticated: false };
+    }
+  | { status: 500; body: { error: string } };
 
 interface CompletionReply {
   status: number;
@@ -22,6 +28,9 @@ interface CompletionReply {
 interface PrivateNetworkOptions {
   sessionReply?: SessionReply;
   completionReplies?: readonly CompletionReply[];
+  completionStatusReplies?: readonly CompletionReply[];
+  otpRequestReply?: CompletionReply;
+  otpVerifyReply?: CompletionReply;
 }
 
 async function mockPrivateNetwork(
@@ -30,7 +39,11 @@ async function mockPrivateNetwork(
 ) {
   const sessionReply = options.sessionReply ?? {
     status: 200,
-    body: { valid: true },
+    body: {
+      authenticated: true,
+      maskedPhone: "+60 123••6789",
+      draftKey: "e2e-member-draft-123456",
+    },
   };
   const completionReplies = options.completionReplies ?? [
     {
@@ -39,13 +52,14 @@ async function mockPrivateNetwork(
     },
   ];
   const externalRequests: string[] = [];
+  const otpRequestBodies: unknown[] = [];
+  const otpVerifyBodies: unknown[] = [];
+  const completionBodies: unknown[] = [];
   let completionCalls = 0;
+  let completionStatusCalls = 0;
 
-  await page.route("**/api/session", async (route) => {
-    expect(route.request().method()).toBe("POST");
-    expect(route.request().postDataJSON()).toEqual({
-      token: invitationToken,
-    });
+  await page.route("**/api/auth/session", async (route) => {
+    expect(route.request().method()).toBe("GET");
     await route.fulfill({
       status: sessionReply.status,
       contentType: "application/json",
@@ -55,10 +69,55 @@ async function mockPrivateNetwork(
 
   await page.route("**/api/complete", async (route) => {
     completionCalls += 1;
+    completionBodies.push(route.request().postDataJSON());
     const reply =
       completionReplies[
         Math.min(completionCalls - 1, completionReplies.length - 1)
       ];
+    await route.fulfill({
+      status: reply.status,
+      contentType: "application/json",
+      body: JSON.stringify(reply.body),
+    });
+  });
+
+  await page.route("**/api/complete/status", async (route) => {
+    completionStatusCalls += 1;
+    expect(route.request().method()).toBe("GET");
+    const replies = options.completionStatusReplies ?? [
+      {
+        status: 404,
+        body: { error: "NOT_COMPLETED" },
+      },
+    ];
+    const reply =
+      replies[Math.min(completionStatusCalls - 1, replies.length - 1)];
+    await route.fulfill({
+      status: reply.status,
+      contentType: "application/json",
+      body: JSON.stringify(reply.body),
+    });
+  });
+
+  await page.route("**/api/auth/otp/request", async (route) => {
+    otpRequestBodies.push(route.request().postDataJSON());
+    const reply = options.otpRequestReply ?? {
+      status: 500,
+      body: { error: "E2E_OTP_DISABLED" },
+    };
+    await route.fulfill({
+      status: reply.status,
+      contentType: "application/json",
+      body: JSON.stringify(reply.body),
+    });
+  });
+
+  await page.route("**/api/auth/otp/verify", async (route) => {
+    otpVerifyBodies.push(route.request().postDataJSON());
+    const reply = options.otpVerifyReply ?? {
+      status: 500,
+      body: { error: "E2E_OTP_DISABLED" },
+    };
     await route.fulfill({
       status: reply.status,
       contentType: "application/json",
@@ -84,11 +143,15 @@ async function mockPrivateNetwork(
   return {
     externalRequests,
     completionCalls: () => completionCalls,
+    completionStatusCalls: () => completionStatusCalls,
+    completionBodies,
+    otpRequestBodies,
+    otpVerifyBodies,
   };
 }
 
 async function openInvitation(page: Page) {
-  await page.goto(`/t/${invitationToken}`);
+  await page.goto("/");
   await expect(
     page.getByRole("heading", {
       name: "What kind of coffee person are you?",
@@ -143,6 +206,32 @@ async function answerExactlySixQuestions(
   await expect(page.getByRole("progressbar")).toHaveCount(0);
 }
 
+test("offers a direct guest preview without authentication or reward calls", async ({
+  page,
+}) => {
+  const network = await mockPrivateNetwork(page, {
+    sessionReply: {
+      status: 500,
+      body: { error: "SESSION_MUST_NOT_BE_REQUIRED" },
+    },
+  });
+
+  await page.goto("/demo");
+  await expect(page.getByText("Guest preview")).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "What kind of coffee person are you?",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Freshly made. Unmistakably you.",
+    }),
+  ).toHaveCount(0);
+  expect(network.completionCalls()).toBe(0);
+  expect(network.externalRequests).toEqual([]);
+});
+
 test("defaults to English and fits every supported mobile width", async ({
   page,
 }) => {
@@ -158,6 +247,190 @@ test("defaults to English and fits every supported mobile width", async ({
   await assertNoHorizontalOverflow(page);
   expect(network.externalRequests).toEqual([]);
   expect(network.completionCalls()).toBe(0);
+});
+
+test("uses the HOT CRUSH storefront tokens, trilingual slogan, and full-colour arrow", async ({
+  page,
+}) => {
+  const network = await mockPrivateNetwork(page, {
+    sessionReply: {
+      status: 200,
+      body: { authenticated: false },
+    },
+  });
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", {
+      name: "Freshly made. Unmistakably you.",
+    }),
+  ).toBeVisible();
+
+  const brandState = await page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement);
+    const header = document.querySelector<HTMLElement>(
+      '[data-surface="brand-lightbox"]',
+    );
+    const arrow = document.querySelector<HTMLElement>(
+      '[data-brand-arrow="true"]',
+    );
+    const endlesslyAnimated = Array.from(
+      document.querySelectorAll<HTMLElement>("*"),
+    )
+      .filter(
+        (element) =>
+          getComputedStyle(element).animationIterationCount === "infinite",
+      )
+      .map((element) => element.tagName);
+
+    return {
+      tokens: {
+        peach: root.getPropertyValue("--hc-peach").trim(),
+        paper: root.getPropertyValue("--hc-paper").trim(),
+        oxblood: root.getPropertyValue("--hc-oxblood").trim(),
+        red: root.getPropertyValue("--hc-red").trim(),
+        ink: root.getPropertyValue("--hc-ink").trim(),
+        metal: root.getPropertyValue("--hc-metal").trim(),
+      },
+      headerDuration: header
+        ? getComputedStyle(header).animationDuration
+        : "",
+      arrowBackground: arrow
+        ? getComputedStyle(arrow).backgroundImage
+        : "",
+      arrowMask: arrow
+        ? getComputedStyle(arrow).maskImage
+        : "",
+      endlesslyAnimated,
+    };
+  });
+
+  expect(brandState.tokens).toEqual({
+    peach: "#f3d0b8",
+    paper: "#fff7ea",
+    oxblood: "#6a1c13",
+    red: "#c51f2c",
+    ink: "#151313",
+    metal: "#bfc3c6",
+  });
+  expect(brandState.headerDuration).toBe("0.56s");
+  expect(brandState.arrowBackground).toContain(
+    "/hot-crush-arrow.png",
+  );
+  expect(brandState.arrowMask).toBe("none");
+  expect(brandState.endlesslyAnimated).toEqual([]);
+
+  await page.getByRole("button", { name: /简体中文/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "新鲜出炉，刚好是你。" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Bahasa Melayu/ }).click();
+  await expect(
+    page.getByRole("heading", {
+      name: "Dibuat segar. Seunik diri anda.",
+    }),
+  ).toBeVisible();
+
+  await assertNoHorizontalOverflow(page);
+  expect(network.externalRequests).toEqual([]);
+  expect(network.completionCalls()).toBe(0);
+});
+
+test("retires personal-link entry points without preserving the token", async ({
+  page,
+}) => {
+  const network = await mockPrivateNetwork(page);
+  await page.goto(`/t/${privateMarker}`);
+  await expect(page).toHaveURL(`${localOrigin}/`);
+  await expect(
+    page.getByRole("heading", {
+      name: "What kind of coffee person are you?",
+    }),
+  ).toBeVisible();
+  expect(page.url()).not.toContain(privateMarker);
+  expect(network.externalRequests).toEqual([]);
+});
+
+test("verifies a +86 phone without putting identity in the URL or storage", async ({
+  page,
+}) => {
+  const challengeToken = "c".repeat(43);
+  const network = await mockPrivateNetwork(page, {
+    sessionReply: {
+      status: 200,
+      body: { authenticated: false },
+    },
+    otpRequestReply: {
+      status: 200,
+      body: {
+        challengeToken,
+        maskedPhone: "+86 139••••5678",
+        retryAfterSeconds: 60,
+      },
+    },
+    otpVerifyReply: {
+      status: 200,
+      body: {
+        authenticated: true,
+        maskedPhone: "+86 139••••5678",
+        draftKey: "e2e-member-draft-123456",
+      },
+    },
+  });
+
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", {
+      name: "Freshly made. Unmistakably you.",
+    }),
+  ).toBeFocused();
+  await page.getByLabel("Country or region").selectOption("CN");
+  const phoneInput = page.getByLabel("Member phone number");
+  await page
+    .getByRole("button", { name: "Send verification code" })
+    .click();
+  await expect(phoneInput).toHaveAttribute("aria-invalid", "true");
+  await expect(phoneInput).toHaveAttribute(
+    "aria-describedby",
+    /member-phone-error/,
+  );
+  await expect(page.locator("#member-phone-error")).toBeVisible();
+
+  await phoneInput.fill("139 1234 5678");
+  await expect(phoneInput).not.toHaveAttribute("aria-invalid");
+  await page
+    .getByRole("button", { name: "Send verification code" })
+    .click();
+  await page.getByLabel("Six-digit code").fill("123456");
+  await page.getByRole("button", { name: "Verify and begin" }).click();
+
+  await expect(page.getByText("Member account verified")).toBeVisible();
+  await expect(page.getByText("+86 139••••5678", { exact: false })).toBeVisible();
+  expect(network.otpRequestBodies).toEqual([
+    {
+      phone: {
+        countryCode: "86",
+        isoCode: "CN",
+        phone: "13912345678",
+      },
+    },
+  ]);
+  expect(network.otpVerifyBodies).toEqual([
+    {
+      challengeToken,
+      code: "123456",
+      acceptMembership: true,
+    },
+  ]);
+  const browserState = await page.evaluate(() => ({
+    href: location.href,
+    storage: Object.entries(localStorage).flat().join(""),
+  }));
+  expect(browserState.href).not.toContain("13912345678");
+  expect(browserState.storage).not.toContain("13912345678");
+  expect(browserState.storage).not.toContain(challengeToken);
+  expect(network.completionCalls()).toBe(0);
+  await assertNoHorizontalOverflow(page);
+  expect(network.externalRequests).toEqual([]);
 });
 
 test("switches the same page between English, Chinese, and Malay", async ({
@@ -240,32 +513,32 @@ test("restores a local draft and Back returns to the saved answer", async ({
   const savedStorage = await page.evaluate(() =>
     Object.entries(localStorage).flat().join(""),
   );
-  expect(savedStorage).not.toContain(invitationToken);
+  expect(savedStorage).not.toContain("+60 123");
   expect(network.externalRequests).toEqual([]);
   expect(network.completionCalls()).toBe(0);
 });
 
-test("announces an invalid invitation and moves focus to its heading", async ({
+test("recovers when member-account status cannot be checked", async ({
   page,
 }) => {
   const network = await mockPrivateNetwork(page, {
     sessionReply: {
-      status: 410,
-      body: { valid: false, error: "LINK_EXPIRED" },
+      status: 500,
+      body: { error: "RES_UNAVAILABLE" },
     },
   });
 
-  await page.goto(`/t/${invitationToken}`);
+  await page.goto("/");
 
   const alert = page.locator('section[role="alert"]');
   const heading = page.getByRole("heading", {
-    name: "This invitation can’t be opened.",
+    name: "We couldn’t verify your account.",
   });
   await expect(alert).toContainText(
-    "Ask our team for a fresh HBTI invitation.",
+    "Check your connection and try again.",
   );
   await expect(heading).toBeFocused();
-  await expect(page.getByRole("button", { name: "Try again" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   expect(network.externalRequests).toEqual([]);
   expect(network.completionCalls()).toBe(0);
 });
@@ -311,7 +584,7 @@ test("completes exactly six questions and safely retries from 500 to issued", as
   const preview = page.getByTestId("result-colour-preview");
   await expect(preview).toHaveAttribute("data-color", "neutral");
   await expect(
-    page.getByRole("button", { name: /Send my gift coupon/ }),
+    page.getByRole("button", { name: /Finish my HBTI/ }),
   ).toBeDisabled();
   await assertNoHorizontalOverflow(page);
   const colourGroup = page.getByRole("group", {
@@ -353,10 +626,12 @@ test("completes exactly six questions and safely retries from 500 to issued", as
   ]);
   expect(png.readUInt32BE(16)).toBe(1_080);
   expect(png.readUInt32BE(20)).toBe(1_350);
-  expect(png.includes(Buffer.from(invitationToken))).toBe(false);
-  await expect(page.getByRole("status")).toHaveText(
-    "Your HBTI card has been saved.",
-  );
+  expect(png.includes(Buffer.from(privateMarker))).toBe(false);
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Your HBTI card has been saved." }),
+  ).toHaveText("Your HBTI card has been saved.");
 
   await page
     .getByRole("button", {
@@ -364,9 +639,11 @@ test("completes exactly six questions and safely retries from 500 to issued", as
       exact: true,
     })
     .click();
-  await expect(page.getByRole("status")).toHaveText(
-    "Your HBTI card is ready to share.",
-  );
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Your HBTI card is ready to share." }),
+  ).toHaveText("Your HBTI card is ready to share.");
   const cardCapture = await readResultCardCapture(page);
   expect(cardCapture.share).toMatchObject({
     title: "HBTI ILBA · The Clear-Eyed",
@@ -384,10 +661,10 @@ test("completes exactly six questions and safely retries from 500 to issued", as
       share: cardCapture.share,
       canvasText: cardCapture.canvasText,
     }),
-  ).not.toContain(invitationToken);
+  ).not.toContain(privateMarker);
 
   await page
-    .getByRole("button", { name: /Send my gift coupon/ })
+    .getByRole("button", { name: /Finish my HBTI/ })
     .click();
 
   await expect(page.locator('p[role="alert"]')).toContainText(
@@ -398,17 +675,89 @@ test("completes exactly six questions and safely retries from 500 to issued", as
   await assertNoHorizontalOverflow(page);
 
   await page
-    .getByRole("button", { name: /Send my gift coupon/ })
+    .getByRole("button", { name: /Finish my HBTI/ })
     .click();
 
   await expect(
-    page.getByRole("heading", { name: "Your gift is ready." }),
+    page.getByRole("heading", {
+      name: "Your gift is in your member wallet.",
+    }),
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /View it in my member wallet/ }),
   ).toHaveAttribute("href", walletUrl);
   expect(network.completionCalls()).toBe(2);
+  for (const body of network.completionBodies) {
+    expect(body).not.toHaveProperty("token");
+    expect(body).not.toHaveProperty("phone");
+    expect(body).toMatchObject({
+      answers: expect.any(Object),
+      color: "pistachio",
+    });
+  }
   await assertNoHorizontalOverflow(page);
+  expect(network.externalRequests).toEqual([]);
+});
+
+test("keeps polling a processing reward until RES confirms it", async ({
+  page,
+}) => {
+  const network = await mockPrivateNetwork(page, {
+    completionReplies: [
+      {
+        status: 200,
+        body: {
+          status: "processing",
+          code: "ILBA",
+          color: "pistachio",
+        },
+      },
+    ],
+    completionStatusReplies: [
+      {
+        status: 200,
+        body: {
+          status: "processing",
+          code: "ILBA",
+          color: "pistachio",
+        },
+      },
+      {
+        status: 200,
+        body: {
+          status: "issued",
+          code: "ILBA",
+          color: "pistachio",
+          reward: { couponTemplateName: "Pistachio Green Jewel" },
+        },
+      },
+    ],
+  });
+
+  await openInvitation(page);
+  await startQuiz(page);
+  await answerExactlySixQuestions(page);
+  await page
+    .getByRole("button", { name: /Receive my member gift/ })
+    .click();
+  await page
+    .getByRole("group", { name: "Favourite colour" })
+    .getByRole("button", { name: "Pistachio green", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: /Finish my HBTI/ })
+    .click();
+
+  await expect(
+    page.getByRole("heading", { name: "Your gift is being prepared." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Your gift is in your member wallet.",
+    }),
+  ).toBeVisible({ timeout: 9_000 });
+  expect(network.completionCalls()).toBe(1);
+  expect(network.completionStatusCalls()).toBe(2);
   expect(network.externalRequests).toEqual([]);
 });
 
@@ -526,14 +875,16 @@ test("supports the core journey with keyboard input only", async ({ page }) => {
   await page.keyboard.press("Space");
 
   const submit = page.getByRole("button", {
-    name: /Send my gift coupon/,
+    name: /Finish my HBTI/,
   });
   await tabTo(page, submit);
   await expectFocusIndicator(submit);
   await page.keyboard.press("Enter");
 
   await expect(
-    page.getByRole("heading", { name: "Your gift is ready." }),
+    page.getByRole("heading", {
+      name: "Your gift is in your member wallet.",
+    }),
   ).toBeFocused();
   expect(network.completionCalls()).toBe(1);
   expect(network.externalRequests).toEqual([]);

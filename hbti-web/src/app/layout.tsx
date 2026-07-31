@@ -8,6 +8,10 @@ export const metadata: Metadata = {
   },
   description:
     "Discover your coffee personality and receive your Hot Crush member gift.",
+  icons: {
+    icon: "/hot-crush-arrow.png",
+    apple: "/hot-crush-arrow.png",
+  },
   robots: {
     index: false,
     follow: false,

@@ -1,5 +1,5 @@
-import { PublicLanding } from "@/components/PublicLanding";
+import { HbtiExperience } from "@/components/HbtiExperience";
 
 export default function Home() {
-  return <PublicLanding />;
+  return <HbtiExperience />;
 }

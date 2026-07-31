@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createMemberLinkToken } from "@/lib/member-link/crypto";
-
 const routeMocks = vi.hoisted(() => ({
   completeHbti: vi.fn(),
   createCompletionStoreFromEnv: vi.fn(),
   createResApiClientFromEnv: vi.fn(),
   consumeTokenRateLimit: vi.fn(),
+  readHbtiAuthSession: vi.fn(),
+  readHbtiSessionCookie: vi.fn(),
 }));
 
 vi.mock("@/lib/completion/complete-hbti", async () => {
@@ -26,6 +26,14 @@ vi.mock("@/lib/res/client", () => ({
 
 vi.mock("@/lib/rate-limit/mongo-rate-limit", () => ({
   consumeTokenRateLimit: routeMocks.consumeTokenRateLimit,
+}));
+
+vi.mock("@/lib/auth/session", () => ({
+  readHbtiAuthSession: routeMocks.readHbtiAuthSession,
+}));
+
+vi.mock("@/lib/auth/session-cookie", () => ({
+  readHbtiSessionCookie: routeMocks.readHbtiSessionCookie,
 }));
 
 import { POST } from "@/app/api/complete/route";
@@ -49,6 +57,8 @@ describe("complete route", () => {
     routeMocks.createCompletionStoreFromEnv.mockReset();
     routeMocks.createResApiClientFromEnv.mockReset();
     routeMocks.consumeTokenRateLimit.mockReset();
+    routeMocks.readHbtiAuthSession.mockReset();
+    routeMocks.readHbtiSessionCookie.mockReset();
     routeMocks.createCompletionStoreFromEnv.mockResolvedValue({
       kind: "fake-store",
     });
@@ -58,6 +68,21 @@ describe("complete route", () => {
     routeMocks.consumeTokenRateLimit.mockResolvedValue({
       allowed: true,
       retryAfterSeconds: 0,
+    });
+    routeMocks.readHbtiSessionCookie.mockReturnValue("s".repeat(43));
+    routeMocks.readHbtiAuthSession.mockResolvedValue({
+      payload: {
+        resToken: "server-only-res-token",
+        memberId: "member-1",
+        identity: {
+          countryCode: "+1",
+          isoCode: "US",
+          phone: "2025550123",
+          e164: "+12025550123",
+        },
+      },
+      expiresAt: new Date("2026-07-30T10:00:00.000Z"),
+      draftKey: "server-only-draft-key",
     });
     routeMocks.completeHbti.mockResolvedValue({
       status: "issued",
@@ -82,7 +107,6 @@ describe("complete route", () => {
   it("rejects a completion without the required colour before creating dependencies", async () => {
     const response = await POST(
       completionRequest({
-        token: createValidToken(),
         answers: validAnswers,
       }),
     );
@@ -99,11 +123,27 @@ describe("complete route", () => {
     expect(routeMocks.consumeTokenRateLimit).not.toHaveBeenCalled();
   });
 
+  it.each(["token", "phone", "memberId"])(
+    "rejects browser-controlled member identity field %s",
+    async (field) => {
+      const response = await POST(
+        completionRequest({
+          answers: validAnswers,
+          color: "pistachio",
+          [field]: "attacker-controlled",
+        }),
+      );
+
+      expect(response.status).toBe(400);
+      expect(routeMocks.readHbtiAuthSession).not.toHaveBeenCalled();
+      expect(routeMocks.completeHbti).not.toHaveBeenCalled();
+    },
+  );
+
   it("rejects an untrusted Origin before decrypting or calling RES and Mongo", async () => {
     const response = await POST(
       completionRequest(
         {
-          token: createValidToken(),
           answers: validAnswers,
           color: "pistachio",
         },
@@ -112,9 +152,8 @@ describe("complete route", () => {
     );
 
     expect(response.status).toBe(403);
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       error: "INVALID_ORIGIN",
-      retryable: false,
     });
     expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
     expect(routeMocks.createCompletionStoreFromEnv).not.toHaveBeenCalled();
@@ -128,11 +167,8 @@ describe("complete route", () => {
       allowed: false,
       retryAfterSeconds: 91,
     });
-    const token = createValidToken();
-
     const response = await POST(
       completionRequest({
-        token,
         answers: validAnswers,
         color: "pistachio",
       }),
@@ -147,7 +183,7 @@ describe("complete route", () => {
     expect(response.headers.get("cache-control")).toBe("no-store, max-age=0");
     expect(routeMocks.consumeTokenRateLimit).toHaveBeenCalledWith({
       scope: "complete",
-      token,
+      token: "s".repeat(43),
       limit: 60,
       windowMs: 5 * 60_000,
     });
@@ -159,7 +195,6 @@ describe("complete route", () => {
   it("accepts a valid completion without optional gender or age and never exposes the receipt ID", async () => {
     const response = await POST(
       completionRequest({
-        token: createValidToken(),
         answers: validAnswers,
         color: "pistachio",
       }),
@@ -178,13 +213,14 @@ describe("complete route", () => {
     expect(routeMocks.completeHbti).toHaveBeenCalledOnce();
     expect(routeMocks.completeHbti.mock.calls[0][0]).toEqual({
       phone: "+12025550123",
+      expectedMemberId: "member-1",
       campaignVersion: CAMPAIGN_VERSION,
       answers: validAnswers,
       color: "pistachio",
     });
     expect(routeMocks.consumeTokenRateLimit).toHaveBeenCalledWith({
       scope: "complete",
-      token: expect.any(String),
+      token: "s".repeat(43),
       limit: 60,
       windowMs: 5 * 60_000,
     });
@@ -203,15 +239,6 @@ function stubValidServerEnvironment(): void {
   );
 }
 
-function createValidToken(): string {
-  return createMemberLinkToken({
-    phone: "+1 202 555 0123",
-    campaignVersion: CAMPAIGN_VERSION,
-    expiresAt: Math.floor(Date.now() / 1_000) + 3_600,
-    secret: LINK_SECRET,
-  });
-}
-
 function completionRequest(
   body: Record<string, unknown>,
   origin = ORIGIN,
@@ -221,6 +248,8 @@ function completionRequest(
     headers: {
       "Content-Type": "application/json",
       Origin: origin,
+      "Sec-Fetch-Site": "same-origin",
+      Cookie: `${process.env.NODE_ENV === "production" ? "__Host-hbti_session" : "hbti_session"}=${"s".repeat(43)}`,
     },
     body: JSON.stringify(body),
   });

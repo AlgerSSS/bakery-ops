@@ -14,7 +14,7 @@ import type {
 
 const key: CompletionStoreKey = {
   campaignVersion: "2026-08-pistachio-v1",
-  memberHash: "b".repeat(64),
+  memberId: "2083088506766532613",
 };
 const prepared: PreparedCompletionRecord = {
   status: "processing",
@@ -125,8 +125,8 @@ class RotatingPendingStore implements CompletionStore {
 
   constructor(count: number) {
     for (let index = 0; index < count; index += 1) {
-      const memberHash = index.toString(16).padStart(64, "0");
-      this.records.set(memberHash, {
+      const memberId = `90000000000000${String(10000 + index).slice(-5)}`;
+      this.records.set(memberId, {
         ...prepared,
         attemptId: `00000000-0000-4000-8000-${index
           .toString()
@@ -151,14 +151,14 @@ class RotatingPendingStore implements CompletionStore {
         );
       })
       .slice(0, limit)
-      .map(([memberHash, record]) => ({
-        key: { ...key, memberHash },
+      .map(([memberId, record]) => ({
+        key: { ...key, memberId },
         record,
       }));
   }
 
   async get(keyToRead: CompletionStoreKey): Promise<CompletionRecord | null> {
-    return this.records.get(keyToRead.memberHash) ?? null;
+    return this.records.get(keyToRead.memberId) ?? null;
   }
 
   async acquireProcessing(): Promise<CompletionAcquisition> {
@@ -172,7 +172,7 @@ class RotatingPendingStore implements CompletionStore {
   async markIssued(
     keyToWrite: CompletionStoreKey,
   ): Promise<void> {
-    this.records.delete(keyToWrite.memberHash);
+    this.records.delete(keyToWrite.memberId);
   }
 
   async markReview(): Promise<void> {
@@ -188,13 +188,13 @@ class RotatingPendingStore implements CompletionStore {
     attemptId: string,
     reconciledAt: string,
   ): Promise<void> {
-    const current = this.records.get(keyToTouch.memberHash);
+    const current = this.records.get(keyToTouch.memberId);
     if (current?.attemptId === attemptId) {
-      this.records.set(keyToTouch.memberHash, {
+      this.records.set(keyToTouch.memberId, {
         ...current,
         lastReconciledAt: reconciledAt,
       });
-      this.touchedKeys.add(keyToTouch.memberHash);
+      this.touchedKeys.add(keyToTouch.memberId);
     }
   }
 }

@@ -3,7 +3,6 @@ export interface HbtiServerConfig {
   couponTemplateName: string;
   linkSecret: string;
   linkBaseUrl: string;
-  memberHashSecret: Uint8Array;
   memberWalletUrl: string;
 }
 
@@ -19,17 +18,6 @@ export function readHbtiServerConfig(): HbtiServerConfig {
   const linkSecret = requireEnvironmentVariable("HBTI_LINK_SECRET");
   if (new TextEncoder().encode(linkSecret).byteLength < 32) {
     throw new Error("HBTI_LINK_SECRET must contain at least 32 bytes.");
-  }
-  const memberHashSecret = requireEnvironmentVariable(
-    "HBTI_MEMBER_HASH_SECRET",
-  );
-  if (new TextEncoder().encode(memberHashSecret).byteLength < 32) {
-    throw new Error("HBTI_MEMBER_HASH_SECRET must contain at least 32 bytes.");
-  }
-  if (memberHashSecret === linkSecret) {
-    throw new Error(
-      "HBTI_MEMBER_HASH_SECRET must be independent from HBTI_LINK_SECRET.",
-    );
   }
 
   const memberWalletUrl = new URL(
@@ -56,7 +44,6 @@ export function readHbtiServerConfig(): HbtiServerConfig {
     ),
     linkSecret,
     linkBaseUrl: linkBaseUrl.origin,
-    memberHashSecret: new TextEncoder().encode(memberHashSecret),
     memberWalletUrl: memberWalletUrl.toString(),
   };
 }
@@ -68,7 +55,6 @@ export function readHbtiAuthConfig(): HbtiAuthConfig {
   }
   for (const otherSecretName of [
     "HBTI_LINK_SECRET",
-    "HBTI_MEMBER_HASH_SECRET",
   ] as const) {
     const otherSecret = process.env[otherSecretName]?.trim();
     if (otherSecret && otherSecret === authSecret) {

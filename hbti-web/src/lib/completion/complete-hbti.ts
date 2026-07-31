@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import { z } from "zod";
 
@@ -28,7 +28,7 @@ const PREPARED_REVIEW_AFTER_MS = 120_000;
 
 const completeHbtiInputSchema = z.strictObject({
   phone: z.string().trim().min(1).max(32),
-  expectedMemberId: z.string().trim().min(1).max(128).optional(),
+  expectedMemberId: z.string().trim().min(1).max(128),
   campaignVersion: z
     .string()
     .trim()
@@ -50,7 +50,7 @@ const completionStatusInputSchema = z.strictObject({
 
 export interface CompleteHbtiInput {
   phone: string;
-  expectedMemberId?: string;
+  expectedMemberId: string;
   campaignVersion: string;
   answers: HbtiAnswersInput;
   color: string;
@@ -61,7 +61,6 @@ export interface CompleteHbtiInput {
 export interface CompleteHbtiDependencies {
   store: CompletionStore;
   res: ResCouponAdapter;
-  memberHashSecret: string | Uint8Array;
   couponTemplateName: string;
   now?: () => Date;
 }
@@ -72,10 +71,7 @@ export interface ReconcilePreparedDependencies {
   now?: () => Date;
 }
 
-export interface GetHbtiCompletionStatusDependencies
-  extends ReconcilePreparedDependencies {
-  memberHashSecret: string | Uint8Array;
-}
+export type GetHbtiCompletionStatusDependencies = ReconcilePreparedDependencies;
 
 export type CompleteHbtiErrorCode =
   | "INVALID_INPUT"
@@ -126,8 +122,7 @@ export async function completeHbti(
 
   const couponTemplateName = dependencies.couponTemplateName.trim();
   if (
-    couponTemplateName.length === 0 ||
-    !hasHashSecret(dependencies.memberHashSecret)
+    couponTemplateName.length === 0
   ) {
     throw new CompleteHbtiError(
       "INVALID_CONFIGURATION",
@@ -148,8 +143,7 @@ export async function completeHbti(
   };
   const key = createCompletionKey({
     campaignVersion: parsed.data.campaignVersion,
-    identity: phoneE164,
-    memberHashSecret: dependencies.memberHashSecret,
+    memberId: parsed.data.expectedMemberId,
   });
   const now = dependencies.now ?? (() => new Date());
   const startedAt = safeIsoTimestamp(now);
@@ -319,8 +313,7 @@ export async function getHbtiCompletionStatus(
 ): Promise<CompleteHbtiResult | null> {
   const parsed = completionStatusInputSchema.safeParse(input);
   if (
-    !parsed.success ||
-    !hasHashSecret(dependencies.memberHashSecret)
+    !parsed.success
   ) {
     throw new CompleteHbtiError(
       "INVALID_INPUT",
@@ -329,11 +322,12 @@ export async function getHbtiCompletionStatus(
     );
   }
 
-  const phoneE164 = normalizeE164(parsed.data.phone);
+  // 键已改用 member_id，但手机号格式仍要校验：非法输入应当在这里被拒，
+  // 而不是带着脏数据继续往下走。normalizeE164 校验失败会抛 INVALID_INPUT。
+  normalizeE164(parsed.data.phone);
   const key = createCompletionKey({
     campaignVersion: parsed.data.campaignVersion,
-    identity: phoneE164,
-    memberHashSecret: dependencies.memberHashSecret,
+    memberId: parsed.data.expectedMemberId,
   });
   const record = await getCompletion(dependencies.store, key);
   if (!record) {
@@ -363,19 +357,12 @@ export async function getHbtiCompletionStatus(
 
 function createCompletionKey({
   campaignVersion,
-  identity,
-  memberHashSecret,
+  memberId,
 }: {
   campaignVersion: string;
-  identity: string;
-  memberHashSecret: string | Uint8Array;
+  memberId: string;
 }): CompletionStoreKey {
-  return {
-    campaignVersion,
-    memberHash: createHmac("sha256", memberHashSecret)
-      .update(identity, "utf8")
-      .digest("hex"),
-  };
+  return { campaignVersion, memberId };
 }
 
 function normalizeE164(rawPhone: string): string {
@@ -395,9 +382,6 @@ function normalizeE164(rawPhone: string): string {
   return normalized;
 }
 
-function hasHashSecret(secret: string | Uint8Array): boolean {
-  return typeof secret === "string" ? secret.length > 0 : secret.byteLength > 0;
-}
 
 function safeIsoTimestamp(now: () => Date): string {
   return safeDate(now).toISOString();

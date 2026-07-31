@@ -6,7 +6,14 @@ import type {
 
 export interface CompletionStoreKey {
   campaignVersion: string;
-  memberHash: string;
+  /**
+   * RES 的 customerId，同时也是 pos_member 的主键之一。
+   *
+   * 066 之前这里是 HMAC(手机号)。换成 member_id 有两个理由：完成记录收进了 pos_member，
+   * 行本身就是会员；而且 HMAC(手机号) 有个洞——会员换号（RES 有 qryChangePhoneLog，
+   * 说明这是真实场景）之后哈希就变了，同一期活动可以再领一次券。
+   */
+  memberId: string;
 }
 
 export interface HbtiCompletionSnapshot {

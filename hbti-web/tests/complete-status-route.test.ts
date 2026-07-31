@@ -116,7 +116,6 @@ describe("completion status route", () => {
       {
         store: { kind: "fake-store" },
         res: { kind: "fake-res" },
-        memberHashSecret: new TextEncoder().encode("m".repeat(48)),
       },
     );
   });

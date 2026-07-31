@@ -11,7 +11,6 @@
 // 生产库不留任何痕迹——这也是 062 上线前采用的同一套做法。
 //
 // 没有 DATABASE_URL 时整组跳过，所以默认 `npm test` 不依赖网络；发布前必须带库跑一次。
-import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 
 import postgres from "postgres";
@@ -33,8 +32,6 @@ import type {
   PreparedCompletionRecord,
 } from "@/lib/store/completion-store";
 
-const MIGRATION_PATH =
-  "/tmp/hotcrush-finance-semi-price-fix/sql/063_hbti_member_profile.sql";
 const DATABASE_URL = process.env.DATABASE_URL?.trim();
 const STORE = process.env.HBTI_MEMBER_STORE?.trim() || "吉隆坡Pavilion门店";
 const AUTH_SECRET = "integration-auth-secret-".repeat(2);
@@ -62,10 +59,10 @@ const nextKey = (): CompletionStoreKey => {
   seq += 1;
   return {
     campaignVersion: "itest",
-    memberHash: seq.toString(16).padStart(64, "0"),
+    memberId: `91000000000000${String(10000 + seq).slice(-5)}`,
   };
 };
-// 会员 ID 用独立计数器：和 memberHash 共用一个会让先取 ID、后取 key 的用例
+// 会员 ID 用独立计数器：和 memberId 共用一个会让先取 ID、后取 key 的用例
 // 撞上前一个用例已经建过画像的那个会员，断言就会看到多出来的历史行。
 let memberSeq = 0;
 const nextMemberId = () => {
@@ -128,7 +125,6 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
     });
     finished = root
       .begin(async (transaction) => {
-        await transaction.unsafe(readFileSync(MIGRATION_PATH, "utf8"));
         open(transaction);
         await stop;
         throw new Error("__rollback__");
@@ -146,15 +142,13 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
   afterAll(async () => {
     release?.();
     await finished;
-    // 回滚必须是真的：迁移建的表一张都不能留在生产库里。
-    const leftovers = await root`
-      SELECT count(*)::int AS n FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'public' AND c.relname LIKE 'hbti\\_%'`;
-    expect(leftovers[0].n).toBe(0);
-    const columns = await root`
-      SELECT count(*)::int AS n FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = 'pos_member' AND column_name LIKE 'hbti\\_%'`;
-    expect(columns[0].n).toBe(0);
+    // 回滚必须是真的：测试写进去的行一条都不能留下。
+    const leftoverMembers = await root`
+      SELECT count(*)::int AS n FROM pos_member WHERE member_id LIKE '91%'`;
+    expect(leftoverMembers[0].n).toBe(0);
+    const leftoverTokens = await root`
+      SELECT count(*)::int AS n FROM hbti_auth_token WHERE expires_at < now() - interval '365 days'`;
+    expect(leftoverTokens[0].n).toBe(0);
     await root.end();
   }, 60_000);
 
@@ -181,8 +175,8 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
       const key = nextKey();
       await store.acquireProcessing(key, locked(randomUUID()));
       await tx`
-        UPDATE hbti_completion SET expires_at = now() - interval '1 day'
-        WHERE campaign_version = ${key.campaignVersion} AND member_hash = ${key.memberHash}`;
+        UPDATE pos_member SET hbti_expires_at = now() - interval '1 day'
+        WHERE hbti_campaign_version = ${key.campaignVersion} AND member_id = ${key.memberId}`;
 
       expect(await store.get(key)).toBeNull();
       const retaken = await store.acquireProcessing(key, locked(randomUUID()));
@@ -269,9 +263,9 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
         "2026-07-01T00:00:00.000Z",
         50,
       );
-      const hashes = scanned.map((entry) => entry.key.memberHash);
-      expect(hashes.indexOf(never.memberHash)).toBeLessThan(
-        hashes.indexOf(older.memberHash),
+      const hashes = scanned.map((entry) => entry.key.memberId);
+      expect(hashes.indexOf(never.memberId)).toBeLessThan(
+        hashes.indexOf(older.memberId),
       );
       expect(await store.listPreparedBefore("2026-07-01T00:00:00.000Z", 1))
         .toHaveLength(1);
@@ -289,17 +283,17 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
       const record = await store.get(key);
       expect(record).toMatchObject({ lastReconciledAt: reconciledAt });
       const row = await tx`
-        SELECT last_reconciled_at FROM hbti_completion
-        WHERE campaign_version = ${key.campaignVersion} AND member_hash = ${key.memberHash}`;
+        SELECT hbti_record->>'lastReconciledAt' AS last_reconciled_at FROM pos_member
+        WHERE hbti_campaign_version = ${key.campaignVersion} AND member_id = ${key.memberId}`;
       expect(new Date(row[0].last_reconciled_at).toISOString()).toBe(reconciledAt);
     });
 
     it("拒绝形状不对的键，不把它拼进 SQL", async () => {
       await expect(
-        store.get({ campaignVersion: "v1", memberHash: "nope" }),
+        store.get({ campaignVersion: "v1", memberId: "nope" }),
       ).rejects.toThrow("Invalid completion-store key.");
       await expect(
-        store.get({ campaignVersion: "bad version!", memberHash: "a".repeat(64) }),
+        store.get({ campaignVersion: "bad version!", memberId: "a".repeat(64) }),
       ).rejects.toThrow("Invalid completion-store key.");
     });
   });
@@ -308,7 +302,7 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
     it("会员还没进 POS 快照时也能建行，snapshot_date 留 NULL", async () => {
       const key = nextKey();
       const attemptId = randomUUID();
-      const memberId = nextMemberId();
+      const memberId = key.memberId;
       await store.acquireProcessing(key, locked(attemptId));
       await store.markPrepared(key, attemptId, prepared(attemptId, memberId));
 
@@ -329,7 +323,7 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
     it("当晚爬虫 upsert 覆盖 POS 那批列，画像原样存活", async () => {
       const key = nextKey();
       const attemptId = randomUUID();
-      const memberId = nextMemberId();
+      const memberId = key.memberId;
       await store.acquireProcessing(key, locked(attemptId));
       await store.markPrepared(key, attemptId, prepared(attemptId, memberId));
 
@@ -351,14 +345,14 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
       expect(rows[0].snapshot_date).not.toBeNull();
     });
 
-    it("第二期活动覆盖成最新画像，历史留在 hbti_completion", async () => {
-      const memberId = nextMemberId();
-      const first = { campaignVersion: "itest", memberHash: nextKey().memberHash };
+    it("第二期活动覆盖成最新画像，会员仍只有一行", async () => {
+      const memberId = nextKey().memberId;
+      const first = { campaignVersion: "itest", memberId };
       const firstAttempt = randomUUID();
       await store.acquireProcessing(first, locked(firstAttempt));
       await store.markPrepared(first, firstAttempt, prepared(firstAttempt, memberId));
 
-      const second = { campaignVersion: "itest2", memberHash: nextKey().memberHash };
+      const second = { campaignVersion: "itest2", memberId };
       const secondAttempt = randomUUID();
       await store.acquireProcessing(second, locked(secondAttempt));
       await store.markPrepared(second, secondAttempt, {
@@ -372,13 +366,11 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
       expect(rows[0].hbti_campaign_version).toBe("itest2");
       expect(rows[0].hbti_code).toBe("HSDT");
 
-      const history = await tx`
-        SELECT campaign_version FROM hbti_completion
-        WHERE member_id = ${memberId} ORDER BY campaign_version`;
-      expect(history.map((row) => row.campaign_version)).toEqual([
-        "itest",
-        "itest2",
-      ]);
+      // 收进会员表之后一行一个会员：只保留最新一期，逐期历史不再留存。
+      // 这是 066 的明确取舍，不是丢数据的 bug。
+      const single = await tx`
+        SELECT count(*)::int AS n FROM pos_member WHERE member_id = ${memberId}`;
+      expect(single[0].n).toBe(1);
     });
   });
 
@@ -424,7 +416,7 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
         identity,
       });
       await tx`
-        UPDATE hbti_auth_challenge SET expires_at = now() - interval '1 minute'`;
+        UPDATE hbti_auth_token SET expires_at = now() - interval '1 minute'`;
       expect(await auth.beginAttempt(created.token)).toBeNull();
     });
 
@@ -446,7 +438,7 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
         identity,
       });
       await tx`
-        UPDATE hbti_auth_session
+        UPDATE hbti_auth_token
            SET payload = jsonb_set(payload, '{ciphertext}', '"dGFtcGVyZWQ"')`;
       expect(await auth.getSession(created.token)).toBeNull();
     });
@@ -457,7 +449,7 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
         memberId: "2082777414026694664",
         identity,
       });
-      const rows = await tx`SELECT token_hash, payload::text AS payload FROM hbti_auth_session`;
+      const rows = await tx`SELECT token_hash, payload::text AS payload FROM hbti_auth_token`;
       for (const row of rows) {
         expect(row.token_hash).toMatch(/^[a-f0-9]{64}$/);
         expect(row.payload).not.toContain(identity.e164);
@@ -518,14 +510,14 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
       const stale = nextKey();
       await store.acquireProcessing(stale, locked(randomUUID()));
       await tx`
-        UPDATE hbti_completion SET expires_at = now() - interval '1 day'
-        WHERE campaign_version = ${stale.campaignVersion} AND member_hash = ${stale.memberHash}`;
+        UPDATE pos_member SET hbti_expires_at = now() - interval '1 day'
+        WHERE hbti_campaign_version = ${stale.campaignVersion} AND member_id = ${stale.memberId}`;
 
       await tx`INSERT INTO hbti_rate_limit (bucket, count, expires_at)
                VALUES ('purge-stale', 1, now() - interval '1 hour'),
                       ('purge-live', 1, now() + interval '1 hour')`;
-      await tx`INSERT INTO hbti_auth_session (token_hash, payload, expires_at)
-               VALUES (${"f".repeat(64)}, '{}'::jsonb, now() - interval '1 hour')`;
+      await tx`INSERT INTO hbti_auth_token (token_hash, kind, payload, expires_at)
+               VALUES (${"f".repeat(64)}, 'session', '{}'::jsonb, now() - interval '1 hour')`;
 
       const removed = await purgeExpired(tx);
       expect(removed).toBeGreaterThanOrEqual(3);
@@ -534,12 +526,14 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
       const survivors = await tx`SELECT bucket FROM hbti_rate_limit WHERE bucket LIKE 'purge-%'`;
       expect(survivors.map((row) => row.bucket)).toEqual(["purge-live"]);
       const sessions = await tx`
-        SELECT count(*)::int AS n FROM hbti_auth_session WHERE token_hash = ${"f".repeat(64)}`;
+        SELECT count(*)::int AS n FROM hbti_auth_token WHERE token_hash = ${"f".repeat(64)}`;
       expect(sessions[0].n).toBe(0);
+      // purgeExpired 对 pos_member 是「清空 hbti_ 状态」，不是删行——
+      // 那是会员主表，行的存亡由 res_api 决定，不该被 HBTI 的保留期左右。
       const staleRows = await tx`
-        SELECT count(*)::int AS n FROM hbti_completion
-        WHERE campaign_version = ${stale.campaignVersion} AND member_hash = ${stale.memberHash}`;
-      expect(staleRows[0].n).toBe(0);
+        SELECT hbti_status FROM pos_member
+        WHERE hbti_campaign_version = ${stale.campaignVersion} AND member_id = ${stale.memberId}`;
+      expect(staleRows[0]?.hbti_status ?? null).toBeNull();
     });
   });
 });

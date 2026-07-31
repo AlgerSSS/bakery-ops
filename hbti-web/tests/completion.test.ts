@@ -1,4 +1,6 @@
-import { createHmac } from "node:crypto";
+// 真实 RES customerId 是 19 位纯数字；assertKey 按这个形态校验，假数据必须同形。
+const memberId = "2083088506766532613";
+
 
 import { describe, expect, it } from "vitest";
 
@@ -103,7 +105,7 @@ class FakeCompletionStore implements CompletionStore {
   }
 
   private serialize(key: CompletionStoreKey): string {
-    return `${key.campaignVersion}:${key.memberHash}`;
+    return `${key.campaignVersion}:${key.memberId}`;
   }
 
   private assertOwner(key: CompletionStoreKey, attemptId: string): void {
@@ -118,7 +120,7 @@ class FakeCompletionStore implements CompletionStore {
 }
 
 class FakeResCouponAdapter implements ResCouponAdapter {
-  readonly member: ResMember = { id: "member-1" };
+  readonly member: ResMember = { id: "2083088506766532613" };
   readonly template: ResCouponTemplate = {
     id: "template-1",
     name: "Pistachio Green Jewel",
@@ -203,6 +205,7 @@ describe("completeHbti", () => {
     const result = await completeHbti(
       {
         phone,
+        expectedMemberId: "2083088506766532613",
         campaignVersion: "2026-08-pistachio-v1",
         answers: validAnswers,
         color: "pistachio",
@@ -210,7 +213,6 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
         now: () => new Date("2026-07-30T08:00:00.000Z"),
       },
@@ -237,12 +239,11 @@ describe("completeHbti", () => {
     ]);
 
     const storeKey = store.acquiredKeys[0];
-    expect(storeKey.memberHash).toBe(
-      createHmac("sha256", "completion-test-secret")
-        .update(phone)
-        .digest("hex"),
-    );
+    // 066 起幂等键是 member_id 本身（完成记录已收进 pos_member）。
+    // 手机号仍然不得出现在键或返回体里。
+    expect(storeKey.memberId).toBe(memberId);
     expect(JSON.stringify({ result, storeKey })).not.toContain(phone);
+    expect(JSON.stringify({ result, storeKey })).not.toContain("2025550123");
   });
 
   it("uses atomic acquisition so concurrent completions issue only once", async () => {
@@ -250,6 +251,7 @@ describe("completeHbti", () => {
     const res = new FakeResCouponAdapter();
     const input = {
       phone: "+1 202-555-0123",
+      expectedMemberId: "2083088506766532613",
       campaignVersion: "2026-08-pistachio-v1",
       answers: validAnswers,
       color: "pistachio",
@@ -257,7 +259,6 @@ describe("completeHbti", () => {
     const dependencies = {
       store,
       res,
-      memberHashSecret: "completion-test-secret",
       couponTemplateName: "Pistachio Green Jewel",
       now: () => new Date("2026-07-30T08:00:00.000Z"),
     };
@@ -279,10 +280,7 @@ describe("completeHbti", () => {
     const res = new FakeResCouponAdapter();
     const phone = "+12025550123";
     const campaignVersion = "2026-08-pistachio-v1";
-    const memberHash = createHmac("sha256", "completion-test-secret")
-      .update(phone)
-      .digest("hex");
-    store.records.set(`${campaignVersion}:${memberHash}`, {
+    store.records.set(`${campaignVersion}:${memberId}`, {
       status: "processing",
       phase: "locked",
       attemptId: "00000000-0000-4000-8000-000000000001",
@@ -298,6 +296,7 @@ describe("completeHbti", () => {
     const result = await completeHbti(
       {
         phone,
+        expectedMemberId: "2083088506766532613",
         campaignVersion,
         answers: validAnswers,
         color: "pistachio",
@@ -305,7 +304,6 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
         now: () => new Date("2026-07-30T08:02:00.000Z"),
       },
@@ -320,10 +318,7 @@ describe("completeHbti", () => {
     const res = new FakeResCouponAdapter();
     const phone = "+12025550123";
     const campaignVersion = "2026-08-pistachio-v1";
-    const memberHash = createHmac("sha256", "completion-test-secret")
-      .update(phone)
-      .digest("hex");
-    const serializedKey = `${campaignVersion}:${memberHash}`;
+    const serializedKey = `${campaignVersion}:${memberId}`;
     const attemptId = "00000000-0000-4000-8000-000000000003";
     const completion = {
       code: "ISBA",
@@ -348,7 +343,7 @@ describe("completeHbti", () => {
         completion,
         baselineCouponIds: ["coupon-1", "coupon-2"],
         rewardContext: {
-          memberId: "member-1",
+          memberId: "2083088506766532613",
           templateId: "template-1",
           templateName: "Pistachio Green Jewel",
         },
@@ -358,6 +353,7 @@ describe("completeHbti", () => {
     const result = await completeHbti(
       {
         phone,
+        expectedMemberId: "2083088506766532613",
         campaignVersion,
         answers: validAnswers,
         color: "pistachio",
@@ -365,7 +361,6 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
         now: () => new Date("2026-07-30T08:02:00.000Z"),
       },
@@ -383,10 +378,7 @@ describe("completeHbti", () => {
     const res = new FakeResCouponAdapter({ initialCouponCount: 3 });
     const phone = "+12025550123";
     const campaignVersion = "2026-08-pistachio-v1";
-    const memberHash = createHmac("sha256", "completion-test-secret")
-      .update(phone)
-      .digest("hex");
-    store.records.set(`${campaignVersion}:${memberHash}`, {
+    store.records.set(`${campaignVersion}:${memberId}`, {
       status: "processing",
       phase: "prepared",
       attemptId: "00000000-0000-4000-8000-000000000002",
@@ -394,7 +386,7 @@ describe("completeHbti", () => {
       preparedAt: "2026-07-30T08:00:01.000Z",
       baselineCouponIds: ["coupon-1", "coupon-2"],
       rewardContext: {
-        memberId: "member-1",
+        memberId: "2083088506766532613",
         templateId: "template-1",
         templateName: "Pistachio Green Jewel",
       },
@@ -409,6 +401,7 @@ describe("completeHbti", () => {
     const result = await completeHbti(
       {
         phone,
+        expectedMemberId: "2083088506766532613",
         campaignVersion,
         answers: validAnswers,
         color: "pistachio",
@@ -416,7 +409,6 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
         now: () => new Date("2026-07-30T08:02:00.000Z"),
       },
@@ -437,10 +429,7 @@ describe("completeHbti", () => {
     });
     const phone = "+12025550123";
     const campaignVersion = "2026-08-pistachio-v1";
-    const memberHash = createHmac("sha256", "completion-test-secret")
-      .update(phone)
-      .digest("hex");
-    store.records.set(`${campaignVersion}:${memberHash}`, {
+    store.records.set(`${campaignVersion}:${memberId}`, {
       status: "processing",
       phase: "prepared",
       attemptId: "00000000-0000-4000-8000-000000000004",
@@ -448,7 +437,7 @@ describe("completeHbti", () => {
       preparedAt: "2026-07-30T08:00:01.000Z",
       baselineCouponIds: ["coupon-1", "coupon-2"],
       rewardContext: {
-        memberId: "member-1",
+        memberId: "2083088506766532613",
         templateId: "template-1",
         templateName: "Pistachio Green Jewel",
       },
@@ -463,7 +452,7 @@ describe("completeHbti", () => {
     const result = await completeHbti(
       {
         phone,
-        expectedMemberId: "member-1",
+        expectedMemberId: "2083088506766532613",
         campaignVersion,
         answers: validAnswers,
         color: "pistachio",
@@ -471,7 +460,6 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
         now: () => new Date("2026-07-30T08:00:07.000Z"),
       },
@@ -490,7 +478,6 @@ describe("completeHbti", () => {
     const dependencies = {
       store,
       res,
-      memberHashSecret: "completion-test-secret",
       couponTemplateName: "Pistachio Green Jewel",
       now: () => new Date("2026-07-30T08:00:00.000Z"),
     };
@@ -498,6 +485,7 @@ describe("completeHbti", () => {
     const first = await completeHbti(
       {
         phone: "+1 202-555-0123",
+        expectedMemberId: "2083088506766532613",
         campaignVersion: "2026-08-pistachio-v1",
         answers: validAnswers,
         color: "pistachio",
@@ -507,6 +495,7 @@ describe("completeHbti", () => {
     const retry = await completeHbti(
       {
         phone: "001 (202) 555-0123",
+        expectedMemberId: "2083088506766532613",
         campaignVersion: "2026-08-pistachio-v1",
         answers: {
           ...validAnswers,
@@ -531,6 +520,7 @@ describe("completeHbti", () => {
     const result = await completeHbti(
       {
         phone,
+        expectedMemberId: "2083088506766532613",
         campaignVersion: "2026-08-pistachio-v1",
         answers: validAnswers,
         color: "pistachio",
@@ -538,7 +528,6 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
       },
     );
@@ -556,6 +545,7 @@ describe("completeHbti", () => {
     });
     const input = {
       phone: "+12025550123",
+      expectedMemberId: "2083088506766532613",
       campaignVersion: "2026-08-pistachio-v1",
       answers: validAnswers,
       color: "pistachio",
@@ -564,7 +554,6 @@ describe("completeHbti", () => {
     const dependencies = {
       store,
       res,
-      memberHashSecret: "completion-test-secret",
       couponTemplateName: "Pistachio Green Jewel",
       now: () => new Date(currentTime),
     };
@@ -604,6 +593,7 @@ describe("completeHbti", () => {
     const res = new FakeResCouponAdapter({ couponsAddedOnGive: 2 });
     const input = {
       phone: "+12025550123",
+      expectedMemberId: "2083088506766532613",
       campaignVersion: "2026-08-pistachio-v1",
       answers: validAnswers,
       color: "pistachio",
@@ -611,7 +601,6 @@ describe("completeHbti", () => {
     const dependencies = {
       store,
       res,
-      memberHashSecret: "completion-test-secret",
       couponTemplateName: "Pistachio Green Jewel",
       now: () => new Date("2026-07-30T08:00:00.000Z"),
     };
@@ -647,7 +636,7 @@ describe("completeHbti", () => {
     const result = await completeHbti(
       {
         phone: "+12025550123",
-        expectedMemberId: "member-1",
+        expectedMemberId: "2083088506766532613",
         campaignVersion: "2026-08-pistachio-v1",
         answers: validAnswers,
         color: "pistachio",
@@ -655,7 +644,6 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
       },
     );
@@ -675,6 +663,7 @@ describe("completeHbti", () => {
     });
     const input = {
       phone: "+12025550123",
+      expectedMemberId: "2083088506766532613",
       campaignVersion: "2026-08-pistachio-v1",
       answers: validAnswers,
       color: "pistachio",
@@ -683,7 +672,6 @@ describe("completeHbti", () => {
     const dependencies = {
       store,
       res,
-      memberHashSecret: "completion-test-secret",
       couponTemplateName: "Pistachio Green Jewel",
       now: () => new Date(currentTime),
     };
@@ -733,7 +721,7 @@ describe("completeHbti", () => {
     } as const;
     store.beforeMarkReview = (key) => {
       store.records.set(
-        `${key.campaignVersion}:${key.memberHash}`,
+        `${key.campaignVersion}:${key.memberId}`,
         concurrentIssued,
       );
     };
@@ -741,6 +729,7 @@ describe("completeHbti", () => {
     const result = await completeHbti(
       {
         phone: "+12025550123",
+        expectedMemberId: "2083088506766532613",
         campaignVersion: "2026-08-pistachio-v1",
         answers: validAnswers,
         color: "pistachio",
@@ -748,7 +737,6 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
       },
     );
@@ -769,6 +757,7 @@ describe("completeHbti", () => {
     });
     const input = {
       phone: "+12025550123",
+      expectedMemberId: "2083088506766532613",
       campaignVersion: "2026-08-pistachio-v1",
       answers: validAnswers,
       color: "pistachio",
@@ -776,7 +765,6 @@ describe("completeHbti", () => {
     const dependencies = {
       store,
       res,
-      memberHashSecret: "completion-test-secret",
       couponTemplateName: "Pistachio Green Jewel",
     };
 
@@ -798,6 +786,7 @@ describe("completeHbti", () => {
     const result = await completeHbti(
       {
         phone: "+12025550123",
+        expectedMemberId: "2083088506766532613",
         campaignVersion: "2026-08-pistachio-v1",
         answers: validAnswers,
         color: "pistachio",
@@ -805,7 +794,6 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
       },
     );
@@ -824,6 +812,7 @@ describe("completeHbti", () => {
       completeHbti(
         {
           phone: "+12025550123",
+          expectedMemberId: "2083088506766532613",
           campaignVersion: "2026-08-pistachio-v1",
           answers: {
             ...validAnswers,
@@ -834,7 +823,6 @@ describe("completeHbti", () => {
         {
           store,
           res,
-          memberHashSecret: "completion-test-secret",
           couponTemplateName: "Pistachio Green Jewel",
         },
       ),
@@ -858,12 +846,12 @@ describe("completeHbti", () => {
     const dependencies = {
       store,
       res,
-      memberHashSecret: "completion-test-secret",
       couponTemplateName: "Pistachio Green Jewel",
       now: () => new Date(currentTime),
     };
     const input = {
       phone: "+12025550123",
+      expectedMemberId: "2083088506766532613",
       campaignVersion: "2026-08-pistachio-v1",
       answers: validAnswers,
       color: "pistachio",
@@ -895,6 +883,7 @@ describe("completeHbti", () => {
       await completeHbti(
         {
           phone,
+          expectedMemberId: "2083088506766532613",
           campaignVersion: "2026-08-pistachio-v1",
           answers: validAnswers,
           color: "pistachio",
@@ -902,7 +891,6 @@ describe("completeHbti", () => {
         {
           store,
           res,
-          memberHashSecret: "completion-test-secret",
           couponTemplateName: "Pistachio Green Jewel",
         },
       );
@@ -922,17 +910,17 @@ describe("completeHbti", () => {
     expect(res.giveInputs).toHaveLength(0);
   });
 
-  it("scopes idempotency by both campaign version and member HMAC", async () => {
+  it("scopes idempotency by both campaign version and member id", async () => {
     const store = new FakeCompletionStore();
     const res = new FakeResCouponAdapter();
     const dependencies = {
       store,
       res,
-      memberHashSecret: "completion-test-secret",
       couponTemplateName: "Pistachio Green Jewel",
     };
     const baseInput = {
       phone: "+12025550123",
+      expectedMemberId: "2083088506766532613",
       answers: validAnswers,
       color: "pistachio",
     };
@@ -948,25 +936,19 @@ describe("completeHbti", () => {
 
     expect(res.giveInputs).toHaveLength(2);
     expect(store.acquiredKeys).toHaveLength(2);
-    expect(store.acquiredKeys[0].memberHash).toBe(
-      store.acquiredKeys[1].memberHash,
+    expect(store.acquiredKeys[0].memberId).toBe(
+      store.acquiredKeys[1].memberId,
     );
     expect(store.acquiredKeys.map(({ campaignVersion }) => campaignVersion)).toEqual(
       ["campaign-v1", "campaign-v2"],
     );
   });
 
-  it("keeps a legacy phone-key issuance authoritative after member-login migration", async () => {
+  it("keeps an already-issued record authoritative and never gives a second coupon", async () => {
     const store = new FakeCompletionStore();
     const res = new FakeResCouponAdapter();
     const campaignVersion = "2026-08-pistachio-v1";
-    const legacyHash = createHmac(
-      "sha256",
-      "completion-test-secret",
-    )
-      .update("+12025550123")
-      .digest("hex");
-    store.records.set(`${campaignVersion}:${legacyHash}`, {
+    store.records.set(`${campaignVersion}:${memberId}`, {
       status: "issued",
       completion: {
         code: "ISBA",
@@ -986,7 +968,7 @@ describe("completeHbti", () => {
     const result = await completeHbti(
       {
         phone: "+12025550123",
-        expectedMemberId: "member-1",
+        expectedMemberId: "2083088506766532613",
         campaignVersion,
         answers: validAnswers,
         color: "pistachio",
@@ -994,7 +976,6 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
       },
     );
@@ -1007,14 +988,14 @@ describe("completeHbti", () => {
     expect(res.giveInputs).toHaveLength(0);
   });
 
-  it("keeps the normalized phone HMAC as the sole idempotency key after member login", async () => {
+  it("uses the member id as the sole idempotency key, whatever form the phone arrives in", async () => {
     const store = new FakeCompletionStore();
     const res = new FakeResCouponAdapter();
 
     await completeHbti(
       {
         phone: "+12025550123",
-        expectedMemberId: "member-1",
+        expectedMemberId: "2083088506766532613",
         campaignVersion: "2026-08-pistachio-v1",
         answers: validAnswers,
         color: "pistachio",
@@ -1022,17 +1003,12 @@ describe("completeHbti", () => {
       {
         store,
         res,
-        memberHashSecret: "completion-test-secret",
         couponTemplateName: "Pistachio Green Jewel",
       },
     );
 
     expect(store.acquiredKeys).toHaveLength(1);
-    expect(store.acquiredKeys[0].memberHash).toBe(
-      createHmac("sha256", "completion-test-secret")
-        .update("+12025550123")
-        .digest("hex"),
-    );
+    expect(store.acquiredKeys[0].memberId).toBe(memberId);
   });
 
   it("refuses a phone lookup that disagrees with the authenticated member", async () => {
@@ -1051,7 +1027,6 @@ describe("completeHbti", () => {
         {
           store,
           res,
-          memberHashSecret: "completion-test-secret",
           couponTemplateName: "Pistachio Green Jewel",
         },
       ),
@@ -1063,17 +1038,11 @@ describe("completeHbti", () => {
     expect(res.giveInputs).toHaveLength(0);
   });
 
-  it("reads the same legacy-first status without issuing another coupon", async () => {
+  it("reads back an existing issuance without calling RES again", async () => {
     const store = new FakeCompletionStore();
     const res = new FakeResCouponAdapter();
     const campaignVersion = "2026-08-pistachio-v1";
-    const legacyHash = createHmac(
-      "sha256",
-      "completion-test-secret",
-    )
-      .update("+12025550123")
-      .digest("hex");
-    store.records.set(`${campaignVersion}:${legacyHash}`, {
+    store.records.set(`${campaignVersion}:${memberId}`, {
       status: "review",
       completion: {
         code: "ISBA",
@@ -1089,13 +1058,12 @@ describe("completeHbti", () => {
       getHbtiCompletionStatus(
         {
           phone: "+12025550123",
-          expectedMemberId: "member-1",
+          expectedMemberId: "2083088506766532613",
           campaignVersion,
         },
         {
           store,
           res,
-          memberHashSecret: "completion-test-secret",
         },
       ),
     ).resolves.toMatchObject({

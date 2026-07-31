@@ -104,7 +104,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       {
         store: await createCompletionStoreFromEnv(),
         res: createResApiClientFromEnv(),
-        memberHashSecret: config.memberHashSecret,
         couponTemplateName: config.couponTemplateName,
       },
     );

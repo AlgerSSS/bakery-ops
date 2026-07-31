@@ -11,7 +11,10 @@ import { z } from "zod";
 import { getDb, type SqlRunner } from "@/lib/db/postgres";
 
 /**
- * OTP 挑战与登录会话存在 `hbti_auth_challenge` / `hbti_auth_session`（迁移 063）。
+ * OTP 挑战与登录会话合存在 `hbti_auth_token`，用 kind 区分（066 由 063 的两张表合并而来）。
+ * 合并的理由是两者本质相同：带 TTL 的不透明令牌 + 加密载荷。
+ * 它们**没有**跟着完成记录收进 pos_member：发验证码时还不知道是谁（验证身份正是它的目的），
+ * 且一个会员可以同时持有多个令牌——不满足「一行一个会员」。
  *
  * ⚠ 加密没有随迁库一起去掉，这是有意的。payload 仍然是用 HBTI_AUTH_SECRET 派生密钥做的
  * AES-256-GCM 密文，明文含手机号与 RES token。这个库同时被财务站、爬虫、bakery-ops 和
@@ -141,8 +144,8 @@ export class PgAuthStore {
       this.challengeEncryptionKey,
     );
     await this.sql`
-      INSERT INTO hbti_auth_challenge (token_hash, state, attempts, payload, created_at, expires_at)
-      VALUES (${tokenHash(token)}, 'pending', 0, ${this.sql.json(encrypted)},
+      INSERT INTO hbti_auth_token (token_hash, kind, state, attempts, payload, created_at, expires_at)
+      VALUES (${tokenHash(token)}, 'challenge', 'pending', 0, ${this.sql.json(encrypted)},
               ${createdAt}, ${expiresAt})
     `;
     return { token, expiresAt };
@@ -156,9 +159,10 @@ export class PgAuthStore {
     // 单条语句里同时占用 pending 态并自增 attempts —— 对应 Mongo 的 findOneAndUpdate。
     // 拆成先读后写会让两个并发请求各拿一次尝试次数，把 5 次上限变成实际无上限。
     const rows = await this.sql`
-      UPDATE hbti_auth_challenge
+      UPDATE hbti_auth_token
          SET state = 'verifying', attempts = attempts + 1
        WHERE token_hash = ${tokenHash(token)}
+         AND kind = 'challenge'
          AND state = 'pending'
          AND attempts < ${AUTH_MAX_VERIFY_ATTEMPTS}
          AND expires_at > ${now}
@@ -193,8 +197,9 @@ export class PgAuthStore {
       return false;
     }
     const result = await this.sql`
-      UPDATE hbti_auth_challenge SET state = 'pending'
+      UPDATE hbti_auth_token SET state = 'pending'
        WHERE token_hash = ${tokenHash(token)}
+         AND kind = 'challenge'
          AND state = 'verifying'
          AND attempts < ${AUTH_MAX_VERIFY_ATTEMPTS}
          AND expires_at > ${validNow(this.now())}
@@ -210,8 +215,8 @@ export class PgAuthStore {
     const expectedHash = tokenHash(token);
     const rows = await this.sql`
       SELECT token_hash, state, attempts, payload, created_at, expires_at
-        FROM hbti_auth_challenge
-       WHERE token_hash = ${expectedHash} AND state = 'verifying' AND expires_at > ${now}
+        FROM hbti_auth_token
+       WHERE token_hash = ${expectedHash} AND kind = 'challenge' AND state = 'verifying' AND expires_at > ${now}
     `;
     const parsed = challengeRowSchema.safeParse(rows[0]);
     if (
@@ -236,9 +241,10 @@ export class PgAuthStore {
     );
     // 比对旧密文是乐观锁：读到写之间若有别的请求改过这条挑战，这次就不该覆盖它。
     const result = await this.sql`
-      UPDATE hbti_auth_challenge
+      UPDATE hbti_auth_token
          SET state = 'pending', payload = ${this.sql.json(encrypted)}
        WHERE token_hash = ${expectedHash}
+         AND kind = 'challenge'
          AND state = 'verifying'
          AND expires_at > ${now}
          AND payload->>'ciphertext' = ${parsed.data.payload.ciphertext}
@@ -251,8 +257,9 @@ export class PgAuthStore {
       return false;
     }
     const result = await this.sql`
-      UPDATE hbti_auth_challenge SET state = 'consumed'
+      UPDATE hbti_auth_token SET state = 'consumed'
        WHERE token_hash = ${tokenHash(token)}
+         AND kind = 'challenge'
          AND state = 'verifying'
          AND expires_at > ${validNow(this.now())}
     `;
@@ -268,8 +275,8 @@ export class PgAuthStore {
     const expiresAt = new Date(createdAt.getTime() + AUTH_SESSION_TTL_MS);
     const encrypted = encryptPayload(parsedPayload, this.sessionEncryptionKey);
     await this.sql`
-      INSERT INTO hbti_auth_session (token_hash, payload, created_at, expires_at)
-      VALUES (${tokenHash(token)}, ${this.sql.json(encrypted)}, ${createdAt}, ${expiresAt})
+      INSERT INTO hbti_auth_token (token_hash, kind, payload, created_at, expires_at)
+      VALUES (${tokenHash(token)}, 'session', ${this.sql.json(encrypted)}, ${createdAt}, ${expiresAt})
     `;
     return {
       token,
@@ -286,7 +293,7 @@ export class PgAuthStore {
     const expectedHash = tokenHash(token);
     const rows = await this.sql`
       SELECT token_hash, payload, created_at, expires_at
-        FROM hbti_auth_session WHERE token_hash = ${expectedHash}
+        FROM hbti_auth_token WHERE token_hash = ${expectedHash} AND kind = 'session'
     `;
     const parsed = sessionRowSchema.safeParse(rows[0]);
     if (
@@ -317,7 +324,7 @@ export class PgAuthStore {
       return false;
     }
     const result = await this.sql`
-      DELETE FROM hbti_auth_session WHERE token_hash = ${tokenHash(token)}
+      DELETE FROM hbti_auth_token WHERE token_hash = ${tokenHash(token)} AND kind = 'session'
     `;
     return result.count === 1;
   }

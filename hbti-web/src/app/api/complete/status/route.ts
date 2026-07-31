@@ -44,7 +44,6 @@ export async function GET(request: Request): Promise<NextResponse> {
       {
         store: await createCompletionStoreFromEnv(),
         res: createResApiClientFromEnv(),
-        memberHashSecret: config.memberHashSecret,
       },
     );
     if (!result) {

@@ -1,4 +1,3 @@
-import type postgres from "postgres";
 import { z } from "zod";
 
 import type { HbtiCode } from "@/content/types";
@@ -15,23 +14,24 @@ import type {
 } from "@/lib/store/completion-store";
 
 /**
- * 幂等记录存在 `hbti_completion`（迁移 063）。
+ * HBTI 的完成记录**就存在会员主表 pos_member 上**（迁移 066）。
  *
- * 判别联合整体存进 `record` jsonb，读出后仍由下面这份 Zod 校验——与 Mongo 时期同一份契约，
- * 所以状态机语义零漂移。只有 CAS 判词和对账扫描真正用到的字段被提升成列。
+ * 063 当初把它拆成独立的 hbti_completion，理由是「幂等锁是操作状态，不是会员信息」。
+ * 那是实现细节压过了数据模型：一行一个会员一期活动，这本来就是会员数据。
+ * 锁怎么实现，不该决定这条业务事实存在哪张表。
  *
- * Mongo 语义到 PostgreSQL 的对应关系（每一条都是刻意的，不是顺手写的）：
+ * 键因此从 HMAC(手机号) 换成 member_id ——行本身就是会员，同时补掉一个洞：
+ * 会员换号之后哈希会变，同一期活动可以再领一次券（RES 有 qryChangePhoneLog，这不是假想）。
  *
- * | Mongo                                   | PostgreSQL                                    |
- * |-----------------------------------------|-----------------------------------------------|
- * | `insertOne` 撞 11000                     | `INSERT ... ON CONFLICT` 未返回行               |
- * | `replaceOne(filter).matchedCount === 1` | `UPDATE ... WHERE <判词>` 的 `count === 1`      |
- * | `deleteOne(filter).deletedCount === 1`  | `DELETE ... WHERE <判词>` 的 `count === 1`      |
- * | TTL 索引到期自动删除                       | 读路径一律带 `expires_at > now()`                |
+ * 原子性靠单行的条件 UPDATE：
+ *   | Mongo                        | 现在                                        |
+ *   |------------------------------|---------------------------------------------|
+ *   | insertOne 撞 11000            | INSERT ... ON CONFLICT DO UPDATE WHERE 无返回行 |
+ *   | replaceOne 的 matchedCount    | UPDATE ... WHERE <CAS 判词> 的 count          |
+ *   | TTL 索引自动删除               | 读路径带 hbti_expires_at > now()              |
  *
- * 最后一条是唯一一处「PG 没有等价物、必须自己补」的地方：Mongo 的 TTL 索引会把过期锁删掉，
- * 于是下一次 acquire 能重新拿到。PG 不会，所以过期行必须在读时当作不存在、在 acquire 时可被顶替，
- * 否则一条 548 天前的锁会永久挡住这个会员。
+ * ⚠ 这张表的另一个写者是 ~/hot/res_api 的每晚会员同步。两边靠**列集不相交**共存：
+ * 它写 mapMember() 的 26 列，这里只碰 hbti_ 开头的列。改任何一边前先看两个仓库的 AGENTS.md。
  */
 
 const hbtiCodeSchema = z
@@ -103,72 +103,52 @@ export interface PreparedCompletionEntry {
   record: PreparedCompletionRecord;
 }
 
-interface CompletionRow {
-  record: unknown;
-}
-
-/**
- * `CompletionRecord` 是判别联合，没有索引签名，所以不满足 postgres.js 的 `JSONValue`
- * 结构约束——但它每一支都是纯 JSON 数据（Zod 的 strictObject 已经排除了函数与不可序列化值）。
- * 这个断言只绕开类型形状，不放松任何运行时校验：读回来时仍由 completionRecordSchema 全量解析。
- */
-function jsonRecord(
-  sql: SqlRunner,
-  record: CompletionRecord,
-) {
-  return sql.json(record as unknown as postgres.JSONValue);
-}
-
 function assertKey(key: CompletionStoreKey): void {
   if (
     !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(key.campaignVersion) ||
-    !/^[a-f0-9]{64}$/.test(key.memberHash)
+    !/^[0-9]{1,32}$/.test(key.memberId)
   ) {
     throw new Error("Invalid completion-store key.");
   }
 }
 
 /**
- * 提升列必须与 record 一致，否则 CAS 判词会对着一份过期投影做决策。
- * member_id 在加锁那一刻通常还拿不到——`completeHbti` 先加锁再 `resolveMemberByPhone`——
- * 所以这里只在 prepared 之后才有值，写入时用 COALESCE 保证不会被后续状态清回 NULL。
+ * `CompletionRecord` 是判别联合，没有索引签名，不满足 postgres.js 的 `JSONValue`
+ * 结构约束——但每一支都是纯 JSON（Zod strictObject 已排除函数与不可序列化值）。
+ * 断言只绕类型形状，不放松运行时校验：读回来仍由 completionRecordSchema 全量解析。
  */
-function projection(record: CompletionRecord) {
-  const processing = record.status === "processing" ? record : null;
-  const prepared =
-    processing?.phase === "prepared" ? processing : null;
+function jsonRecord(sql: SqlRunner, record: CompletionRecord) {
+  return sql.json(record as unknown as Parameters<SqlRunner["json"]>[0]);
+}
+
+/** 画像列：答完题就该有，与发券成不成功无关。 */
+function profileOf(record: CompletionRecord) {
+  const c = record.completion;
   return {
-    status: record.status,
-    phase: processing?.phase ?? null,
-    attempt_id: processing?.attemptId ?? null,
-    prepared_at: prepared?.preparedAt ?? null,
-    last_reconciled_at: prepared?.lastReconciledAt ?? null,
-    member_id: prepared?.rewardContext.memberId ?? null,
+    code: c.code,
+    visitTime: c.visitTime,
+    category: c.category,
+    color: c.color,
+    gender: c.gender ?? null,
+    age: c.age ?? null,
   };
 }
 
 export class PgCompletionStore implements CompletionStore {
   constructor(private readonly sql: SqlRunner) {}
 
-  private atomically<T>(fn: (tx: SqlRunner) => Promise<T>): Promise<T> {
-    const sql = this.sql;
-    return "begin" in sql
-      ? (sql.begin((tx) => fn(tx)) as Promise<T>)
-      : (sql.savepoint((tx) => fn(tx)) as Promise<T>);
-  }
 
   async get(key: CompletionStoreKey): Promise<CompletionRecord | null> {
     assertKey(key);
-    const rows = await this.sql<CompletionRow[]>`
-      SELECT record FROM hbti_completion
-      WHERE campaign_version = ${key.campaignVersion}
-        AND member_hash = ${key.memberHash}
-        AND expires_at > now()
+    const rows = await this.sql<{ hbti_record: unknown }[]>`
+      SELECT hbti_record FROM pos_member
+      WHERE store = ${memberStore()} AND member_id = ${key.memberId}
+        AND hbti_status IS NOT NULL
+        AND hbti_campaign_version = ${key.campaignVersion}
+        AND hbti_expires_at > now()
     `;
-    if (rows.length === 0) {
-      return null;
-    }
-    return completionRecordSchema.parse(rows[0].record);
+    if (rows.length === 0) return null;
+    return completionRecordSchema.parse(rows[0].hbti_record);
   }
 
   async acquireProcessing(
@@ -176,35 +156,42 @@ export class PgCompletionStore implements CompletionStore {
     record: ProcessingCompletionRecord,
   ): Promise<CompletionAcquisition> {
     assertKey(key);
-    const fields = projection(record);
-    // `DO UPDATE ... WHERE expires_at <= now()` 是 Mongo TTL 删除后重新 insert 的等价物：
-    // 活锁撞上时 WHERE 不成立、不返回行；过期锁则被原子顶替。
+    const p = profileOf(record);
+    // 会员行可能还不存在（OTP 当场注册、爬虫今晚才会抓到），所以是 INSERT-or-lock。
+    // WHERE 判词就是「锁是空的」：没做过、已过期、或那是上一期活动的记录。
+    // 抢不到锁时 WHERE 不成立、不返回行——等价于 Mongo 的 insertOne 撞 11000。
     const rows = await this.sql`
-      INSERT INTO hbti_completion (
-        campaign_version, member_hash, member_id, status, phase, attempt_id,
-        prepared_at, last_reconciled_at, record, expires_at
+      INSERT INTO pos_member AS m (
+        member_id, store,
+        hbti_status, hbti_attempt_id, hbti_record, hbti_expires_at,
+        hbti_campaign_version, hbti_code, hbti_visit_time, hbti_category,
+        hbti_color, hbti_gender, hbti_age, hbti_completed_at
       ) VALUES (
-        ${key.campaignVersion}, ${key.memberHash}, ${fields.member_id},
-        ${fields.status}, ${fields.phase}, ${fields.attempt_id},
-        ${fields.prepared_at}, ${fields.last_reconciled_at},
-        ${jsonRecord(this.sql, record)}, ${new Date(Date.now() + RETENTION_MS)}
+        ${key.memberId}, ${memberStore()},
+        ${record.status}, ${record.attemptId}, ${jsonRecord(this.sql, record)},
+        ${new Date(Date.now() + RETENTION_MS)},
+        ${key.campaignVersion}, ${p.code}, ${p.visitTime}, ${p.category},
+        ${p.color}, ${p.gender}, ${p.age}, now()
       )
-      ON CONFLICT (campaign_version, member_hash) DO UPDATE SET
-        member_id          = EXCLUDED.member_id,
-        status             = EXCLUDED.status,
-        phase              = EXCLUDED.phase,
-        attempt_id         = EXCLUDED.attempt_id,
-        prepared_at        = EXCLUDED.prepared_at,
-        last_reconciled_at = EXCLUDED.last_reconciled_at,
-        record             = EXCLUDED.record,
-        expires_at         = EXCLUDED.expires_at,
-        updated_at         = now()
-      WHERE hbti_completion.expires_at <= now()
+      ON CONFLICT ON CONSTRAINT uk_pos_member_store_member DO UPDATE SET
+        hbti_status           = EXCLUDED.hbti_status,
+        hbti_attempt_id       = EXCLUDED.hbti_attempt_id,
+        hbti_record           = EXCLUDED.hbti_record,
+        hbti_expires_at       = EXCLUDED.hbti_expires_at,
+        hbti_campaign_version = EXCLUDED.hbti_campaign_version,
+        hbti_code             = EXCLUDED.hbti_code,
+        hbti_visit_time       = EXCLUDED.hbti_visit_time,
+        hbti_category         = EXCLUDED.hbti_category,
+        hbti_color            = EXCLUDED.hbti_color,
+        hbti_gender           = EXCLUDED.hbti_gender,
+        hbti_age              = EXCLUDED.hbti_age,
+        hbti_completed_at     = EXCLUDED.hbti_completed_at
+      WHERE m.hbti_status IS NULL
+         OR m.hbti_expires_at <= now()
+         OR m.hbti_campaign_version IS DISTINCT FROM ${key.campaignVersion}
       RETURNING 1 AS acquired
     `;
-    if (rows.length === 1) {
-      return { acquired: true };
-    }
+    if (rows.length === 1) return { acquired: true };
 
     const existing = await this.get(key);
     if (existing === null) {
@@ -219,20 +206,8 @@ export class PgCompletionStore implements CompletionStore {
     record: PreparedCompletionRecord,
   ): Promise<void> {
     assertKey(key);
-    // 状态转移与会员画像必须同一个事务：只落其中一半，会出现「券发出去了但会员表查不到这个人做过
-    // HBTI」，或者反过来。两者是同一个事实的两个投影。
-    await this.atomically(async (tx) => {
-      const updated = await this.write(tx, key, attemptId, record, "locked");
-      if (updated !== 1) {
-        throw new Error("Completion lock ownership changed.");
-      }
-      await writeMemberProfile(tx, {
-        memberId: record.rewardContext.memberId,
-        campaignVersion: key.campaignVersion,
-        completion: record.completion,
-        completedAt: record.preparedAt,
-      });
-    });
+    const updated = await this.write(this.sql, key, attemptId, record, "locked");
+    if (updated !== 1) throw new Error("Completion lock ownership changed.");
   }
 
   async markIssued(
@@ -242,9 +217,7 @@ export class PgCompletionStore implements CompletionStore {
   ): Promise<void> {
     assertKey(key);
     const updated = await this.write(this.sql, key, attemptId, record, null);
-    if (updated !== 1) {
-      throw new Error("Completion was not in the processing state.");
-    }
+    if (updated !== 1) throw new Error("Completion was not in the processing state.");
   }
 
   async markReview(
@@ -254,25 +227,24 @@ export class PgCompletionStore implements CompletionStore {
   ): Promise<void> {
     assertKey(key);
     const updated = await this.write(this.sql, key, attemptId, record, null);
-    if (updated !== 1) {
-      throw new Error("Completion was not in the processing state.");
-    }
+    if (updated !== 1) throw new Error("Completion was not in the processing state.");
   }
 
-  async clearLocked(
-    key: CompletionStoreKey,
-    attemptId: string,
-  ): Promise<boolean> {
+  async clearLocked(key: CompletionStoreKey, attemptId: string): Promise<boolean> {
     assertKey(key);
-    const result = await this.sql`
-      DELETE FROM hbti_completion
-      WHERE campaign_version = ${key.campaignVersion}
-        AND member_hash = ${key.memberHash}
-        AND status = 'processing'
-        AND phase = 'locked'
-        AND attempt_id = ${attemptId}
+    // 只清锁，**不删会员行，也不擦画像**——顾客答过题是既成事实，
+    // 发券前的失败不该把它抹掉（这也是它长在会员表上之后必须想清楚的一点）。
+    const res = await this.sql`
+      UPDATE pos_member SET
+        hbti_status = NULL, hbti_attempt_id = NULL,
+        hbti_record = NULL, hbti_expires_at = NULL
+      WHERE store = ${memberStore()} AND member_id = ${key.memberId}
+        AND hbti_campaign_version = ${key.campaignVersion}
+        AND hbti_status = 'processing'
+        AND hbti_record->>'phase' = 'locked'
+        AND hbti_attempt_id = ${attemptId}
     `;
-    return result.count === 1;
+    return res.count === 1;
   }
 
   async listPreparedBefore(
@@ -281,37 +253,32 @@ export class PgCompletionStore implements CompletionStore {
   ): Promise<PreparedCompletionEntry[]> {
     if (
       !Number.isFinite(Date.parse(preparedBefore)) ||
-      !Number.isInteger(limit) ||
-      limit < 1 ||
-      limit > 50
+      !Number.isInteger(limit) || limit < 1 || limit > 50
     ) {
       throw new Error("Invalid prepared-completion query.");
     }
-    // NULLS FIRST 不是风格选择：Mongo 的 sort 把缺失字段排在最前，PG 默认 NULLS LAST 会让
-    // 从未对过账的记录沉到队尾、永远轮不到补偿。
+    // NULLS FIRST 不是风格：Mongo 的 sort 把缺失字段排最前，PG 默认 NULLS LAST 会让
+    // 从未对过账的记录永远沉在队尾、轮不到补偿。
     const rows = await this.sql<
-      { campaign_version: string; member_hash: string; record: unknown }[]
+      { member_id: string; hbti_campaign_version: string; hbti_record: unknown }[]
     >`
-      SELECT campaign_version, member_hash, record
-      FROM hbti_completion
-      WHERE status = 'processing'
-        AND phase = 'prepared'
-        AND prepared_at <= ${preparedBefore}
-        AND expires_at > now()
-      ORDER BY last_reconciled_at ASC NULLS FIRST, prepared_at ASC
+      SELECT member_id, hbti_campaign_version, hbti_record
+      FROM pos_member
+      WHERE hbti_status = 'processing'
+        AND hbti_record->>'phase' = 'prepared'
+        AND hbti_record->>'preparedAt' <= ${preparedBefore}
+        AND hbti_expires_at > now()
+      ORDER BY hbti_record->>'lastReconciledAt' ASC NULLS FIRST,
+               hbti_record->>'preparedAt' ASC
       LIMIT ${limit}
     `;
-
     return rows.map((row) => {
-      const record = completionRecordSchema.parse(row.record);
+      const record = completionRecordSchema.parse(row.hbti_record);
       if (record.status !== "processing" || record.phase !== "prepared") {
         throw new Error("Prepared completion query returned another state.");
       }
       return {
-        key: {
-          campaignVersion: row.campaign_version,
-          memberHash: row.member_hash,
-        },
+        key: { campaignVersion: row.hbti_campaign_version, memberId: row.member_id },
         record,
       };
     });
@@ -327,24 +294,17 @@ export class PgCompletionStore implements CompletionStore {
       throw new Error("Invalid prepared reconciliation timestamp.");
     }
     await this.sql`
-      UPDATE hbti_completion SET
-        last_reconciled_at = ${reconciledAt},
-        record = jsonb_set(record, '{lastReconciledAt}', ${
-          this.sql.json(reconciledAt)
-        }),
-        updated_at = now()
-      WHERE campaign_version = ${key.campaignVersion}
-        AND member_hash = ${key.memberHash}
-        AND status = 'processing'
-        AND phase = 'prepared'
-        AND attempt_id = ${attemptId}
+      UPDATE pos_member SET
+        hbti_record = jsonb_set(hbti_record, '{lastReconciledAt}', ${this.sql.json(reconciledAt)})
+      WHERE store = ${memberStore()} AND member_id = ${key.memberId}
+        AND hbti_campaign_version = ${key.campaignVersion}
+        AND hbti_status = 'processing'
+        AND hbti_record->>'phase' = 'prepared'
+        AND hbti_attempt_id = ${attemptId}
     `;
   }
 
-  /**
-   * 所有状态转移共用的 CAS 写入。`requiredPhase` 为 null 表示只要求仍在 processing
-   * （对应 Mongo 的 `{status:'processing', attemptId}` 过滤器）。
-   */
+  /** 所有状态转移共用的 CAS。requiredPhase 为 null 表示只要求仍在 processing。 */
   private async write(
     sql: SqlRunner,
     key: CompletionStoreKey,
@@ -352,81 +312,29 @@ export class PgCompletionStore implements CompletionStore {
     record: CompletionRecord,
     requiredPhase: "locked" | null,
   ): Promise<number> {
-    const fields = projection(record);
-    const result = await sql`
-      UPDATE hbti_completion SET
-        member_id          = COALESCE(${fields.member_id}, hbti_completion.member_id),
-        status             = ${fields.status},
-        phase              = ${fields.phase},
-        attempt_id         = ${fields.attempt_id},
-        prepared_at        = ${fields.prepared_at},
-        last_reconciled_at = ${fields.last_reconciled_at},
-        record             = ${jsonRecord(sql, record)},
-        expires_at         = ${new Date(Date.now() + RETENTION_MS)},
-        updated_at         = now()
-      WHERE campaign_version = ${key.campaignVersion}
-        AND member_hash = ${key.memberHash}
-        AND status = 'processing'
-        AND attempt_id = ${attemptId}
-        AND expires_at > now()
-        ${requiredPhase === null ? sql`` : sql`AND phase = ${requiredPhase}`}
+    const p = profileOf(record);
+    const processing = record.status === "processing";
+    const res = await sql`
+      UPDATE pos_member SET
+        hbti_status       = ${record.status},
+        hbti_attempt_id   = ${processing ? attemptId : null},
+        hbti_record       = ${jsonRecord(sql, record)},
+        hbti_expires_at   = ${new Date(Date.now() + RETENTION_MS)},
+        hbti_code         = ${p.code},
+        hbti_visit_time   = ${p.visitTime},
+        hbti_category     = ${p.category},
+        hbti_color        = ${p.color},
+        hbti_gender       = ${p.gender},
+        hbti_age          = ${p.age}
+      WHERE store = ${memberStore()} AND member_id = ${key.memberId}
+        AND hbti_campaign_version = ${key.campaignVersion}
+        AND hbti_status = 'processing'
+        AND hbti_attempt_id = ${attemptId}
+        AND hbti_expires_at > now()
+        ${requiredPhase === null ? sql`` : sql`AND hbti_record->>'phase' = ${requiredPhase}`}
     `;
-    return result.count;
+    return res.count;
   }
-}
-
-/**
- * 把画像写到 `pos_member` 的 hbti_ 八列上（迁移 063）。
- *
- * 顾客走 OTP 当场注册的会员，在当晚 23:00 爬虫跑之前根本不在 pos_member 里，所以这里必须是
- * INSERT-or-UPDATE 而不是纯 UPDATE。新建的行 `snapshot_date` 留 NULL——那正是「POS 快照还没
- * 见过这个会员」的诚实表示，当晚爬虫 upsert 会补齐 POS 那 26 列。
- *
- * ⚠ 只碰 hbti_ 开头的列。这张表的另一个写者是 ~/hot/res_api，两边靠列集不相交共存。
- */
-async function writeMemberProfile(
-  sql: SqlRunner,
-  input: {
-    memberId: string;
-    campaignVersion: string;
-    completion: {
-      code: string;
-      visitTime: string;
-      category: string;
-      color: string;
-      gender?: string;
-      age?: string;
-    };
-    completedAt: string;
-  },
-): Promise<void> {
-  if (!/^[0-9]{1,32}$/.test(input.memberId)) {
-    // RES 的 customerId 实测全是 19 位纯数字。形状不对说明上游变了，
-    // 与其往会员主表写一行对不上的数据，不如让画像缺失、由 hbti_completion 留证。
-    return;
-  }
-  await sql`
-    INSERT INTO pos_member (
-      member_id, store,
-      hbti_campaign_version, hbti_code, hbti_visit_time, hbti_category,
-      hbti_color, hbti_gender, hbti_age, hbti_completed_at
-    ) VALUES (
-      ${input.memberId}, ${memberStore()},
-      ${input.campaignVersion}, ${input.completion.code},
-      ${input.completion.visitTime}, ${input.completion.category},
-      ${input.completion.color}, ${input.completion.gender ?? null},
-      ${input.completion.age ?? null}, ${input.completedAt}
-    )
-    ON CONFLICT ON CONSTRAINT uk_pos_member_store_member DO UPDATE SET
-      hbti_campaign_version = EXCLUDED.hbti_campaign_version,
-      hbti_code             = EXCLUDED.hbti_code,
-      hbti_visit_time       = EXCLUDED.hbti_visit_time,
-      hbti_category         = EXCLUDED.hbti_category,
-      hbti_color            = EXCLUDED.hbti_color,
-      hbti_gender           = EXCLUDED.hbti_gender,
-      hbti_age              = EXCLUDED.hbti_age,
-      hbti_completed_at     = EXCLUDED.hbti_completed_at
-  `;
 }
 
 export async function createCompletionStoreFromEnv(): Promise<PgCompletionStore> {
@@ -435,36 +343,39 @@ export async function createCompletionStoreFromEnv(): Promise<PgCompletionStore>
 
 export async function checkCompletionStoreFromEnv(): Promise<void> {
   // 健康检查要证明「这张表真的能读」，不是「进程还活着」。
-  await getDb()`SELECT 1 FROM hbti_completion LIMIT 1`;
+  await getDb()`SELECT 1 FROM pos_member LIMIT 1`;
 }
 
-/** 有 expires_at 的四张表；顺序无关，逐张有界删除。 */
-const EXPIRING_TABLES = [
-  "hbti_completion",
-  "hbti_auth_challenge",
-  "hbti_auth_session",
-  "hbti_rate_limit",
+/** 有 expires_at 的表；顺序无关，逐张有界删除。 */
+const EXPIRING = [
+  { table: "hbti_auth_token", col: "expires_at" },
+  { table: "hbti_rate_limit", col: "expires_at" },
 ] as const;
 
 /**
- * PG 没有 TTL 索引，过期行要自己清。正确性不依赖它——所有读路径都带 `expires_at > now()`
- * ——所以这里只做有界删除，由每日 Cron 顺带调用，失败不影响对账本身。
+ * PG 没有 TTL 索引，过期行要自己清。正确性不依赖它——所有读路径都带 expires_at 过滤——
+ * 所以只做有界删除，由每日 Cron 顺带调用。
  *
- * 表名走 `runner(...)` 做标识符转义；`EXPIRING_TABLES` 是模块内常量，不接受外部输入。
- * `runner` 可注入，好让集成测试把它关进可回滚的事务里——否则这段代码要到生产才第一次执行。
+ * pos_member 上过期的完成记录**不删行**，只把 hbti_ 状态清空：那是会员主表，
+ * 行的存在与否由 res_api 决定，不该被 HBTI 的保留期左右。
  */
 export async function purgeExpired(
   runner: SqlRunner = getDb(),
   limitPerTable = 1_000,
 ): Promise<number> {
   let removed = 0;
-  for (const table of EXPIRING_TABLES) {
-    const result = await runner`
+  for (const { table, col } of EXPIRING) {
+    const res = await runner`
       DELETE FROM ${runner(table)} WHERE ctid IN (
-        SELECT ctid FROM ${runner(table)} WHERE expires_at <= now() LIMIT ${limitPerTable}
+        SELECT ctid FROM ${runner(table)} WHERE ${runner(col)} <= now() LIMIT ${limitPerTable}
       )
     `;
-    removed += result.count;
+    removed += res.count;
   }
-  return removed;
+  const cleared = await runner`
+    UPDATE pos_member SET
+      hbti_status = NULL, hbti_attempt_id = NULL, hbti_record = NULL, hbti_expires_at = NULL
+    WHERE hbti_expires_at IS NOT NULL AND hbti_expires_at <= now()
+  `;
+  return removed + cleared.count;
 }

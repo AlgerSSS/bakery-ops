@@ -46,27 +46,8 @@ describe("isTrustedRequestOrigin", () => {
     const rotated = readHbtiServerConfig();
 
     expect(first.linkSecret).not.toBe(rotated.linkSecret);
-    expect(first.memberHashSecret).toEqual(rotated.memberHashSecret);
-    expect(new TextDecoder().decode(first.memberHashSecret)).toBe(
-      "m".repeat(48),
-    );
   });
 
-  it("rejects reusing the link secret as the member hash secret", () => {
-    vi.stubEnv("HBTI_LINK_SECRET", "s".repeat(48));
-    vi.stubEnv("HBTI_MEMBER_HASH_SECRET", "s".repeat(48));
-    vi.stubEnv("HBTI_LINK_BASE_URL", expectedOrigin);
-    vi.stubEnv("HBTI_CAMPAIGN_VERSION", "campaign-v1");
-    vi.stubEnv("RES_COUPON_TEMPLATE_NAME", "Pistachio Green Jewel");
-    vi.stubEnv(
-      "RES_MEMBER_WALLET_URL",
-      "https://f4klzbmr9n2d.m.sea.restosuite.ai/couponIndex",
-    );
-
-    expect(() => readHbtiServerConfig()).toThrow(
-      "must be independent from HBTI_LINK_SECRET",
-    );
-  });
 
   it("reads the pinned RES H5 member-auth configuration", () => {
     vi.stubEnv("HBTI_AUTH_SECRET", "a".repeat(48));

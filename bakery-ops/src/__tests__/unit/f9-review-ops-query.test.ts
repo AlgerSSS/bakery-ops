@@ -69,7 +69,7 @@ describe("F9a 昨日决策闭环", () => {
 
   it("昨日 insight 非空：SQL 精确读取并注入 prompt，要求「昨日决策跟进」小节", async () => {
     query.mockImplementation(async (sql: string) => {
-      if (String(sql).includes("SELECT insight FROM manager_review")) {
+      if (String(sql).includes("SELECT manager_insight AS insight FROM daily_review")) {
         return [{ insight: "蛋挞备货量从40提高到50" }];
       }
       return [];
@@ -80,7 +80,7 @@ describe("F9a 昨日决策闭环", () => {
     );
 
     expect(result.status).toBe("pending");
-    const insightSelects = query.mock.calls.filter((c) => String(c[0]).includes("SELECT insight FROM manager_review"));
+    const insightSelects = query.mock.calls.filter((c) => String(c[0]).includes("SELECT manager_insight AS insight FROM daily_review"));
     expect(insightSelects).toHaveLength(1);
     expect(insightSelects[0][1]).toEqual(["2026-06-30"]);
 

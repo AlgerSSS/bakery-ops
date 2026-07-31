@@ -232,7 +232,7 @@ export async function getOrgMembersFull(): Promise<OrgMember[]> {
 
 let orgMemberCache: { map: Map<string, string>; at: number } | null = null; // 小写显示名 → open_id
 
-/** 显示名(小写) → open_id，缓存 1 小时。用于按名字一次性发送（team_member 表才是权限/推送真源）。 */
+/** 显示名(小写) → open_id，缓存 1 小时。用于按名字一次性发送（staff 表才是权限/推送真源）。 */
 export async function getOrgMemberMap(): Promise<Map<string, string>> {
   if (orgMemberCache && Date.now() - orgMemberCache.at < DEPT_CACHE_TTL) return orgMemberCache.map;
   const members = await getOrgMembersFull();

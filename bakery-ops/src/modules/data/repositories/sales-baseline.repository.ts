@@ -17,7 +17,6 @@ interface BaselineRow {
 }
 
 interface TimeslotSalesRow {
-  id: number;
   product_name: string;
   day_type: string;
   time_slot: string;
@@ -39,7 +38,12 @@ function rowToBaseline(row: BaselineRow): ProductSalesBaseline {
 
 // ========== Sales Baselines ==========
 export async function getSalesBaselines(): Promise<ProductSalesBaseline[]> {
-  const rows = await query<BaselineRow>("SELECT * FROM product_sales_baseline ORDER BY id");
+  // 迁移 067：product_sales_baseline 并入 product（列改名 baseline_*，内容是 2026-04-12 冻结快照）。
+  const rows = await query<BaselineRow>(
+    `SELECT id, name AS product_name, avg_monday_to_thursday, avg_friday, avg_weekend,
+            baseline_total_sales AS total_sales, baseline_day_count AS day_count
+     FROM product WHERE baseline_total_sales IS NOT NULL ORDER BY id`
+  );
   return rows.map(rowToBaseline);
 }
 
@@ -63,7 +67,7 @@ export async function getTimeslotSalesRecords(dayType?: string): Promise<Timeslo
   const NORM = (c: string) =>
     `lower(btrim(regexp_replace(replace(${c}, chr(160), ' '), '[[:space:]]+', ' ', 'g')))`;
   let sql =
-    `SELECT t.id, COALESCE(p.name, t.product_name) AS product_name,
+    `SELECT COALESCE(p.name, t.product_name) AS product_name,
             t.day_type, t.time_slot, t.avg_quantity, t.sample_count
        FROM timeslot_sales_record t
        LEFT JOIN product p ON ${NORM("p.name_en")} = ${NORM("t.product_name")}`;
@@ -78,23 +82,6 @@ export async function getTimeslotSalesRecords(dayType?: string): Promise<Timeslo
     avgQuantity: r.avg_quantity,
     sampleCount: r.sample_count,
   }));
-}
-
-export async function importTimeslotSalesData(records: TimeslotSalesRecord[]): Promise<ImportResult> {
-  try {
-    await execute("DELETE FROM timeslot_sales_record");
-    for (const r of records) {
-      await execute(
-        `INSERT INTO timeslot_sales_record (product_name, day_type, time_slot, avg_quantity, sample_count)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT (product_name, day_type, time_slot) DO UPDATE SET avg_quantity=EXCLUDED.avg_quantity, sample_count=EXCLUDED.sample_count`,
-        [r.productName, r.dayType, r.timeSlot, r.avgQuantity, r.sampleCount]
-      );
-    }
-    return { success: true, totalRows: records.length, importedRows: records.length, skippedRows: 0, errors: [] };
-  } catch (error) {
-    return { success: false, totalRows: 0, importedRows: 0, skippedRows: 0, errors: [String(error)] };
-  }
 }
 
 /** 近 4 周同日型的每小时 bill_count 汇总曲线（用于无历史品项的默认上架时段推断）。 */

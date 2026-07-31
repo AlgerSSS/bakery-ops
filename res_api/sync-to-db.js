@@ -174,109 +174,7 @@ async function syncDailyRevenue() {
   return count;
 }
 
-// === 2. daily_sales_record (existing table) ===
-// Real per-day per-product quantities aggregated from daily.json itemsByDateHour.
-// (Previously wrote a 30-day rolling average stamped with the sync date, which
-// flattened all weekday variation downstream — see IMPROVEMENT-PLAN.md G1.)
-async function syncDailySalesRecord() {
-  const section = dailySection('itemsByDateHour');
-  const daily = { itemsByDateHour: section.rows };
-
-  const transFile = 'output/sales/translations.json';
-  let itemNames = {};
-  if (fs.existsSync(transFile)) {
-    const t = JSON.parse(fs.readFileSync(transFile, 'utf8'));
-    itemNames = t.dimOptions?.D_itemName || {};
-  }
-
-  // 按 **稳定键** 去重，不是按显示名。r.name 就是 RES 的 menuItemNameKey
-  // （形如 {orgId}-{orgType}-{menuItemId}），显示名只是它的翻译。
-  // 实测有 3 组不同商品共用同一显示名，按名字去重会把第二个商品的销量整份丢掉。
-  const seen = new Set();
-  const byDate = new Map();
-  for (const r of daily.itemsByDateHour) {
-    if (!r.date || !r.name) continue;
-    const itemKey = r.name;
-    const name = itemNames[itemKey] || itemKey;
-    const uid = `${r.date}|${r.hour}|${itemKey}`;
-    if (seen.has(uid)) continue;
-    seen.add(uid);
-    const qty = num(r.qty);
-    if (!qty || qty <= 0) continue;
-    if (!byDate.has(r.date)) byDate.set(r.date, new Map());
-    const m = byDate.get(r.date);
-    // 按键分组：同名不同品必须是两行，合并会让单品销量凭空翻倍/消失。
-    const prev = m.get(itemKey);
-    m.set(itemKey, { name, qty: (prev?.qty || 0) + qty });
-  }
-
-  let count = 0;
-  await sql.begin(async (sql) => {
-    for (const [date, products] of byDate) {
-      const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
-      await sql`DELETE FROM daily_sales_record WHERE date = ${date}`;
-      const batch = [...products].map(([itemKey, v]) => ({
-        item_key: itemKey, product_name: v.name, standard_name: v.name,
-        quantity: v.qty, date, day_of_week: dayOfWeek,
-      }));
-      for (let i = 0; i < batch.length; i += 200) {
-        const chunk = batch.slice(i, i + 200);
-        await sql`INSERT INTO daily_sales_record ${sql(chunk, 'item_key', 'product_name', 'standard_name', 'quantity', 'date', 'day_of_week')}`;
-      }
-      count += batch.length;
-    }
-  });
-  return settleExpectedDate(count, section, 'daily_sales_record');
-}
-
-// === 3. timeslot_sales_record (existing table) ===
-// Real per-dayType per-hour averages aggregated from item_hourly_sales (56-day window).
-// Must run AFTER syncItemHourlySales so the window includes tonight's data.
-// (Previously copied one 30-day average to all three day_types with snake_case
-// 'monday_to_thursday', which the TS engine — expecting 'mondayToThursday' — could
-// never match for Mon-Thu; see IMPROVEMENT-PLAN.md G1.)
-async function syncTimeslotSalesRecord() {
-  return await sql.begin(async (sql) => {
-    // TRUNCATE 前必须确认源非空：itemsByDateHour 静默失败若干天就会让 56 天窗口变空，
-    // 于是这张表被清空且插入 0 行，返回 0、exit 0，加减货建议直接失去基线。
-    // 断言在 TRUNCATE 之前抛出，事务回滚，表保持原样。
-    // （2026-07-26 实测窗口内有 57 天，阈值 14 有充足余量。）
-    const [{ days }] = await sql`
-      SELECT COUNT(DISTINCT date)::int AS days FROM item_hourly_sales
-      WHERE date >= CURRENT_DATE - INTERVAL '56 days'
-    `;
-    if (days < 14) {
-      throw new Error(`timeslot_sales_record 拒绝重建：item_hourly_sales 56 天窗口内只有 ${days} 天（阈值 14），TRUNCATE 会清空基线`);
-    }
-    await sql`TRUNCATE timeslot_sales_record RESTART IDENTITY`;
-    const inserted = await sql`
-      WITH win AS (
-        SELECT DISTINCT date FROM item_hourly_sales
-        WHERE date >= CURRENT_DATE - INTERVAL '56 days'
-      ), typed AS (
-        SELECT date,
-          CASE WHEN EXTRACT(DOW FROM date) = 5 THEN 'friday'
-               WHEN EXTRACT(DOW FROM date) IN (0, 6) THEN 'weekend'
-               ELSE 'mondayToThursday' END AS day_type
-        FROM win
-      ), day_counts AS (
-        SELECT day_type, COUNT(*) AS days FROM typed GROUP BY day_type
-      )
-      INSERT INTO timeslot_sales_record (product_name, day_type, time_slot, avg_quantity, sample_count)
-      SELECT s.item_name, t.day_type, lpad(s.hour::text, 2, '0') || ':00',
-             ROUND(SUM(s.qty)::numeric / c.days, 1), c.days
-      FROM item_hourly_sales s
-      JOIN typed t ON t.date = s.date
-      JOIN day_counts c ON c.day_type = t.day_type
-      GROUP BY s.item_name, t.day_type, s.hour, c.days
-      HAVING SUM(s.qty) > 0
-      RETURNING 1
-    `;
-    return inserted.length;
-  });
-}
-
-// === 4. hourly_sales_summary (per-day per-hour) ===
+// === 2. hourly_sales_summary (per-day per-hour) ===
 async function syncHourlySales() {
   // 原来的「没有 per-day 数据就退回聚合 hourly，然后 return 0」是个假降级：
   // 它一行都不写，却记成成功。现在缺 hourlyByDate 直接判失败。
@@ -298,7 +196,7 @@ async function syncHourlySales() {
   return settleExpectedDate(count, section, 'hourly_sales_summary');
 }
 
-// === 5. item_hourly_sales (per-day per-hour per-item) ===
+// === 3. item_hourly_sales (per-day per-hour per-item) ===
 async function syncItemHourlySales() {
   const section = dailySection('itemsByDateHour');
   const daily = { itemsByDateHour: section.rows };
@@ -329,8 +227,9 @@ async function syncItemHourlySales() {
   await sql.begin(async (sql) => {
     const dates = [...new Set(batch.map(r => r.date))];
     // 「日期齐全但行数塌陷」的护栏：源被截断（分页中断、pageSize 打满）时日期看着都在，
-    // 只是每天少了一大半行。DELETE+INSERT 会把这份缩水结果写成事实，第 5 步再据此重建
-    // timeslot 基线。所以先比一比同一天的旧行数：缩水超过阈值就整笔回滚。
+    // 只是每天少了一大半行。DELETE+INSERT 会把这份缩水结果写成事实，而
+    // daily_sales_record / timeslot_sales_record 视图直接由本表派生，塌陷会原样透出。
+    // 所以先比一比同一天的旧行数：缩水超过阈值就整笔回滚。
     // 允许缩水的正常情形（作废单、退款）幅度很小，SHRINK_RATIO=0.5 有充足余量；
     // 确需强推时 SYNC_ALLOW_SHRINK=1。
     const SHRINK_RATIO = Number(process.env.SYNC_SHRINK_RATIO || 0.5);
@@ -360,18 +259,17 @@ async function syncItemHourlySales() {
       await sql`INSERT INTO item_hourly_sales ${sql(chunk, 'date', 'hour', 'item_key', 'item_name', 'qty', 'net_sales', 'gross_sales')}`;
     }
   });
-  // 当天无法证明是零流水日时记 PARTIAL：其他日期已经写进去了，但第 5 步不许据此重建基线
-  // （runStep 的 requires 只认 'ok'）。
+  // 当天无法证明是零流水日时记 PARTIAL：其他日期已经写进去了，整轮仍以 exit 1 收尾告警。
   return settleExpectedDate(batch.length, section, 'item_hourly_sales');
 }
 
-// === 6. daily_payment_breakdown (per-day from sales_by_business_date) ===
+// === 4. daily_breakdown (payment, per-day from sales_by_business_date) ===
 async function syncPaymentBreakdown() {
   const rows = loadCsv(`${READABLE_DIR}/sales_by_business_date.csv`);
-  // 本表没有任何 fallback 数据源，CSV 一缺就必须炸，不能静默返回 0。
-  // 实测后果：daily_payment_breakdown 停在 2026-07-23，而当晚整链 exit=0。
+  // 本维度没有任何 fallback 数据源，CSV 一缺就必须炸，不能静默返回 0。
+  // 实测后果：daily_breakdown(payment) 停在 2026-07-23，而当晚整链 exit=0。
   if (!rows?.length) {
-    throw new Error(`daily_payment_breakdown 源缺失：${READABLE_DIR}/sales_by_business_date.csv 不存在或为空`);
+    throw new Error(`daily_breakdown(payment) 源缺失：${READABLE_DIR}/sales_by_business_date.csv 不存在或为空`);
   }
   // 「有文件但没有今天这一行」有两种可能：30 天窗口重放的半成功形态（必须响亮失败），
   // 或者当天真的零流水（门店停业 -> 一笔支付都没有 -> 报表里根本没有这一天）。
@@ -380,7 +278,7 @@ async function syncPaymentBreakdown() {
   const missingToday = !rows.some((r) => r['Business Date'] === EXPECTED_DATE);
   const verdict = missingToday ? businessDateVerdict() : null;
   if (missingToday && verdict.verdict === 'closed') {
-    console.log(`  [info] ${EXPECTED_DATE} 已证实为零流水日：当天没有任何支付，daily_payment_breakdown 不写当天`);
+    console.log(`  [info] ${EXPECTED_DATE} 已证实为零流水日：当天没有任何支付，daily_breakdown(payment) 不写当天`);
   }
 
   let count = 0;
@@ -400,9 +298,9 @@ async function syncPaymentBreakdown() {
       if (amount == null) continue;
       const ratio = totalPayment > 0 ? +(amount / totalPayment).toFixed(4) : null;
       await sql`
-        INSERT INTO daily_payment_breakdown (date, payment_method, net_sales, ratio)
-        VALUES (${date}, ${method}, ${amount}, ${ratio})
-        ON CONFLICT (date, payment_method) DO UPDATE SET
+        INSERT INTO daily_breakdown (date, dim_type, dim_value, net_sales, ratio)
+        VALUES (${date}, 'payment', ${method}, ${amount}, ${ratio})
+        ON CONFLICT (date, dim_type, dim_value) DO UPDATE SET
           net_sales = EXCLUDED.net_sales, ratio = EXCLUDED.ratio
       `;
       count++;
@@ -410,7 +308,7 @@ async function syncPaymentBreakdown() {
   }
   if (missingToday && verdict.verdict !== 'closed') {
     throw new PartialStepError(
-      `daily_payment_breakdown 源里没有 ${EXPECTED_DATE} 这一天，且无法证明当天是零流水日` +
+      `daily_breakdown(payment) 源里没有 ${EXPECTED_DATE} 这一天，且无法证明当天是零流水日` +
         `（${verdict.reason}）；其他日期的 ${count} 行已照常写入`,
       { written: count },
     );
@@ -418,29 +316,29 @@ async function syncPaymentBreakdown() {
   return count;
 }
 
-// === 7. daily_dining_breakdown (per-day from hourly_sales_summary) ===
+// === 5. daily_breakdown (dining, 30-day ratios fanned out per date) ===
 async function syncDiningBreakdown() {
   // We don't have per-day dining data from the CSV, only 30-day totals.
   // Store the 30-day ratio for each date in the range as a reference.
   const rows = loadCsv(`${READABLE_DIR}/orders_by_dining_option.csv`);
-  // MEDIUM-2：本表没有任何 fallback 数据源，CSV 一缺就必须炸（与第 6 步同一处理）。
+  // MEDIUM-2：本维度没有任何 fallback 数据源，CSV 一缺就必须炸（与第 4 步同一处理）。
   // 而且 apply-translations 现在是 delete-first：文件不存在 = 今晚没重建成功，
-  // 静默 return 0 会让「daily_dining_breakdown 停在几天前」而整链 exit 0。
+  // 静默 return 0 会让「daily_breakdown(dining) 停在几天前」而整链 exit 0。
   if (!rows?.length) {
-    throw new Error(`daily_dining_breakdown 源缺失：${READABLE_DIR}/orders_by_dining_option.csv 不存在或为空`);
+    throw new Error(`daily_breakdown(dining) 源缺失：${READABLE_DIR}/orders_by_dining_option.csv 不存在或为空`);
   }
 
   const total = rows.reduce((a, r) => a + (num(r['Bill Count']) || 0), 0);
   // Get all dates from daily_revenue to assign dining ratios
   const revenueRows = loadCsv(`${READABLE_DIR}/sales_by_business_date.csv`);
   if (!revenueRows?.length) {
-    throw new Error(`daily_dining_breakdown 缺少日期源：${READABLE_DIR}/sales_by_business_date.csv 不存在或为空`);
+    throw new Error(`daily_breakdown(dining) 缺少日期源：${READABLE_DIR}/sales_by_business_date.csv 不存在或为空`);
   }
   // 与第 6 步同一处理：零流水日当天没有任何账单，日期源里没有当天是正常的。
   const missingToday = !revenueRows.some((r) => r['Business Date'] === EXPECTED_DATE);
   const verdict = missingToday ? businessDateVerdict() : null;
   if (missingToday && verdict.verdict === 'closed') {
-    console.log(`  [info] ${EXPECTED_DATE} 已证实为零流水日：当天没有任何账单，daily_dining_breakdown 不写当天`);
+    console.log(`  [info] ${EXPECTED_DATE} 已证实为零流水日：当天没有任何账单，daily_breakdown(dining) 不写当天`);
   }
 
   let count = 0;
@@ -453,16 +351,16 @@ async function syncDiningBreakdown() {
       const billCount = num(r['Bill Count']);
       const ratio = total > 0 ? +(billCount / total).toFixed(4) : null;
       await sql`
-        INSERT INTO daily_dining_breakdown (date, dining_option, bill_count, net_sales, ratio)
-        VALUES (${date}, ${option}, ${null}, ${null}, ${ratio})
-        ON CONFLICT (date, dining_option) DO UPDATE SET ratio = EXCLUDED.ratio
+        INSERT INTO daily_breakdown (date, dim_type, dim_value, bill_count, net_sales, ratio)
+        VALUES (${date}, 'dining', ${option}, ${null}, ${null}, ${ratio})
+        ON CONFLICT (date, dim_type, dim_value) DO UPDATE SET ratio = EXCLUDED.ratio
       `;
       count++;
     }
   }
   if (missingToday && verdict.verdict !== 'closed') {
     throw new PartialStepError(
-      `daily_dining_breakdown 的日期源里没有 ${EXPECTED_DATE} 这一天，且无法证明当天是零流水日` +
+      `daily_breakdown(dining) 的日期源里没有 ${EXPECTED_DATE} 这一天，且无法证明当天是零流水日` +
         `（${verdict.reason}）；其他日期的 ${count} 行已照常写入`,
       { written: count },
     );
@@ -470,7 +368,7 @@ async function syncDiningBreakdown() {
   return count;
 }
 
-// === 8. item_waste (per-day per-item waste with reason) ===
+// === 6. item_waste (per-day per-item waste with reason) ===
 async function syncItemWaste() {
   // itemWaste 与另外两个数组不同：某天真的一条报损都没有是完全正常的，
   // 所以只要求「文件新鲜 + 该查询当晚 ok + 字段存在」，不要求含 EXPECTED_DATE。
@@ -519,7 +417,7 @@ async function syncItemWaste() {
   return batch.length;
 }
 
-// === 9. item_last_sale (per-day per-item last-sale MINUTE, for precise stockout) ===
+// === 7. item_last_sale (per-day per-item last-sale MINUTE, for precise stockout) ===
 // Source: scrape-item-last-sale.mjs → output/sales/item-last-sale.json (menuItemId keyed).
 // Translate id → readable name via the same D_itemName map as item_hourly_sales/item_waste.
 async function syncItemLastSale() {
@@ -563,28 +461,15 @@ async function syncItemLastSale() {
 }
 
 // 每一步都「失败也不阻断后面的步骤」，最后统一报错并非 0 退出。
-// 理由与 lib/step-runner.js 一致：这 9 张表的数据源彼此基本独立
-// （2/3/4/5/8 只读 daily.json，1/6/7 只读 readable CSV，9 只读 item-last-sale.json），
-// 一张表的源缺失不该让另外 8 张当晚一行不写。
-// 尤其第 5 步 timeslot 的 `days < 14` 断言：它抛出后原本会让 6/7/8/9 步全不执行，
-// 与第 6 步刻意做的 deferredFailures 处理自相矛盾。
+// 理由与 lib/step-runner.js 一致：这 7 张表的数据源彼此基本独立
+// （2/3/6 只读 daily.json，1/4/5 只读 readable CSV，7 只读 item-last-sale.json），
+// 一张表的源缺失不该让另外 6 张当晚一行不写。
+// stepStatus 只用于日志与汇总：派生视图（daily_sales_record / timeslot_sales_record）
+// 直接读 item_hourly_sales，不再需要「步骤间依赖」—— 源没写进去，视图自然停在旧数据。
 const deferredFailures = [];
 const stepStatus = new Map();
-/**
- * requires：只有极少数步骤之间存在真实依赖 —— 第 5 步 TRUNCATE timeslot_sales_record 之后
- * 完全从 item_hourly_sales 重算，而第 4 步刚刚重写了 item_hourly_sales。第 4 步失败（源陈旧/
- * 截断/塌陷）时第 5 步必须一并放弃：它的 `56 天窗口 distinct date >= 14` 断言对「日期齐全但
- * 行数塌陷」完全免疫，照跑就等于把塌陷结果固化成新的加减货基线。
- */
-async function runStep(label, fn, { id = label, requires = null } = {}) {
+async function runStep(label, fn, { id = label } = {}) {
   console.log(label);
-  if (requires && stepStatus.get(requires) !== 'ok') {
-    const msg = `上游步骤 ${requires} 未成功，拒绝执行（避免以残缺源重建基线）`;
-    console.error(`   -> SKIPPED: ${msg}\n`);
-    deferredFailures.push(`${label}: ${msg}`);
-    stepStatus.set(id, 'skipped');
-    return null;
-  }
   try {
     const count = await fn();
     console.log(`   -> ${count} rows\n`);
@@ -592,8 +477,7 @@ async function runStep(label, fn, { id = label, requires = null } = {}) {
     return count;
   } catch (e) {
     // PARTIAL：窗口内其他日期已经写进去了（保留），只有业务日当天写不了且判不出是不是零流水日。
-    // 记成失败（deferredFailures -> exit 1 -> daily-refresh.sh 重试/告警照常），
-    // 但状态不是 'ok'，所以 requires 它的第 5 步仍会跳过，不会拿残缺窗口重建基线。
+    // 记成失败（deferredFailures -> exit 1 -> daily-refresh.sh 重试/告警照常），状态记 'partial'。
     if (e instanceof PartialStepError) {
       console.error(`   -> PARTIAL: 已写 ${e.written} 行；${e.message}\n`);
       deferredFailures.push(`${label}: ${e.message}`);
@@ -620,17 +504,12 @@ async function main() {
     console.log(`[sync-to-db] daily-revenue-only complete for ${EXPECTED_DATE}`);
     return finish();
   }
-
-  await runStep('2. daily_sales_record (real per-day, from itemsByDateHour)', syncDailySalesRecord);
-  await runStep('3. hourly_sales_summary (per-day per-hour)', syncHourlySales);
-  await runStep('4. item_hourly_sales (per-day per-hour per-item)', syncItemHourlySales, { id: 'item_hourly_sales' });
-  // 第 5 步必须在第 4 步之后：56 天窗口要包含今晚刚写进 item_hourly_sales 的数据；
-  // 且第 4 步没成功就不许重建（requires）。
-  await runStep('5. timeslot_sales_record (real day-type averages, from item_hourly_sales)', syncTimeslotSalesRecord, { requires: 'item_hourly_sales' });
-  await runStep('6. daily_payment_breakdown', syncPaymentBreakdown);
-  await runStep('7. daily_dining_breakdown', syncDiningBreakdown);
-  await runStep('8. item_waste (per-day per-item waste)', syncItemWaste);
-  await runStep('9. item_last_sale (per-day per-item last-sale minute)', syncItemLastSale);
+  await runStep('2. hourly_sales_summary (per-day per-hour)', syncHourlySales);
+  await runStep('3. item_hourly_sales (per-day per-hour per-item)', syncItemHourlySales);
+  await runStep('4. daily_breakdown(payment)', syncPaymentBreakdown);
+  await runStep('5. daily_breakdown(dining)', syncDiningBreakdown);
+  await runStep('6. item_waste (per-day per-item waste)', syncItemWaste);
+  await runStep('7. item_last_sale (per-day per-item last-sale minute)', syncItemLastSale);
 
   return finish();
 }

@@ -1,13 +1,15 @@
 // sync-to-db.js **本体**的行为测试：真的把脚本跑起来，只把 postgres 驱动换成假的
 // （test/fixtures/fake-postgres.mjs，见那里的说明）。不连任何数据库、不碰仓库里的 output/。
 //
-// 存在的理由是上一轮变异测试漏过的那三处，全都在这个文件里、全都是「调用处」的判定：
+// 存在的理由是上一轮变异测试漏过的那两处，全都在这个文件里、全都是「调用处」的判定：
 //   1) syncDailyRevenue 里 dailySection 的 try/catch（改成永远吞掉也不红）
-//   2) 第 5 步的 `if (requires && stepStatus.get(requires) !== 'ok')`（改成 if(false) 也不红）
-//   3) 第 4 步的行数塌陷护栏 `if (n >= 20 && now < n * SHRINK_RATIO)`（改成 if(false) 也不红）
+//   2) item_hourly_sales 的行数塌陷护栏 `if (n >= 20 && now < n * SHRINK_RATIO)`（改成 if(false) 也不红）
 // 把等价逻辑搬进 lib 再测 lib 只能证明 lib 对，证明不了 sync-to-db 真的用了它。
-// 所以这里断言的是「哪些语句真的发给了数据库」——DELETE / TRUNCATE 发没发出去，
-// 是这几个护栏唯一说了算的事。
+// 所以这里断言的是「哪些语句真的发给了数据库」——DELETE 发没发出去，是这几个护栏唯一说了算的事。
+//
+// 2026-07-31（迁移 068）起，daily_sales_record / timeslot_sales_record 变成了由
+// item_hourly_sales 派生的**视图**：本脚本不许再对它们发任何 INSERT/DELETE/TRUNCATE，
+// 发了就是对视图写入、直接炸。每个用例末尾的 neverWriteViews 就是钉这件事的。
 
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -54,8 +56,8 @@ const csvFor = (dates) =>
 
 const DINING_CSV = 'Dining Options,Bill Count\nDine-in,80\nTakeaway,20\n';
 
-/** 默认的库侧回应：56 天窗口够宽（第 5 步的 days<14 断言过），行数塌陷护栏查不到旧行。 */
-const DEFAULT_SCRIPT = [{ match: 'COUNT\\(DISTINCT date\\)::int AS days', rows: [{ days: 57 }] }];
+/** 默认的库侧回应：行数塌陷护栏查不到旧行。 */
+const DEFAULT_SCRIPT = [];
 
 function runSync({ daily = freshDaily(), csvDates = ['2026-07-23', '2026-07-24', '2026-07-25', EXPECTED], script = [] } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'hotcrush-sync-'));
@@ -96,6 +98,15 @@ function runSync({ daily = freshDaily(), csvDates = ['2026-07-23', '2026-07-24',
         queries.filter((q) => new RegExp(`DELETE FROM ${table} WHERE date =`).test(q.text)).map((q) => q.values[0]).sort(),
       revenueRowFor: (date) =>
         queries.find((q) => /INSERT INTO daily_revenue/.test(q.text) && q.values[0] === date)?.values || null,
+      /** 派生视图是禁区：对它们发任何写语句，迁移 068 之后就是对视图写入。 */
+      neverWriteViews: () => {
+        for (const q of queries) {
+          assert.ok(
+            !/(INSERT INTO|DELETE FROM|UPDATE|TRUNCATE)\s+(daily_sales_record|timeslot_sales_record)/.test(q.text),
+            `不许再写派生视图: ${q.text}`,
+          );
+        }
+      },
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -104,30 +115,31 @@ function runSync({ daily = freshDaily(), csvDates = ['2026-07-23', '2026-07-24',
 
 // ---------- 正常之夜：确认这套改造没有把好日子弄坏 ----------
 
-test('四天俱全的正常之夜：九步全过，exit 0，timeslot 照常重建', () => {
+test('四天俱全的正常之夜：七步全过，exit 0，两个维度照常写进 daily_breakdown', () => {
   const r = runSync();
 
   assert.equal(r.status, 0, r.out);
   assert.match(r.out, /定性 = present/);
   assert.deepEqual(r.deleted('item_hourly_sales'), ['2026-07-23', '2026-07-24', '2026-07-25', '2026-07-26']);
-  assert.ok(r.sent(/TRUNCATE timeslot_sales_record/), '第 4 步成功时第 5 步必须重建');
+  assert.ok(r.sent(/INSERT INTO daily_breakdown[\s\S]*?'payment'/), '支付维度必须写入');
+  assert.ok(r.sent(/INSERT INTO daily_breakdown[\s\S]*?'dining'/), '就餐维度必须写入');
   assert.ok(r.revenueRowFor(EXPECTED), 'daily_revenue 必须写到业务日当天');
+  r.neverWriteViews();
 });
 
-test('陈旧 daily.json：第 2/3/4/8 步一行不删不写，第 5 步不重建（守卫真的接在调用处）', () => {
+test('陈旧 daily.json：第 2/3/6 步一行不删不写（守卫真的接在调用处）', () => {
   // 盘上躺了两天的产物（scrapedAt=07-24）。以前是 `[skip] return 0` 静默成功后照样 DELETE+INSERT。
   const r = runSync({ daily: freshDaily({ scrapedAt: '2026-07-24T16:36:12.627Z' }) });
 
   assert.equal(r.status, 1, r.out);
   assert.match(r.out, /陈旧/);
   assert.deepEqual(r.deleted('item_hourly_sales'), []);
-  assert.deepEqual(r.deleted('daily_sales_record'), []);
   assert.deepEqual(r.deleted('item_waste'), []);
   assert.ok(!r.sent(/INSERT INTO hourly_sales_summary/));
-  assert.ok(!r.sent(/TRUNCATE timeslot_sales_record/));
-  // 只读 CSV 的第 6/7 步与 daily.json 无关，照常写（一张表的源坏了不该让另外几张也空一晚）。
-  assert.ok(r.sent(/INSERT INTO daily_payment_breakdown/));
-  assert.ok(r.sent(/INSERT INTO daily_dining_breakdown/));
+  // 只读 CSV 的第 4/5 步与 daily.json 无关，照常写（一张表的源坏了不该让另外几张也空一晚）。
+  assert.ok(r.sent(/INSERT INTO daily_breakdown[\s\S]*?'payment'/));
+  assert.ok(r.sent(/INSERT INTO daily_breakdown[\s\S]*?'dining'/));
+  r.neverWriteViews();
 });
 
 // ---------- 一、零流水日不再误伤 ----------
@@ -148,13 +160,11 @@ test('零流水日（公假停业）：当天无明细，但窗口内另外三�
   assert.match(r.out, /定性 = closed/);
   // 好日子照写：这正是上一轮「全有全无」丢掉的东西。
   assert.deepEqual(r.deleted('item_hourly_sales'), days);
-  assert.deepEqual(r.deleted('daily_sales_record'), days);
   // 当天一行明细都不写（明细表只记录发生过的事）。
   assert.ok(!r.deleted('item_hourly_sales').includes(EXPECTED));
   assert.ok(!r.sent(/INSERT INTO hourly_sales_summary/, (v) => v[0] === EXPECTED));
-  assert.ok(!r.sent(/INSERT INTO daily_payment_breakdown/, (v) => v[0] === EXPECTED));
-  // 第 4 步算成功 -> 第 5 步照常重建（停业日本来就不该阻断基线重建）。
-  assert.ok(r.sent(/TRUNCATE timeslot_sales_record/));
+  assert.ok(!r.sent(/INSERT INTO daily_breakdown/, (v) => v[0] === EXPECTED));
+  r.neverWriteViews();
 });
 
 test('零流水日在 daily_revenue 留一行显式的 0：0 是实测事实，0/0 的比率写 NULL', () => {
@@ -194,7 +204,7 @@ test('判不出是不是零流水日：其他天照写，当天不写，该步 P
   assert.match(r.out, /PARTIAL/);
   assert.deepEqual(r.deleted('item_hourly_sales'), days, '另外三天必须照写');
   assert.ok(!r.deleted('item_hourly_sales').includes(EXPECTED), '当天不许写');
-  assert.ok(!r.sent(/TRUNCATE timeslot_sales_record/), 'PARTIAL 不是 ok，第 5 步不许拿残缺窗口重建基线');
+  r.neverWriteViews();
 });
 
 test('整窗口零行的源没有作证资格（0 行 != 没生意），判成 unknown 而不是 closed', () => {
@@ -207,7 +217,6 @@ test('整窗口零行的源没有作证资格（0 行 != 没生意），判成 u
   assert.equal(r.status, 1, r.out);
   assert.match(r.out, /定性 = unknown/);
   assert.match(r.out, /无法证明查询是活的/);
-  assert.ok(!r.sent(/TRUNCATE timeslot_sales_record/));
   assert.equal(r.revenueRowFor(EXPECTED), null, '判不出来时绝不写当天的 0');
   // 但第 1 步不是全有全无：CSV 里其他日期的精确记录照写，当天缺失单独记 PARTIAL。
   assert.ok(r.revenueRowFor('2026-07-25'), 'daily_revenue 的其他日期必须照常写入');
@@ -233,8 +242,9 @@ test('漏点 1：CSV 缺当天时必须真的用 daily.json 当降级源（try/c
   assert.equal(row[8], true, '降级出来的当天记录必须打 degraded 标记（走 COALESCE 保护）');
 });
 
-test('漏点 2：第 4 步没成功时，第 5 步绝不 TRUNCATE 重建（requires 判定）', () => {
-  // itemsByDateHour 当晚查询失败 -> 第 2/4 步失败 -> 第 5 步必须 SKIPPED。
+test('漏点 2：itemsByDateHour 失败时，item_hourly_sales 一行不删不写，其余步骤照常', () => {
+  // itemsByDateHour 当晚查询失败 -> 第 3 步失败。派生视图直接读 item_hourly_sales，
+  // 只要这一步没写入，视图自然停在旧数据上 —— 不需要也不再有「重建基线」这一步。
   const r = runSync({
     daily: freshDaily({
       queryStatus: {
@@ -245,12 +255,12 @@ test('漏点 2：第 4 步没成功时，第 5 步绝不 TRUNCATE 重建（requi
   });
 
   assert.equal(r.status, 1, r.out);
-  assert.match(r.out, /SKIPPED/);
-  assert.ok(!r.sent(/TRUNCATE timeslot_sales_record/), '第 4 步失败还去 TRUNCATE = 把残缺结果固化成新基线');
-  assert.ok(!r.sent(/COUNT\(DISTINCT date\)::int AS days/), '连 56 天窗口都不该去查');
-  // 第 3/6/7/9 步与 itemsByDateHour 无关，必须照常写。
+  assert.deepEqual(r.deleted('item_hourly_sales'), []);
+  assert.ok(!r.sent(/INSERT INTO item_hourly_sales/));
+  // 第 2/4/5/7 步与 itemsByDateHour 无关，必须照常写。
   assert.ok(r.sent(/INSERT INTO hourly_sales_summary/));
-  assert.ok(r.sent(/INSERT INTO daily_payment_breakdown/));
+  assert.ok(r.sent(/INSERT INTO daily_breakdown[\s\S]*?'payment'/));
+  r.neverWriteViews();
 });
 
 test('漏点 3：行数塌陷时整笔回滚，一条 DELETE 都不许发出去', () => {
@@ -268,9 +278,9 @@ test('漏点 3：行数塌陷时整笔回滚，一条 DELETE 都不许发出去'
   assert.match(r.out, /行数塌陷/);
   assert.deepEqual(r.deleted('item_hourly_sales'), [], '护栏必须早于 DELETE，一天都不许删');
   assert.ok(!r.sent(/INSERT INTO item_hourly_sales/));
-  assert.ok(!r.sent(/TRUNCATE timeslot_sales_record/), '第 4 步塌陷 -> 第 5 步也不许重建');
   // 与塌陷无关的步骤照常。
   assert.ok(r.sent(/INSERT INTO hourly_sales_summary/));
+  r.neverWriteViews();
 });
 
 test('行数塌陷护栏对 n<20 的冷清日子不误伤（比例噪声大，不参与判定）', () => {

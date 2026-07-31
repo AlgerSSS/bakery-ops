@@ -101,17 +101,18 @@ async function main() {
     // 注意：只按 date 关联，不按 store —— daily_revenue.store 全部为 NULL。
     const drift = await sql`
       select d.date::text as date, d.net_sales, m.card_payment_net
-      from daily_payment_breakdown d
+      from daily_breakdown d
       join pos_member_daily m on m.date = d.date
-      where d.payment_method ilike '%member%'
+      where d.dim_type = 'payment'
+        and d.dim_value ilike '%member%'
         and m.card_payment_net is not null
         and abs(d.net_sales - m.card_payment_net) > 0.01
       order by d.date desc limit 5`;
     if (drift.length) {
-      console.warn(`[member-sync] ⚠️ card_payment_net 与 daily_payment_breakdown 有 ${drift.length} 天不一致（两条独立采集路径分叉）`);
+      console.warn(`[member-sync] ⚠️ card_payment_net 与 daily_breakdown(payment) 有 ${drift.length} 天不一致（两条独立采集路径分叉）`);
       for (const r of drift) console.warn(`    ${r.date}: dpb=${r.net_sales} vs member=${r.card_payment_net}`);
     } else {
-      console.log('[member-sync] ✅ card_payment_net 与 daily_payment_breakdown 逐日一致');
+      console.log('[member-sync] ✅ card_payment_net 与 daily_breakdown(payment) 逐日一致');
     }
   } finally {
     await sql.end({ timeout: 5 });

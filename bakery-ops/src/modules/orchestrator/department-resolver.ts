@@ -6,8 +6,8 @@ import { teamRepository } from "../data/repositories/team.repository";
 import type { ChannelMessage } from "../shared/types";
 
 /**
- * 消息 → 权限组。优先读 team_member 表里配的 role（DB 是权限真源，用户可在库里改）；
- * team_member 里没有该人时，回落到 Lark 部门实时推断。
+ * 消息 → 权限组。优先读 staff 表里配的 role（原 team_member，DB 是权限真源，用户可在库里改）；
+ * staff 里没有该人时，回落到 Lark 部门实时推断。
  * resolved=false 表示两条路都解析不到（Lark 不可用 / 不在组织里），上层据此 fail-open
  * （放行 + 菜单显示全部），绝不误锁。
  */

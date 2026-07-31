@@ -100,8 +100,8 @@ async function getSalesData(date: string): Promise<string> {
        FROM item_hourly_sales s
       WHERE s.date = $1 AND ${NORM("s.item_name")} = ANY($2::text[])`;
   const waterBar = await query<any>(WATER_BAR_SQL, [date, bevNames]);
-  const payment = await query<any>("SELECT * FROM daily_payment_breakdown WHERE date = $1 ORDER BY net_sales DESC", [date]);
-  const dining = await query<any>("SELECT * FROM daily_dining_breakdown WHERE date = $1", [date]);
+  const payment = await query<any>("SELECT dim_value AS payment_method, net_sales, ratio FROM daily_breakdown WHERE date = $1 AND dim_type = 'payment' ORDER BY net_sales DESC", [date]);
+  const dining = await query<any>("SELECT dim_value AS dining_option, bill_count, net_sales, ratio FROM daily_breakdown WHERE date = $1 AND dim_type = 'dining'", [date]);
   const pnl = await query<any>("SELECT * FROM daily_pnl WHERE date = $1", [date]);
   const wasteByReason = await query<any>("SELECT waste_reason, SUM(qty) as total_qty, SUM(amount) as total_amount FROM item_waste WHERE date = $1 GROUP BY waste_reason", [date]);
   // 报废王只取「排产报废」(可改进的过量)；试吃(品尝)属品控/推广投入，不进报废王。品名转中文。
@@ -247,13 +247,14 @@ async function getSalesData(date: string): Promise<string> {
   // ===== P1 归因分析：品类结构 / 毛利 / 断货损失 / 预估偏差 =====
   // 这些是「为什么 + 值多少钱」的分析口径；不生成"明日减产X个"这类自动指令，只供归因判断。
 
-  // 营业额构成【保留】用 item_category —— 这是该表在 bakery-ops 侧唯一合法的用途（展示，不承载判定语义）。
+  // 营业额构成【保留】读 pos_product 分类（迁移 067 后 item_category 并入）—— 展示用途，不承载判定语义。
   // LEFT JOIN + COALESCE：分类表里没有的品（如 2026-07-20 上架的 Golden Tropic Cold Brew）
   // 用 INNER JOIN 会被整段静默吞掉。NORM 已含 chr(160) 处理，捞回尾部带 tab/NBSP 的那批行。
   const byCat = await query<any>(
-    `SELECT COALESCE(c.category, '未分类') AS cat, SUM(s.gross_sales) AS amt, SUM(s.qty) AS qty
+    `SELECT COALESCE(c.category_display, c.category_en, c.category_zh, '未分类') AS cat,
+            SUM(s.gross_sales) AS amt, SUM(s.qty) AS qty
        FROM item_hourly_sales s
-       LEFT JOIN item_category c ON ${NORM('c.item_name')} = ${NORM('s.item_name')}
+       LEFT JOIN pos_product c ON ${NORM('c.name_en')} = ${NORM('s.item_name')}
       WHERE s.date = $1 GROUP BY 1 ORDER BY amt DESC`, [date]);
   if (byCat.length) {
     const catTotal = byCat.reduce((a: number, r: any) => a + Number(r.amt), 0);
@@ -346,13 +347,13 @@ async function getSalesData(date: string): Promise<string> {
 export async function generateDailyReviewText(date: string, managerText = ""): Promise<string> {
   const isAuto = !managerText.trim();
 
-  // 昨日决策闭环：SQL 精确读昨日 manager_review.insight（不靠 RAG 模糊检索）
+  // 昨日决策闭环：SQL 精确读昨日 manager insight（迁移 070 后 manager_review 并入 daily_review，不靠 RAG 模糊检索）
   const yd = new Date(date);
   yd.setDate(yd.getDate() - 1);
   const ydStr = `${yd.getFullYear()}-${String(yd.getMonth() + 1).padStart(2, "0")}-${String(yd.getDate()).padStart(2, "0")}`;
   let yesterdayInsight = "";
   try {
-    const rows = await query<any>("SELECT insight FROM manager_review WHERE date = $1", [ydStr]);
+    const rows = await query<any>("SELECT manager_insight AS insight FROM daily_review WHERE date = $1", [ydStr]);
     if (rows.length && rows[0].insight) yesterdayInsight = String(rows[0].insight);
   } catch (err) {
     logger.warn("Yesterday insight lookup failed", { date: ydStr, error: String(err) });
@@ -442,15 +443,14 @@ export class DailyReviewChatSkillHandler implements SkillHandler {
         .catch((e) => logger.warn("LightRAG ingest failed (fire-and-forget)", { date, error: String(e) }));
     }
 
-    // 复盘原文落库（真相源）。此前写 daily_review 的 content 列——列不存在且表已被 005
-    // 迁入 forecast schema，INSERT 必败且被静默吞掉，复盘正文一直在丢 — IMPROVEMENT-PLAN.md B7
+    // 复盘原文落库（真相源）。迁移 070：manager_review 并入 daily_review，原文写 manager_text 列。
     try {
       await query(
-        "INSERT INTO manager_review (date, content) VALUES ($1, $2) ON CONFLICT (date) DO UPDATE SET content = $2, updated_at = NOW()",
+        "INSERT INTO daily_review (date, manager_text, created_at, updated_at) VALUES ($1, $2, NOW(), NOW()) ON CONFLICT (date) DO UPDATE SET manager_text = $2, updated_at = NOW()",
         [date, rawText],
       );
     } catch (err) {
-      logger.error("manager_review insert failed — 复盘原文没有落库", { date, error: String(err) });
+      logger.error("daily_review.manager_text insert failed — 复盘原文没有落库", { date, error: String(err) });
     }
 
     // 返回 pending 进入多轮追问：orchestrator 存下 data 到 collectedInputs，
@@ -495,7 +495,7 @@ ${extraData ? `【系统查询到的数据】\n${extraData}\n` : ""}
 
     const reply = await aiProvider.chatCompletionLong(prompt);
 
-    // 追问阶段不写 manager_review.content（只有 initial 写正文、end 写 insight），
+    // 追问阶段不写 daily_review.manager_text（只有 initial 写正文、end 写 insight），
     // 继续 pending 并把本轮问答追加进 _history — IMPROVEMENT-PLAN.md B5
     return {
       runId: uuidv4(),
@@ -537,12 +537,12 @@ ${history}
     if (extractedKnowledge) {
       try {
         await query(
-          "UPDATE manager_review SET insight = $2, updated_at = NOW() WHERE date = $1",
+          "UPDATE daily_review SET manager_insight = $2, updated_at = NOW() WHERE date = $1",
           [date, extractedKnowledge],
         );
         persisted = true;
       } catch (err) {
-        logger.error("manager_review insight update failed", { date, error: String(err) });
+        logger.error("daily_review.manager_insight update failed", { date, error: String(err) });
       }
     }
 

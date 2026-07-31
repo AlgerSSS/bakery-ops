@@ -1,7 +1,6 @@
 "use server";
 
 import {
-  importTimeslotSalesData,
   hasTimeslotSalesData,
   autoImportFromDataDir,
   getTimeslotSalesRecords,
@@ -11,7 +10,6 @@ import {
 } from "@/modules/data/repositories/forecast.repository";
 
 export {
-  importTimeslotSalesData,
   hasTimeslotSalesData,
   autoImportFromDataDir,
   getTimeslotSalesRecords,

@@ -10,10 +10,10 @@
 //      现在 failedRequired 一律从 queryStatus 推导，落盘的那份就是判定依据本身。
 //
 // 必需清单必须对齐「真实消费方」，不能只凭直觉挑三个聚合查询：
-//   hourlyByDate    -> sync 第 3 步 hourly_sales_summary（也是 daily_revenue 的降级源）
-//   itemsByDateHour -> sync 第 2 步 daily_sales_record、第 4 步 item_hourly_sales，
-//                      第 5 步 timeslot_sales_record 再从第 4 步的结果重建
-//   itemWaste       -> sync 第 8 步 item_waste（唯一来源）
+//   hourlyByDate    -> sync 第 2 步 hourly_sales_summary（也是 daily_revenue 的降级源）
+//   itemsByDateHour -> sync 第 3 步 item_hourly_sales（daily_sales_record /
+//                      timeslot_sales_record 两个视图直接由它派生）
+//   itemWaste       -> sync 第 6 步 item_waste（唯一来源）
 //   summary/hourly/items -> server.js /v1/daily/* 的正文
 export const REQUIRED_QUERIES = ['summary', 'hourly', 'items', 'hourlyByDate', 'itemsByDateHour', 'itemWaste'];
 

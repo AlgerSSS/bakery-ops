@@ -5,7 +5,43 @@ import type {
   PlanningRules,
   OutOfStockRecord,
   ImportResult,
+  ProductStrategy,
 } from "@/modules/domain/forecast/types";
+
+/**
+ * 策略整表替换的唯一写路径（迁移 067：product_strategy 已并入 product 的列）。
+ * 两个入口共用：设置页 data 目录自动导入、/api/import/strategy 上传。
+ * 先清空所有商品的策略列再逐行写回；策略 Excel 的 category 是 product.category 的
+ * 粗粒度重复，不写（product.category 由产品表导入维护）。
+ * Excel 里有但 product 里没有的品名跳过并计数 —— 合并后策略只是 product 的列，
+ * 不能再为陌生品名凭空建行。
+ */
+export async function importStrategies(strategies: ProductStrategy[]): Promise<ImportResult> {
+  let imported = 0;
+  let skipped = 0;
+  await withTransaction(async ({ execute }) => {
+    await execute(
+      `UPDATE product SET positioning=NULL, cold_hot=NULL, sales_ratio=NULL, target_tc=NULL,
+         audience=NULL, break_stock_time=NULL, sort_order=NULL`
+    );
+    const existing = new Set((await query<{ name: string }>("SELECT name FROM product")).map((r) => r.name));
+    const seen = new Set<string>();
+    let sortOrder = 0;
+    for (const s of strategies) {
+      if (seen.has(s.productName)) continue;
+      seen.add(s.productName);
+      if (!existing.has(s.productName)) { skipped++; continue; }
+      sortOrder++;
+      await execute(
+        `UPDATE product SET positioning=?, cold_hot=?, sales_ratio=?, target_tc=?,
+           audience=?, break_stock_time=?, sort_order=? WHERE name=?`,
+        [s.positioning, s.coldHot, s.salesRatio, s.targetTC, s.audience, s.breakStockTime, sortOrder, s.productName]
+      );
+    }
+    imported = sortOrder;
+  });
+  return { success: true, totalRows: strategies.length, importedRows: imported, skippedRows: skipped, errors: [] };
+}
 
 // ========== DB Row Types ==========
 interface BusinessRuleRow {
@@ -79,7 +115,8 @@ export async function getPlanningRulesFromDB(): Promise<PlanningRules> {
   for (const row of ruleRows) {
     map[row.rule_key] = JSON.parse(row.rule_value);
   }
-  const scheduleRows = await query<FixedScheduleRow>("SELECT product_name, time_slots FROM fixed_shipment_schedule");
+  // 迁移 067：fixed_shipment_schedule 已并入 product.time_slots。
+  const scheduleRows = await query<FixedScheduleRow>("SELECT name AS product_name, time_slots FROM product WHERE time_slots IS NOT NULL");
   const fixedShipmentSchedule: Record<string, string[]> = {};
   for (const row of scheduleRows) {
     fixedShipmentSchedule[row.product_name] = JSON.parse(row.time_slots);
@@ -128,22 +165,19 @@ export async function deleteOutOfStockByDate(date: string): Promise<void> {
 
 // ========== Fixed Shipment Schedule ==========
 export async function getFixedShipmentSchedules(): Promise<Record<string, string[]>> {
-  const rows = await query<FixedScheduleRow>("SELECT product_name, time_slots FROM fixed_shipment_schedule");
+  const rows = await query<FixedScheduleRow>("SELECT name AS product_name, time_slots FROM product WHERE time_slots IS NOT NULL");
   const result: Record<string, string[]> = {};
   for (const row of rows) result[row.product_name] = JSON.parse(row.time_slots);
   return result;
 }
 
 export async function updateFixedShipmentSchedule(productName: string, timeSlots: string[]): Promise<void> {
-  await execute(
-    `INSERT INTO fixed_shipment_schedule (product_name, time_slots) VALUES (?, ?)
-     ON CONFLICT (product_name) DO UPDATE SET time_slots = EXCLUDED.time_slots`,
-    [productName, JSON.stringify(timeSlots)]
-  );
+  // 迁移 067 后时段配置是 product 的一列；只能给已存在的商品配（设置页的商品清单本来就来自 product）。
+  await execute("UPDATE product SET time_slots = ? WHERE name = ?", [JSON.stringify(timeSlots), productName]);
 }
 
 export async function deleteFixedShipmentSchedule(productName: string): Promise<void> {
-  await execute("DELETE FROM fixed_shipment_schedule WHERE product_name = ?", [productName]);
+  await execute("UPDATE product SET time_slots = NULL WHERE name = ?", [productName]);
 }
 
 // ========== Daily Sales Total ==========
@@ -220,7 +254,9 @@ export async function autoImportFromDataDir(): Promise<{
       logger.warn("forecast-calc.repository.autoImportFromDataDir dfq file skipped", { error: String(error) });
     }
     await withTransaction(async ({ execute }) => {
-      await execute("DELETE FROM product");
+      // 迁移 067 之后 strategy/baseline/time_slots/item_key 都是 product 的列，
+      // 不能再 DELETE FROM product —— 那会把合并进来的配置和身份绑定一起抹掉。
+      // 改为纯 upsert；只清「Excel 里已删、且不带任何合并配置」的行。
       for (const p of products) {
         await execute(
           `INSERT INTO product (category, name, name_en, price, pack_multiple, unit_type)
@@ -234,6 +270,15 @@ export async function autoImportFromDataDir(): Promise<{
           await execute("UPDATE product SET display_full_quantity = ? WHERE name = ?", [qty, name]);
         }
       }
+      if (products.length > 0) {
+        const placeholders = products.map(() => "?").join(", ");
+        await execute(
+          `DELETE FROM product WHERE name NOT IN (${placeholders})
+             AND positioning IS NULL AND baseline_total_sales IS NULL
+             AND time_slots IS NULL AND item_key IS NULL`,
+          products.map((p) => p.name)
+        );
+      }
     });
     productResult = { success: true, totalRows: products.length, importedRows: products.length, skippedRows: 0, errors: [] };
   } catch (e) {
@@ -244,23 +289,7 @@ export async function autoImportFromDataDir(): Promise<{
   try {
     const buf = await readFile(path.join(dataDir, "产品销售策略.xlsx"));
     const strategies = await parseStrategyData(buf.buffer as ArrayBuffer);
-    await withTransaction(async ({ execute }) => {
-      await execute("DELETE FROM product_strategy");
-      const seen = new Set<string>();
-      let sortOrder = 0;
-      for (const s of strategies) {
-        if (seen.has(s.productName)) continue;
-        seen.add(s.productName);
-        sortOrder++;
-        await execute(
-          `INSERT INTO product_strategy (product_name, positioning, category, cold_hot, sales_ratio, target_tc, audience, break_stock_time, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (product_name) DO UPDATE SET positioning=EXCLUDED.positioning, category=EXCLUDED.category, cold_hot=EXCLUDED.cold_hot, sales_ratio=EXCLUDED.sales_ratio, target_tc=EXCLUDED.target_tc, audience=EXCLUDED.audience, break_stock_time=EXCLUDED.break_stock_time, sort_order=EXCLUDED.sort_order`,
-          [s.productName, s.positioning, s.category, s.coldHot, s.salesRatio, s.targetTC, s.audience, s.breakStockTime, sortOrder]
-        );
-      }
-    });
-    strategyResult = { success: true, totalRows: strategies.length, importedRows: strategies.length, skippedRows: 0, errors: [] };
+    strategyResult = await importStrategies(strategies);
   } catch (e) {
     strategyResult = { success: false, totalRows: 0, importedRows: 0, skippedRows: 0, errors: [String(e)] };
   }
@@ -304,16 +333,9 @@ export async function autoImportFromDataDir(): Promise<{
           allTsRecords = allTsRecords.concat(tsRecords);
           for (const u of tsUnmatched) allTsUnmatched.add(u);
         }
-        await withTransaction(async ({ execute }) => {
-          await execute("DELETE FROM timeslot_sales_record");
-          for (const r of allTsRecords) {
-            await execute(
-              `INSERT INTO timeslot_sales_record (product_name, day_type, time_slot, avg_quantity, sample_count) VALUES (?, ?, ?, ?, ?) ON CONFLICT (product_name, day_type, time_slot) DO UPDATE SET avg_quantity=EXCLUDED.avg_quantity, sample_count=EXCLUDED.sample_count`,
-              [r.productName, r.dayType, r.timeSlot, r.avgQuantity, r.sampleCount]
-            );
-          }
-        });
-        timeslotResult = { success: true, totalRows: allTsRecords.length, importedRows: allTsRecords.length, skippedRows: 0, errors: [], unmatchedProducts: Array.from(allTsUnmatched) };
+        // 【已摘除整表写入】timeslot_sales_record 现在是由 item_hourly_sales 派生的**视图**（迁移 068），
+        // 本来这里的 DELETE+INSERT 就是三写者互相清空的来源之一。保留解析与未匹配品名校验，不再落库。
+        timeslotResult = { success: true, totalRows: allTsRecords.length, importedRows: 0, skippedRows: allTsRecords.length, errors: [], unmatchedProducts: Array.from(allTsUnmatched) };
       } else {
         timeslotResult = { success: false, totalRows: 0, importedRows: 0, skippedRows: 0, errors: ["时段销售目录下无 xlsx 文件"] };
       }

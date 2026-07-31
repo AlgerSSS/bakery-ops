@@ -119,7 +119,7 @@ export async function getNonProductionNameSet(): Promise<Set<string>> {
 /**
  * 漂移探测器 —— 把「按英文分组判饮品」这个方案降级成提示，不给它判决权。
  * 报两类可疑品（只 warn，不改任何判定）：
- *   suspects  : 近 7 天出单、item_category 落在六个疑似饮品组之一、但不在 beverageItems 里
+ *   suspects  : 近 7 天出单、分类（pos_product，迁移 067 后 item_category 并入）落在六个疑似饮品组之一、但不在 beverageItems 里
  *   newcomers : 近 7 天首次出现的新 POS 品名（兜住 Golden Tropic Cold Brew 这种连分类都没有的）
  */
 export async function detectBeverageCaliberDrift(
@@ -133,16 +133,16 @@ export async function detectBeverageCaliberDrift(
     const [bevSet, nonProdSet] = await Promise.all([getBeverageNameSet(), getNonProductionNameSet()]);
     const rows = await query<{ item_name: string; category: string | null; is_new: boolean }>(
       `SELECT s.item_name,
-              c.category,
+              COALESCE(c.category_display, c.category_en, c.category_zh) AS category,
               NOT EXISTS (
                 SELECT 1 FROM item_hourly_sales o
                  WHERE ${NORM_SQL("o.item_name")} = ${NORM_SQL("s.item_name")}
                    AND o.date < $1::date - 7
               ) AS is_new
          FROM item_hourly_sales s
-         LEFT JOIN item_category c ON ${NORM_SQL("c.item_name")} = ${NORM_SQL("s.item_name")}
+         LEFT JOIN pos_product c ON ${NORM_SQL("c.name_en")} = ${NORM_SQL("s.item_name")}
         WHERE s.date > $1::date - 7 AND s.date <= $1::date
-        GROUP BY s.item_name, c.category`,
+        GROUP BY s.item_name, c.category_display, c.category_en, c.category_zh`,
       [date],
     );
     const suspects: string[] = [];

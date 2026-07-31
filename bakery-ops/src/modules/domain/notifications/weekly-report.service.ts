@@ -162,7 +162,7 @@ async function fetchWeeklyData(today: string): Promise<WeeklyReportData | null> 
   );
 
   const reviewRows = await query<any>(
-    "SELECT date, insight FROM manager_review WHERE date >= $1 AND date <= $2 AND insight IS NOT NULL ORDER BY date",
+    "SELECT date, manager_insight AS insight FROM daily_review WHERE date >= $1 AND date <= $2 AND manager_insight IS NOT NULL ORDER BY date",
     [weekStart, weekEnd],
   );
 

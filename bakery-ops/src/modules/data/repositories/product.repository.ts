@@ -77,7 +77,13 @@ export async function getProducts(): Promise<Product[]> {
 }
 
 export async function getStrategies(): Promise<ProductStrategy[]> {
-  const rows = await query<StrategyRow>("SELECT * FROM product_strategy ORDER BY sort_order, id");
+  // 迁移 067：product_strategy 已并入 product。原表 sort_order 是 NOT NULL，
+  // 用它过滤正好等价于原来的 52 行（product 里另外 2 行没有策略配置）。
+  const rows = await query<StrategyRow>(
+    `SELECT id, name AS product_name, positioning, category, cold_hot,
+            sales_ratio, target_tc, audience, break_stock_time, sort_order
+     FROM product WHERE sort_order IS NOT NULL ORDER BY sort_order, id`
+  );
   return rows.map(rowToStrategy);
 }
 
@@ -102,8 +108,9 @@ export async function deleteProductAlias(alias: string): Promise<void> {
 
 // ========== Product Config ==========
 export async function getProductConfigs(): Promise<ProductConfigRow[]> {
+  // product_config 在库里从不存在（迁移 067 核实），这三个列一直长在 product 上。
   return query<ProductConfigRow>(
-    "SELECT product_name, pack_multiple, unit_type, display_full_quantity FROM product_config ORDER BY product_name"
+    "SELECT name AS product_name, pack_multiple, unit_type, display_full_quantity FROM product ORDER BY name"
   );
 }
 
@@ -113,15 +120,8 @@ export async function updateProductConfig(
   unitType: string,
   displayFullQuantity: number
 ): Promise<void> {
-  await execute(
-    `INSERT INTO product_config (product_name, pack_multiple, unit_type, display_full_quantity)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT (product_name) DO UPDATE SET
-       pack_multiple = EXCLUDED.pack_multiple,
-       unit_type = EXCLUDED.unit_type,
-       display_full_quantity = EXCLUDED.display_full_quantity`,
-    [productName, packMultiple, unitType, displayFullQuantity]
-  );
+  // 原先先写 product_config 再写 product：前者是不存在的表，第一 execute 就抛，
+  // 设置页保存因此从未成功过。product 本来就是唯一落点。
   await execute(
     "UPDATE product SET pack_multiple = ?, unit_type = ?, display_full_quantity = ? WHERE name = ?",
     [packMultiple, unitType, displayFullQuantity, productName]

@@ -50,7 +50,7 @@ function setupQueryMock(opts: {
     if (sql.includes("ORDER BY revenue DESC")) return [{ date: "2026-06-27", revenue: 1500 }];
     if (sql.includes("ORDER BY revenue ASC")) return [{ date: "2026-06-23", revenue: 600 }];
     if (sql.includes("FROM item_waste")) return [{ total_amount: opts.wasteTotal ?? 0 }];
-    if (sql.includes("FROM manager_review")) return opts.reviewRows ?? [];
+    if (sql.includes("FROM daily_review")) return opts.reviewRows ?? [];
     if (sql.includes("FROM daily_push_log")) return opts.pushLogRows ?? [];
     return [];
   });

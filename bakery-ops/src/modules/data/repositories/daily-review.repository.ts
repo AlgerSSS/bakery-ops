@@ -7,29 +7,37 @@ import type {
 interface DailyReviewRow {
   id: number;
   date: string;
-  review_json: string;
-  suggestions_json: string;
+  // 迁移 070 把这两列从 text 改成了 jsonb：驱动直接返回对象，不再是字符串。
+  // 迁移执行前旧库还是 text，所以读侧两种形态都兼容。
+  review_json: unknown;
+  suggestions_json: unknown;
   adopted: boolean;
 }
+
+const asJson = (v: unknown) => (typeof v === "string" ? JSON.parse(v) : v);
 
 // ========== Daily Review ==========
 export async function getDailyReview(date: string): Promise<DailyReviewResult | null> {
   const rows = await query<DailyReviewRow>("SELECT * FROM daily_review WHERE date = ?", [date]);
   if (rows.length === 0) return null;
   const row = rows[0];
+  // 迁移 070 后同一天可能只有店长手记（manager_text）、没有 AI 复盘 ——
+  // 这与合并前「daily_review 里查不到这一天」等价，保持返回 null。
+  if (row.review_json == null) return null;
   return {
     id: row.id,
     date: row.date,
-    review: JSON.parse(row.review_json),
-    tomorrowSuggestions: JSON.parse(row.suggestions_json),
+    review: asJson(row.review_json),
+    tomorrowSuggestions: asJson(row.suggestions_json),
     adopted: row.adopted,
   };
 }
 
 export async function saveDailyReview(date: string, reviewJson: string, suggestionsJson: string): Promise<void> {
+  // ::jsonb 显式转换：迁移 070 后列是 jsonb，驱动送来的字符串参数需要明确转型。
   await execute(
     `INSERT INTO daily_review (date, review_json, suggestions_json)
-     VALUES (?, ?, ?)
+     VALUES (?, ?::jsonb, ?::jsonb)
      ON CONFLICT (date) DO UPDATE SET review_json = EXCLUDED.review_json, suggestions_json = EXCLUDED.suggestions_json, adopted = false`,
     [date, reviewJson, suggestionsJson]
   );

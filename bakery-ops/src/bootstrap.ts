@@ -159,10 +159,10 @@ async function runBootstrap() {
     cron.schedule("0 7 * * *", wrapCron("production_plan_push", runProductionPlanPush), TZ);
   }
 
-  // 9b. 每晚 23:30 今日复盘：收件人读 team_member 订阅（Lark 发送），无数据记 cron 失败
+  // 9b. 每晚 23:30 今日复盘：收件人读 staff 订阅（Lark 发送），无数据记 cron 失败
   if (onCore) cron.schedule("30 23 * * *", wrapCron("morning_brief", runMorningBrief), TZ);
 
-  // 9c. 每日 03:00 同步 Lark 组织架构 → team_member（保留用户配的 role/subscriptions）。core 启动时也同步一次。
+  // 9c. 每日 03:00 同步 Lark 组织架构 → staff（保留用户配的 role/subscriptions）。core 启动时也同步一次。
   if (onCore) {
     cron.schedule("0 3 * * *", wrapCron("lark_org_sync", async () => { await syncLarkOrg(); }), TZ);
     void syncLarkOrg().catch((e) => logger.warn("startup lark org sync failed", { error: String(e) }));

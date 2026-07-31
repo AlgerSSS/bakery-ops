@@ -1,7 +1,7 @@
 // output/daily/daily.json 的「新鲜度 / 完备性」断言（HIGH-1）。
 //
-// 背景：sync-to-db 的第 2/4/8 步是 `DELETE FROM <表> WHERE date = $d` 然后插入，
-// 第 5 步随后 TRUNCATE timeslot_sales_record 并从 item_hourly_sales 重算。
+// 背景：sync-to-db 的第 3/6 步是 `DELETE FROM <表> WHERE date = $d` 然后插入，
+// 派生视图（daily_sales_record / timeslot_sales_record）直接读 item_hourly_sales。
 // 这几步以前对 daily.json 零校验：文件不在就 `[skip] return 0`、字段缺就 `[skip] return 0`，
 // 于是一份躺在盘上好几天的陈旧 daily.json（或某个查询失败后残缺的 daily.json）
 // 可以让整晚「静默销毁数据」——把库里完整的一天删掉、换成陈旧/残缺的一小撮行，然后 exit 0。

@@ -69,7 +69,7 @@ describe("daily-review-chat 多轮追问状态流转", () => {
     expect(String(result.data?._history)).toContain("AI分析结果");
     expect(result.summary).toContain("没了");
 
-    const insertCalls = query.mock.calls.filter((c) => String(c[0]).includes("INSERT INTO manager_review"));
+    const insertCalls = query.mock.calls.filter((c) => String(c[0]).includes("INSERT INTO daily_review"));
     expect(insertCalls).toHaveLength(1);
   });
 
@@ -123,7 +123,7 @@ describe("daily-review-chat 多轮追问状态流转", () => {
     expect(end.data?.phase).toBe("end");
     expect(end.summary).toContain("提炼出的经验条目");
 
-    const insightUpdates = query.mock.calls.filter((c) => String(c[0]).includes("UPDATE manager_review SET insight"));
+    const insightUpdates = query.mock.calls.filter((c) => String(c[0]).includes("UPDATE daily_review SET manager_insight"));
     expect(insightUpdates).toHaveLength(1);
     expect(insightUpdates[0][1]).toEqual(["2026-07-01", "提炼出的经验条目"]);
   });

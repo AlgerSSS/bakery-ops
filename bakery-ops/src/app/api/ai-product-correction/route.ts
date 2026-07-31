@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     }
 
     const baselines = await query<BaselineRow>(
-      "SELECT product_name, avg_monday_to_thursday, avg_friday, avg_weekend FROM product_sales_baseline"
+      "SELECT name AS product_name, avg_monday_to_thursday, avg_friday, avg_weekend FROM product WHERE baseline_total_sales IS NOT NULL"
     );
     const baselineMap = new Map<string, number>();
     const col = DAY_TYPE_COL[dayType] || "avg_monday_to_thursday";

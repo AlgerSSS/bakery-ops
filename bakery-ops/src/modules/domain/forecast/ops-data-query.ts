@@ -14,14 +14,15 @@ import { NORM_SQL } from "./beverage-caliber";
  * 直接 ILIKE '%蛋挞%' 恒 0 行，而且返回的是「未找到数据」而不是报错——看起来像那天真没卖。
  *
  * 两座桥都要走，缺一不可：
- *   · item_alias（en→cn，104 行）覆盖近 90 天在售 93 品里的 86 品，**且覆盖饮品**
+ *   · pos_product（en→cn；迁移 067 后 item_alias 并入，中文名取人工覆盖值优先）覆盖全部在售品，**且覆盖饮品**
  *   · product（name↔name_en，54 行）只有排产用的烘焙品，查「拿铁」是 0 条
  * 同时保留对 item_name 本身的匹配，这样店长直接输英文也能查到。
  */
 const ITEM_NAME_MATCH = (dollarWord: string) => `(
      s.item_name ILIKE ${dollarWord}
   OR ${NORM_SQL("s.item_name")} IN (
-       SELECT ${NORM_SQL("a.en")} FROM item_alias a WHERE a.cn ILIKE ${dollarWord}
+       SELECT ${NORM_SQL("a.name_en")} FROM pos_product a
+        WHERE COALESCE(a.name_zh_display, a.name_zh) ILIKE ${dollarWord}
        UNION
        SELECT ${NORM_SQL("p.name_en")} FROM product p
         WHERE p.name ILIKE ${dollarWord} AND p.name_en IS NOT NULL

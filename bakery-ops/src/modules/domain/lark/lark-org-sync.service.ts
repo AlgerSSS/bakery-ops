@@ -1,4 +1,4 @@
-// lark-org-sync.service.ts — 把 Lark 组织架构同步进 team_member 表（migration 025）。
+// lark-org-sync.service.ts — 把 Lark 组织架构同步进 staff 表（原 team_member，迁移 072 并入）。
 // 保留用户在 DB 里配的 role/subscriptions/alias；新人 role 按部门默认；离职者标 active=false。
 // 由 bootstrap cron 每日跑 + 可手动 npm run team:sync。
 import { getOrgMembersFull } from "@/modules/channel/lark/lark-messenger";
@@ -16,7 +16,7 @@ function deriveRole(deptNames: string[]): DeptGroup {
 export async function syncLarkOrg(): Promise<{ synced: number }> {
   const members = await getOrgMembersFull();
   if (members.length === 0) {
-    logger.warn("syncLarkOrg: Lark 组织架构返回为空，跳过（不清空 team_member）");
+    logger.warn("syncLarkOrg: Lark 组织架构返回为空，跳过（不清空 staff）");
     return { synced: 0 };
   }
   await teamRepository.setAllInactive();

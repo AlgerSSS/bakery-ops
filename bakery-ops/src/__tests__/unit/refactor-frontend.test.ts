@@ -43,11 +43,6 @@ describe("Server Actions barrel compatibility", () => {
     expect(typeof mod.getContextEvents).toBe("function");
   });
 
-  it("exports importTimeslotSalesData as a function from barrel", async () => {
-    const mod = await import("@/app/(forecast)/actions");
-    expect(typeof mod.importTimeslotSalesData).toBe("function");
-  });
-
   it("exports getPromptSegments as a function from barrel", async () => {
     const mod = await import("@/app/(forecast)/actions");
     expect(typeof mod.getPromptSegments).toBe("function");
@@ -68,11 +63,6 @@ describe("Split action files resolve independently", () => {
   it("getDailyReview resolves from review-actions", async () => {
     const mod = await import("@/app/(forecast)/review-actions");
     expect(typeof mod.getDailyReview).toBe("function");
-  });
-
-  it("importTimeslotSalesData resolves from import-actions", async () => {
-    const mod = await import("@/app/(forecast)/import-actions");
-    expect(typeof mod.importTimeslotSalesData).toBe("function");
   });
 
   it("getPromptSegments resolves from prompt-actions", async () => {

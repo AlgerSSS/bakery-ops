@@ -120,31 +120,30 @@ test('sync-to-db 的 degraded 开关是 per-record 的，不是整轮的', () =>
   assert.ok(loopStart > 0 && degradedAt > loopStart, 'degraded 必须在 selectedRecords 循环体内计算');
 });
 
-test('sync-to-db 的每一步都走 deferredFailures，timeslot 断言不再吞掉后面 4 步', () => {
-  // MEDIUM-2：syncTimeslotSalesRecord 的 `days < 14` throw 原本是 main() 第 5 步直接抛，
-  // 抛出后第 6/7/8/9 步全不执行，与第 6 步刻意做的 deferred 处理自相矛盾。
+test('sync-to-db 的每一步都走 deferredFailures，不再有一步炸掉后面全部', () => {
+  // MEDIUM-2 的原始问题：某一步直接 throw 会让后面所有步骤全不执行。
+  // 迁移 068 后 main() 是 7 步（两个派生表变成视图，它们的写入步已删）。
   const src = readFileSync(new URL('../sync-to-db.js', import.meta.url), 'utf8');
   const main = src.slice(src.indexOf('async function main()'), src.indexOf('async function finish()'));
   const syncCalls = [...main.matchAll(/await (runStep\(|sync[A-Za-z]+\()/g)].map((m) => m[1]);
-  assert.ok(syncCalls.length >= 9, `main() 里应有 9 步，实际 ${syncCalls.length}`);
+  assert.ok(syncCalls.length >= 7, `main() 里应有 7 步，实际 ${syncCalls.length}`);
   assert.deepEqual(
     syncCalls.filter((c) => c !== 'runStep('),
     [],
     'main() 里不允许直接 await sync*()，必须经过 runStep 才能聚合失败',
   );
-  // 第 5 步现在多了 `{ requires: 'item_hourly_sales' }`：仍然经过 runStep（聚合失败），
-  // 只是第 4 步没成功时不许重建基线。
-  assert.match(main, /timeslot_sales_record.*', syncTimeslotSalesRecord, \{ requires: 'item_hourly_sales' \}\)/);
+  // 派生视图是禁区：任何步骤都不许再对它们发写语句。
+  assert.doesNotMatch(src, /(INSERT INTO|DELETE FROM|TRUNCATE)\s+(daily_sales_record|timeslot_sales_record)/);
 });
 
-test('第 7 步 daily_dining_breakdown 不再吃陈旧 CSV 静默成功（MEDIUM-2）', () => {
-  // 它是 daily_dining_breakdown 的唯一来源，而 apply-translations 现在是 delete-first：
-  // 文件不存在 = 今晚没重建成功，静默 return 0 会让这张表停在几天前而整链 exit 0。
+test('第 5 步 daily_breakdown(dining) 不再吃陈旧 CSV 静默成功（MEDIUM-2）', () => {
+  // 它是 daily_breakdown 就餐维度的唯一来源，而 apply-translations 现在是 delete-first：
+  // 文件不存在 = 今晚没重建成功，静默 return 0 会让这个维度停在几天前而整链 exit 0。
   const src = readFileSync(new URL('../sync-to-db.js', import.meta.url), 'utf8');
-  const fn = src.slice(src.indexOf('async function syncDiningBreakdown()'), src.indexOf('// === 8.'));
+  const fn = src.slice(src.indexOf('async function syncDiningBreakdown()'), src.indexOf('// === 6.'));
   assert.doesNotMatch(fn, /\[skip\] no data/);
-  assert.match(fn, /throw new Error\(`daily_dining_breakdown 源缺失/);
-  assert.match(fn, /throw new Error\(`daily_dining_breakdown 缺少日期源/);
+  assert.match(fn, /throw new Error\(`daily_breakdown\(dining\) 源缺失/);
+  assert.match(fn, /throw new Error\(`daily_breakdown\(dining\) 缺少日期源/);
   assert.match(fn, /没有 \$\{EXPECTED_DATE\} 这一天/);
 });
 

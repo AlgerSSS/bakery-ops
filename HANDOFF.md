@@ -8,6 +8,22 @@
 
 ## 当前状态
 
+> ✅ **产品身份重构已上线（2026-07-31，迁移 064/065）。**
+> `res_api/sync-to-db.js` 过去拿到 RES 的稳定商品键后翻译成显示名就丢弃，导致
+> POS 销售能连回成本卡的只有 **2.6%**。现在保留键并写入 `item_key`，覆盖率 **95.3%**
+> （可算成本 92.5%）。新建 `pos_product` 作为全库唯一商品身份权威（211 条，158 条已建卡）。
+> **新代码请用 `item_key` 关联，不要再按名字 JOIN。**
+>
+> 顺带修掉一个丢数据 bug：按 `date|hour|显示名` 去重，而有 3 组不同商品共用同一显示名，
+> 第二个商品的销量被静默丢弃。已改按稳定键去重。
+>
+> ⚠️ **今晚 23:00 是第一次带 `item_key` 的自动运行**（已 rsync 到 Contabo）。
+> 明早确认 `select count(*) filter (where item_key is null) from item_hourly_sales where date=当日`
+> 应接近 0（只剩 3 组重名 + 新品）。
+>
+> 目录同步：`node --env-file=.env sync-catalog.mjs`（尚未接进 run-refresh.mjs 的每日步骤，
+> 目前需要手工跑；RES 上新品或改价后应重跑）。
+
 | | |
 |---|---|
 | 最后更新 | 2026-07-31 by Claude Code（Postgres 迁移侧） |

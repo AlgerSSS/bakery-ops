@@ -6,6 +6,29 @@
 
 ---
 
+## 六组表合并（2026-07-31，配合财务库迁移 067-074）
+
+ bakery-ops / res_api 侧代码已同步并部署 Contabo（origin main = f4375be）：
+ - `product_strategy`/`product_sales_baseline`/`fixed_shipment_schedule` 成为 `product` 的列；
+   策略导入唯一写路径 `importStrategies`（API 上传与 data 目录自动导入共用）；
+   **产品 Excel 导入从 DELETE+INSERT 改为 upsert**（整表 DELETE 会抹掉合并进列的配置）。
+ - `item_alias`/`item_category` → `pos_product`（中文名 `COALESCE(name_zh_display, name_zh)`，
+   分类 `COALESCE(category_display, category_en, category_zh)`）。
+ - `daily_sales_record`/`timeslot_sales_record` 变视图：sync-to-db 九步变七步，
+   两个写入步删除，时段 Excel 导入不再落库；测试有 neverWriteViews 守卫。
+ - `daily_payment_breakdown`/`daily_dining_breakdown` → `daily_breakdown(dim_type, dim_value)`，
+   读侧 SQL 别名保持下游列名不变。
+ - `manager_review` → `daily_review.manager_text/manager_insight`；`review_json`/`suggestions_json`
+   转 jsonb，读侧 `asJson` 兼容 text 与对象两种形态。
+ - `ops_user`+`team_member` → `staff`：user.repository 限定 `phone IS NOT NULL`，
+   team.repository 限定 `lark_open_id IS NOT NULL`（setAllInactive 不会误停 WhatsApp 员工），
+   `TeamMemberRow` 接口用 SQL 别名保持不变。3 个 WhatsApp 员工的 lark_open_id 待人工关联。
+ - 顺带修复：设置页 product_config 标签一直在查不存在的表，已改读写 `product`。
+ - 删除 backfill-daily-sales.js（目标表已变视图）。
+
+ 门禁：tsc 0 + vitest 503/503 + next build 通过；res_api 119/119。
+ 明早看一眼今晚 23:00 新管线第一跑：daily_breakdown 应有当晚 payment/dining 行。
+
 ## 当前状态
 
 > ✅ **HBTI 已收进会员表（2026-07-31，迁移 066）。** `hbti_completion` 的内容成为

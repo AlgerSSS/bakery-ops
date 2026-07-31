@@ -438,22 +438,30 @@ export async function checkCompletionStoreFromEnv(): Promise<void> {
   await getDb()`SELECT 1 FROM hbti_completion LIMIT 1`;
 }
 
+/** 有 expires_at 的四张表；顺序无关，逐张有界删除。 */
+const EXPIRING_TABLES = [
+  "hbti_completion",
+  "hbti_auth_challenge",
+  "hbti_auth_session",
+  "hbti_rate_limit",
+] as const;
+
 /**
  * PG 没有 TTL 索引，过期行要自己清。正确性不依赖它——所有读路径都带 `expires_at > now()`
  * ——所以这里只做有界删除，由每日 Cron 顺带调用，失败不影响对账本身。
+ *
+ * 表名走 `runner(...)` 做标识符转义；`EXPIRING_TABLES` 是模块内常量，不接受外部输入。
+ * `runner` 可注入，好让集成测试把它关进可回滚的事务里——否则这段代码要到生产才第一次执行。
  */
-export async function purgeExpired(limitPerTable = 1_000): Promise<number> {
-  const sql = getDb();
+export async function purgeExpired(
+  runner: SqlRunner = getDb(),
+  limitPerTable = 1_000,
+): Promise<number> {
   let removed = 0;
-  for (const table of [
-    sql`hbti_completion`,
-    sql`hbti_auth_challenge`,
-    sql`hbti_auth_session`,
-    sql`hbti_rate_limit`,
-  ]) {
-    const result = await sql`
-      DELETE FROM ${table} WHERE ctid IN (
-        SELECT ctid FROM ${table} WHERE expires_at <= now() LIMIT ${limitPerTable}
+  for (const table of EXPIRING_TABLES) {
+    const result = await runner`
+      DELETE FROM ${runner(table)} WHERE ctid IN (
+        SELECT ctid FROM ${runner(table)} WHERE expires_at <= now() LIMIT ${limitPerTable}
       )
     `;
     removed += result.count;

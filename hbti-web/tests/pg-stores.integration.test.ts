@@ -21,7 +21,10 @@ import { PgAuthStore } from "@/lib/auth/pg-auth-store";
 import type { SqlRunner } from "@/lib/db/postgres";
 import { PgAuthRateLimiter } from "@/lib/rate-limit/auth-rate-limit";
 import { bumpRateLimitBucket } from "@/lib/rate-limit/pg-rate-limit";
-import { PgCompletionStore } from "@/lib/store/pg-completion-store";
+import {
+  PgCompletionStore,
+  purgeExpired,
+} from "@/lib/store/pg-completion-store";
 import type {
   CompletionStoreKey,
   HbtiCompletionSnapshot,
@@ -505,6 +508,38 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
         expect(row.bucket).not.toContain("60123450002");
         expect(row.bucket).not.toContain("203.0.113.10");
       }
+    });
+  });
+
+  describe("purgeExpired（替代 Mongo 的 TTL 索引）", () => {
+    it("只删过期行，未过期的一行不碰", async () => {
+      const live = nextKey();
+      await store.acquireProcessing(live, locked(randomUUID()));
+      const stale = nextKey();
+      await store.acquireProcessing(stale, locked(randomUUID()));
+      await tx`
+        UPDATE hbti_completion SET expires_at = now() - interval '1 day'
+        WHERE campaign_version = ${stale.campaignVersion} AND member_hash = ${stale.memberHash}`;
+
+      await tx`INSERT INTO hbti_rate_limit (bucket, count, expires_at)
+               VALUES ('purge-stale', 1, now() - interval '1 hour'),
+                      ('purge-live', 1, now() + interval '1 hour')`;
+      await tx`INSERT INTO hbti_auth_session (token_hash, payload, expires_at)
+               VALUES (${"f".repeat(64)}, '{}'::jsonb, now() - interval '1 hour')`;
+
+      const removed = await purgeExpired(tx);
+      expect(removed).toBeGreaterThanOrEqual(3);
+
+      expect(await store.get(live)).not.toBeNull();
+      const survivors = await tx`SELECT bucket FROM hbti_rate_limit WHERE bucket LIKE 'purge-%'`;
+      expect(survivors.map((row) => row.bucket)).toEqual(["purge-live"]);
+      const sessions = await tx`
+        SELECT count(*)::int AS n FROM hbti_auth_session WHERE token_hash = ${"f".repeat(64)}`;
+      expect(sessions[0].n).toBe(0);
+      const staleRows = await tx`
+        SELECT count(*)::int AS n FROM hbti_completion
+        WHERE campaign_version = ${stale.campaignVersion} AND member_hash = ${stale.memberHash}`;
+      expect(staleRows[0].n).toBe(0);
     });
   });
 });

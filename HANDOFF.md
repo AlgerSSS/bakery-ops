@@ -8,6 +8,16 @@
 
 ## 当前状态
 
+> ✅ **HBTI 已收进会员表（2026-07-31，迁移 066）。** `hbti_completion` 的内容成为
+> `pos_member` 上的列，幂等键从 HMAC(手机号) 换成 **member_id**（顺带堵掉换号可重复领券的洞）。
+> `hbti_auth_challenge` + `hbti_auth_session` 合并为 `hbti_auth_token`。**4 张 → 2 张。**
+> 剩下的 `hbti_auth_token` / `hbti_rate_limit` **不是会员数据**：发码时还不知道是谁、
+> 一个会员可持多个会话、限流桶有一半按 IP 分——所以没有跟着进会员表。
+> `HBTI_MEMBER_HASH_SECRET` 已无读者，从 server-config 与 .env.example 摘除
+> （Vercel 上那条变量可以删了）。
+> 线上 `hotcrush-hbti-9ua71sr8g`，health 200，四仓库门禁全绿。
+
+
 > ✅ **产品身份重构已上线（2026-07-31，迁移 064/065）。**
 > `res_api/sync-to-db.js` 过去拿到 RES 的稳定商品键后翻译成显示名就丢弃，导致
 > POS 销售能连回成本卡的只有 **2.6%**。现在保留键并写入 `item_key`，覆盖率 **95.3%**

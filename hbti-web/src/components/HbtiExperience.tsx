@@ -696,7 +696,7 @@ function QuestionStep({
   return (
     <section className={styles.questionPanel}>
       <Progress current={index + 1} total={questions.length} label={copy.questionProgress(index + 1, questions.length)} />
-      <p className={styles.eyebrow}>{copy.chooseOne}</p>
+      <p className={styles.eyebrow}>{copy.chooseOne[question.id]}</p>
       <h1
         id={`question-${question.id}`}
         ref={headingRef}

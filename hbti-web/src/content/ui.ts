@@ -1,4 +1,4 @@
-import type { Localized } from "@/content/types";
+import type { HbtiAnswers, Localized } from "@/content/types";
 
 export interface UiCopy {
   brand: string;
@@ -62,7 +62,10 @@ export interface UiCopy {
   back: string;
   next: string;
   questionProgress: (current: number, total: number) => string;
-  chooseOne: string;
+  /** 按题 id 键控而非索引:题目重排不会让提示语错位。
+   *  Record<keyof HbtiAnswers, …> 让 TS 强制 13 条齐全 —— 漏一条编译就不过,
+   *  不会出现某个语言某一题渲染成 undefined。 */
+  chooseOne: Record<keyof HbtiAnswers, string>;
   resultEyebrow: string;
   resultTitle: string;
   signatureLabel: string;
@@ -214,7 +217,28 @@ export const uiCopy: Localized<UiCopy> = {
     back: "Back",
     next: "Next",
     questionProgress: (current, total) => `Choice ${current} of ${total}`,
-    chooseOne: "Go with your first instinct—overproofed dough goes flat.",
+    // 13 句烘焙房口吻的作答提示,每题一句。老板点名喜欢第一句那种感觉
+    // (「用烘焙术语讲测验规则」),这里铺满全程,最后一题回扣第一句。
+    //
+    // 硬约束:每句只能讲「怎么作答」,**不得出现任何映射到计分轴的词** ——
+    // 冷/热(温度轴)、甜/苦/盐/糖(甜度轴)、浓/淡/深/重(浓淡轴)、独处/一起(独同轴)。
+    // 初稿犯过这个错:q7 写「面团温着好说话」在温度轴上偏 hot,
+    // q10 写「盐比糖重要」在甜度轴上直接偏 bitter —— 装饰文案会污染测量结果。
+    chooseOne: {
+      q1: "Go with your first instinct—overproofed dough goes flat.",
+      q2: "Don't overthink it. The dough is already rising.",
+      q3: "No house standard here—just yours.",
+      q4: "Whichever one your hand reaches for.",
+      q5: "First thought is usually the honest one.",
+      q6: "No two bakers answer the same.",
+      q7: "Don't measure this one. Just answer.",
+      q8: "You already know. Tap it.",
+      q9: "Recipes are guidelines. This one's all you.",
+      q10: "Answer like nobody's watching the counter.",
+      q11: "Whichever you'd actually pick on a Tuesday.",
+      q12: "Don't let this one sit too long.",
+      q13: "Last one. Same as the first—don't overthink.",
+    },
     resultEyebrow: "Fresh from the oven · Your HBTI",
     resultTitle: "Fresh out of the oven: you.",
     signatureLabel: "Your table order",
@@ -357,7 +381,21 @@ export const uiCopy: Localized<UiCopy> = {
     back: "返回",
     next: "下一题",
     questionProgress: (current, total) => `第 ${current} / ${total} 题`,
-    chooseOne: "凭第一感觉选。面团醒过头，就不松软了。",
+    chooseOne: {
+      q1: "凭第一感觉选。面团醒过头，就不松软了。",
+      q2: "别想太久，面团已经在发了。",
+      q3: "这儿没有标准答案，只有你的答案。",
+      q4: "手先伸向哪个，就是哪个。",
+      q5: "第一反应，通常最诚实。",
+      q6: "没有两个师傅答得一样。",
+      q7: "这题不用量，直接答。",
+      q8: "你已经知道了，点下去。",
+      q9: "配方只是参考，这题全凭你。",
+      q10: "当柜台前没人看着你那样答。",
+      q11: "挑你平常真的会选的那个。",
+      q12: "这题别放太久。",
+      q13: "最后一题。和第一题一样，别多想。",
+    },
     resultEyebrow: "刚出炉 · 你的 HBTI",
     resultTitle: "刚出炉的，是你。",
     signatureLabel: "你的专属搭配",
@@ -500,7 +538,21 @@ export const uiCopy: Localized<UiCopy> = {
     back: "Kembali",
     next: "Seterusnya",
     questionProgress: (current, total) => `Pilihan ${current} daripada ${total}`,
-    chooseOne: "Ikut naluri pertama—doh yang terlebih menunggu akan kempis.",
+    chooseOne: {
+      q1: "Ikut naluri pertama—doh yang terlebih menunggu akan kempis.",
+      q2: "Jangan fikir lama. Doh itu sudah naik.",
+      q3: "Tiada piawai kedai di sini—hanya milik anda.",
+      q4: "Mana yang tangan anda capai dulu.",
+      q5: "Fikiran pertama selalunya yang jujur.",
+      q6: "Tiada dua pembuat roti menjawab sama.",
+      q7: "Yang ini tak perlu disukat. Jawab sahaja.",
+      q8: "Anda sudah tahu. Tekan sahaja.",
+      q9: "Resipi cuma panduan. Yang ini milik anda.",
+      q10: "Jawab seolah tiada sesiapa memerhati di kaunter.",
+      q11: "Yang anda betul-betul akan pilih pada hari biasa.",
+      q12: "Jangan biarkan yang ini terlalu lama.",
+      q13: "Yang terakhir. Sama seperti yang pertama—jangan fikir lama.",
+    },
     resultEyebrow: "Baru keluar ketuhar · HBTI anda",
     resultTitle: "Baru keluar dari ketuhar: anda.",
     signatureLabel: "Pesanan khas anda",

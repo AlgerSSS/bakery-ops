@@ -6,6 +6,17 @@
 
 ---
 
+## HBTI 页面改版（2026-07-31，已部署 Vercel）
+
+「你是哪种咖啡人」→「货架上的 16 种人」全站文案替换，照抄 hbti-copy-redesign.md：
+
+- 6 道题 prompt + 选项三语替换（★零代码子集，不改计分逻辑）
+- 16 型完全重写为面包人格（清醒贝果/碱水战友/深夜巴斯克…）
+- 界面 20 个 key 文案替换（「认领我的面包」「出炉！」…）
+- 测试同步更新文案断言，180/180 全绿
+
+部署：origin main = 26d9c47，Vercel = hotcrush-hbti-dbilrrdb3。
+
 ## 六组表合并（2026-07-31，配合财务库迁移 067-074）
 
  bakery-ops / res_api 侧代码已同步并部署 Contabo（origin main = f4375be）：

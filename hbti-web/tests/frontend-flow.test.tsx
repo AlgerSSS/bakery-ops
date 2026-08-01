@@ -278,14 +278,14 @@ describe("customer HBTI journey", () => {
     const answerPath = [
       /Something iced: 'Wake up. It's fine now.'/, // q1  iced
       /Ease you into the day/, //                     q2  light
-      /A little bitterness/, //                       q3  bitter
+      /Name the first fix while it's still warm/, //  q3  bitter
       /Alone, unhurried, no talking, no sharing/, //  q4  alone
       /Refreshing the longer someone stays/, //       q7  iced
       /Warm up slowly, but you linger/, //            q9  light
       /The honest part: someone has to say it/, //    q10 bitter
       /Don't call me\. I have plans with myself\./, //q13 alone
-      /Light with room to breathe/, //                q8  light
-      /The hard-won parts/, //                        q11 bitter
+      /Break it into steps and work alongside them/, //q8  light
+      /The one you over-baked/, //                    q11 bitter
       /Alone time\. Crowds drain the battery\./, //   q12 alone
       /Early morning, before the world gets loud/, // q5  morning
       /^A cup/, //                                    q6  drink

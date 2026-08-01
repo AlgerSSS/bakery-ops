@@ -1,0 +1,25 @@
+# 凭据 —— 含 app_secret。只存在于服务器 /opt/hotcrush/scripts/lark_app.json。
+# deploy.sh 同样把它排除在 rsync 之外：本地根本不该有这个文件，
+# 有也不该被推上去覆盖服务器那份。改密钥请直接在服务器上改。
+lark_app.json
+lark_app.json.bak-*
+
+# 运行态 —— 「服务器那份才是权威」，与 .env / *-session 同理。
+# 本地覆盖会顶掉真实的 token、月度用量计数和对账 state：
+#   .lark_token_cache.json   跨进程共享的 tenant_access_token
+#   .lark_quota_state.json   配额熔断状态（mark_recovered 会删它）
+#   .lark_usage_state.json   月度调用计数（2026-08-01 新增）
+#   *_state.json             recruit_demand_sync_state.json 等对账游标
+.lark_*
+*_state.json
+
+# 日志与运行产物
+*.log
+*.log.*
+__pycache__/
+*.pyc
+
+# 服务器上历史留下的手工备份（.bak-20260721 那批），不入库
+*.bak-*
+*.new-*
+backup-*/

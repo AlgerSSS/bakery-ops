@@ -1,0 +1,7 @@
+{
+  "_comment": "真实文件是服务器上的 /opt/hotcrush/scripts/lark_app.json（权限 600，不入库、不被 deploy.sh 同步）。这里只记录字段形状，方便重建。",
+  "app_id": "cli_xxxxxxxxxxxxxxxx",
+  "app_secret": "<32 字符，Lark 开放平台「凭证与基础信息」页获取>",
+  "base_app": "<多维表格 app_token，27 字符，从表格 URL 里取>",
+  "hr_open_id": "<收招聘晨报的人的 open_id，ou_ 开头>"
+}

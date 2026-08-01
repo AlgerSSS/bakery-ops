@@ -50,6 +50,24 @@ if [ "$TARGET" = "core" ] || [ "$TARGET" = "both" ]; then
     --exclude node_modules --exclude output --exclude .env \
     --exclude 'storageState*.json' --exclude '*.log' --exclude '/_*' \
     "$ROOT/res_api/" "$CONTABO:/opt/hotcrush/res_api/"
+  echo "==> rsync scripts → Contabo（四个招聘脚本 + lark_budget）"
+  # 这批 Python 脚本 2026-08-01 之前只存在于服务器、不受版本控制也没有异地备份，
+  # 而它们承担招聘对账、漏斗同步、晨报和次日预览。现已纳入 git 并在此同步。
+  #
+  # 排除项和 bakery-ops 的 .env / *-session 是同一个道理 ——「服务器那份才是权威」：
+  #   lark_app.json     含 app_secret，本地不该有，更不该推上去覆盖
+  #   .lark_*           token 缓存 / 配额熔断状态 / 月度调用计数
+  #   *_state.json      recruit_demand_sync_state.json 等对账游标（failure_streak 在里面）
+  # 覆盖它们 = 顶掉真实凭据、清零用量计数、丢失对账进度。
+  # 注意这些脚本由系统 cron 直接调度（/etc/cron.d/recruit-*），不经过 hotcrush-core，
+  # 所以同步完不需要重启任何服务，下一个整点自然生效。
+  rsync -az -e "$SSHC" \
+    --exclude '__pycache__' --exclude '*.pyc' \
+    --exclude 'lark_app.json' --exclude 'lark_app.json.bak-*' \
+    --exclude '.lark_*' --exclude '*_state.json' \
+    --exclude '*.log' --exclude '*.log.*' \
+    --exclude '*.bak-*' --exclude '*.new-*' --exclude 'backup-*' \
+    "$ROOT/scripts/" "$CONTABO:/opt/hotcrush/scripts/"
   echo "==> Contabo: npm install + Playwright 浏览器对齐 + next build + 重启 core"
   # ── 这一步合并了 2026-08-01 的两处独立修复，改动时三条都别丢 ──
   #

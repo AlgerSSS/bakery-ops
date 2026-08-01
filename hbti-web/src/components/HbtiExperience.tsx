@@ -759,6 +759,9 @@ function Progress({
   total: number;
   label: string;
 }) {
+  // 连续进度条：13 题时分段小药丸会换行成三排，很难看。
+  // 用一条填充式进度条，宽度按 current/total 走；role/aria-* 原样保留。
+  const percent = Math.round((current / total) * 100);
   return (
     <div className={styles.progressWrap}>
       <div
@@ -769,14 +772,11 @@ function Progress({
         aria-valuemax={total}
         aria-label={label}
       >
-        {Array.from({ length: total }, (_, index) => (
-          <span
-            key={index}
-            data-active={index < current}
-            data-current={index === current - 1}
-            aria-hidden="true"
-          />
-        ))}
+        <span
+          className={styles.progressFill}
+          style={{ width: `${percent}%` }}
+          aria-hidden="true"
+        />
       </div>
       <p>{label}</p>
     </div>

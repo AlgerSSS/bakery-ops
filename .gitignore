@@ -9,6 +9,8 @@ storageState*.json
 *_backup_*.json
 
 # res_api 调试草稿：一次性排查脚本与截图，随手产生、不入库。
-# deploy.sh 已用 --exclude "_*" 把它们排除在部署之外，这里同步排除出 git，
+# deploy.sh 已用 --exclude "/_*" 把它们排除在部署之外，这里同步排除出 git，
 # 免得 163 个文件把 git status 淹掉、让真正的改动看不见。
+# （前导斜杠是 2026-08-01 补的：原来的 "_*" 无锚点、会匹配任意层级，
+#   把 bakery-ops/src/app/api/import/_auth.ts 也一起排除掉了。）
 res_api/_*

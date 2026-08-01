@@ -220,10 +220,7 @@ async function testIntentRouter() {
     // Test keyword matching (Layer 1) — should not call LLM
     const testCases = [
       { input: "帮我招人", expected: "recruitment_sourcing" },
-      { input: "订货: 面粉:50kg", expected: "supply_order" },
-      { input: "到货: 面粉:48kg", expected: "arrival_check" },
       { input: "明天预估单", expected: "forecast_order" },
-      { input: "帮我找KOL", expected: "kol_discovery" },
     ];
 
     for (const tc of testCases) {
@@ -245,17 +242,6 @@ async function testRecruitmentDB() {
     log("recruitment", "findRecentCandidates", "pass", `count=${recent.length}`);
   } catch (e: any) {
     log("recruitment", "findRecentCandidates", "fail", e.message);
-  }
-}
-
-async function testSupplyChainDB() {
-  console.log("\n━━━ 12. Supply Chain (DB) ━━━");
-  try {
-    const { supplyOrderRepository } = await import("../src/modules/data/repositories/supply-order.repository");
-    const orders = await supplyOrderRepository.getRecentOrders("store_kl", 3);
-    log("supplychain-db", "getRecentOrders", "pass", `count=${orders.length}`);
-  } catch (e: any) {
-    log("supplychain-db", "getRecentOrders", "fail", e.message);
   }
 }
 
@@ -307,8 +293,7 @@ async function main() {
   await testSkillRegistry();
   await testIntentRouter();
   await testRecruitmentDB();
-  await testSupplyChainDB();
-  await testLarkModule();
+    await testLarkModule();
   await testKnowledgeModule();
   await testNodeCron();
 

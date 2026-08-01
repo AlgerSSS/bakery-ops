@@ -14,7 +14,6 @@ const CORE_PAGES: { id: PageId; label: string }[] = [
 const MORE_PAGES: { id: PageId; label: string }[] = [
   { id: "trends", label: "销售趋势" },
   { id: "calendar", label: "事件日历" },
-  { id: "empowerment", label: "赋能分析" },
   { id: "settings", label: "设置" },
 ];
 

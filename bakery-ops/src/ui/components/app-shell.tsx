@@ -14,7 +14,6 @@ const ProductionPage = dynamic(() => import("@/ui/components/pages/production-pa
 const TimeslotsPage = dynamic(() => import("@/ui/components/pages/timeslots-page").then(m => ({ default: m.TimeslotsPage })), { ssr: false });
 const TrendsPage = dynamic(() => import("@/ui/components/pages/trends-page").then(m => ({ default: m.TrendsPage })), { ssr: false });
 const CalendarPage = dynamic(() => import("@/ui/components/pages/calendar-page").then(m => ({ default: m.CalendarPage })), { ssr: false });
-const EmpowermentPage = dynamic(() => import("@/ui/components/pages/empowerment-page").then(m => ({ default: m.EmpowermentPage })), { ssr: false });
 const SettingsPage = dynamic(() => import("@/ui/components/pages/settings-page").then(m => ({ default: m.SettingsPage })), { ssr: false });
 
 function AppShellInner() {
@@ -33,7 +32,6 @@ function AppShellInner() {
           {activePage === "timeslots" && <TimeslotsPage navigate={navigate} />}
           {activePage === "trends" && <TrendsPage />}
           {activePage === "calendar" && <CalendarPage />}
-          {activePage === "empowerment" && <EmpowermentPage />}
           {activePage === "settings" && <SettingsPage />}
         </main>
       </ErrorBoundary>

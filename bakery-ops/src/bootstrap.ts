@@ -24,7 +24,6 @@ import { runInterviewDigest } from "./modules/domain/recruitment/digest/intervie
 import { drainOutboundQueue } from "./modules/channel/whatsapp/outbound.worker";
 import { runWeeklyReport } from "./modules/domain/notifications/weekly-report.service";
 import { runStockoutDetection } from "./modules/domain/forecast/stockout-detector.service";
-import { runOrderReminder } from "./modules/domain/supplychain/order-reminder.service";
 import { runAppointmentReminder } from "./modules/domain/recruitment/appointment-reminder.service";
 import { runProbationReminder } from "./modules/domain/recruitment/probation-reminder.service";
 import { syncLarkOrg } from "./modules/domain/lark/lark-org-sync.service";
@@ -176,7 +175,6 @@ async function runBootstrap() {
 
   // 15. 工作日 16:00 订货提醒：默认暂停；显式设 true 后恢复。
   if (onCore && process.env.ORDER_REMINDER_ENABLED === "true") {
-    cron.schedule("0 16 * * 1-5", wrapCron("order_reminder", runOrderReminder), TZ);
   }
 
   // 15a. 每日 14:30 加减货建议：据今日到 14:20 实际销量(res_api intraday 14:20 拉)判加/减，

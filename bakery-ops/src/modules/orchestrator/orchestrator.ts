@@ -9,7 +9,6 @@ import { ConversationManager } from "./conversation-manager";
 import type { ChatHistoryEntry } from "./conversation-manager";
 import { ResponseFormatter } from "./response-formatter";
 import { UserNotRegisteredError } from "../shared/errors/skill-error";
-import { kolRepository } from "../data/repositories/kol.repository";
 import { chatHistoryRepository } from "../data/repositories/chat-history.repository";
 import { resolveGroupsForMessage } from "./department-resolver";
 import { isSkillAllowedForGroups, GROUP_LABELS } from "./department-permissions";
@@ -61,47 +60,23 @@ export class Orchestrator {
       user = this.permissionService.identifyUser(message.phone || "");
     } catch (err) {
       if (err instanceof UserNotRegisteredError) {
-        // 检查是否是已知 KOL（博主被 DM 引流来 WhatsApp）
-        const phone = message.phone || "";
-        // 限定 KOL 查询时长：DB 不可达/缓慢时退回未注册响应（与原行为一致），避免阻塞
-        const kol = await Promise.race([
-          kolRepository.getByPhone(phone).catch(() => null),
-          new Promise<null>((res) => setTimeout(() => res(null), 2000)),
-        ]);
-        if (kol) {
-          user = {
-            userId: `kol_${kol.id}`,
-            phone,
-            name: kol.name,
-            role: "kol",
-            permissions: ["marketing.use"],
-            storeIds: [],
-          };
-          this.permissionService.registerUser(user);
-        } else {
-          // 陌生号码：友好英文邀约 + 建一个"潜在候选人"对话，回复 1 即进入招聘漏斗（之前一样的流程）。
-          try {
-            const { recruitmentPreRouter } = await import(
-              "../domain/recruitment/intake/recruitment-pre-router"
-            );
-            const greet = await recruitmentPreRouter.greetStranger(message);
-            if (greet) return greet;
-          } catch (greetErr) {
-            logger.warn("greetStranger failed, falling through", { error: String(greetErr) });
-          }
-          // 兜底：开放收件箱，不回拒绝语。
-          logger.info("Unregistered inbound — open inbox, no auto-reply", { phone });
-          return [];
+        // 陌生号码：友好英文邀约 + 建一个"潜在候选人"对话，回复 1 即进入招聘漏斗。
+        // （KOL 识别分支已随营销模块暂停移除 —— kols 表已删，见迁移 076。）
+        try {
+          const { recruitmentPreRouter } = await import(
+            "../domain/recruitment/intake/recruitment-pre-router"
+          );
+          const greet = await recruitmentPreRouter.greetStranger(message);
+          if (greet) return greet;
+        } catch (greetErr) {
+          logger.warn("greetStranger failed, falling through", { error: String(greetErr) });
         }
+        // 兜底：开放收件箱，不回拒绝语。
+        logger.info("Unregistered inbound — open inbox, no auto-reply", { phone: message.phone });
+        return [];
       } else {
         throw err;
       }
-    }
-
-    // 1a. KOL 回流闭环（F15）：博主的入站消息不走技能路由——记 dm_received 样本、
-    //     合作置 negotiating、原文转发老板、回一句固定英文致谢。
-    if (user.role === "kol") {
-      return this.handleKolInbound(user, text);
     }
 
     // 2. 获取对话历史
@@ -230,53 +205,6 @@ export class Orchestrator {
     history.push({ role: "assistant", content: reply });
     this.conversationManager.trimHistory(message.conversationId);
     return [{ type: "text", text: reply }];
-  }
-
-  /**
-   * F15: role=kol 的入站消息处理。记录/转发失败只进日志，不影响给博主的固定致谢回复。
-   * 懒加载 repositories 与 internal-notify（内含 whatsapp.client），避免把 whatsapp-web.js 拖进非 WhatsApp 调用方。
-   */
-  private async handleKolInbound(user: User, text: string): Promise<ChannelResponse[]> {
-    const kolId = user.userId.startsWith("kol_") ? user.userId.slice("kol_".length) : user.userId;
-
-    try {
-      const { chatSampleRepository } = await import("../data/repositories/chat-sample.repository");
-      await chatSampleRepository.create({
-        kol_id: kolId,
-        platform: "whatsapp",
-        message_content: text,
-        message_type: "dm_received",
-      });
-
-      const { kolCollaborationRepository } = await import(
-        "../data/repositories/kol-collaboration.repository"
-      );
-      const collabs = await kolCollaborationRepository.getByKOLId(kolId);
-      if (collabs[0]) {
-        await kolCollaborationRepository.updateStatus(collabs[0].id, "negotiating", {
-          dm_response: text,
-          dm_responded_at: new Date().toISOString(),
-        });
-      }
-    } catch (err) {
-      logger.error("KOL inbound: failed to record reply", { kolId, error: String(err) });
-    }
-
-    // 原文转发老板（已建立会话号码，非冷发送）
-    const owner = process.env.OWNER_WHATSAPP || process.env.OWNER_PHONE || "";
-    if (owner) {
-      try {
-        const { notifyInternal } = await import("../channel/internal-notify");
-        await notifyInternal(owner, `【KOL 回复】${user.name} (${user.phone}):\n${text}`);
-      } catch (fwdErr) {
-        logger.error("KOL inbound: owner forward failed", { kolId, error: String(fwdErr) });
-      }
-    }
-
-    return [{
-      type: "text",
-      text: "Thank you for getting back to us! We've received your message and our team will reply to you shortly.",
-    }];
   }
 
   private async runSkillAndRespond(

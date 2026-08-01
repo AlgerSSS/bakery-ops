@@ -2,7 +2,6 @@ import { query, execute, withTransaction } from "@/modules/shared/db/postgres";
 import type {
   Holiday,
   ContextEvent,
-  EmpowermentEvent,
 } from "@/modules/domain/forecast/types";
 
 // ========== DB Row Types ==========
@@ -25,22 +24,6 @@ interface ContextEventRow {
   created_by: string;
 }
 
-interface EmpowermentEventRow {
-  id: number;
-  event_name: string;
-  event_type: string;
-  start_date: string;
-  end_date: string;
-  target_products: string;
-  platform: string;
-  exposure_count: number;
-  click_count: number;
-  cost: number;
-  operation_type: string;
-  operation_detail: string;
-  review_json: string;
-  reviewed_at: string | null;
-}
 
 // ========== Converters ==========
 function rowToContextEvent(row: ContextEventRow): ContextEvent {
@@ -55,24 +38,6 @@ function rowToContextEvent(row: ContextEventRow): ContextEvent {
   };
 }
 
-function rowToEmpowermentEvent(row: EmpowermentEventRow): EmpowermentEvent {
-  return {
-    id: row.id,
-    eventName: row.event_name,
-    eventType: row.event_type as EmpowermentEvent["eventType"],
-    startDate: row.start_date,
-    endDate: row.end_date,
-    targetProducts: row.target_products,
-    platform: row.platform,
-    exposureCount: row.exposure_count,
-    clickCount: row.click_count,
-    cost: row.cost,
-    operationType: row.operation_type,
-    operationDetail: row.operation_detail,
-    reviewJson: row.review_json,
-    reviewedAt: row.reviewed_at,
-  };
-}
 
 // ========== Holidays ==========
 export async function getHolidays(year?: number, month?: number): Promise<Holiday[]> {
@@ -128,24 +93,3 @@ export async function deleteContextEvent(id: number): Promise<void> {
   await execute("DELETE FROM context_event WHERE id = ?", [id]);
 }
 
-// ========== Empowerment Events ==========
-export async function getEmpowermentEvents(): Promise<EmpowermentEvent[]> {
-  const rows = await query<EmpowermentEventRow>("SELECT * FROM empowerment_event ORDER BY start_date DESC");
-  return rows.map(rowToEmpowermentEvent);
-}
-
-export async function addEmpowermentEvent(event: Omit<EmpowermentEvent, "id" | "reviewJson" | "reviewedAt">): Promise<void> {
-  await execute(
-    `INSERT INTO empowerment_event (event_name, event_type, start_date, end_date, target_products, platform, exposure_count, click_count, cost, operation_type, operation_detail)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [event.eventName, event.eventType, event.startDate, event.endDate, event.targetProducts, event.platform, event.exposureCount, event.clickCount, event.cost, event.operationType, event.operationDetail]
-  );
-}
-
-export async function updateEmpowermentReview(id: number, reviewJson: string): Promise<void> {
-  await execute("UPDATE empowerment_event SET review_json = ?, reviewed_at = NOW() WHERE id = ?", [reviewJson, id]);
-}
-
-export async function deleteEmpowermentEvent(id: number): Promise<void> {
-  await execute("DELETE FROM empowerment_event WHERE id = ?", [id]);
-}

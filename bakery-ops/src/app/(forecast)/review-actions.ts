@@ -14,10 +14,6 @@ import {
   getDailyRevenues,
   upsertDailyRevenue,
   getProductSalesTrend,
-  getEmpowermentEvents,
-  addEmpowermentEvent,
-  updateEmpowermentReview,
-  deleteEmpowermentEvent,
 } from "@/modules/data/repositories/forecast.repository";
 
 export {
@@ -34,8 +30,4 @@ export {
   getDailyRevenues,
   upsertDailyRevenue,
   getProductSalesTrend,
-  getEmpowermentEvents,
-  addEmpowermentEvent,
-  updateEmpowermentReview,
-  deleteEmpowermentEvent,
 };

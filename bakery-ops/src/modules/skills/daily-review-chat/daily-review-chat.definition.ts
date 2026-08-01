@@ -102,7 +102,8 @@ async function getSalesData(date: string): Promise<string> {
   const waterBar = await query<any>(WATER_BAR_SQL, [date, bevNames]);
   const payment = await query<any>("SELECT dim_value AS payment_method, net_sales, ratio FROM daily_breakdown WHERE date = $1 AND dim_type = 'payment' ORDER BY net_sales DESC", [date]);
   const dining = await query<any>("SELECT dim_value AS dining_option, bill_count, net_sales, ratio FROM daily_breakdown WHERE date = $1 AND dim_type = 'dining'", [date]);
-  const pnl = await query<any>("SELECT * FROM daily_pnl WHERE date = $1", [date]);
+  // daily_pnl 已随休眠管线删除（迁移 076）：sync-pnl.js 是手动 Excel 导入、从未进过每日链条，
+  // 表一直为空。损益段落的空数据路径移除，复盘上下文没有任何可观察变化。
   const wasteByReason = await query<any>("SELECT waste_reason, SUM(qty) as total_qty, SUM(amount) as total_amount FROM item_waste WHERE date = $1 GROUP BY waste_reason", [date]);
   // 报废王只取「排产报废」(可改进的过量)；试吃(品尝)属品控/推广投入，不进报废王。品名转中文。
   const wasteTop = await query<any>(
@@ -168,14 +169,6 @@ async function getSalesData(date: string): Promise<string> {
   } else {
     ctx += `【${date} 当日数据】暂无（可能还未同步）\n`;
     if (forecastTarget) ctx += `今日应做: RM${forecastTarget.targetRevenue}\n`;
-  }
-
-  if (pnl.length) {
-    const p = pnl[0];
-    ctx += `\n【损益数据】\n`;
-    ctx += `报废合计: RM${p.waste_total || 0} (排产:RM${p.waste_scheduling || 0}, 品尝:RM${p.waste_tasting || 0}, 生产:RM${p.waste_production || 0})\n`;
-    if (p.labor_cost) ctx += `人力成本: RM${p.labor_cost}\n`;
-    if (p.net_profit) ctx += `净利润: RM${p.net_profit}\n`;
   }
 
   if (wasteByReason.length) {

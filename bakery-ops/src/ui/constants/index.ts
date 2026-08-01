@@ -7,4 +7,4 @@ export const DEFAULT_COEFFICIENTS: Record<string, number> = {
 
 export const TREND_COLORS = ["#0071e3", "#34C759", "#FF9500", "#AF52DE", "#FF3B30", "#5AC8FA", "#FF2D55", "#5856D6", "#FFCC00", "#1d1d1f"];
 
-export type PageId = "overview" | "production" | "review" | "timeslots" | "trends" | "calendar" | "empowerment" | "settings";
+export type PageId = "overview" | "production" | "review" | "timeslots" | "trends" | "calendar" | "settings";

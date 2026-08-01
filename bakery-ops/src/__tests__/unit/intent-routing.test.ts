@@ -69,25 +69,23 @@ describe("IntentRouter — canonical examples route to the owning skill", () => 
 describe("IntentRouter — efficiency + safety invariants", () => {
   it("fast-paths a high-confidence unique keyword without any LLM call", async () => {
     const registry = buildRegistry();
-    const { ai, calls } = mockAiThatPicks("supply_send");
+    const { ai, calls } = mockAiThatPicks("backup_pool");
     const router = new IntentRouter(registry, ai);
-    const result = await router.route("发给供应商", []);
+    const result = await router.route("备选池", []);
     expect(result.action).toBe("skill");
-    expect(result.skillId).toBe("supply_send");
-    expect(calls()).toBe(0); // no LLM round-trip for an unambiguous message
+    expect(result.skillId).toBe("backup_pool");
+    expect(calls()).toBe(0);
   });
 
-  it("defers a 'soft' keyword (substring of a sibling skill's keyword) to the LLM", async () => {
+  it("defers ambiguous keyword to the LLM", async () => {
     const registry = buildRegistry();
-    // '订货' is a substring of supply_send's '发送订货', so it is not high-confidence.
-    const { ai, calls, lastSystem } = mockAiThatPicks("supply_order");
+    const { ai, calls, lastSystem } = mockAiThatPicks("recruitment_sourcing");
     const router = new IntentRouter(registry, ai);
-    const result = await router.route("订货 面粉 50kg", []);
+    const result = await router.route("招聘 服务员", []);
+    // recruitment_sourcing is in NEEDS_LLM_TRIAGE — keyword match still goes to LLM
     expect(calls()).toBe(1);
-    // Candidate subset must include both the order and send skills.
-    expect(lastSystem()).toContain("- supply_order:");
-    expect(lastSystem()).toContain("- supply_send:");
-    expect(result.skillId).toBe("supply_order");
+    expect(lastSystem()).toContain("- recruitment_sourcing:");
+    expect(result.skillId).toBe("recruitment_sourcing");
   });
 
   it("never emits a skillId outside the registry (no orphans)", async () => {

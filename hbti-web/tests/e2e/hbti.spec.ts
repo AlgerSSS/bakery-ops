@@ -168,6 +168,11 @@ async function assertNoHorizontalOverflow(page: Page) {
   expect(overflow.body).toBeLessThanOrEqual(0);
 }
 
+const TOTAL_QUESTIONS = 13;
+// 展示顺序 q1,q2,q3,q4,q7,q9,q10,q13,q8,q11,q12,q5,q6
+// 同轴三票一致 → 结果稳定为 ILBA，与改版前该用例的落点相同。
+const DEFAULT_ANSWER_PATH = [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0] as const;
+
 async function startQuiz(page: Page) {
   await page.getByRole("button", { name: /Claim my bread/ }).click();
   await expect(page.getByRole("progressbar")).toHaveAttribute(
@@ -176,11 +181,11 @@ async function startQuiz(page: Page) {
   );
 }
 
-async function answerExactlySixQuestions(
+async function answerAllQuestions(
   page: Page,
-  optionIndexes: readonly number[] = [1, 1, 1, 0, 0, 0],
+  optionIndexes: readonly number[] = DEFAULT_ANSWER_PATH,
 ) {
-  expect(optionIndexes).toHaveLength(6);
+  expect(optionIndexes).toHaveLength(TOTAL_QUESTIONS);
 
   for (let index = 0; index < optionIndexes.length; index += 1) {
     const progress = page.getByRole("progressbar");
@@ -188,11 +193,15 @@ async function answerExactlySixQuestions(
       "aria-valuenow",
       String(index + 1),
     );
-    await expect(progress).toHaveAttribute("aria-valuemax", "6");
+    await expect(progress).toHaveAttribute(
+      "aria-valuemax",
+      String(TOTAL_QUESTIONS),
+    );
     await assertNoHorizontalOverflow(page);
 
+    // 打包题（最后一题）三个选项，其余两个。
     const answers = page.locator("fieldset").getByRole("button");
-    await expect(answers).toHaveCount(index === 5 ? 3 : 2);
+    await expect(answers).toHaveCount(index === TOTAL_QUESTIONS - 1 ? 3 : 2);
     await answers.nth(optionIndexes[index]).click();
 
     if (index < optionIndexes.length - 1) {
@@ -448,7 +457,7 @@ test("switches the same page between English, Chinese, and Malay", async ({
   await page.getByRole("button", { name: /Bahasa Melayu/ }).click();
   await expect(
     page.getByRole("heading", {
-      name: "Anda jenis pencinta kopi yang mana?",
+      name: "Anda roti yang mana di rak kami?",
     }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "ms-MY");
@@ -473,19 +482,19 @@ test("restores a local draft and Back returns to the saved answer", async ({
 
   await page.getByRole("button", { name: /Claim my bread/ }).click();
   await page
-    .getByRole("button", { name: /A cup still steaming in your hands/ })
+    .getByRole("button", { name: /Something hot: 'Slow down. No rush.'/ })
     .click();
 
   await expect(
     page.getByRole("heading", {
-      name: "That first warm bite is best—",
+      name: "If coffee were a person, you’d want them to—",
     }),
   ).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(() =>
         Object.keys(localStorage).some((key) =>
-          key.startsWith("hot-crush-hbti-draft-v1:"),
+          key.startsWith("hot-crush-hbti-draft-v2:"),
         ),
       ),
     )
@@ -494,19 +503,19 @@ test("restores a local draft and Back returns to the saved answer", async ({
   await page.reload();
   await expect(
     page.getByRole("heading", {
-      name: "That first warm bite is best—",
+      name: "If coffee were a person, you’d want them to—",
     }),
   ).toBeVisible();
 
   await page.getByRole("button", { name: /^Back/ }).click();
   await expect(
     page.getByRole("heading", {
-      name: "It’s Friday after work. You push open the door—what do you want first?",
+      name: "After a long day, which comfort do you want handed to you?",
     }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", {
-      name: /A cup still steaming in your hands/,
+      name: /Something hot: 'Slow down. No rush.'/,
     }),
   ).toHaveAttribute("aria-pressed", "true");
 
@@ -543,7 +552,7 @@ test("recovers when member-account status cannot be checked", async ({
   expect(network.completionCalls()).toBe(0);
 });
 
-test("completes exactly six questions and safely retries from 500 to issued", async ({
+test("completes all thirteen questions and safely retries from 500 to issued", async ({
   page,
 }) => {
   await installResultCardCapture(page);
@@ -571,20 +580,20 @@ test("completes exactly six questions and safely retries from 500 to issued", as
   await assertNoHorizontalOverflow(page);
 
   await startQuiz(page);
-  await answerExactlySixQuestions(page);
+  await answerAllQuestions(page);
 
   await expect(
     page.getByRole("heading", { name: "The Clear-Eyed Bagel" }),
   ).toBeVisible();
   await assertNoHorizontalOverflow(page);
   await page
-    .getByRole("button", { name: /Receive my member gift/ })
+    .getByRole("button", { name: /Collect my fresh-out gift/ })
     .click();
 
   const preview = page.getByTestId("result-colour-preview");
   await expect(preview).toHaveAttribute("data-color", "neutral");
   await expect(
-    page.getByRole("button", { name: /Finish my HBTI/ }),
+    page.getByRole("button", { name: /Out of the oven!/ }),
   ).toBeDisabled();
   await assertNoHorizontalOverflow(page);
   const colourGroup = page.getByRole("group", {
@@ -614,7 +623,7 @@ test("completes exactly six questions and safely retries from 500 to issued", as
 
   const downloadPromise = page.waitForEvent("download");
   await page
-    .getByRole("button", { name: "Save my card", exact: true })
+    .getByRole("button", { name: "Save my bread card", exact: true })
     .click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("hot-crush-ilba.png");
@@ -635,7 +644,7 @@ test("completes exactly six questions and safely retries from 500 to issued", as
 
   await page
     .getByRole("button", {
-      name: "Share with a friend",
+      name: "Send a friend to the shelf",
       exact: true,
     })
     .click();
@@ -664,7 +673,7 @@ test("completes exactly six questions and safely retries from 500 to issued", as
   ).not.toContain(privateMarker);
 
   await page
-    .getByRole("button", { name: /Finish my HBTI/ })
+    .getByRole("button", { name: /Out of the oven!/ })
     .click();
 
   await expect(page.locator('p[role="alert"]')).toContainText(
@@ -675,7 +684,7 @@ test("completes exactly six questions and safely retries from 500 to issued", as
   await assertNoHorizontalOverflow(page);
 
   await page
-    .getByRole("button", { name: /Finish my HBTI/ })
+    .getByRole("button", { name: /Out of the oven!/ })
     .click();
 
   await expect(
@@ -736,16 +745,16 @@ test("keeps polling a processing reward until RES confirms it", async ({
 
   await openInvitation(page);
   await startQuiz(page);
-  await answerExactlySixQuestions(page);
+  await answerAllQuestions(page);
   await page
-    .getByRole("button", { name: /Receive my member gift/ })
+    .getByRole("button", { name: /Collect my fresh-out gift/ })
     .click();
   await page
     .getByRole("group", { name: "Favourite colour" })
     .getByRole("button", { name: "Pistachio green", exact: true })
     .click();
   await page
-    .getByRole("button", { name: /Finish my HBTI/ })
+    .getByRole("button", { name: /Out of the oven!/ })
     .click();
 
   await expect(
@@ -765,18 +774,18 @@ for (const localizedJourney of [
   {
     label: "Chinese",
     languageButton: /简体中文/,
-    begin: "进入 HBTI 测试",
-    firstQuestion: "周五下班，你推开店门，第一秒想要的是——",
-    resultName: "清醒观察者",
+    begin: "认领我的面包",
+    firstQuestion: "辛苦一天之后，你更想被怎样安慰？",
+    resultName: "清醒贝果",
     lang: "zh-CN",
   },
   {
     label: "Malay",
     languageButton: /Bahasa Melayu/,
-    begin: "Mulakan ujian HBTI",
+    begin: "Tuntut roti saya",
     firstQuestion:
-      "Hari Jumaat selepas kerja, bila anda buka pintu kedai, apa yang paling anda teringin?",
-    resultName: "Pemerhati Tajam",
+      "Selepas hari yang panjang, pujukan mana yang anda mahu?",
+    resultName: "Bagel Mata Jernih",
     lang: "ms-MY",
   },
 ] as const) {
@@ -802,7 +811,7 @@ for (const localizedJourney of [
       }),
     ).toBeVisible();
 
-    await answerExactlySixQuestions(page);
+    await answerAllQuestions(page);
 
     await expect(
       page.getByRole("heading", { name: localizedJourney.resultName }),
@@ -838,7 +847,7 @@ test("supports the core journey with keyboard input only", async ({ page }) => {
   await expectFocusIndicator(begin);
   await page.keyboard.press("Enter");
 
-  for (let index = 0; index < 6; index += 1) {
+  for (let index = 0; index < TOTAL_QUESTIONS; index += 1) {
     const questionHeading = page.locator('h1[id^="question-"]');
     await expect(questionHeading).toBeFocused();
     const firstAnswer = page.locator("fieldset").getByRole("button").first();
@@ -846,7 +855,7 @@ test("supports the core journey with keyboard input only", async ({ page }) => {
     await expectFocusIndicator(firstAnswer);
     await page.keyboard.press("Space");
 
-    if (index < 5) {
+    if (index < TOTAL_QUESTIONS - 1) {
       await expect(page.getByRole("progressbar")).toHaveAttribute(
         "aria-valuenow",
         String(index + 2),
@@ -855,10 +864,10 @@ test("supports the core journey with keyboard input only", async ({ page }) => {
   }
 
   await expect(
-    page.getByRole("heading", { name: "This feels like you." }),
+    page.getByRole("heading", { name: "Fresh out of the oven: you." }),
   ).toBeFocused();
   const receiveGift = page.getByRole("button", {
-    name: /Receive my member gift/,
+    name: /Collect my fresh-out gift/,
   });
   await tabTo(page, receiveGift);
   await page.keyboard.press("Enter");
@@ -875,7 +884,7 @@ test("supports the core journey with keyboard input only", async ({ page }) => {
   await page.keyboard.press("Space");
 
   const submit = page.getByRole("button", {
-    name: /Finish my HBTI/,
+    name: /Out of the oven!/,
   });
   await tabTo(page, submit);
   await expectFocusIndicator(submit);

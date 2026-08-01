@@ -272,15 +272,27 @@ describe("customer HBTI journey", () => {
     });
     await user.click(screen.getByRole("button", { name: /Claim my bread|proofing—continue|认领我的面包|接着来/ }));
 
-    await chooseAndContinue(
-      user,
-      /Something iced: 'Wake up. It's fine now.'/,
-    );
-    await chooseAndContinue(user, /Ease you into the day/);
-    await chooseAndContinue(user, /A little bitterness/);
-    await chooseAndContinue(user, /Alone, unhurried, no talking, no sharing/);
-    await chooseAndContinue(user, /Early morning, before the world gets loud/);
-    await chooseAndContinue(user, /^A cup/);
+    // 按题目展示顺序作答，凑出 ILBA：
+    // 温度 iced,iced,(morning=hot) → I；浓淡三票 light → L；
+    // 甜苦三票 bitter → B；独同三票 alone → A。
+    const answerPath = [
+      /Something iced: 'Wake up. It's fine now.'/, // q1  iced
+      /Ease you into the day/, //                     q2  light
+      /A little bitterness/, //                       q3  bitter
+      /Alone, unhurried, no talking, no sharing/, //  q4  alone
+      /Refreshing the longer someone stays/, //       q7  iced
+      /Warm up slowly, but you linger/, //            q9  light
+      /The honest part: someone has to say it/, //    q10 bitter
+      /Don't call me\. I have plans with myself\./, //q13 alone
+      /Light with room to breathe/, //                q8  light
+      /The hard-won parts/, //                        q11 bitter
+      /Alone time\. Crowds drain the battery\./, //   q12 alone
+      /Early morning, before the world gets loud/, // q5  morning
+      /^A cup/, //                                    q6  drink
+    ];
+    for (const option of answerPath) {
+      await chooseAndContinue(user, option);
+    }
 
     expect(
       await screen.findByRole("heading", { name: "The Clear-Eyed Bagel" }),
@@ -324,6 +336,13 @@ describe("customer HBTI journey", () => {
         q4: "alone",
         q5: "morning",
         q6: "drink",
+        q7: "iced",
+        q8: "light",
+        q9: "light",
+        q10: "bitter",
+        q11: "bitter",
+        q12: "alone",
+        q13: "alone",
       },
     });
     expect(completionBody).not.toHaveProperty("token");
@@ -332,7 +351,7 @@ describe("customer HBTI journey", () => {
     await waitFor(() => {
       expect(
         Object.keys(window.localStorage).filter((key) =>
-          key.startsWith("hot-crush-hbti-draft-v1:"),
+          key.startsWith("hot-crush-hbti-draft-"),
         ),
       ).toHaveLength(0);
     });

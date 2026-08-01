@@ -10,6 +10,13 @@ vi.mock("@/modules/domain/recruitment/intake/recruitment-pre-router", () => ({
   },
 }));
 
+/* 同上：ConversationManager 的 `void repo.replace()` 会往生产库发 DELETE FROM chat_history
+   （不 await，落没落看时序）。单测一律不碰真库。 */
+vi.mock("@/modules/shared/db/postgres", () => ({
+  query: vi.fn().mockResolvedValue([]),
+  execute: vi.fn().mockResolvedValue({ affectedRows: 0 }),
+}));
+
 import { SkillRegistry } from "@/modules/orchestrator/skill-registry";
 import { IntentRouter, type AiRouterProvider } from "@/modules/orchestrator/intent-router";
 import { StateManager } from "@/modules/orchestrator/state-manager";

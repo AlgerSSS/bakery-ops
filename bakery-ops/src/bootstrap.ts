@@ -161,11 +161,11 @@ async function runBootstrap() {
   // 9b. 每晚 23:30 今日复盘：收件人读 staff 订阅（Lark 发送），无数据记 cron 失败
   if (onCore) cron.schedule("30 23 * * *", wrapCron("morning_brief", runMorningBrief), TZ);
 
-  // 9c. 每日 03:00 同步 Lark 组织架构 → staff（保留用户配的 role/subscriptions）。core 启动时也同步一次。
-  if (onCore) {
-    cron.schedule("0 3 * * *", wrapCron("lark_org_sync", async () => { await syncLarkOrg(); }), TZ);
-    void syncLarkOrg().catch((e) => logger.warn("startup lark org sync failed", { error: String(e) }));
-  }
+  // 9c. 每日 03:00 同步 Lark 组织架构 → staff（保留用户配的 role/subscriptions）。
+  // 2026-08-01 去掉了原本的「启动时也同步一次」：每次同步约 5 次 Lark 调用（1 次拉部门
+  // + 每部门分页拉人），而 Lark 是按自然月 10000 次计费。组织架构是日级变化，重启却可能
+  // 一天很多次——光 08-01 那天的几次部署就白烧了 5 轮。需要立即同步时手动跑，别挂在启动路径上。
+  if (onCore) cron.schedule("0 3 * * *", wrapCron("lark_org_sync", async () => { await syncLarkOrg(); }), TZ);
 
   // 13. 每周一 10:00 经营周报（F3）
   if (onCore) cron.schedule("0 10 * * 1", wrapCron("weekly_report", runWeeklyReport), TZ);
@@ -173,9 +173,10 @@ async function runBootstrap() {
   // 14. 每晚 23:30 断货检测（检测口径为"昨日"）
   if (onCore) cron.schedule("30 23 * * *", wrapCron("stockout_detect", runStockoutDetection), TZ);
 
-  // 15. 工作日 16:00 订货提醒：默认暂停；显式设 true 后恢复。
-  if (onCore && process.env.ORDER_REMINDER_ENABLED === "true") {
-  }
+  // 15. 订货提醒（原工作日 16:00）已移除：runOrderReminder 服务连同实现一起删掉了，
+  //     这里只剩过一个空的 if (ORDER_REMINDER_ENABLED === "true") {} 空壳。
+  //     注释曾写「显式设 true 后恢复」，但块里没有任何注册代码，设了也不会恢复 —— 已删除，
+  //     避免下一个人以为翻个开关就能把功能打开。要恢复得先把服务实现写回来。
 
   // 15a. 每日 14:30 加减货建议：据今日到 14:20 实际销量(res_api intraday 14:20 拉)判加/减，
   //      Lark 订阅制('restock_advice')，测试期只发 owner。数据不全时引擎自带护栏返回空。

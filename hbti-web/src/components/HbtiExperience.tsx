@@ -36,8 +36,12 @@ import {
 import styles from "./hbti.module.css";
 import { useLocale } from "./useLocale";
 
-const DRAFT_KEY_PREFIX = "hot-crush-hbti-draft-v1";
-const DRAFT_VERSION = 1;
+// v2：题目从 6 题扩到 13 题（每轴三票多数决）。v1 草稿只有 q1–q6，
+// 恢复后 hasCompleteAnswers 必然为 false，若它停在 result/details 阶段
+// 就会还原到一个算不出分数的页面。直接换键让旧草稿失效、从头答，
+// 比带着半份答案走进坏分支干净。
+const DRAFT_KEY_PREFIX = "hot-crush-hbti-draft-v2";
+const DRAFT_VERSION = 2;
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const MEMBER_WALLET_URL =
@@ -55,7 +59,7 @@ type SubmissionState =
   | "error";
 
 interface HbtiDraft {
-  version: 1;
+  version: 2;
   savedAt: number;
   answers: Partial<HbtiAnswers>;
   currentQuestion: number;

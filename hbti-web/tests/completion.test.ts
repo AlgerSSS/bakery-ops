@@ -194,6 +194,13 @@ const validAnswers = {
   q4: "alone",
   q5: "night",
   q6: "drink",
+  q7: "iced",
+  q8: "strong",
+  q9: "strong",
+  q10: "bitter",
+  q11: "bitter",
+  q12: "alone",
+  q13: "alone",
 } as const;
 
 describe("completeHbti", () => {

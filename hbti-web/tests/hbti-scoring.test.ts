@@ -13,6 +13,13 @@ describe("scoreHbti", () => {
       q4: "alone",
       q5: "night",
       q6: "drink",
+      q7: "iced",
+      q8: "strong",
+      q9: "strong",
+      q10: "bitter",
+      q11: "bitter",
+      q12: "alone",
+      q13: "alone",
     });
 
     expect(result.code).toBe("ISBA");
@@ -38,6 +45,13 @@ describe("scoreHbti", () => {
       q4: "together",
       q5: "morning",
       q6: "dessert",
+      q7: "iced",
+      q8: "light",
+      q9: "light",
+      q10: "dolce",
+      q11: "dolce",
+      q12: "together",
+      q13: "together",
     });
 
     expect(result).toEqual({
@@ -53,7 +67,7 @@ describe("scoreHbti", () => {
     });
   });
 
-  it("validates the complete six-answer contract", () => {
+  it("validates the complete thirteen-answer contract", () => {
     expect(
       hbtiAnswersSchema.safeParse({
         q1: "hot",
@@ -62,6 +76,13 @@ describe("scoreHbti", () => {
         q4: "together",
         q5: "morning",
         q6: "bakery",
+        q7: "hot",
+        q8: "light",
+        q9: "light",
+        q10: "dolce",
+        q11: "dolce",
+        q12: "together",
+        q13: "together",
       }).success,
     ).toBe(true);
 

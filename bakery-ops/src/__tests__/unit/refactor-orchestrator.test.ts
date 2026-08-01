@@ -9,6 +9,14 @@ vi.mock("@/modules/domain/recruitment/intake/recruitment-pre-router", () => ({
   },
 }));
 
+/* 上面挡了 pre-router，chat_history 这条还是漏到了生产库：ConversationManager 用
+   `void this.repo?.replace(...)` 发 DELETE FROM chat_history，不 await——worker 退出时
+   连接常常还在飞，落没落全看时序。单测不该碰真库，这里把 DB 层整个换掉。 */
+vi.mock("@/modules/shared/db/postgres", () => ({
+  query: vi.fn().mockResolvedValue([]),
+  execute: vi.fn().mockResolvedValue({ affectedRows: 0 }),
+}));
+
 import { ConversationManager } from "@/modules/orchestrator/conversation-manager";
 import { ResponseFormatter } from "@/modules/orchestrator/response-formatter";
 import { IntentRouter, type AiRouterProvider } from "@/modules/orchestrator/intent-router";

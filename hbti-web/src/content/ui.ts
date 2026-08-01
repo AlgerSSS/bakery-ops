@@ -207,7 +207,7 @@ export const uiCopy: Localized<UiCopy> = {
     introTitle: "Which bread on our shelf is you?",
     introBody:
       "Sixteen bread personalities, baked fresh every morning. A few small questions to claim the one with your name on it.",
-    introTime: "6 little choices · about 40 seconds",
+    introTime: "13 little choices · about 90 seconds",
     introReward: "P.S. There's a little something waiting at the counter once yours is out of the oven.",
     begin: "Claim my bread",
     resume: "The dough's still proofing—continue",
@@ -350,7 +350,7 @@ export const uiCopy: Localized<UiCopy> = {
     introEyebrow: "Freshly Crafted Every Day · 每日新鲜制作",
     introTitle: "你是货架上的哪一块？",
     introBody: "16 种面包性格，每天新鲜出炉。几个小问题，认领那块和你同名的。",
-    introTime: "6 个小选择 · 大约 40 秒",
+    introTime: "13 个小选择 · 大约 90 秒",
     introReward: "顺便说一句：出炉之后，柜台有一份小心意等你。",
     begin: "认领我的面包",
     resume: "面团还醒着，接着来",
@@ -493,7 +493,7 @@ export const uiCopy: Localized<UiCopy> = {
     introTitle: "Anda roti yang mana di rak kami?",
     introBody:
       "Enam belas personaliti roti, dibakar segar setiap pagi. Beberapa soalan kecil untuk menuntut yang tertulis nama anda.",
-    introTime: "6 pilihan kecil · kira-kira 40 saat",
+    introTime: "13 pilihan kecil · kira-kira 90 saat",
     introReward: "P.S. Ada sedikit buah tangan menanti di kaunter selepas roti anda keluar ketuhar.",
     begin: "Tuntut roti saya",
     resume: "Doh masih menunggu—sambung",

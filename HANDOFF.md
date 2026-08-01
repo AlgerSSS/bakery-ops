@@ -624,12 +624,32 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 5. **爬虫写入窗口是 KL 时间每晚 23:00 前后**，任何 DDL 都要避开，建议 01:00–13:00 之间做。
 
+6. **单测没有全局 DB 挡板，忘了 mock `@/modules/shared/db/postgres` 就是直连生产库。**
+   `vitest.config.ts` 没有 `setupFiles`，那个模块在测试里始终是真的。踩中的表现不是报错，
+   是「偶尔超时」：连库要 3 秒上下，默认超时 5 秒，网络抖一下就翻车——而 `deploy.sh` 的
+   vitest 是硬门禁，于是部署被随机挡住（2026-08-01 修的就是这个，实测 3.3s→8ms）。
+   **判断方法**：单测跑进 100ms 以上就该怀疑。想确认就临时在 `postgres.ts` 的
+   `query`/`execute` 开头加一行 `console.error`，跑全量看哪个文件打出来（用完记得撤）。
+   注意 mock 少写一个导出不会报错到测试外面——vitest 抛的「导出不存在」常被业务代码的
+   try/catch 吞掉，静默走兜底分支，断言照样绿。
+
+7. **`deploy.sh` 的 exclude 模式不加前导斜杠就是「任意层级匹配」。**
+   `--exclude '_*'` 本意只想排掉 `res_api/` 顶层那批一次性调查脚本，实际把
+   `bakery-ops/src/app/api/import/_auth.ts` 也吃掉了（Next.js 用 `_` 前缀表示 app 目录下的
+   非路由文件），导致 `/api/import/{products,sales,strategy}` 三个接口在服务器上长期缺依赖。
+   dev 模式按需编译、启动不报错，所以一直没暴露，直到 2026-08-01 改用生产构建才崩出来。
+   现已改成锚定的 `/_*`。**加 exclude 规则时先想清楚要不要锚定。**
+
 ---
 
 ## 最近改动
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-01 | Claude Code | **Lark 月度配额从 154% 降到约 23%。** 起因是 7-31 配额烧穿（`99991403`）导致晨报/复盘推送全部发不出去。查下来 `recruit_demand_sync` 一家占 75%：它每 30 分钟跑一次，而**上一轮不健康时会强制校验字段结构**，每轮从 4 次变 8 次调用 = 11,520 次/月，单它就超配额。让它持续"不健康"的是飞书里 18 条未关联 HR 需求的候选人——**数据待办 → 状态 pending → 强制校验 → 双倍消耗 → 烧穿配额**，一个自我强化的循环。改动三项：① `/etc/cron.d` 两个招聘同步降频并限制到工作时段（`demand_sync` 每 30 分全天 48 次 → `0 9-21/3` 每天 5 次；`funnel_sync` 每 30 分 → `0 9-21` 每天 13 次）。依据是 demand_sync 是**只读守卫**（不创建不删除行）且自身告警冷却就是 6 小时，跑得比能告警快 12 倍；funnel_sync 产出只是看板漏斗图，且日志里一直是 `0 row(s) updated`。② `bootstrap.ts` 去掉启动时的 `syncLarkOrg()`（每次约 5 次调用，重启一天可能很多次，而组织架构是日级变化；03:00 的 cron 保留）。③ `lark_budget.py` 加月度计量：`record_call()` 挂在四个脚本的 `urlopen` 正前方（**重试也计**，重试是真实消耗），fcntl 跨进程锁防丢计数，独立状态文件（**不能放 QUOTA_STATE，`mark_recovered()` 会删它**），跨 80% 阈值只返回一次 True 避免重复告警，任何异常都吞掉绝不影响业务。实测一次 demand_sync 记 8 次，**实证了代码推算的基数**。查看用量：`python3 /opt/hotcrush/scripts/lark_budget.py`。⚠️ **`/opt/hotcrush/scripts/` 不在版本控制里**，deploy.sh 也不同步，本次改动只存在于服务器 + `/opt/hotcrush/backups/scripts-20260801-134014.tar.gz` |
+| 2026-08-01 | Claude Code | 修掉 `ai-correction-apply.test.ts` 的随机超时（约 5 次挂 2 次，随机挡部署）。**报的根因只对一半**：`getHourlyBillCurve` 确实漏在 mock 外，但它抛的是 vitest「导出不存在」，被 try/catch 吞成 `["11:00"]`，**没有连库**；真正慢的是 `getSchedulingWasteAlerts` 直接用 `query()` 真连生产库。只补 `getHourlyBillCurve` 无效——实测仍要 3.3–4.5s（离 5s 超时最近只剩 0.5s），两条都补才 8ms。顺带审计全量单测：加 `console.error` 探针跑 43 文件，发现 `refactor-orchestrator.test.ts` / `phase1.test.ts` 经 `ConversationManager` 的 `void repo.replace()` 往生产库发 `DELETE FROM chat_history`（不 await，落没落看时序；键是 `conv_test`/`conv_1`，没伤到真数据）。三个文件补 mock 后全量探针 **0 次 DB 接触**。只动测试文件，未碰业务代码。原分支 `claude/exciting-torvalds-498847`（`29c157d`），内容已并入主工作树 |
+| 2026-08-01 | Claude Code | 修好 JobStreet 爬虫：`jobstreet_pull` 从 07-28 接上 cron 起**连崩 5 天**。**根因不是「浏览器没装」，是版本错配**——服务器 2026-07-04 装的是 chromium rev **1223**，而 `node_modules` 的 playwright 1.59.1 要 **rev 1217**。两条不显然的事实：① playwright 的 npm 包**没有 postinstall**（1.59.1 的 package.json 连 `scripts` 字段都没有），`npm install` 永远不会下浏览器，跟 `PUPPETEER_SKIP_DOWNLOAD` 无关（那个只管 puppeteer）；② **不要用 `npx playwright install`**，npx 可能从 registry 拉最新版装出对不上的 rev，rev 1223 极可能就是这么来的——必须用 `./node_modules/.bin/playwright`。已装好 rev 1217 并实测：裸 launch → Chrome `147.0.7727.15`；走真实业务栈 `fetchActiveJobs()` → 4 个职位（2 active）、32 个申请人（19 已在库 / 13 新增），Jul 2 的 cookie 仍有效。**刻意没有手动触发 `pullDailyApplicants()`**，因为它会给店长发一条点名 13 人的 WhatsApp。08-02 12:00 第一次真跑时会自然发生，心里有数。存疑未究：`fetchApplicants` 对两个职位都正好返回 16 条，像是只取了第一页，实际超过 16 就会漏。旧的 rev 1223（约 350MB）故意留着没删。原分支 `claude/nostalgic-wiles-f7cb6a`（`df16c4d`），内容已并入主工作树 |
+| 2026-08-01 | Claude Code | Contabo 切生产模式并收紧监听面，顺带挖出一个长期潜伏的部署 bug。① `server.ts` 的 `listen(port, cb)` 一直没传 host（`hostname` 只给了 `next()`，对监听地址无效），等于绑 `0.0.0.0`，对外只靠 ufw 一条规则挡着；改为 `HOST ?? 127.0.0.1`。② systemd 加 `Environment=NODE_ENV=production` —— 此前没设，`server.ts:15` 的 `dev` 恒为 true，Next 一直跑开发模式。**注意 `npm run dev` 不是 next dev**，它是 esbuild 打包 `server.ts` 再 node 跑；改 ExecStart 为 `next start` 会丢掉 `bootstrap()`（WhatsApp/定时任务/Lark/14 个 Skill），千万别那么改。③ 生产模式只读 `.next` 不按需编译，而 rsync 排除了 `.next`，所以 `deploy.sh` 必须在服务器上 `next build`（先 stop 再 build，每次部署约 1-3 分钟停机）。④ **`deploy.sh` 的 `--exclude '_*'` 无锚点**，本意排 `res_api/` 顶层那批一次性脚本，实际连 `bakery-ops/src/app/api/import/_auth.ts` 一起吃掉——`/api/import/{products,sales,strategy}` 三个接口在服务器上一直缺依赖，dev 按需编译不报错所以没人发现，改生产构建才暴露；已改为锚定的 `/_*`。效果：进程 RSS 62MB、首屏 ~6ms。验收：tsc + 444 Vitest + next build，重启后零新错误，Lark 长连接正常，三个 import 接口恢复（畸形请求返回结构化错误而非模块缺失）。**遗留未处理**：服务器 Playwright 浏览器没装导致 `jobstreet_pull` 每天失败；`ai-correction-apply.test.ts` 有 flaky 用例（mock 漏 `getHourlyBillCurve`，单测在打真实库）；Lark 本月 API 配额已耗尽 |
 | 2026-07-31 | Claude Code | hbti-web 存储层从 MongoDB 换成共享 Supabase：新增 `src/lib/db/postgres.ts` 与三个 pg store，删掉三个 mongo store，`mongodb` 降为 devDependency（只给一次性数据迁移脚本用）。会员画像写进 `pos_member` 的八个 `hbti_` 列（财务仓库迁移 063，**尚未执行**）。逐条复刻了 Mongo 的原子语义：`insertOne(11000)` → `ON CONFLICT` 无返回行、`replaceOne(matchedCount)` → 条件 UPDATE 的 rowCount、TTL 索引 → 读路径 `expires_at > now()` + 过期锁可顶替。修掉两个跨库语义差：对账扫描索引必须 `NULLS FIRST`（否则从未对账的记录永远轮不到），以及 PG 无 TTL 导致过期锁会永久占位。tsc / eslint / 181 Vitest / next build 全过，另有 21 项集成测试对真实生产库在事务内跑通并强制回滚、零残留。**未部署**，四步人工清单见「HBTI 切库：剩余人工步骤」 |
 | 2026-07-30 | Codex | 修复并真实验证 HBTI 手机 OTP 登录：最终 `/api/auth/otp/verify` 200，随后 `/api/auth/session` 200 且 `authenticated=true`；没有调用 complete、没有发券。根因包括 RES login 请求契约、nullable verifyToken 与测试号码非会员。当前生产 `dpl_2HRjbsfawGyZpktNUq4YirVfCxiC` READY；本地最终兼容版 170/170 Vitest、39/39 手机 E2E、TypeScript、ESLint、Next build 全过，但因“公开链接一次 OTP 自动建会员并可进入发券”会扩大活动资格，待业务明确批准公开获客或改成仅既有/受邀会员后再部署。同步只读复核新店图与 `HOT CRUSH 2026.pdf`，完成桃色门头/酒红柜台/红环黑箭头/奶油纸与金属灯箱方向的改版方案；未改视觉代码、未部署新风格 |
 | 2026-07-30 | Codex | 完成 HBTI 上线收口并提交 `a98fbe9`：加入用户提供的透明 HOT CRUSH 字标和圆形箭头且保持浅肉粉/可可/开心果主题；扩为 9 色、三语隐私说明、无 token 的 1080×1350 结果卡保存/分享、所有状态返回会员钱包；补 server-authoritative 结果、请求超时/localStorage 降级、Mongo token 指纹限流、durable review、深度 RES/Mongo health 和 Cron 就绪探测。72/72 Vitest、27/27 Playwright、TypeScript、ESLint、Next build 全过。最终生产 `dpl_EFxYwUrvBg1mJLzjPVzZgaQso3Ch` READY 并别名到 `hbti-test.hotcrush.net`；修复空 `CRON_SECRET` 后实测 Cron 200/scanned 0、health 200、运行时错误 0，Mongo 仅既有 issued=1、processing/review=0。未再次真实发券 |

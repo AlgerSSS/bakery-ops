@@ -21,6 +21,16 @@ export interface HbtiAnswers {
   q4: SocialAnswer;
   q5: VisitTimeAnswer;
   q6: CategoryAnswer;
+  // 13 题完整版新增：每轴三票多数决的第二、三票。
+  // 全部可选——2026-07-31 之前存下的草稿与完成记录只有 q1–q6，
+  // 缺票时 scoreHbti 按现有单票逻辑判定，旧数据不会失效。
+  q7?: TemperatureAnswer;
+  q8?: StrengthAnswer;
+  q9?: StrengthAnswer;
+  q10?: SweetnessAnswer;
+  q11?: SweetnessAnswer;
+  q12?: SocialAnswer;
+  q13?: SocialAnswer;
 }
 
 export type ScorableHbtiAnswers = Omit<HbtiAnswers, "q1"> &

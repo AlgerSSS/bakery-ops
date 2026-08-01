@@ -11,7 +11,7 @@ from RES after completion.
 1. A registered member receives a personal `/t/<token>` link by SMS.
 2. The link validates the encrypted member binding without displaying the full
    phone number.
-3. The member completes exactly six questions in English, Simplified Chinese,
+3. The member completes all thirteen questions in English, Simplified Chinese,
    or Malay.
 4. The member sees one of 16 HBTI results, chooses one of nine colours, and may
    save or share a token-free result card.

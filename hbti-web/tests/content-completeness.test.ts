@@ -5,7 +5,7 @@ import { questions } from "@/content/questions";
 import { hbtiCodes, results } from "@/content/results";
 
 describe("HBTI localized content", () => {
-  it("provides all six questions in English, Chinese and Malaysia Malay", () => {
+  it("provides all thirteen questions in English, Chinese and Malaysia Malay", () => {
     expect(defaultLocale).toBe("en");
     expect(supportedLocales).toEqual(["en", "zh-CN", "ms-MY"]);
     expect(questions.map((question) => question.id)).toEqual([
@@ -13,17 +13,28 @@ describe("HBTI localized content", () => {
       "q2",
       "q3",
       "q4",
+      "q7",
+      "q9",
+      "q10",
+      "q13",
+      "q8",
+      "q11",
+      "q12",
       "q5",
       "q6",
     ]);
     expect(questions.map((question) => question.options.length)).toEqual([
-      2, 2, 2, 2, 2, 3,
+      2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3,
     ]);
-    expect(questions[4].options.map((option) => option.value)).toEqual([
+    // 按 id 取，不按下标——题目顺序是文案方案的一部分，未来还会调，
+    // 下标断言会在每次调序时假报警。
+    const byId = (id: string) =>
+      questions.find((question) => question.id === id);
+    expect(byId("q5")?.options.map((option) => option.value)).toEqual([
       "morning",
       "night",
     ]);
-    expect(questions[5].options.map((option) => option.value)).toEqual([
+    expect(byId("q6")?.options.map((option) => option.value)).toEqual([
       "drink",
       "dessert",
       "bakery",

@@ -34,6 +34,20 @@ vi.mock("@/modules/data/repositories/forecast.repository", () => ({
   getDailySalesTotal: vi.fn().mockResolvedValue(0),
   getDailyReview: vi.fn().mockResolvedValue(null),
   getAIDailyCorrections: h.getAIDailyCorrections,
+  // 少了这条，getDefaultSlotsForDayType 拿到的是 vitest 的「导出不存在」Proxy 报错，
+  // 被 try/catch 吞成 ["11:00"]——断言照样过，坏的是排产路径静默走了兜底分支。
+  getHourlyBillCurve: vi.fn().mockResolvedValue([
+    { hour: 11, billCount: 120 },
+    { hour: 15, billCount: 90 },
+  ]),
+}));
+
+/* forecast.service 里 getSchedulingWasteAlerts / saveForecastSnapshot 直接用 query/execute，
+   不挡就是真连生产库：本机实测单测耗时 8ms → 3.3s，逼近 5s 超时，deploy.sh 的 vitest 门禁
+   因此随机挂。单测里 @/modules/shared/db/postgres 必须是假的。 */
+vi.mock("@/modules/shared/db/postgres", () => ({
+  query: vi.fn().mockResolvedValue([]),
+  execute: vi.fn().mockResolvedValue({ affectedRows: 0 }),
 }));
 
 import { getProductForecast, formatForecastCompact } from "@/modules/domain/forecast/forecast.service";

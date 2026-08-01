@@ -43,9 +43,21 @@
     0 13px 0 #35100d,
     0 24px 36px rgba(52, 12, 9, 0.24);
   --ease-storefront: cubic-bezier(0.22, 0.76, 0.24, 1);
-  --font-brand: "Neutra Text", "Avenir Next", "Helvetica Neue", sans-serif;
-  --font-copy: "Neutra Text", "OPPO Sans", "PingFang SC", "Microsoft YaHei",
-    sans-serif;
+  /* 分工遵循设计规格(docs/superpowers/specs/2026-07-30-hbti-web-design.md:114):
+     标题用 Neutra(与 logo 搭配的官方展示字体),正文用 OPPO Sans。
+
+     两件实测得出、与文件名不符的事实:
+     1) CDN 文件叫 NeutraTextDemiAlt.woff2,但浏览器报告的内部族名是
+        「Neutra Text Light Alt」—— 站点一直在渲染 Light,这才是它看起来
+        远比 logo 轻的原因。CDN 上没有更重的字重(Bold/Book/Demi 等 8 个
+        命名实测全 404),@font-face 却声明 400-700,所以写 700 也不会变粗。
+     2) Neutra 不含汉字。此前 --font-brand 没有中文回退,中文标题落到系统
+        默认(macOS 上是 PingFang SC,安卓/Windows 各不相同),品牌观感不一致;
+        补上 OPPO Sans 与规格「中文以 OPPOSans 为安全回退」一致。 */
+  --font-brand:
+    "Neutra Text", "Avenir Next", "Helvetica Neue", "OPPO Sans", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --font-copy: "OPPO Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 * {

@@ -581,11 +581,18 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
             />
           )}
         </div>
-        {!demoMode && authState !== "signedOut" && (
-          <a className={styles.memberReturn} href={MEMBER_WALLET_URL}>
-            {copy.returnToMembership}
-          </a>
-        )}
+        {/* 钱包出口只在开场页与结果页出现。
+            原先它对所有非登出态渲染,于是答题页底部同时有「下一题」「返回」
+            「返回会员账户」三个动作抢注意力,还第二次重复了圆圈箭头图案;
+            它那 44px+ 的页脚也是 320x740 上第 13 题溢出的一部分成因。
+            已发券的完成态本身带有自己的钱包 CTA,不需要这个。 */}
+        {!demoMode &&
+          authState !== "signedOut" &&
+          (stage === "intro" || stage === "result") && (
+            <a className={styles.memberReturn} href={MEMBER_WALLET_URL}>
+              {copy.returnToMembership}
+            </a>
+          )}
       </div>
     </main>
   );
@@ -721,7 +728,9 @@ function QuestionStep({
                 <span className={styles.answerEmoji} aria-hidden="true">
                   {option.emoji}
                 </span>
-                <span>{option.label[locale]}</span>
+                <span className={styles.answerLabel}>
+                  {option.label[locale]}
+                </span>
                 <span className={styles.answerCheck} aria-hidden="true">
                   ✓
                 </span>

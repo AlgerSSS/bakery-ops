@@ -73,9 +73,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 4rem;
+  min-height: 3.4rem;
   gap: 1rem;
-  padding: 0.55rem 0.6rem 0.55rem 0.8rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.75rem;
   border: 1px solid var(--chrome-dark);
   border-radius: 0.72rem;
   background:
@@ -85,9 +85,9 @@
       var(--cream) 46%,
       #f5eadb
     );
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 255, 255, 0.48),
-    0 10px 24px rgba(56, 28, 22, 0.12);
+  /* 去掉外投影,只留内高光。投影让它像一张浮起的卡片,与下方的题目卡争分量;
+     招牌该是「贴在墙上」的,不是浮在内容之上的。渐变与边框保留 = 品牌不丢。 */
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.42);
   animation: lightboxOn 560ms var(--ease-storefront) both;
 }
 
@@ -588,98 +588,77 @@
   width: 100%;
 }
 
-.memberChip {
+/* 会员/游客状态从「卡片」降级为「细状态行」。
+   它和品牌栏都是看一眼就不再需要的常驻信息,却各占一个带边框+投影的卡片,
+   两者合计吃掉视口顶部 21.5%。去掉边框/投影/独立底色后,它在视觉上并入
+   品牌栏下方,读起来是一行注解而不是一块内容。
+   纯样式改动,不动 JSX。已登录态用 e2e 里那套 /api/auth/session mock
+   在 361x784 与 320x740 上实测过,不是只在 /demo 上看过。 */
+.memberChip,
+.demoChip {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.55rem;
   width: min(100%, 31rem);
-  margin: 1rem auto 0;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid var(--chrome-dark);
-  border-radius: 0.5rem;
-  background: var(--cream);
-  box-shadow: 0 8px 20px rgba(56, 28, 22, 0.1);
+  margin: 0.45rem auto 0;
+  padding: 0.15rem 0.1rem;
   animation: panelIn 320ms var(--ease-storefront) both;
 }
 
-.memberChip > span {
-  display: grid;
-  width: 1.65rem;
-  height: 1.65rem;
-  place-items: center;
-  border-radius: 50%;
-  border: 2px solid var(--hot-red);
-  color: var(--cocoa-dark);
-  background: var(--cream);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.memberChip strong {
-  display: block;
-  font-family: var(--font-brand);
-  font-size: 0.76rem;
-}
-
-.memberChip p {
-  margin-top: 0.06rem;
-  color: var(--ink-soft);
-  font-size: 0.68rem;
-  line-height: 1.35;
-}
-
-.memberChip button {
-  min-width: 2.75rem;
-  min-height: 2.75rem;
-  padding-inline: 0.55rem;
-  cursor: pointer;
-  border-radius: 0.35rem;
-  color: var(--cocoa-dark);
-  background: var(--flesh);
-  font-family: var(--font-brand);
-  font-size: 0.68rem;
-  font-weight: 700;
+.memberChip {
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .demoChip {
-  display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 0.65rem;
-  width: min(100%, 31rem);
-  margin: 1rem auto 0;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid var(--chrome-dark);
-  border-radius: 0.5rem;
-  background: var(--cream);
-  box-shadow: 0 8px 20px rgba(56, 28, 22, 0.1);
-  animation: panelIn 320ms var(--ease-storefront) both;
 }
 
+/* 图标缩小并去掉实心底:它是状态指示,不该有卡片般的存在感。 */
+.memberChip > span,
 .demoChip > span {
   display: grid;
-  width: 1.65rem;
-  height: 1.65rem;
+  width: 1.15rem;
+  height: 1.15rem;
   place-items: center;
   border-radius: 50%;
-  border: 2px solid var(--hot-red);
-  color: var(--cocoa-dark);
-  background: var(--cream);
-  font-size: 0.78rem;
+  border: 1.5px solid var(--hot-red);
+  color: var(--hot-red);
+  font-size: 0.6rem;
+  font-weight: 700;
 }
 
+/* 两行状态行:标题一行、说明一行,但都降到注解级字号。
+   保持 block 是有意的 —— 手机号那行较长,并成一行会挤掉「修改」的位置。 */
+.memberChip strong,
 .demoChip strong {
   display: block;
+  color: var(--cocoa-dark);
   font-family: var(--font-brand);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
 }
 
+.memberChip p,
 .demoChip p {
-  margin-top: 0.06rem;
+  margin-top: 0.02rem;
   color: var(--ink-soft);
+  font-size: 0.66rem;
+  line-height: 1.3;
+}
+
+/* 「Change」从填色按钮降为文字链接 —— 它是低频动作,不该有主按钮的分量。
+   触控目标仍保持 44px 高度(min-height),只是视觉上不再是一个色块。 */
+.memberChip button {
+  min-height: 2.75rem;
+  padding-inline: 0.35rem;
+  cursor: pointer;
+  border: 0;
+  color: var(--cocoa);
+  background: transparent;
+  font-family: var(--font-brand);
   font-size: 0.68rem;
-  line-height: 1.35;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }
 
 .introPanel {
@@ -867,29 +846,30 @@
   gap: 0.65rem;
 }
 
+/* 选项卡：默认无边框无阴影,只靠填充与留白成形。
+   边框/左红条/对勾一律只在选中时出现 —— 让「有框」本身成为选中的语义,
+   而不是所有卡片的默认装饰。同屏 8 个等分量的框正是「乱」的来源。 */
 .answerCard {
   position: relative;
   display: grid;
-  min-height: 5.75rem;
-  grid-template-columns: auto 1fr auto;
+  min-height: 5.25rem;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  gap: 0.9rem;
-  padding: 1rem;
+  gap: 0.85rem;
+  padding: 0.95rem 1rem;
   cursor: pointer;
   overflow: hidden;
-  border: 1px solid rgba(21, 19, 19, 0.24);
+  border: 1px solid transparent;
   border-radius: 0.42rem;
   color: var(--cocoa-dark);
   background: var(--cream);
-  box-shadow: 0 7px 0 rgba(106, 28, 19, 0.12);
   font-size: 1rem;
   line-height: 1.4;
   text-align: left;
   transition:
     transform 180ms var(--ease-storefront),
     border-color 180ms ease,
-    background 180ms ease,
-    box-shadow 180ms ease;
+    background 180ms ease;
 }
 
 .answerCard::before {
@@ -906,53 +886,67 @@
 .answerCard[data-selected="true"] {
   border-color: var(--hot-red);
   background: #fffaf1;
-  box-shadow: 0 7px 0 rgba(106, 28, 19, 0.2);
-  transform: translateY(1px);
 }
 
 .answerCard[data-selected="true"]::before {
   transform: scaleY(1);
 }
 
+/* emoji 直接落在卡片上。--chrome 拉丝金属仍是全站 token(进度条、品牌处保留),
+   但把暖色盘里唯一的冷灰用来框信息量最低的元素,就成了噪音。 */
 .answerEmoji {
   display: grid;
-  width: 3rem;
-  height: 3rem;
+  width: 2.25rem;
+  height: 2.25rem;
   place-items: center;
-  border: 1px solid var(--chrome);
-  border-radius: 0.3rem;
-  background:
-    linear-gradient(150deg, var(--chrome-light), var(--chrome));
-  font-size: 1.22rem;
+  font-size: 1.35rem;
 }
 
+/* 对勾绝对定位在右上角,会盖住首行文字 —— 给标签留出避让宽度。
+   仍比原先「圆环独占一列」省:文字列 226px -> ~250px。 */
+.answerLabel {
+  padding-right: 1.15rem;
+}
+
+/* 对勾绝对定位到右上角:不再独占一列。保留非颜色反馈 —— 只用红色表示选中
+   会违反 WCAG 1.4.1。未选中时不画空心环,同屏少两个盒子。 */
 .answerCheck {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.55rem;
   display: grid;
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.25rem;
+  height: 1.25rem;
   place-items: center;
-  border: 1px solid rgba(89, 35, 27, 0.25);
   border-radius: 50%;
-  color: transparent;
-  font-size: 0.72rem;
-  transition:
-    color 180ms ease,
-    background 180ms ease,
-    border-color 180ms ease;
+  opacity: 0;
+  color: var(--cream);
+  background: var(--cocoa-dark);
+  font-size: 0.66rem;
+  transition: opacity 160ms ease;
 }
 
 .answerCard[data-selected="true"] .answerCheck {
-  border-color: var(--cocoa-dark);
-  color: var(--cream);
-  background: var(--cocoa-dark);
+  opacity: 1;
 }
 
-/* Two auto margins — one here, one above the question block — so flexbox splits
-   the leftover height evenly instead of dumping all of it into one slab above
-   the controls. The question then reads as centred between the progress bar and
-   the nav, and the nav stays in thumb reach at the bottom. */
+/* 原先这里和 .stepActions 各有一个 margin-top:auto,把剩余高度对半分。
+   问题是:chrome 瘦身省下的高度也被上面那半吸走了,题目并没有上移。
+   现在只保留 .stepActions 的 auto —— 余量全部落到选项与导航之间,于是
+   「进度条 -> 题目」直接相连,题目上移,导航仍锚在拇指区。
+   这里必须是 0 而不是任何固定值:13 题(3 选项)在 320x740 上余量本就见底,
+   加任何不可收缩的间距都会让它溢出需要滚动(实测 clamp(0.85rem,..) 即触发)。
+   分隔由 .progressWrap 已有的 margin-bottom 提供。 */
 .questionPanel > .eyebrow {
-  margin-top: auto;
+  margin-top: 0;
+  /* 只在答题页降分量:原先两行全大写 + 0.16em 字距紧贴标题上方,抢走「第一眼」。
+     不做条件隐藏(会让 Q1 与 Q2+ 块高不同,破坏 13 题间标题位置的稳定),
+     也不做单行截断 —— 实测会断在词中间(「…OVERPROOFED DC」),比两行更难看。
+     保留换行,只把字号、字距、对比度降下来。其他页面的 .eyebrow 不受影响。 */
+  color: var(--ink-soft);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  line-height: 1.35;
 }
 
 .stepActions {
@@ -1697,14 +1691,6 @@
   text-underline-offset: 0.25rem;
 }
 
-.memberReturn::after {
-  width: 1.25rem;
-  height: 1.25rem;
-  flex: 0 0 auto;
-  background: url("/hot-crush-arrow.png") center / contain no-repeat;
-  content: "";
-}
-
 .landing .memberReturn {
   align-self: flex-start;
   margin-top: 1.25rem;
@@ -1853,11 +1839,6 @@
   .answerCard {
     min-height: 5rem;
     padding: 0.75rem;
-  }
-
-  .answerEmoji {
-    width: 2.6rem;
-    height: 2.6rem;
   }
 
   .typeTicket {
@@ -2180,11 +2161,4 @@
     min-height: 4.6rem;
   }
 
-  /* /demo only. The guest banner costs 73px that a real customer never pays,
-     so on the shortest screens it shrinks rather than pushing the preview of
-     the actual page out of one screenful. */
-  .demoChip {
-    margin-top: 0.5rem;
-    padding: 0.45rem 0.65rem;
-  }
 }

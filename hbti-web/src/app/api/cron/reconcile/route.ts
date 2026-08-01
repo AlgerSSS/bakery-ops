@@ -26,12 +26,23 @@ export async function GET(request: Request): Promise<NextResponse> {
       store: await createCompletionStoreFromEnv(),
       res,
     });
-    // PostgreSQL 没有 Mongo 的 TTL 索引，过期行得自己收。放在对账之后、且吞掉异常：
-    // 清理失败不该让一次成功的对账报 503，正确性也不依赖它——读路径都带 expires_at 过滤。
-    const purged = await purgeExpired().catch(() => -1);
+    // PostgreSQL 没有 Mongo 的 TTL 索引，过期行得自己收。清理失败不该让一次成功的
+    // 对账报 503——正确性不依赖它，读路径都带 expires_at 过滤。
+    // 但**必须留痕**：此前这里是 `.catch(() => -1)`，异常连日志都没有，
+    // 于是「清理坏了」和「本来就没有过期行」在响应里长得一模一样，无法诊断。
+    let purged = 0;
+    let purgeOk = true;
+    try {
+      purged = await purgeExpired();
+    } catch (error) {
+      purgeOk = false;
+      console.error("[cron/reconcile] purgeExpired failed", error);
+    }
     const ok = summary.errors === 0;
-    return noStoreJson({ ok, ...summary, purged }, ok ? 200 : 503);
-  } catch {
+    return noStoreJson({ ok, ...summary, purged, purgeOk }, ok ? 200 : 503);
+  } catch (error) {
+    // 同理：不留痕的 503 无法区分「RES 挂了」「配置缺失」「数据库不可达」。
+    console.error("[cron/reconcile] run failed", error);
     return noStoreJson({ ok: false }, 503);
   }
 }

@@ -85,6 +85,7 @@ describe("cron reconciliation route", () => {
       review: 0,
       errors: 0,
       purged: 0,
+      purgeOk: true,
     });
     expect(
       routeMocks.resolveEnabledCouponTemplateByName,
@@ -97,6 +98,43 @@ describe("cron reconciliation route", () => {
     expect(response.headers.get("cache-control")).toBe(
       "no-store, max-age=0",
     );
+  });
+
+  // 这次改动的核心分支:清理抛异常时,一次成功的对账不该被判失败。
+  // 旧代码 `.catch(() => -1)` 连日志都不留,失败与「本来就没有过期行」不可区分。
+  it("keeps a successful reconciliation green when cleanup throws, and says so", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    routeMocks.reconcilePendingCompletions.mockResolvedValue({
+      scanned: 1,
+      issued: 1,
+      processing: 0,
+      review: 0,
+      errors: 0,
+    });
+    routeMocks.purgeExpired.mockRejectedValue(new Error("relation missing"));
+
+    const response = await GET(request());
+
+    // 200,不是 503:清理是卫生工作,正确性不依赖它。
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      scanned: 1,
+      issued: 1,
+      processing: 0,
+      review: 0,
+      errors: 0,
+      purged: 0,
+      purgeOk: false,
+    });
+    // 且没有掉进外层 catch--那会返回不带 scanned 的裸 { ok: false }。
+    expect(consoleError).toHaveBeenCalledWith(
+      "[cron/reconcile] purgeExpired failed",
+      expect.any(Error),
+    );
+    consoleError.mockRestore();
   });
 
   it("returns 503 when reconciliation reports any record error", async () => {
@@ -119,6 +157,7 @@ describe("cron reconciliation route", () => {
       review: 0,
       errors: 1,
       purged: 0,
+      purgeOk: true,
     });
     expect(response.headers.get("cache-control")).toBe(
       "no-store, max-age=0",

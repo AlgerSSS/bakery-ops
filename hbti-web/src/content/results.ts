@@ -33,33 +33,33 @@ export const hbtiCodes = [
 const traitLabels: Record<Locale, Record<HbtiAxis, string>> = {
   en: {
     I: "Iced",
-    H: "Hot",
+    H: "Warm",
     L: "Light",
     S: "Strong",
-    B: "Bitter",
+    B: "Bittersweet",
     D: "Sweet",
-    A: "Alone",
-    T: "Together",
+    A: "Solo",
+    T: "In-sync",
   },
   "zh-CN": {
-    I: "冰饮",
-    H: "热饮",
+    I: "冰系",
+    H: "暖系",
     L: "轻盈",
     S: "浓烈",
-    B: "偏苦",
+    B: "回甘",
     D: "偏甜",
     A: "独享",
-    T: "同行",
+    T: "同频",
   },
   "ms-MY": {
     I: "Ais",
-    H: "Panas",
+    H: "Hangat",
     L: "Ringan",
     S: "Pekat",
-    B: "Pahit",
+    B: "Pahit-manis",
     D: "Manis",
-    A: "Sendiri",
-    T: "Bersama",
+    A: "Bersendiri",
+    T: "Sefrekuensi",
   },
 };
 
@@ -102,315 +102,315 @@ export const results = {
   ILBA: localizedResult(
     "ILBA",
     {
-      name: "The Clear-Eyed",
+      name: "The Clear-Eyed Bagel",
       description:
-        "You rarely speak first, but you notice everything. You take your time with an iced pour-over, thoughts settling beside an empty chair no one is about to claim.",
+        "You're rarely the first to speak, but you see everything. No sugar, no fuss—your calm isn't coldness. It's saving your strength for what actually matters.",
       signatureOrder: "Iced Pour-Over + Original Egg Tart",
     },
     {
-      name: "清醒观察者",
+      name: "清醒贝果",
       description:
-        "你很少是最先开口的那个，但你什么都看见了。一杯冰手冲放在手边，慢慢喝，慢慢想——你要的不是刺激，是一段没人打扰的清醒。",
+        "你很少最先开口，但什么都看见了。不加糖、不凑热闹，你的冷静不是冷漠——是把力气留给真正重要的事。",
       signatureOrder: "冰手冲 + 原味蛋挞",
     },
     {
-      name: "Pemerhati Tajam",
+      name: "Bagel Mata Jernih",
       description:
-        "Anda jarang jadi orang pertama yang bersuara, tapi semuanya anda perasan. Dengan kopi pour-over ais di sisi, anda minum dan berfikir perlahan-lahan—bukan kejutan yang dicari, cuma satu jam yang jernih tanpa gangguan.",
+        "Anda jarang bersuara dulu, tapi semuanya anda nampak. Tanpa gula, tanpa gimik—ketenangan anda bukan dingin, cuma menyimpan tenaga untuk perkara yang benar-benar penting.",
       signatureOrder: "Kopi Pour-Over Ais + Tat Telur Asli",
     },
   ),
   ILBT: localizedResult(
     "ILBT",
     {
-      name: "The Level Head",
+      name: "The Wholegrain Strategist",
       description:
-        "When friends start arguing, everyone looks your way. You lay out what matters over an iced pour-over until the voices drop and both hands settle back around their cold glasses.",
+        "When friends clash, everyone looks at you first. You don't play referee—you just lay things out straight. You're the wholegrain of the group: nothing fancy, quietly essential.",
       signatureOrder: "Iced Pour-Over + Pistachio Nut Bar",
     },
     {
-      name: "理性搭子",
+      name: "全麦军师",
       description:
-        "朋友吵起来的时候，大家会先看你一眼。你不劝架，你只是把事情说清楚。一起坐下来，喝点不甜的、不烫的，然后事情就没那么大了。",
+        "朋友吵起来，大家先看你。你不劝架，只把事情摊开说清。你是人群里那片全麦：不花哨，但谁都离不开你。",
       signatureOrder: "冰手冲 + 开心果坚果棒",
     },
     {
-      name: "Teman Kepala Dingin",
+      name: "Jurutaktik Mil Penuh",
       description:
-        "Bila kawan-kawan mula bertelagah, semua orang akan pandang anda dahulu. Anda bukan cuba jadi orang tengah; anda cuma meluruskan perkara yang berserabut. Duduk bersama dengan minuman yang tak manis dan tak panas, tiba-tiba masalah itu terasa lebih kecil.",
+        "Bila kawan bertelagah, semua pandang anda dulu. Anda tak jadi pengadil—anda cuma susun perkara sampai jelas. Andalah roti mil penuh kumpulan itu: tak bergaya, tapi semua perlukan anda.",
       signatureOrder: "Kopi Pour-Over Ais + Bar Kacang Pistachio",
     },
   ),
   ILDA: localizedResult(
     "ILDA",
     {
-      name: "The Afternoon Escapist",
+      name: "The Layered Croissant",
       description:
-        "You slip away for an hour that belongs to no one else. An iced latte by the window, your phone face-down—the world can wait on the other side of the glass.",
+        "You need one hour that belongs to no one. Phone face-down, window seat claimed—your softness comes in layers, and the innermost one is yours alone.",
       signatureOrder: "Iced Latte + Blueberry Cream Puff",
     },
     {
-      name: "午后逃逸者",
+      name: "千层牛角",
       description:
-        "你不是不想上班，你只是需要一小时不属于任何人。冰拿铁、靠窗的位置、手机反扣——这一小时结束之前，世界可以先等一等。",
+        "你需要一小时不属于任何人。手机反扣，窗边坐好——你的温柔分很多层，最里面那一层，只留给自己。",
       signatureOrder: "冰拿铁 + 蓝莓泡芙",
     },
     {
-      name: "Pelarian Petang",
+      name: "Croissant Berlapis",
       description:
-        "Bukan anda tak mahu bekerja; anda cuma perlukan satu jam yang bukan milik sesiapa. Latte ais, tempat di tepi tingkap, telefon diterbalikkan—dunia boleh tunggu sampai sejam itu habis.",
+        "Anda perlukan satu jam yang bukan milik sesiapa. Telefon diterbalikkan, tempat tepi tingkap dituntut—kelembutan anda berlapis-lapis, dan lapisan paling dalam itu milik anda sendiri.",
       signatureOrder: "Latte Ais + Puff Krim Blueberi",
     },
   ),
   ILDT: localizedResult(
     "ILDT",
     {
-      name: "The Picnic Starter",
+      name: "The Picnic Focaccia",
       description:
-        "You send “shall we go somewhere?” to the group chat before anyone else does. Soon, something sweet sits in the middle of a picnic blanket with every friend finally gathered around it.",
+        "The \"shall we go out?\" text usually comes from you. Good weather, something sweet, everyone present—that's your whole recipe for joy. Tear a piece; there's enough for all.",
       signatureOrder: "Iced Latte + Macaron",
     },
     {
-      name: "野餐发起人",
+      name: "野餐佛卡夏",
       description:
-        "群里那句「要不要出去坐坐」，通常是你发的。你不追求隆重，只要天气好、东西甜、人齐就够了。事情办不办得成不重要，重要的是大家都出来了。",
+        "群里那句「出来坐坐？」通常是你发的。天气好、东西甜、人到齐，你的快乐就这么简单——撕一块，人人有份。",
       signatureOrder: "冰拿铁 + 马卡龙",
     },
     {
-      name: "Pencetus Piknik",
+      name: "Focaccia Piknik",
       description:
-        "Mesej ajak “keluar duduk-duduk” dalam group chat selalunya datang daripada anda. Tak perlu gah; cuaca elok, ada yang manis, dan semua orang cukup. Jadi atau tak rancangan itu kurang penting—yang penting semua dah keluar.",
+        "Mesej \"jom keluar?\" selalunya datang daripada anda. Cuaca elok, ada yang manis, semua orang cukup—itulah resipi kebahagiaan anda. Koyak sekeping; semua orang dapat.",
       signatureOrder: "Latte Ais + Makaron",
     },
   ),
   ISBA: localizedResult(
     "ISBA",
     {
-      name: "The Deadline Runner",
+      name: "The Midnight Rye",
       description:
-        "You don’t ask for reassurance when a deadline closes in; you get moving. An iced Americano, a glowing laptop, and an empty chair beside you carry the room past midnight.",
+        "You don't need comforting—you need clarity. One iced Americano that asks no questions, one table nobody touches, and you'll win whatever tonight demands.",
       signatureOrder: "Iced Americano + Original Egg Tart",
     },
     {
-      name: "深夜赶稿人",
+      name: "深夜黑麦",
       description:
-        "你不需要被安慰，只需要被清醒。最好的陪伴是一杯不说话的冰美式，和一张没人坐过来的桌子。",
+        "你不需要安慰，只需要清醒。一杯不说话的冰美式，一张没人打扰的桌子，你就能把今晚该赢的仗打完。",
       signatureOrder: "冰美式 + 原味蛋挞",
     },
     {
-      name: "Pejuang Deadline",
+      name: "Rai Tengah Malam",
       description:
-        "Anda tak perlukan pujukan bila deadline semakin dekat; anda terus bergerak. Teman terbaik ialah secawan Americano ais yang tak meminta apa-apa, sebuah komputer riba yang menyala, dan kerusi kosong di sebelah.",
+        "Anda tak perlukan pujukan—anda perlukan kejernihan. Satu Americano ais yang tak banyak tanya, satu meja tanpa gangguan, dan anda akan menang apa sahaja malam ini.",
       signatureOrder: "Americano Ais + Tat Telur Asli",
     },
   ),
   ISBT: localizedResult(
     "ISBT",
     {
-      name: "The War Room Ally",
+      name: "The Pretzel Comrade",
       description:
-        "You skip the small talk and push the work across the line. Four iced Americanos sweat across the meeting table while the progress bar keeps moving in silence.",
+        "Small talk isn't your sport; finishing things is. Like a pretzel—looks twisted, but every knot is tied firm and true. Under pressure, you're the professional.",
       signatureOrder: "Iced Americano + Wellington",
     },
     {
-      name: "会议室战友",
+      name: "碱水战友",
       description:
-        "你不擅长寒暄，但你擅长把事情推完。桌上四杯冰美式，谁也没说话，进度条却在动——这种沉默你觉得很舒服。",
+        "你不擅长寒暄，擅长把事情推完。像碱水结：看着拧，其实每个结都打得又稳又准——扛压这块，你是专业的。",
       signatureOrder: "冰美式 + 惠灵顿",
     },
     {
-      name: "Sekutu Bilik Mesyuarat",
+      name: "Pretzel Seperjuangan",
       description:
-        "Anda kurang gemar berbasa-basi, tapi anda tahu cara menyiapkan kerja. Empat Americano ais berembun di atas meja; tiada siapa bercakap, namun bar kemajuan terus bergerak.",
+        "Berbasa-basi bukan bidang anda; menyiapkan kerja itu baru bidang anda. Macam pretzel—nampak berpintal, tapi setiap simpulannya kemas dan kukuh. Soal tahan tekanan, andalah pakarnya.",
       signatureOrder: "Americano Ais + Wellington",
     },
   ),
   ISDA: localizedResult(
     "ISDA",
     {
-      name: "The Secret Sweet Tooth",
+      name: "The Coffee Bun Paradox",
       description:
-        "You move briskly through the day and keep your small indulgences to yourself. Then you set a chocolate egg tart beside a bitter iced Americano—one dark cup and one glossy tart under the café lights.",
+        "Cold brew on the surface, butter at the core. You move sharp and travel light, yet always keep something sweet in your pocket—no explanations. Contrast isn't contradiction; it's the room you save for yourself.",
       signatureOrder: "Iced Americano + Chocolate Egg Tart",
     },
     {
-      name: "反差控",
+      name: "反差咖啡包",
       description:
-        "外面看你很利落，其实你偷偷在咖啡里加了糖。你不解释，也不觉得需要解释——反差不是矛盾，是你留给自己的那点余地。",
+        "表面冷萃，内心黄油。你外表利落，兜里却总揣着一点甜——不解释。反差不是矛盾，是你留给自己的余地。",
       signatureOrder: "冰美式 + 巧克力蛋挞",
     },
     {
-      name: "Peminat Manis Rahsia",
+      name: "Roti Kopi Manis Rahsia",
       description:
-        "Dari luar, anda nampak serba pantas dan kemas; diam-diam, anda tetap mahu sedikit manis. Americano ais yang pahit duduk di sebelah tat telur coklat berkilat—ruang kecil yang anda simpan untuk diri sendiri.",
+        "Kopi pekat di luaran, mentega di dalaman. Anda nampak tangkas dan kemas, tapi dalam poket sentiasa ada sedikit manis—tanpa penjelasan. Kontras bukan konflik; ia ruang yang anda simpan untuk diri sendiri.",
       signatureOrder: "Americano Ais + Tat Telur Coklat",
     },
   ),
   ISDT: localizedResult(
     "ISDT",
     {
-      name: "The Night Extender",
+      name: "The Party Donut",
       description:
-        "You’re always the one asking everyone to stay a little longer. A strong iced Americano and a macaron platter keep the last few friends laughing under the lights long after they said they would leave.",
+        "Ending early is your one fear. One strong, sweet cup and you're good for two more hours—someone has to be in charge of keeping the night alive, and it's you.",
       signatureOrder: "Iced Americano + Macaron Platter",
     },
     {
-      name: "派对续命师",
+      name: "派对甜甜圈",
       description:
-        "散场太早是你最怕的事。一杯又浓又甜的冰的，够你再撑两小时，也够你把已经想走的人留下来。热闹这件事，总要有人负责。",
+        "散场太早是你最怕的事。又浓又甜的一杯下去，你还能再撑两小时——热闹这件事，总得有人负责到底。",
       signatureOrder: "冰美式 + 马卡龙拼盘",
     },
     {
-      name: "Penyambung Malam",
+      name: "Donat Parti",
       description:
-        "Anda selalu jadi orang yang minta semua tunggu sekejap lagi. Americano ais yang pekat dan sepiring makaron membuat kawan-kawan terakhir terus ketawa, lama selepas mereka kata mahu balik.",
+        "Bersurai awal ialah satu-satunya perkara yang anda takut. Satu minuman pekat dan manis, anda boleh bertahan dua jam lagi—mesti ada orang yang menjaga kemeriahan sampai habis, dan orangnya anda.",
       signatureOrder: "Americano Ais + Sepiring Makaron",
     },
   ),
   HLBA: localizedResult(
     "HLBA",
     {
-      name: "The Morning Ritualist",
+      name: "The Sourdough Ritualist",
       description:
-        "You guard the first quiet minutes of the morning. The same hot pour-over, the first sip untouched, and a familiar egg tart wait in their usual places as the shutters rise.",
+        "Your day begins with a stretch of morning nobody touches. Like sourdough, you rise slowly and refuse to be rushed—you learned long ago that good things take their time.",
       signatureOrder: "Hot Pour-Over + Original Egg Tart",
     },
     {
-      name: "晨间仪式派",
+      name: "晨间酸种",
       description:
-        "一天里最好的那段在早上，而且不能被人分走。热手冲，第一口不加任何东西，喝完才算真正醒来。这个顺序你已经很多年没变过。",
+        "你的一天从一段没人打扰的清晨开始。像酸种一样慢慢发酵，不赶时间——你早就明白，好东西都需要等。",
       signatureOrder: "热手冲 + 原味蛋挞",
     },
     {
-      name: "Pengamal Ritual Pagi",
+      name: "Sourdough Ritual Pagi",
       description:
-        "Anda menjaga minit-minit sunyi pertama pada waktu pagi. Pour-over panas yang sama, teguk pertama tanpa apa-apa tambahan, dan tat telur di tempat biasa menunggu ketika bidai kedai mula dibuka.",
+        "Hari anda bermula dengan pagi yang tiada siapa ganggu. Macam sourdough, anda naik perlahan dan enggan diburu—anda dah lama faham, benda yang baik memang ambil masa.",
       signatureOrder: "Kopi Pour-Over Panas + Tat Telur Asli",
     },
   ),
   HLBT: localizedResult(
     "HLBT",
     {
-      name: "The Long Talker",
+      name: "The Long-Talk Scone",
       description:
-        "You stay with someone’s story for hours without rushing to solve it. When the cup cools and the conversation wanders, you order another pour-over and pull the loose thread gently back across the table.",
+        "You can sit with someone's story for three hours without rushing to fix it. Refill the cup when it cools, pick the thread back up when it drifts—things feel lighter simply because you're there.",
       signatureOrder: "Hot Pour-Over + Pistachio Nut Bar",
     },
     {
-      name: "长谈陪伴者",
+      name: "长谈司康",
       description:
-        "你是那种能陪人聊三个小时的人。杯子凉了会续，话题散了会捡回来——你不急着给建议，你只是让对方知道你还在。",
+        "你能陪人聊三个小时，不急着给答案。杯凉了续，话散了捡——你在，事情就没那么难。",
       signatureOrder: "热手冲 + 开心果坚果棒",
     },
     {
-      name: "Teman Berbual Panjang",
+      name: "Skon Teman Bicara",
       description:
-        "Anda boleh menemani cerita seseorang berjam-jam tanpa tergesa-gesa mahu membetulkannya. Bila cawan sejuk dan topik mula hanyut, anda pesan satu lagi pour-over lalu membawa perbualan kembali perlahan-lahan.",
+        "Anda boleh menemani cerita seseorang tiga jam tanpa tergesa-gesa membetulkannya. Cawan sejuk, dituang semula; topik hanyut, dikutip kembali—segalanya terasa ringan semata-mata kerana anda ada.",
       signatureOrder: "Kopi Pour-Over Panas + Bar Kacang Pistachio",
     },
   ),
   HLDA: localizedResult(
     "HLDA",
     {
-      name: "The Warm Room Keeper",
+      name: "The Shokupan Nest",
       description:
-        "You know when to make a little room for yourself. A warm latte, a soft blueberry puff, and a tucked-away table turn one café corner into a small room with the door quietly closed.",
+        "You're good at looking after yourself: something hot, something sweet, something soft, in the warmest seat. It's a little house you built for one—not open to visitors.",
       signatureOrder: "Hot Latte + Blueberry Cream Puff",
     },
     {
-      name: "暖房独享家",
+      name: "暖房生吐司",
       description:
-        "你很会照顾自己。一杯热的、甜的、不太浓的，配一块软的东西，坐在暖的地方——这是你给自己修的一间小房子，不对外开放。",
+        "你很会照顾自己：热的、甜的、软的，坐在暖的地方。这是你给自己盖的小房子——不对外开放，谢绝参观。",
       signatureOrder: "热拿铁 + 蓝莓泡芙",
     },
     {
-      name: "Penjaga Sudut Hangat",
+      name: "Sarang Roti Susu",
       description:
-        "Anda tahu bila perlu menyediakan sedikit ruang untuk diri sendiri. Latte panas, puff blueberi yang lembut, dan meja tersorok mengubah satu sudut kafe menjadi bilik kecil dengan pintunya tertutup senyap.",
+        "Anda pandai menjaga diri: yang panas, yang manis, yang lembut, di tempat paling hangat. Itu rumah kecil yang anda bina untuk seorang—tidak dibuka untuk pelawat.",
       signatureOrder: "Latte Panas + Puff Krim Blueberi",
     },
   ),
   HLDT: localizedResult(
     "HLDT",
     {
-      name: "The Tea Time Host",
+      name: "The Madeleine Host",
       description:
-        "You remember who skips nuts, who wants less sugar, and who always orders hot. By the time everyone arrives, the macarons are lined up, the lattes are steaming, and every seat around your table is saved.",
+        "Who skips nuts, who wants less sugar, who only drinks it hot—you remember it all. People keep coming back: half for the pastries, half for you.",
       signatureOrder: "Hot Latte + Macaron",
     },
     {
-      name: "下午茶召集人",
+      name: "下午茶玛德琳",
       description:
-        "你记得每个人的口味。谁不吃坚果、谁要少糖、谁一定要热的——点单的时候你从来不用问。大家愿意来，一半因为东西好吃，一半因为你在。",
+        "谁不吃坚果、谁要少糖、谁必须热的——你全记得。大家愿意来，一半为了茶点，一半为了你。",
       signatureOrder: "热拿铁 + 马卡龙",
     },
     {
-      name: "Tuan Rumah Minum Petang",
+      name: "Madeleine Tuan Rumah",
       description:
-        "Anda ingat siapa tak makan kacang, siapa mahu kurang gula, dan siapa mesti pesan panas. Bila semua tiba, makaron sudah tersusun, latte masih berwap, dan setiap tempat di meja anda sudah disimpan.",
+        "Siapa tak makan kacang, siapa mahu kurang gula, siapa mesti minum panas—semuanya anda ingat. Orang datang lagi dan lagi: separuh kerana kuih, separuh kerana anda.",
       signatureOrder: "Latte Panas + Makaron",
     },
   ),
   HSBA: localizedResult(
     "HSBA",
     {
-      name: "The Purist",
+      name: "The Baguette Purist",
       description:
-        "You taste carefully and never lower the bar just to be agreeable. Steam rises from a bold Americano beside a dense slice of Basque cheesecake, with every sugar packet left unopened.",
+        "Flour, water, salt—three things done right are enough. You hold a standard for \"good\" and don't plan to lower it, not even to fit in. That's not being difficult. That's respect.",
       signatureOrder: "Hot Americano + Basque Cheesecake",
     },
     {
-      name: "硬核老饕",
+      name: "硬核法棍",
       description:
-        "你对「好吃」有标准，而且不打算降低。热的、浓的、不加糖的，配一块扎实的巴斯克——你不需要有人认同，你只需要它是对的。",
+        "面粉、水、盐，三样就够——你对「好」有标准，而且不打算降。不为合群点头。这不是挑剔，是尊重。",
       signatureOrder: "热美式 + 巴斯克",
     },
     {
-      name: "Pencinta Tulen",
+      name: "Baguette Tulen",
       description:
-        "Anda merasa dengan teliti dan tak pernah merendahkan standard hanya untuk menyenangkan orang. Wap naik daripada Americano yang pekat di sebelah sepotong kek keju Basque, sementara semua paket gula kekal tidak dibuka.",
+        "Tepung, air, garam—tiga bahan yang betul sudah memadai. Anda ada piawai untuk \"yang baik\" dan tak berniat menurunkannya, walau untuk menyenangkan sesiapa. Itu bukan cerewet. Itu hormat.",
       signatureOrder: "Americano Panas + Kek Keju Basque",
     },
   ),
   HSBT: localizedResult(
     "HSBT",
     {
-      name: "The Late Night Confidant",
+      name: "The Midnight Basque",
       description:
-        "You keep quiet through the day, then let the real conversation begin after dark. Over a hot Americano, your soft “I’ve been meaning to tell you…” hangs between two chairs in the last half-hour before closing.",
+        "Quiet by day, honest after dark. Under the burnt shell it's all softness—and that \"actually, I've been meaning to tell you…\" in the last half-hour before closing is saved for the few you trust.",
       signatureOrder: "Hot Americano + Wellington",
     },
     {
-      name: "深夜谈心局",
+      name: "深夜巴斯克",
       description:
-        "白天你话不多，越晚话越多。一杯浓的、热的，配一句「其实我一直想说」——真正重要的对话，都发生在打烊前那半小时。",
+        "白天话不多，越夜越真心。烤焦的外壳底下全是软的——打烊前那句「其实我一直想说」，你只留给信得过的人。",
       signatureOrder: "热美式 + 惠灵顿",
     },
     {
-      name: "Teman Bicara Larut Malam",
+      name: "Basque Larut Malam",
       description:
-        "Anda banyak diam pada siang hari, kemudian perbualan sebenar bermula selepas gelap. Di hadapan Americano panas, ayat perlahan “sebenarnya, dah lama saya nak cakap…” tergantung antara dua kerusi dalam setengah jam sebelum kedai tutup.",
+        "Pendiam pada siang hari, paling jujur selepas gelap. Di bawah kulit rentung itu semuanya lembut—dan ayat \"sebenarnya, dah lama saya nak cakap…\" pada setengah jam terakhir sebelum kedai tutup, hanya untuk orang yang anda percaya.",
       signatureOrder: "Americano Panas + Wellington",
     },
   ),
   HSDA: localizedResult(
     "HSDA",
     {
-      name: "The Both-And",
+      name: "The Pistachio Tart",
       description:
-        "You take bitter and sweet as they come, without asking either one to disappear. You work the question through alone, with a hot Americano to the left of your notebook and a pistachio egg tart to the right.",
+        "You can hold the bitter and still welcome the sweet. Like a pistachio: nutty edge on the shell, cream at the heart—life was never black and white, and you've known it for years.",
       signatureOrder: "Hot Americano + Pistachio Egg Tart",
     },
     {
-      name: "甜苦兼修者",
+      name: "开心果蛋挞",
       description:
-        "苦你受得住，甜你也不推辞。你早就知道日子不是非黑即白的，所以一杯浓的配一块甜的，刚刚好。这道题你自己解，不用别人参与。",
+        "苦你受得住，甜你不推辞。像开心果：壳有果仁的苦香，心是奶油的甜——日子从不非黑即白，你早就懂了。",
       signatureOrder: "热美式 + 开心果蛋挞",
     },
     {
-      name: "Pahit dan Manis",
+      name: "Tat Pistachio",
       description:
-        "Anda menerima pahit dan manis tanpa meminta salah satunya hilang. Soalan itu anda fikirkan sendiri, dengan Americano panas di kiri buku nota dan tat telur pistachio di kanan.",
+        "Pahit anda tahan, manis anda tak tolak. Macam pistachio: kulitnya berbau kacang yang pahit-wangi, hatinya krim yang manis—hidup tak pernah hitam-putih, dan anda dah lama faham.",
       signatureOrder: "Americano Panas + Tat Telur Pistachio",
     },
   ),
@@ -419,19 +419,19 @@ export const results = {
     {
       name: "The Cake Person",
       description:
-        "You remember every birthday and somehow end up ordering the cake. When the candles catch above a four-inch Basque, you’re already smiling across the table before the birthday guest makes a wish.",
+        "You remember every birthday, and somehow the cake is always yours to order. The second the candles catch, you're happier than the birthday kid—because you believe joy deserves to be taken seriously.",
       signatureOrder: "Hot Latte + 4-Inch Basque Cheesecake",
     },
     {
       name: "生日蛋糕主理人",
       description:
-        "谁过生日你都记得，蛋糕永远是你订的。你喜欢浓的、甜的、有仪式感的东西，因为你相信高兴这件事值得被认真对待。插上蜡烛那一刻，你比寿星还开心。",
+        "谁的生日你都记得，蛋糕永远你订。蜡烛点亮那刻，你比寿星还开心——你相信高兴这件事，值得认真对待。",
       signatureOrder: "热拿铁 + 4 吋巴斯克",
     },
     {
       name: "Ketua Kek Hari Jadi",
       description:
-        "Anda ingat setiap hari jadi dan entah bagaimana selalu jadi orang yang menempah kek. Bila lilin menyala di atas kek Basque empat inci, anda sudah tersenyum dari seberang meja sebelum orang yang diraikan sempat membuat hajat.",
+        "Anda ingat setiap hari jadi, dan entah bagaimana kek sentiasa anda yang tempah. Saat lilin menyala, anda lebih gembira daripada orang yang diraikan—kerana anda percaya kegembiraan patut diambil serius.",
       signatureOrder: "Latte Panas + Kek Keju Basque 4 Inci",
     },
   ),

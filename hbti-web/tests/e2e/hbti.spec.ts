@@ -154,7 +154,7 @@ async function openInvitation(page: Page) {
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
-      name: "What kind of coffee person are you?",
+      name: "Which bread on our shelf is you?",
     }),
   ).toBeVisible();
 }
@@ -169,7 +169,7 @@ async function assertNoHorizontalOverflow(page: Page) {
 }
 
 async function startQuiz(page: Page) {
-  await page.getByRole("button", { name: /Start my HBTI/ }).click();
+  await page.getByRole("button", { name: /Claim my bread/ }).click();
   await expect(page.getByRole("progressbar")).toHaveAttribute(
     "aria-valuenow",
     "1",
@@ -220,7 +220,7 @@ test("offers a direct guest preview without authentication or reward calls", asy
   await expect(page.getByText("Guest preview")).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: "What kind of coffee person are you?",
+      name: "Which bread on our shelf is you?",
     }),
   ).toBeVisible();
   await expect(
@@ -343,7 +343,7 @@ test("retires personal-link entry points without preserving the token", async ({
   await expect(page).toHaveURL(`${localOrigin}/`);
   await expect(
     page.getByRole("heading", {
-      name: "What kind of coffee person are you?",
+      name: "Which bread on our shelf is you?",
     }),
   ).toBeVisible();
   expect(page.url()).not.toContain(privateMarker);
@@ -441,7 +441,7 @@ test("switches the same page between English, Chinese, and Malay", async ({
 
   await page.getByRole("button", { name: /简体中文/ }).click();
   await expect(
-    page.getByRole("heading", { name: "你是哪一种咖啡人？" }),
+    page.getByRole("heading", { name: "你是货架上的哪一块？" }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
 
@@ -456,7 +456,7 @@ test("switches the same page between English, Chinese, and Malay", async ({
   await page.getByRole("button", { name: /English/ }).click();
   await expect(
     page.getByRole("heading", {
-      name: "What kind of coffee person are you?",
+      name: "Which bread on our shelf is you?",
     }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -471,14 +471,14 @@ test("restores a local draft and Back returns to the saved answer", async ({
   const network = await mockPrivateNetwork(page);
   await openInvitation(page);
 
-  await page.getByRole("button", { name: /Start my HBTI/ }).click();
+  await page.getByRole("button", { name: /Claim my bread/ }).click();
   await page
     .getByRole("button", { name: /A cup still steaming in your hands/ })
     .click();
 
   await expect(
     page.getByRole("heading", {
-      name: "If coffee were a person, you’d want them to—",
+      name: "That first warm bite is best—",
     }),
   ).toBeVisible();
   await expect
@@ -494,7 +494,7 @@ test("restores a local draft and Back returns to the saved answer", async ({
   await page.reload();
   await expect(
     page.getByRole("heading", {
-      name: "If coffee were a person, you’d want them to—",
+      name: "That first warm bite is best—",
     }),
   ).toBeVisible();
 
@@ -574,7 +574,7 @@ test("completes exactly six questions and safely retries from 500 to issued", as
   await answerExactlySixQuestions(page);
 
   await expect(
-    page.getByRole("heading", { name: "The Clear-Eyed" }),
+    page.getByRole("heading", { name: "The Clear-Eyed Bagel" }),
   ).toBeVisible();
   await assertNoHorizontalOverflow(page);
   await page
@@ -646,7 +646,7 @@ test("completes exactly six questions and safely retries from 500 to issued", as
   ).toHaveText("Your HBTI card is ready to share.");
   const cardCapture = await readResultCardCapture(page);
   expect(cardCapture.share).toMatchObject({
-    title: "HBTI ILBA · The Clear-Eyed",
+    title: "HBTI ILBA · The Clear-Eyed Bagel",
     url: `${localOrigin}/`,
     files: [
       {
@@ -830,10 +830,10 @@ test("supports the core journey with keyboard input only", async ({ page }) => {
   await openInvitation(page);
 
   const introHeading = page.getByRole("heading", {
-    name: "What kind of coffee person are you?",
+    name: "Which bread on our shelf is you?",
   });
   await expect(introHeading).toBeFocused();
-  const begin = page.getByRole("button", { name: "Start my HBTI" });
+  const begin = page.getByRole("button", { name: "Claim my bread" });
   await tabTo(page, begin);
   await expectFocusIndicator(begin);
   await page.keyboard.press("Enter");

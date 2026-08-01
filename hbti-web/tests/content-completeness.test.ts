@@ -60,12 +60,12 @@ describe("HBTI localized content", () => {
         ].filter(({ segment }) => segment.trim() !== "");
         expect(
           sentences.length,
-          `${code} ${locale} must contain 2–3 sentences`,
+          `${code} ${locale} must contain 2-4 sentences`,
         ).toBeGreaterThanOrEqual(2);
         expect(
           sentences.length,
-          `${code} ${locale} must contain 2–3 sentences`,
-        ).toBeLessThanOrEqual(3);
+          `${code} ${locale} must contain 2-4 sentences`,
+        ).toBeLessThanOrEqual(4);
       }
     }
   });

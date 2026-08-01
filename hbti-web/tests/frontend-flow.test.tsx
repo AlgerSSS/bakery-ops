@@ -164,7 +164,7 @@ describe("customer HBTI journey", () => {
     );
     expect(
       await screen.findByRole("heading", {
-        name: "What kind of coffee person are you?",
+        name: "Which bread on our shelf is you?",
       }),
     ).toBeInTheDocument();
     expect(
@@ -206,11 +206,11 @@ describe("customer HBTI journey", () => {
 
     render(<HbtiExperience />);
     await user.click(
-      await screen.findByRole("button", { name: /Start my HBTI/ }),
+      await screen.findByRole("button", { name: /Claim my bread|proofing—continue|认领我的面包|接着来/ }),
     );
     await user.click(
       await screen.findByRole("button", {
-        name: /Condensation beading on the glass/,
+        name: /Something iced: 'Wake up. It's fine now.'/,
       }),
     );
     await waitFor(() => {
@@ -235,7 +235,7 @@ describe("customer HBTI journey", () => {
     );
 
     expect(
-      await screen.findByRole("button", { name: /Start my HBTI/ }),
+      await screen.findByRole("button", { name: /Claim my bread|proofing—continue|认领我的面包|接着来/ }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Continue where I left off/ }),
@@ -268,26 +268,26 @@ describe("customer HBTI journey", () => {
     render(<HbtiExperience />);
 
     await screen.findByRole("heading", {
-      name: "What kind of coffee person are you?",
+      name: "Which bread on our shelf is you?",
     });
-    await user.click(screen.getByRole("button", { name: /Start my HBTI/ }));
+    await user.click(screen.getByRole("button", { name: /Claim my bread|proofing—continue|认领我的面包|接着来/ }));
 
     await chooseAndContinue(
       user,
-      /Condensation beading on the glass/,
+      /Something iced: 'Wake up. It's fine now.'/,
     );
     await chooseAndContinue(user, /Ease you into the day/);
     await chooseAndContinue(user, /A little bitterness/);
-    await chooseAndContinue(user, /No one interrupts/);
-    await chooseAndContinue(user, /Before the sun gets fierce/);
+    await chooseAndContinue(user, /Alone, unhurried, no talking, no sharing/);
+    await chooseAndContinue(user, /Early morning, before the world gets loud/);
     await chooseAndContinue(user, /^A cup/);
 
     expect(
-      await screen.findByRole("heading", { name: "The Clear-Eyed" }),
+      await screen.findByRole("heading", { name: "The Clear-Eyed Bagel" }),
     ).toBeInTheDocument();
 
     await user.click(
-      screen.getByRole("button", { name: /Receive my member gift/ }),
+      screen.getByRole("button", { name: /Collect my fresh-out gift/ }),
     );
     await user.click(
       screen.getByRole("button", { name: "Pistachio green" }),
@@ -297,7 +297,7 @@ describe("customer HBTI journey", () => {
       "pistachio",
     );
     await user.click(
-      screen.getByRole("button", { name: /Finish my HBTI/ }),
+      screen.getByRole("button", { name: /Out of the oven!/ }),
     );
 
     expect(

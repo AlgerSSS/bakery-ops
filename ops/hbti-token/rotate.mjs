@@ -219,7 +219,10 @@ try {
   process.stderr.write(
     `${new Date().toISOString()} 轮换失败：${error?.message ?? error}\n`,
   );
-  process.exit(1);
+  // 用 exitCode 而不是 process.exit(1):后者同步终止进程,下面 finally 里的
+  // `await session.close()` 不会跑完,每次失败都漏一个 Chromium。
+  // 这个任务每 12 小时一班,失败若连续发生,泄漏的浏览器会把内存吃光。
+  process.exitCode = 1;
 } finally {
   await session?.close();
 }

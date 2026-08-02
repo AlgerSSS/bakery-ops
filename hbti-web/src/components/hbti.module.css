@@ -1103,17 +1103,36 @@
 .traitLine {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.42rem;
   margin-top: 0.6rem;
 }
 
-.traitLine span {
+/* 特征标签本体。用 :not() 排除同行首位的「配料」小标题 ——
+   它和标签同为 span 且选择器权重更高,不排除的话会被画成一个假标签。 */
+.traitLine > span:not(.traitsLabel) {
   padding: 0.32rem 0.6rem;
   border: 1px solid rgba(21, 19, 19, 0.2);
   border-radius: 0.25rem;
   color: var(--cocoa-dark);
   background: rgba(255, 247, 234, 0.82);
   font-size: 0.7rem;
+}
+
+/* 「配料」小标题:独立一行,注解分量,不与下面的特征标签抢视线。
+   间距收到最紧 —— 结果页本就要滚动(基线 830 > 812),这行只再加 ~15px。 */
+.traitsLabel {
+  margin-top: 0.5rem;
+  color: var(--ink-soft);
+  font-family: var(--font-brand);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.traitsLabel + .traitLine {
+  margin-top: 0.25rem;
 }
 
 .resultDescription {

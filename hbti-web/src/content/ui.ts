@@ -61,13 +61,20 @@ export interface UiCopy {
   resume: string;
   back: string;
   next: string;
+  /** 进度的**字面**表述,只做 aria-label。屏幕阅读器不该靠隐喻猜自己答到第几题。 */
   questionProgress: (current: number, total: number) => string;
+  /** 进度的**可见**表述,烘焙口径,aria-hidden。 */
+  questionProgressFlavor: (current: number, total: number) => string;
   /** 按题 id 键控而非索引:题目重排不会让提示语错位。
    *  Record<keyof HbtiAnswers, …> 让 TS 强制 13 条齐全 —— 漏一条编译就不过,
    *  不会出现某个语言某一题渲染成 undefined。 */
   chooseOne: Record<keyof HbtiAnswers, string>;
   resultEyebrow: string;
   resultTitle: string;
+  /** 结果卡上「配料」小标题 —— 让四个特征读成配方而不是标签堆。 */
+  /** 结果卡票头的「配方编号」前缀 —— HBTI 四个字母当配方号。 */
+  recipeNoLabel: string;
+  traitsLabel: string;
   signatureLabel: string;
   discoverGift: string;
   retake: string;
@@ -216,7 +223,8 @@ export const uiCopy: Localized<UiCopy> = {
     resume: "The dough's still proofing—continue",
     back: "Back",
     next: "Next",
-    questionProgress: (current, total) => `Choice ${current} of ${total}`,
+    questionProgress: (current, total) => `Question ${current} of ${total}`,
+    questionProgressFlavor: (current, total) => `Batch ${current} of ${total}`,
     // 13 句烘焙房口吻的作答提示,每题一句。老板点名喜欢第一句那种感觉
     // (「用烘焙术语讲测验规则」),这里铺满全程,最后一题回扣第一句。
     //
@@ -241,6 +249,8 @@ export const uiCopy: Localized<UiCopy> = {
     },
     resultEyebrow: "Fresh from the oven · Your HBTI",
     resultTitle: "Fresh out of the oven: you.",
+    recipeNoLabel: "Recipe no.",
+    traitsLabel: "Ingredients",
     signatureLabel: "Your table order",
     discoverGift: "Collect my fresh-out gift",
     retake: "Bake it again",
@@ -380,7 +390,8 @@ export const uiCopy: Localized<UiCopy> = {
     resume: "面团还醒着，接着来",
     back: "返回",
     next: "下一题",
-    questionProgress: (current, total) => `第 ${current} / ${total} 题`,
+    questionProgress: (current, total) => `第 ${current} 题，共 ${total} 题`,
+    questionProgressFlavor: (current, total) => `第 ${current} 炉 / 共 ${total} 炉`,
     chooseOne: {
       q1: "凭第一感觉选。面团醒过头，就不松软了。",
       q2: "别想太久，面团已经在发了。",
@@ -398,6 +409,8 @@ export const uiCopy: Localized<UiCopy> = {
     },
     resultEyebrow: "刚出炉 · 你的 HBTI",
     resultTitle: "刚出炉的，是你。",
+    recipeNoLabel: "配方编号",
+    traitsLabel: "配料",
     signatureLabel: "你的专属搭配",
     discoverGift: "收下这份出炉礼",
     retake: "重烤一次",
@@ -537,7 +550,9 @@ export const uiCopy: Localized<UiCopy> = {
     resume: "Doh masih menunggu—sambung",
     back: "Kembali",
     next: "Seterusnya",
-    questionProgress: (current, total) => `Pilihan ${current} daripada ${total}`,
+    questionProgress: (current, total) => `Soalan ${current} daripada ${total}`,
+    // 可见文案用紧凑写法:320px 上「Bakaran 13 daripada 13」会换行,撑高进度块。
+    questionProgressFlavor: (current, total) => `Bakaran ${current}/${total}`,
     chooseOne: {
       q1: "Ikut naluri pertama—doh yang terlebih menunggu akan kempis.",
       q2: "Jangan fikir lama. Doh itu sudah naik.",
@@ -555,6 +570,8 @@ export const uiCopy: Localized<UiCopy> = {
     },
     resultEyebrow: "Baru keluar ketuhar · HBTI anda",
     resultTitle: "Baru keluar dari ketuhar: anda.",
+    recipeNoLabel: "No. resipi",
+    traitsLabel: "Bahan",
     signatureLabel: "Pesanan khas anda",
     discoverGift: "Terima hadiah keluar ketuhar",
     retake: "Bakar sekali lagi",

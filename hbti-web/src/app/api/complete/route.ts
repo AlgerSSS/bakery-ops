@@ -15,6 +15,7 @@ import { hbtiAnswersSchema } from "@/lib/hbti/schema";
 import { consumeTokenRateLimit } from "@/lib/rate-limit/pg-rate-limit";
 import { createResApiClientFromEnv } from "@/lib/res/client";
 import { readHbtiServerConfig } from "@/lib/server-config";
+import { drawGift, releaseGift } from "@/lib/store/gift-pool";
 import { createCompletionStoreFromEnv } from "@/lib/store/pg-completion-store";
 
 export const runtime = "nodejs";
@@ -105,12 +106,20 @@ export async function POST(request: Request): Promise<NextResponse> {
         store: await createCompletionStoreFromEnv(),
         res: createResApiClientFromEnv(),
         couponTemplateName: config.couponTemplateName,
+        gifts: {
+          draw: () => drawGift(),
+          release: (templateName) => releaseGift(templateName),
+        },
       },
     );
 
+    // 202 的含义是「还没完，接着轮询」。unrewarded 是终态——周边发完了，不会再变——
+    // 所以和 issued 一样返回 200，前端不该为它继续轮询。
     const response = noStoreJson(
       publicCompletionPayload(result, config.memberWalletUrl),
-      result.status === "issued" ? { status: 200 } : { status: 202 },
+      result.status === "issued" || result.status === "unrewarded"
+        ? { status: 200 }
+        : { status: 202 },
     );
     return response;
   } catch (error) {

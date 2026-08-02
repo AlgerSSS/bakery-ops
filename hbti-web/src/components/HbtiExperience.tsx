@@ -22,6 +22,7 @@ import {
   ageChoices,
   colorChoices,
   genderChoices,
+  isGiftTemplateName,
   type AgeChoice,
   type ColorChoice,
   type GenderChoice,
@@ -53,6 +54,8 @@ type SubmissionState =
   | "idle"
   | "submitting"
   | "issued"
+  // 答完了但周边已发完。是终态，不是错误——人格照常出，只是没有券。
+  | "unrewarded"
   | "processing"
   | "review"
   | "demo"
@@ -70,7 +73,7 @@ interface HbtiDraft {
 }
 
 interface CompletionResponse {
-  status?: "issued" | "processing" | "review";
+  status?: "issued" | "unrewarded" | "processing" | "review";
   code?: HbtiCode;
   color?: ColorChoice;
   memberWalletUrl?: string;
@@ -111,7 +114,9 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [submission, setSubmission] =
     useState<SubmissionState>("idle");
-  const [rewardName, setRewardName] = useState(copy.rewardName);
+  // 存的是 RES 的原始券模板名，不是显示名。翻译推迟到渲染时做——
+  // 存翻译结果的话，顾客在结果页切语言，卡片上的礼物名会冻在上一个语言。
+  const [rewardTemplateName, setRewardTemplateName] = useState<string>();
   const [memberWalletUrl, setMemberWalletUrl] = useState<string>();
   const [confirmedCode, setConfirmedCode] = useState<HbtiCode>();
   const [confirmedColor, setConfirmedColor] = useState<ColorChoice>();
@@ -262,13 +267,14 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
       setConfirmedColor(payload.color);
     }
     if (payload.reward?.couponTemplateName) {
-      setRewardName(payload.reward.couponTemplateName);
+      setRewardTemplateName(payload.reward.couponTemplateName);
     }
     if (isSafeWalletUrl(payload.memberWalletUrl)) {
       setMemberWalletUrl(payload.memberWalletUrl);
     }
     if (
       payload.status === "issued" ||
+      payload.status === "unrewarded" ||
       payload.status === "processing" ||
       payload.status === "review"
     ) {
@@ -434,11 +440,11 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
     setDraftKey(undefined);
     setDraftLoaded(false);
     setSubmission("idle");
-    setRewardName(copy.rewardName);
+    setRewardTemplateName(undefined);
     setMemberWalletUrl(undefined);
     setConfirmedCode(undefined);
     setConfirmedColor(undefined);
-  }, [copy.rewardName]);
+  }, []);
 
   useEffect(() => {
     if (submission !== "processing") {
@@ -519,7 +525,7 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
                   ? results[confirmedCode][locale].name
                   : result?.name
               }
-              rewardName={rewardName}
+              rewardTemplateName={rewardTemplateName}
               memberWalletUrl={memberWalletUrl}
               color={confirmedColor ?? color}
               onRetry={pollCompletionStatus}
@@ -1174,7 +1180,7 @@ function CompletionState({
   state,
   resultCode,
   resultName,
-  rewardName,
+  rewardTemplateName,
   memberWalletUrl,
   color,
   onRetry,
@@ -1184,7 +1190,8 @@ function CompletionState({
   state: Exclude<SubmissionState, "idle" | "error">;
   resultCode?: HbtiCode;
   resultName?: string;
-  rewardName: string;
+  /** RES 的原始券模板名；显示名在这里现算，见下方 giftDisplayName。 */
+  rewardTemplateName?: string;
   memberWalletUrl?: string;
   color?: ColorChoice;
   onRetry: () => void;
@@ -1203,6 +1210,14 @@ function CompletionState({
   const isIssued = state === "issued";
   const isProcessing = state === "processing";
   const isDemo = state === "demo";
+  const isSoldOut = state === "unrewarded";
+  // 券模板名是后台的内部字符串（"HBTI Gift · Rose Fridge Magnet"），不能直接给顾客看。
+  // 认不出来时退回兜底文案，而不是把原字符串漏出去——万一后台改名，顾客看到的是
+  // 一句得体的话，不是一行内部标识。
+  const giftDisplayName =
+    rewardTemplateName && isGiftTemplateName(rewardTemplateName)
+      ? copy.giftNames[rewardTemplateName]
+      : copy.rewardName;
   return (
     <section className={styles.completionPanel} aria-live="polite">
       <div
@@ -1217,34 +1232,52 @@ function CompletionState({
           ? copy.demoCompleteEyebrow
           : isIssued
             ? copy.successEyebrow
-            : copy.resultEyebrow}
+            : isSoldOut
+              ? copy.giftSoldOutEyebrow
+              : copy.resultEyebrow}
       </p>
       <h1 ref={headingRef} tabIndex={-1}>
         {isDemo
           ? copy.demoCompleteTitle
           : isIssued
             ? copy.successTitle
-            : isProcessing
-              ? copy.processingTitle
-              : copy.reviewTitle}
+            : isSoldOut
+              ? copy.giftSoldOutTitle
+              : isProcessing
+                ? copy.processingTitle
+                : copy.reviewTitle}
       </h1>
       <p className={styles.completionBody}>
         {isDemo
           ? copy.demoCompleteBody
           : isIssued
             ? copy.successBody
-            : isProcessing
-              ? copy.processingBody
-              : copy.reviewBody}
+            : isSoldOut
+              ? copy.giftSoldOutBody
+              : isProcessing
+                ? copy.processingBody
+                : copy.reviewBody}
       </p>
       <div
         className={styles.rewardCard}
         data-surface="reward-receipt"
         data-color={color ?? "neutral"}
       >
-        <span>{isDemo ? copy.demoRewardLabel : copy.rewardLabel}</span>
-        <strong>{rewardName || copy.rewardName}</strong>
-        <p>{isDemo ? copy.demoRewardNote : copy.rewardNote}</p>
+        <span>
+          {isDemo
+            ? copy.demoRewardLabel
+            : isSoldOut
+              ? copy.giftSoldOutLabel
+              : copy.rewardLabel}
+        </span>
+        <strong>{isSoldOut ? copy.giftSoldOutName : giftDisplayName}</strong>
+        <p>
+          {isDemo
+            ? copy.demoRewardNote
+            : isSoldOut
+              ? copy.giftSoldOutNote
+              : copy.rewardNote}
+        </p>
       </div>
       {resultCode && resultName && (
         <div

@@ -55,7 +55,9 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     return noStoreJson(
       publicCompletionPayload(result, config.memberWalletUrl),
-      result.status === "issued" ? { status: 200 } : { status: 202 },
+      result.status === "issued" || result.status === "unrewarded"
+        ? { status: 200 }
+        : { status: 202 },
     );
   } catch (error) {
     if (error instanceof CompleteHbtiError) {

@@ -80,10 +80,29 @@ export interface ReviewCompletionRecord {
   markedAt: string;
 }
 
+/**
+ * 答完题了，但周边已经发完，没有券可发。
+ *
+ * 这是**成功的终态**，不是失败：顾客的面包人格照常出，只是柜台没有小礼物了。
+ * 之所以不复用 `issued`——publicCompletionPayload 对 issued 会无保护地读
+ * `reward.couponTemplateName`，一个没有 reward 的 issued 记录会让整条响应崩掉。
+ *
+ * ⚠ 新增终态时，pg-completion-store 里的 completionRecordSchema 必须同步加一支。
+ * 那个 zod union 是出库时唯一的校验，而 get() 直接把 parse 结果断言成 CompletionRecord——
+ * 只加 TS 分支、不加 zod 分支的话编译完全通过，线上才炸，而且因为保留期是 548 天，
+ * 那个会员会永久 503，再也看不到自己的结果。
+ */
+export interface UnrewardedCompletionRecord {
+  status: "unrewarded";
+  completion: HbtiCompletionSnapshot;
+  markedAt: string;
+}
+
 export type CompletionRecord =
   | ProcessingCompletionRecord
   | IssuedCompletionRecord
-  | ReviewCompletionRecord;
+  | ReviewCompletionRecord
+  | UnrewardedCompletionRecord;
 
 export type CompletionAcquisition =
   | { acquired: true }
@@ -116,6 +135,11 @@ export interface CompletionStore {
     key: CompletionStoreKey,
     attemptId: string,
     record: ReviewCompletionRecord,
+  ): Promise<void>;
+  markUnrewarded(
+    key: CompletionStoreKey,
+    attemptId: string,
+    record: UnrewardedCompletionRecord,
   ): Promise<void>;
   clearLocked(key: CompletionStoreKey, attemptId: string): Promise<boolean>;
 }

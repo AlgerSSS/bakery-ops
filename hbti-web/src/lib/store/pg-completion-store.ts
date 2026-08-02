@@ -11,6 +11,7 @@ import type {
   PreparedCompletionRecord,
   ProcessingCompletionRecord,
   ReviewCompletionRecord,
+  UnrewardedCompletionRecord,
 } from "@/lib/store/completion-store";
 
 /**
@@ -47,7 +48,12 @@ const completionSnapshotSchema = z.strictObject({
   age: z.string().trim().min(1).max(32).optional(),
 });
 
-const completionRecordSchema = z.union([
+/**
+ * 出库时唯一的校验。导出是为了让 completion-record-schema.test.ts 能逐个状态验往返——
+ * 少一支分支的话 tsc 是不会响的（get() 把 parse 的结果直接当成 CompletionRecord 返回，
+ * 更窄的联合类型照样可赋值），只有那个测试会响。
+ */
+export const completionRecordSchema = z.union([
   z.strictObject({
     status: z.literal("processing"),
     phase: z.literal("locked"),
@@ -91,6 +97,11 @@ const completionRecordSchema = z.union([
       "readback_mismatch",
       "stale_reconciliation",
     ]),
+    markedAt: z.string().min(1),
+  }),
+  z.strictObject({
+    status: z.literal("unrewarded"),
+    completion: completionSnapshotSchema,
     markedAt: z.string().min(1),
   }),
 ]);
@@ -224,6 +235,16 @@ export class PgCompletionStore implements CompletionStore {
     key: CompletionStoreKey,
     attemptId: string,
     record: ReviewCompletionRecord,
+  ): Promise<void> {
+    assertKey(key);
+    const updated = await this.write(this.sql, key, attemptId, record, null);
+    if (updated !== 1) throw new Error("Completion was not in the processing state.");
+  }
+
+  async markUnrewarded(
+    key: CompletionStoreKey,
+    attemptId: string,
+    record: UnrewardedCompletionRecord,
   ): Promise<void> {
     assertKey(key);
     const updated = await this.write(this.sql, key, attemptId, record, null);

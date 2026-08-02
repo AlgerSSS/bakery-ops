@@ -19,6 +19,7 @@ import type {
   IssuedCompletionRecord,
   PreparedCompletionRecord,
   ReviewCompletionRecord,
+  UnrewardedCompletionRecord,
 } from "@/lib/store/completion-store";
 
 const metadataSchema = z.string().trim().min(1).max(32);
@@ -58,10 +59,26 @@ export interface CompleteHbtiInput {
   age?: string;
 }
 
+/**
+ * 周边奖池。配置后，每次完成从池中按剩余库存加权抽一件，而不是发固定的那张券。
+ *
+ * 契约要求 draw 已经把库存扣掉了——所以从 draw 返回到 markPrepared 之间的任何失败，
+ * 都必须调用 release 归还，否则那一件实物在账上被永久占住却从没发出去。
+ */
+export interface GiftPoolDependency {
+  /** 抽一件并扣减库存；池子空了返回 null。 */
+  draw(): Promise<{ templateName: string } | null>;
+  /** 归还一件库存。 */
+  release(templateName: string): Promise<void>;
+}
+
 export interface CompleteHbtiDependencies {
   store: CompletionStore;
   res: ResCouponAdapter;
+  /** 未配置 gifts 时发的固定奖励；健康检查与对账也用它探活。 */
   couponTemplateName: string;
+  /** 配置后改为从周边奖池抽取，忽略 couponTemplateName。 */
+  gifts?: GiftPoolDependency;
   now?: () => Date;
 }
 
@@ -105,7 +122,9 @@ export type CompleteHbtiResult =
   | ({
       status: "review";
       reason: CompletionReviewReason;
-    } & HbtiCompletionSnapshot);
+    } & HbtiCompletionSnapshot)
+  // 周边发完了。仍然是成功：面包人格照常返回，只是没有券。
+  | ({ status: "unrewarded" } & HbtiCompletionSnapshot);
 
 export async function completeHbti(
   input: CompleteHbtiInput,
@@ -180,6 +199,25 @@ export async function completeHbti(
   let member;
   let template;
   let beforeCoupons: readonly UsableCoupon[];
+  // 抽中之后、markPrepared 之前的每一条失败路径都要靠它归还库存。
+  //
+  // ⚠ 已知取舍：这个变量只活在进程内存里。drawGift 的扣减是自己一个事务、立即提交的，
+  // 而记下「谁抽走了这一件」要等到 markPrepared。中间隔着两次 RES 网络调用，进程若在
+  // 这个窗口里被杀（函数超时、部署重启），那一件就永久对不上账——库存少一件，实物还在抽屉里。
+  //
+  // 为什么不改成把抽中的券名先写进 locked 记录、再靠过期锁去归还：那样会引入**双重归还**。
+  // 本地失败路径已经归还过一次，若归还与清锁之间又崩了，过期锁的恢复逻辑会再归还一次，
+  // issued_count 被减到低于真实发出量，池子以为还有货——于是发出比实物更多的券。
+  // 也就是说，天真的修法把「少发」（东西还在店里，手工加回来即可）换成了「超发」
+  // （顾客拿着券到柜台却没有实物）。要真正修好，得让清锁与归还在同一个事务里完成，
+  // 那需要把 CompletionStore 与奖池的边界打通——不是这次改动该做的。
+  //
+  // 现在这版失败方向是安全的。对账用：
+  //   SELECT SUM(issued_count) FROM hbti_gift_stock;   -- 池子认为发出去多少
+  //   SELECT COUNT(*) FROM pos_member WHERE hbti_status = 'issued'
+  //     AND hbti_campaign_version = '<本期>';           -- 真正发成功多少
+  // 前者持续大于后者、且差值在涨，就是这个窗口在漏，按差值把 issued_count 调回去即可。
+  let drawnTemplateName: string | null = null;
   try {
     member = await dependencies.res.resolveMemberByPhone(phoneE164);
     if (
@@ -193,9 +231,31 @@ export async function completeHbti(
         false,
       );
     }
+    // 抽奖排在会员校验之后：RES 查询是最常见的中断点，先过了这一关再动库存，
+    // 能省掉大量「扣了再还」的往返。
+    let selection: RewardSelection;
+    try {
+      selection = await selectReward(dependencies.gifts);
+    } catch (error) {
+      await clearLocked(dependencies.store, key, attemptId);
+      throw error;
+    }
+    if (selection.kind === "sold-out") {
+      // 周边发完了。这不是错误：把锁直接转成终态，顾客照样拿到自己的面包人格，
+      // 只是结果页会告诉他们小礼物已经领完。
+      return markUnrewarded(
+        dependencies.store,
+        key,
+        attemptId,
+        completion,
+        safeIsoTimestamp(now),
+      );
+    }
+    drawnTemplateName =
+      selection.kind === "drawn" ? selection.templateName : null;
     template =
       await dependencies.res.resolveEnabledCouponTemplateByName(
-        couponTemplateName,
+        drawnTemplateName ?? couponTemplateName,
       );
     beforeCoupons = await dependencies.res.listUsableMatchingCoupons({
       member,
@@ -204,8 +264,10 @@ export async function completeHbti(
     assertCouponList(beforeCoupons);
   } catch (error) {
     if (error instanceof CompleteHbtiError) {
+      // 抛到这里的都已经自己清过锁；抽奖失败时也还没扣到库存。
       throw error;
     }
+    await releaseReward(dependencies.gifts, drawnTemplateName);
     await clearLocked(dependencies.store, key, attemptId);
     throw new CompleteHbtiError(
       "RES_UNAVAILABLE",
@@ -228,7 +290,14 @@ export async function completeHbti(
       templateName: template.name,
     },
   };
-  await markPrepared(dependencies.store, key, attemptId, prepared);
+  // 这一步落库后，抽中的券名就写进了 rewardContext.templateName：后续所有重试
+  // 都从记录里读它，不会再抽第二次。落库失败则必须把库存还回去。
+  try {
+    await markPrepared(dependencies.store, key, attemptId, prepared);
+  } catch (error) {
+    await releaseReward(dependencies.gifts, drawnTemplateName);
+    throw error;
+  }
 
   let giveResult: GiveCouponResult;
   try {
@@ -545,6 +614,61 @@ export async function reconcilePreparedCompletion({
   );
 }
 
+type RewardSelection =
+  | { kind: "fixed" }
+  | { kind: "drawn"; templateName: string }
+  | { kind: "sold-out" };
+
+/**
+ * 决定这次完成该发什么。`drawn` 意味着库存**已经扣掉了**，调用方必须在后续失败时归还。
+ *
+ * 只有「库存表本身读不动」才算错误；「读得动，但一件不剩」是正常的业务终局，
+ * 交给调用方走 unrewarded 终态。把这两件事分开是关键：一次连接抖动若被当成发完，
+ * 顾客就白白丢了一件本来还有货的周边。
+ */
+async function selectReward(
+  gifts: GiftPoolDependency | undefined,
+): Promise<RewardSelection> {
+  if (!gifts) {
+    return { kind: "fixed" };
+  }
+
+  let draw: { templateName: string } | null;
+  try {
+    draw = await gifts.draw();
+  } catch {
+    throw new CompleteHbtiError(
+      "STORE_UNAVAILABLE",
+      "Completion service is temporarily unavailable.",
+      true,
+    );
+  }
+
+  return draw
+    ? { kind: "drawn", templateName: draw.templateName }
+    : { kind: "sold-out" };
+}
+
+/**
+ * 归还一件抽中但没发出去的库存。
+ *
+ * 吞掉异常是有意的：调用它的地方本来就在处理另一个错误，归还失败不该把那个错误盖掉。
+ * 代价是极少数情况下漏还一件——库存表少算一件，比顾客拿到一个被覆盖的错误要好。
+ */
+async function releaseReward(
+  gifts: GiftPoolDependency | undefined,
+  templateName: string | null,
+): Promise<void> {
+  if (!gifts || !templateName) {
+    return;
+  }
+  try {
+    await gifts.release(templateName);
+  } catch {
+    // 见上
+  }
+}
+
 async function getCompletion(
   store: CompletionStore,
   key: CompletionStoreKey,
@@ -669,6 +793,42 @@ async function markForReview(
   return resultFromRecord(review);
 }
 
+/**
+ * 把锁转成「完成但无券」终态。
+ *
+ * 用的是和 markIssued/markReview 同一条 CAS：仍要求本次 attempt 持有锁，
+ * 所以并发的另一个请求不会把它覆盖掉。落库后 acquireProcessing 的闸门
+ * （hbti_status IS NULL OR 已过期 OR 换了活动版本）就会挡住同一会员的第二次参与——
+ * 他们不会因为「这次没抽到」而反复重试直到补货。
+ */
+async function markUnrewarded(
+  store: CompletionStore,
+  key: CompletionStoreKey,
+  attemptId: string,
+  completion: HbtiCompletionSnapshot,
+  markedAt: string,
+): Promise<CompleteHbtiResult> {
+  const record: UnrewardedCompletionRecord = {
+    status: "unrewarded",
+    completion,
+    markedAt,
+  };
+  try {
+    await store.markUnrewarded(key, attemptId, record);
+  } catch {
+    const current = await getCompletion(store, key);
+    if (current && current.status !== "processing") {
+      return resultFromRecord(current);
+    }
+    throw new CompleteHbtiError(
+      "STORE_UNAVAILABLE",
+      "Completion service is temporarily unavailable.",
+      true,
+    );
+  }
+  return resultFromRecord(record);
+}
+
 function resultFromRecord(record: CompletionRecord): CompleteHbtiResult {
   switch (record.status) {
     case "issued":
@@ -682,6 +842,11 @@ function resultFromRecord(record: CompletionRecord): CompleteHbtiResult {
         status: "review",
         ...record.completion,
         reason: record.reason,
+      };
+    case "unrewarded":
+      return {
+        status: "unrewarded",
+        ...record.completion,
       };
     case "processing":
       return {

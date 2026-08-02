@@ -30,7 +30,13 @@ import type {
   IssuedCompletionRecord,
   LockedCompletionRecord,
   PreparedCompletionRecord,
+  UnrewardedCompletionRecord,
 } from "@/lib/store/completion-store";
+import {
+  drawGift,
+  listGiftStock,
+  releaseGift,
+} from "@/lib/store/gift-pool";
 
 const DATABASE_URL = process.env.DATABASE_URL?.trim();
 const STORE = process.env.HBTI_MEMBER_STORE?.trim() || "吉隆坡Pavilion门店";
@@ -534,6 +540,222 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
         SELECT hbti_status FROM pos_member
         WHERE hbti_campaign_version = ${stale.campaignVersion} AND member_id = ${stale.memberId}`;
       expect(staleRows[0]?.hbti_status ?? null).toBeNull();
+    });
+  });
+
+  describe("周边奖池（hbti_gift_stock）", () => {
+    // 和上面同理：加权抽取、FOR UPDATE、CHECK 约束这些真正承载正确性的东西只有真库能验。
+    //
+    // 每个用例再套一层 savepoint 并强制回滚，有两个原因：
+    // 一是这些用例要改全表库存（缩放、停用），不隔离就会互相污染；
+    // 二是「超发被拦下」那条会真的触发一次约束违规，而 PG 里一个报错就会把整个事务打成
+    // aborted，后面每一条都变成 "current transaction is aborted"，看起来像全面崩塌。
+    const onStock = async (body: (sp: SqlRunner) => Promise<void>) => {
+      class Rollback extends Error {}
+      try {
+        await (tx as postgres.TransactionSql).savepoint(async (sp) => {
+          await body(sp);
+          throw new Rollback();
+        });
+      } catch (error) {
+        if (!(error instanceof Rollback)) throw error;
+      }
+    };
+
+    it("抽取扣库存，归还加回来", async () => {
+      await onStock(async (sp) => {
+        const before = await listGiftStock(sp);
+        const total = before.reduce((sum, row) => sum + row.remaining, 0);
+        expect(total).toBeGreaterThan(0);
+
+        const draw = await drawGift(sp);
+        expect(draw).not.toBeNull();
+        const drawn = draw as NonNullable<typeof draw>;
+
+        const mid = await listGiftStock(sp);
+        expect(
+          mid.find((r) => r.templateName === drawn.templateName)?.remaining,
+        ).toBe(drawn.remainingAfter);
+        expect(mid.reduce((s, r) => s + r.remaining, 0)).toBe(total - 1);
+
+        await releaseGift(drawn.templateName, sp);
+        const after = await listGiftStock(sp);
+        expect(after.reduce((s, r) => s + r.remaining, 0)).toBe(total);
+      });
+    });
+
+    it("抽干奖池得到的恰好是库存清单，之后一直返回 null", async () => {
+      await onStock(async (sp) => {
+        // 缩到 11 件（一件 3 份、其余各 1 份）。验证的不变量和抽干全池完全相同——
+        // 每项抽出次数 == 库存、归零后离池、池空返回 null——但库在新加坡，
+        // 一次抽取两个往返，按真实的 1376 件跑要几十分钟，必然超时。
+        // 保留一件 3 份是为了证明「同一品项可以被抽中多次」，不只是每项一次。
+        await sp`
+          UPDATE hbti_gift_stock
+             SET issued_count = 0,
+                 initial_stock = CASE
+                   WHEN template_name = (SELECT min(template_name) FROM hbti_gift_stock)
+                   THEN 3 ELSE 1 END,
+                 is_active = TRUE`;
+        const target = await listGiftStock(sp);
+        const expected = Object.fromEntries(
+          target
+            .filter((r) => r.isActive)
+            .map((r) => [r.templateName, r.remaining]),
+        );
+        const totalTarget = Object.values(expected).reduce((a, b) => a + b, 0);
+
+        const tally: Record<string, number> = {};
+        for (let i = 0; i < totalTarget; i += 1) {
+          const draw = await drawGift(sp);
+          expect(draw, `第 ${i + 1} 次抽取意外落空`).not.toBeNull();
+          const name = (draw as NonNullable<typeof draw>).templateName;
+          tally[name] = (tally[name] ?? 0) + 1;
+        }
+
+        // 每个品项抽出的次数必须恰好等于它的库存：多了是超发，少了说明归零的品项还留在池中。
+        expect(tally).toEqual(expected);
+        expect(await drawGift(sp)).toBeNull();
+        expect(await drawGift(sp)).toBeNull();
+      });
+    });
+
+    it("停用的品项抽不到", async () => {
+      await onStock(async (sp) => {
+        const [first] = await listGiftStock(sp);
+        await sp`UPDATE hbti_gift_stock SET is_active = FALSE
+                  WHERE template_name <> ${first.templateName}`;
+
+        for (let i = 0; i < 5; i += 1) {
+          expect((await drawGift(sp))?.templateName).toBe(first.templateName);
+        }
+      });
+    });
+
+    it("not_oversold 挡住超发——代码算错也发不出多余的一份", async () => {
+      await onStock(async (sp) => {
+        const [row] = await listGiftStock(sp);
+        // 再套一层内层 savepoint：违规一旦发生，连接就进入 aborted 状态，
+        // 必须就地 ROLLBACK TO SAVEPOINT 才能继续用。
+        await expect(
+          (sp as postgres.TransactionSql).savepoint(
+            (inner) =>
+              inner`UPDATE hbti_gift_stock SET issued_count = initial_stock + 1
+                     WHERE template_name = ${row.templateName}`,
+          ),
+        ).rejects.toThrow(/not_oversold/);
+
+        // 拦下之后事务仍然可用，库存也没被改动。
+        const after = await listGiftStock(sp);
+        expect(
+          after.find((r) => r.templateName === row.templateName)?.issuedCount,
+        ).toBe(row.issuedCount);
+      });
+    });
+
+    it("重复归还不会把已发数做成负数", async () => {
+      await onStock(async (sp) => {
+        const [row] = await listGiftStock(sp);
+        await releaseGift(row.templateName, sp);
+        await releaseGift(row.templateName, sp);
+        const target = (await listGiftStock(sp)).find(
+          (r) => r.templateName === row.templateName,
+        );
+        expect(target?.issuedCount).toBeGreaterThanOrEqual(0);
+      });
+    });
+  });
+
+  describe("markUnrewarded（迁移 078 放开的新终态）", () => {
+    it("落库、通过所有 CHECK、并能被 zod 原样读回", async () => {
+      const key = nextKey();
+      const attemptId = randomUUID();
+      expect(
+        (await store.acquireProcessing(key, locked(attemptId))).acquired,
+      ).toBe(true);
+
+      const record: UnrewardedCompletionRecord = {
+        status: "unrewarded",
+        completion: snapshot,
+        markedAt: new Date().toISOString(),
+      };
+      await store.markUnrewarded(key, attemptId, record);
+
+      // 读回这步同时验证了 completionRecordSchema 的 unrewarded 分支——少了它这里抛 ZodError。
+      expect(await store.get(key)).toEqual(record);
+
+      const rows = await tx`
+        SELECT hbti_status, hbti_attempt_id, hbti_record->>'status' AS rec_status,
+               hbti_code, hbti_completed_at
+          FROM pos_member
+         WHERE store = ${STORE} AND member_id = ${key.memberId}`;
+      // ck_pos_member_hbti_status：078 之前这一行根本写不进去。
+      expect(rows[0].hbti_status).toBe("unrewarded");
+      // ck_pos_member_hbti_record_shape：JSON 里的 status 必须等于列。
+      expect(rows[0].rec_status).toBe("unrewarded");
+      // ck_pos_member_hbti_attempt_shape：非 processing 状态不得留 attempt_id。
+      expect(rows[0].hbti_attempt_id).toBeNull();
+      // 画像列照常写——答完题就该有，与发没发券无关。
+      expect(rows[0].hbti_code).toBe(snapshot.code);
+      expect(rows[0].hbti_completed_at).not.toBeNull();
+    });
+
+    it("终态挡住同一会员本期活动内的第二次参与", async () => {
+      const key = nextKey();
+      const attemptId = randomUUID();
+      await store.acquireProcessing(key, locked(attemptId));
+      await store.markUnrewarded(key, attemptId, {
+        status: "unrewarded",
+        completion: snapshot,
+        markedAt: new Date().toISOString(),
+      });
+
+      const again = await store.acquireProcessing(key, locked(randomUUID()));
+      expect(again.acquired).toBe(false);
+      expect(again).toMatchObject({ record: { status: "unrewarded" } });
+    });
+
+    it("不会覆盖已经发过券的记录", async () => {
+      const key = nextKey();
+      const attemptId = randomUUID();
+      await store.acquireProcessing(key, locked(attemptId));
+      await store.markIssued(key, attemptId, {
+        status: "issued",
+        completion: snapshot,
+        reward: {
+          couponTemplateName: "HBTI Gift · White Pencil",
+          newCouponId: "coupon-x",
+          usableCouponCountBefore: 0,
+          usableCouponCountAfter: 1,
+          confirmedAt: new Date().toISOString(),
+        },
+      });
+
+      await expect(
+        store.markUnrewarded(key, attemptId, {
+          status: "unrewarded",
+          completion: snapshot,
+          markedAt: new Date().toISOString(),
+        }),
+      ).rejects.toThrow();
+      expect(await store.get(key)).toMatchObject({ status: "issued" });
+    });
+
+    it("cron 对账不会把 unrewarded 记录扫进来", async () => {
+      const key = nextKey();
+      const attemptId = randomUUID();
+      await store.acquireProcessing(key, locked(attemptId));
+      await store.markUnrewarded(key, attemptId, {
+        status: "unrewarded",
+        completion: snapshot,
+        markedAt: new Date().toISOString(),
+      });
+
+      const pending = await store.listPreparedBefore(
+        new Date(Date.now() + 60_000).toISOString(),
+        50,
+      );
+      expect(pending.some((e) => e.key.memberId === key.memberId)).toBe(false);
     });
   });
 });

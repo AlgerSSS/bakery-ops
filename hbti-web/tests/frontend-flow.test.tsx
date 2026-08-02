@@ -358,6 +358,104 @@ describe("customer HBTI journey", () => {
   });
 });
 
+describe("周边发完之后", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.spyOn(window, "scrollTo").mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  function mockJourney(completion: unknown) {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse({
+            authenticated: true,
+            maskedPhone: "+60 123••6789",
+            draftKey: "member-draft-key-123456",
+          }),
+        )
+        .mockResolvedValueOnce(jsonResponse(completion)),
+    );
+    return userEvent.setup();
+  }
+
+  it("照常出结果，并说明小礼物已经领完", async () => {
+    const user = mockJourney({
+      status: "unrewarded",
+      code: "HSDT",
+      color: "cocoa",
+    });
+    render(<HbtiExperience />);
+
+    await walkTheWholeJourney(user);
+
+    // 最要紧的一条：答完 13 题的人必须还能看到自己的面包人格。
+    expect(
+      await screen.findByRole("heading", {
+        name: "Your bread type is yours to keep.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("HSDT")).toBeInTheDocument();
+    expect(screen.getByText("The Cake Person")).toBeInTheDocument();
+    expect(screen.getByText("All claimed for now")).toBeInTheDocument();
+    expect(screen.getByText("Nothing to redeem this time")).toBeInTheDocument();
+    // 绝不能退回兜底的礼物名——顾客会拿着它去柜台扑空。
+    expect(
+      screen.queryByText("A little something from the counter"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("发到券时显示本地化礼物名，而不是后台的内部字符串", async () => {
+    const user = mockJourney({
+      status: "issued",
+      code: "HSDT",
+      color: "cocoa",
+      reward: { couponTemplateName: "HBTI Gift · Rose Fridge Magnet" },
+    });
+    render(<HbtiExperience />);
+
+    await walkTheWholeJourney(user);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Your gift is in your member wallet.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Rose Fridge Magnet")).toBeInTheDocument();
+    expect(
+      screen.queryByText("HBTI Gift · Rose Fridge Magnet"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("券名认不出来时退回兜底文案，不把原字符串漏给顾客", async () => {
+    const user = mockJourney({
+      status: "issued",
+      code: "HSDT",
+      color: "cocoa",
+      // 后台改名或新增品项、而前端 giftNames 还没跟上时的样子。
+      reward: { couponTemplateName: "HBTI Gift · Something New" },
+    });
+    render(<HbtiExperience />);
+
+    await walkTheWholeJourney(user);
+
+    expect(
+      await screen.findByText("A little something from the counter"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("HBTI Gift · Something New"),
+    ).not.toBeInTheDocument();
+  });
+});
+
 async function chooseAndContinue(
   user: ReturnType<typeof userEvent.setup>,
   answer: RegExp,
@@ -365,4 +463,38 @@ async function chooseAndContinue(
   await user.click(await screen.findByRole("button", { name: answer }));
   await user.click(screen.getByRole("button", { name: /^Next/ }));
   await act(async () => {});
+}
+
+/** 答完 13 题并提交，走到结果页。这组答案凑出 ILBA。 */
+async function walkTheWholeJourney(
+  user: ReturnType<typeof userEvent.setup>,
+) {
+  await screen.findByRole("heading", {
+    name: "Which bread on our shelf is you?",
+  });
+  await user.click(
+    screen.getByRole("button", { name: /Claim my bread|proofing—continue/ }),
+  );
+  for (const option of [
+    /Something iced: 'Wake up. It's fine now.'/,
+    /Ease you into the day/,
+    /Name the first fix while it's still warm/,
+    /Alone, unhurried, no talking, no sharing/,
+    /Refreshing the longer someone stays/,
+    /Warm up slowly, but you linger/,
+    /The honest part: someone has to say it/,
+    /Don't call me\. I have plans with myself\./,
+    /Break it into steps, work alongside/,
+    /The over-baked batch/,
+    /Alone time\. Crowds drain the battery\./,
+    /Early morning, before the world gets loud/,
+    /^A cup/,
+  ]) {
+    await chooseAndContinue(user, option);
+  }
+  await user.click(
+    screen.getByRole("button", { name: /Collect my fresh-out gift/ }),
+  );
+  await user.click(screen.getByRole("button", { name: "Pistachio green" }));
+  await user.click(screen.getByRole("button", { name: /Out of the oven!/ }));
 }

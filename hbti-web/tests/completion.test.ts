@@ -86,6 +86,15 @@ class FakeCompletionStore implements CompletionStore {
     this.records.set(this.serialize(key), record);
   }
 
+  async markUnrewarded(
+    key: CompletionStoreKey,
+    attemptId: string,
+    record: Extract<CompletionRecord, { status: "unrewarded" }>,
+  ): Promise<void> {
+    this.assertOwner(key, attemptId);
+    this.records.set(this.serialize(key), record);
+  }
+
   async clearLocked(
     key: CompletionStoreKey,
     attemptId: string,

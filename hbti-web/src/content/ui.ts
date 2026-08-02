@@ -107,6 +107,15 @@ export interface UiCopy {
   rewardName: string;
   rewardNote: string;
   openWallet: string;
+  /** 周边发完时的结果页。不是错误提示——面包人格照常出，只是柜台没礼物了。 */
+  giftSoldOutEyebrow: string;
+  giftSoldOutTitle: string;
+  giftSoldOutBody: string;
+  giftSoldOutLabel: string;
+  giftSoldOutName: string;
+  giftSoldOutNote: string;
+  /** 9 件周边的显示名。Record 强制三语各写满 9 条，漏一件编译就不过。 */
+  giftNames: Record<GiftTemplateName, string>;
   processingTitle: string;
   processingBody: string;
   reviewTitle: string;
@@ -117,6 +126,33 @@ export interface UiCopy {
   networkError: string;
   retry: string;
   saved: string;
+}
+
+/**
+ * 9 件完成礼周边的 RES 券模板名，必须与 077_hbti_gift_stock.sql 里的
+ * template_name 逐字节一致（分隔符是 U+00B7 中点，两侧各一个空格）。
+ *
+ * 存在的理由：完成接口返回的是这个内部字符串，直接渲染给顾客会变成
+ * 「HBTI Gift · Rose Fridge Magnet」。giftNames 用 Record 把它们映射成三语显示名，
+ * 少一件就编译不过。
+ */
+export const giftTemplateNames = [
+  "HBTI Gift · White Pencil",
+  "HBTI Gift · Red Pencil",
+  "HBTI Gift · Black Pencil",
+  "HBTI Gift · Heart Scent Card",
+  "HBTI Gift · Rose Scent Card",
+  "HBTI Gift · Butterfly Scent Card",
+  "HBTI Gift · Rose Fridge Magnet",
+  "HBTI Gift · KL Fridge Magnet",
+  "HBTI Gift · Bow Fridge Magnet",
+] as const;
+export type GiftTemplateName = (typeof giftTemplateNames)[number];
+
+export function isGiftTemplateName(
+  value: string,
+): value is GiftTemplateName {
+  return (giftTemplateNames as readonly string[]).includes(value);
 }
 
 export const colorChoices = [
@@ -306,9 +342,30 @@ export const uiCopy: Localized<UiCopy> = {
     successBody:
       "It’s ready in the Hot Crush account you just verified.",
     rewardLabel: "Your member reward",
-    rewardName: "Pistachio Green Jewel",
+    // 兜底名，只在券名还没到手时出现（例如演示模式）。此前这里写死
+    // "Pistachio Green Jewel"——那是一张饮品券，压根不在这 9 件周边里，
+    // 顾客照着去柜台会扑空。改成呼应开场 introReward 的说法。
+    rewardName: "A little something from the counter",
     rewardNote: "Physical Gift Coupon · one-time redemption",
     openWallet: "View it in my member wallet",
+    giftSoldOutEyebrow: "Still warm · Straight from the oven",
+    giftSoldOutTitle: "Your bread type is yours to keep.",
+    giftSoldOutBody:
+      "Every gift on the counter has found a home. Your result stays in your member account—come say hello on your next visit.",
+    giftSoldOutLabel: "The gift counter",
+    giftSoldOutName: "All claimed for now",
+    giftSoldOutNote: "Nothing to redeem this time",
+    giftNames: {
+      "HBTI Gift · White Pencil": "White Pencil",
+      "HBTI Gift · Red Pencil": "Red Pencil",
+      "HBTI Gift · Black Pencil": "Black Pencil",
+      "HBTI Gift · Heart Scent Card": "Heart Scent Card",
+      "HBTI Gift · Rose Scent Card": "Rose Scent Card",
+      "HBTI Gift · Butterfly Scent Card": "Butterfly Scent Card",
+      "HBTI Gift · Rose Fridge Magnet": "Rose Fridge Magnet",
+      "HBTI Gift · KL Fridge Magnet": "Kuala Lumpur Fridge Magnet",
+      "HBTI Gift · Bow Fridge Magnet": "Ribbon Bow Fridge Magnet",
+    },
     processingTitle: "Your gift is being prepared.",
     processingBody:
       "Keep this page open for a moment. Your result is saved and we’re confirming the coupon.",
@@ -463,9 +520,27 @@ export const uiCopy: Localized<UiCopy> = {
     successTitle: "礼物券已放进你的会员账户。",
     successBody: "它已经进入你刚刚验证的 Hot Crush 账户。",
     rewardLabel: "你的会员礼物",
-    rewardName: "Pistachio Green Jewel",
+    rewardName: "柜台的一份小心意",
     rewardNote: "周边实物兑换券 · 仅可兑换一次",
     openWallet: "去会员账户查看",
+    giftSoldOutEyebrow: "趁热 · 刚出炉",
+    giftSoldOutTitle: "这块面包，是你的了。",
+    giftSoldOutBody:
+      "柜台的小礼物已经全被领走了。你的结果留在会员账户里——下次来店里，记得给我们看看。",
+    giftSoldOutLabel: "礼物柜台",
+    giftSoldOutName: "小礼物暂时领完了",
+    giftSoldOutNote: "这次没有可兑换的券",
+    giftNames: {
+      "HBTI Gift · White Pencil": "白色铅笔",
+      "HBTI Gift · Red Pencil": "红色铅笔",
+      "HBTI Gift · Black Pencil": "黑色铅笔",
+      "HBTI Gift · Heart Scent Card": "爱心纸香卡",
+      "HBTI Gift · Rose Scent Card": "玫瑰纸香卡",
+      "HBTI Gift · Butterfly Scent Card": "蝴蝶纸香卡",
+      "HBTI Gift · Rose Fridge Magnet": "玫瑰冰箱贴",
+      "HBTI Gift · KL Fridge Magnet": "吉隆坡冰箱贴",
+      "HBTI Gift · Bow Fridge Magnet": "蝴蝶结冰箱贴",
+    },
     processingTitle: "正在准备你的礼物。",
     processingBody: "请暂时保留这个页面。你的结果已经保存，我们正在确认礼物券。",
     reviewTitle: "你的结果已经保存。",
@@ -627,9 +702,29 @@ export const uiCopy: Localized<UiCopy> = {
     successBody:
       "Ia sedia dalam akaun Hot Crush yang baru anda sahkan.",
     rewardLabel: "Ganjaran ahli anda",
-    rewardName: "Pistachio Green Jewel",
+    rewardName: "Sedikit buah tangan dari kaunter",
     rewardNote: "Kupon Hadiah Fizikal · penebusan sekali sahaja",
     openWallet: "Lihat dalam dompet ahli saya",
+    giftSoldOutEyebrow: "Masih panas · Baru keluar ketuhar",
+    giftSoldOutTitle: "Roti ini milik anda.",
+    giftSoldOutBody:
+      "Semua buah tangan di kaunter sudah bertuan. Keputusan anda tersimpan dalam akaun ahli—singgah menyapa kami pada kunjungan seterusnya.",
+    giftSoldOutLabel: "Kaunter hadiah",
+    giftSoldOutName: "Semua sudah dituntut",
+    giftSoldOutNote: "Tiada kupon untuk ditebus kali ini",
+    giftNames: {
+      "HBTI Gift · White Pencil": "Pensel Putih",
+      "HBTI Gift · Red Pencil": "Pensel Merah",
+      "HBTI Gift · Black Pencil": "Pensel Hitam",
+      "HBTI Gift · Heart Scent Card": "Kad Wangi Hati",
+      "HBTI Gift · Rose Scent Card": "Kad Wangi Mawar",
+      "HBTI Gift · Butterfly Scent Card": "Kad Wangi Rama-Rama",
+      "HBTI Gift · Rose Fridge Magnet": "Magnet Peti Sejuk Mawar",
+      // 用 KL 而不是 Kuala Lumpur：本地读者本来就这么说，而奖品卡的 strong 是
+      // 1.45rem，全称在 320px 下要折成三行（ui.ts:554 已经为马来文的长度做过一次妥协）。
+      "HBTI Gift · KL Fridge Magnet": "Magnet Peti Sejuk KL",
+      "HBTI Gift · Bow Fridge Magnet": "Magnet Peti Sejuk Reben",
+    },
     processingTitle: "Hadiah anda sedang disediakan.",
     processingBody:
       "Biarkan halaman ini terbuka sebentar. Keputusan anda telah disimpan dan kami sedang mengesahkan kupon.",

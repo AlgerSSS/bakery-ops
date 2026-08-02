@@ -3,7 +3,7 @@
 set -o pipefail
 set -u
 
-ENTRY='0 5,17 * * * /opt/hotcrush/hbti-token/run.sh'
+ENTRY='0 3,9,15,21 * * * /opt/hotcrush/hbti-token/run.sh'
 CUR=$(crontab -l 2>/dev/null || true)
 
 if printf '%s\n' "$CUR" | grep -qF 'hbti-token/run.sh'; then
@@ -12,8 +12,8 @@ else
   {
     printf '%s\n' "$CUR"
     echo ''
-    echo '# HBTI 发券令牌轮换。RES BO 令牌约 24 小时失效,失效后发券全挂。'
-    echo '# 排期避开 intraday-refresh(14:20) 与 daily-refresh(23:00)。'
+    echo '# HBTI 发券令牌轮换。令牌从 RES 后台会话借来,失效后发券全挂。'
+    echo '# 每 6 小时。15:00 排在 intraday-refresh(14:20) 之后,避免令牌被新会话顶掉。'
     printf '%s\n' "$ENTRY"
   } | crontab -
   echo "已安装"

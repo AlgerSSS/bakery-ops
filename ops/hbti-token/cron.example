@@ -1,3 +1,5 @@
 # RES_VULCAN_TOKEN 轮换(服务器本地时区 UTC+8)。
-# 避开已有任务:intraday-refresh 14:20、daily-refresh 23:00。
-0 5,17 * * * /opt/hotcrush/hbti-token/run.sh
+# 每 6 小时一次。15:00 排在 intraday-refresh(14:20) 之后 —— 那个脚本会重新
+# 登录 BO,跑在它之前的话 Vercel 上的令牌可能被新会话顶掉。
+# 21:00 距 daily-refresh(23:00) 有 2 小时。
+0 3,9,15,21 * * * /opt/hotcrush/hbti-token/run.sh

@@ -1,0 +1,263 @@
+diff --git a/hbti-web/src/components/HbtiExperience.tsx b/hbti-web/src/components/HbtiExperience.tsx
+index d6c4fef..5c15b08 100644
+--- a/hbti-web/src/components/HbtiExperience.tsx
++++ b/hbti-web/src/components/HbtiExperience.tsx
+@@ -701,7 +701,7 @@ function QuestionStep({
+         label={copy.questionProgress(index + 1, questions.length)}
+         flavor={copy.questionProgressFlavor(index + 1, questions.length)}
+       />
+-      <p className={styles.eyebrow}>{copy.chooseOne[question.id]}</p>
++      <p className={styles.eyebrow}>{copy.chooseOne}</p>
+       <h1
+         id={`question-${question.id}`}
+         ref={headingRef}
+diff --git a/hbti-web/src/content/questions.ts b/hbti-web/src/content/questions.ts
+index 9cfd9ef..ad99cac 100644
+--- a/hbti-web/src/content/questions.ts
++++ b/hbti-web/src/content/questions.ts
+@@ -60,32 +60,28 @@ export const questions = [
+   },
+   {
+     id: "q3",
+-    // 甜度轴。原题「关于甜,你的立场」把测量维度直接摆上台面 —— 是问卷不是体验,
+-    // 老板评价「太直接」。改成试吃新配方给反馈:场景在烘焙房,但选的是**怎么开口**
+-    // (先护着人 vs 先说实话),不是选口味。与 q10「朋友难过时」区分:那是人际安慰,
+-    // 这是手艺反馈。
+     prompt: {
+-      en: "A new recipe, still warm. They ask what you think—",
+-      "zh-CN": "新配方刚出炉，他问你觉得怎么样——",
+-      "ms-MY": "Resipi baharu, masih panas. Dia tanya pendapat anda—",
++      en: "Your official position on sweetness—",
++      "zh-CN": "关于『甜』，你的立场——",
++      "ms-MY": "Pendirian anda tentang manis—",
+     },
+     options: [
+       {
+         value: "dolce",
+-        emoji: "🤝",
++        emoji: "🍯",
+         label: {
+-          en: "Lead with what works, then tune it together",
+-          "zh-CN": "先说做成的地方，再一起调",
+-          "ms-MY": "Puji yang menjadi, kemudian halusi",
++          en: "Life's bitter enough. Sweet is allowed.",
++          "zh-CN": "生活已经够苦了，甜一点不丢人",
++          "ms-MY": "Hidup dah cukup pahit. Manis itu halal.",
+         },
+       },
+       {
+         value: "bitter",
+-        emoji: "🔍",
++        emoji: "🖤",
+         label: {
+-          en: "Name the first fix while it's still warm",
+-          "zh-CN": "趁热点出第一个要改的",
+-          "ms-MY": "Tunjuk pembetulan selagi ia panas",
++          en: "A little bitterness is what depth tastes like",
++          "zh-CN": "有点苦，才尝得出层次",
++          "ms-MY": "Sedikit pahit, baru terasa lapisannya",
+         },
+       },
+     ],
+@@ -232,64 +228,56 @@ export const questions = [
+   },
+   {
+     id: "q8",
+-    // 浓淡轴。原题「你喜欢的故事(和日子)」一个题干两个主语,老板评价「主体意义
+-    // 很不明确」;选项用「浓/淡」是口味词,和叙事主语对不上,也完全脱离烘焙。
+-    // 改成带新人:同样测「你把自己开到多大」,但落在烘焙房的真实动作上。
+-    // 与 q2(咖啡拟人)、q9(新环境)区分:那两个是被动感受与社交起手,这个是主动带人。
+     prompt: {
+-      en: "Someone new starts today. You—",
+-      "zh-CN": "今天来了个新人，你——",
+-      "ms-MY": "Ada orang baharu hari ini. Anda—",
++      en: "The stories (and days) you like best are—",
++      "zh-CN": "你喜欢的故事（和日子），最好——",
++      "ms-MY": "Cerita (dan hari) yang anda suka biar—",
+     },
+     options: [
+       {
+         value: "strong",
+         emoji: "⚡",
+         label: {
+-          en: "Show the whole bake—they'll catch on",
+-          "zh-CN": "完整做一炉给他看，节奏一次就有了",
+-          "ms-MY": "Buat sekali habis—dia dapat iramanya",
++          en: "Rich and dramatic—make it count",
++          "zh-CN": "浓一点，起伏大一点，才过瘾",
++          "ms-MY": "Pekat dan penuh warna, baru puas",
+         },
+       },
+       {
+         value: "light",
+         emoji: "🌤",
+         label: {
+-          en: "Break it into steps, work alongside",
+-          "zh-CN": "拆成几步，陪着他一段一段来",
+-          "ms-MY": "Pecahkan ikut langkah, temani dia",
++          en: "Light with room to breathe",
++          "zh-CN": "淡一点，留白多一点，才舒服",
++          "ms-MY": "Ringan dan berruang, baru selesa",
+         },
+       },
+     ],
+   },
+   {
+     id: "q11",
+-    // 甜度轴。原题「回忆过去,你最先想起」与 q3 语义过近(都在问偏甜还是偏苦),
+-    // 且完全脱离烘焙,老板评价「太片面、目的不明」。保留原题的魂(回望时先想起什么),
+-    // 但落到收工复盘这个烘焙房场景。三票现在是三种互不重叠的行为:
+-    // q3 手艺反馈 / q10 安慰朋友 / q11 自我复盘。两个选项都是称职的收工方式。
+     prompt: {
+-      en: "Shutters down. What your mind replays is—",
+-      "zh-CN": "关店了，你脑子里回放的是——",
+-      "ms-MY": "Kedai tutup. Yang bermain semula dalam fikiran anda—",
++      en: "Looking back, you remember first—",
++      "zh-CN": "回忆过去，你最先想起——",
++      "ms-MY": "Bila mengimbas kembali, anda teringat dulu—",
+     },
+     options: [
+       {
+         value: "dolce",
+-        emoji: "🧺",
++        emoji: "🍯",
+         label: {
+-          en: "The trays that sold out before noon",
+-          "zh-CN": "中午前就卖光的那几盘",
+-          "ms-MY": "Dulang yang habis sebelum tengah hari",
++          en: "The sweet moments, even in hard times",
++          "zh-CN": "那些甜的瞬间，哪怕当时很难",
++          "ms-MY": "Saat-saat manis, walau masa itu susah",
+         },
+       },
+       {
+         value: "bitter",
+-        emoji: "🔥",
++        emoji: "🖤",
+         label: {
+-          en: "The over-baked batch—fixed tomorrow",
+-          "zh-CN": "烤过头的那一炉，明天不会了",
+-          "ms-MY": "Yang terlebih bakar—esok tidak lagi",
++          en: "The hard-won parts—bitter, but worth it",
++          "zh-CN": "那些来之不易的部分，苦得值得",
++          "ms-MY": "Bahagian yang payah—pahit, tapi berbaloi",
+         },
+       },
+     ],
+diff --git a/hbti-web/src/content/ui.ts b/hbti-web/src/content/ui.ts
+index 29f792d..b9bce0e 100644
+--- a/hbti-web/src/content/ui.ts
++++ b/hbti-web/src/content/ui.ts
+@@ -1,4 +1,4 @@
+-import type { HbtiAnswers, Localized } from "@/content/types";
++import type { Localized } from "@/content/types";
+ 
+ export interface UiCopy {
+   brand: string;
+@@ -65,10 +65,7 @@ export interface UiCopy {
+   questionProgress: (current: number, total: number) => string;
+   /** 进度的**可见**表述,烘焙口径,aria-hidden。 */
+   questionProgressFlavor: (current: number, total: number) => string;
+-  /** 按题 id 键控而非索引:题目重排不会让提示语错位。
+-   *  Record<keyof HbtiAnswers, …> 让 TS 强制 13 条齐全 —— 漏一条编译就不过,
+-   *  不会出现某个语言某一题渲染成 undefined。 */
+-  chooseOne: Record<keyof HbtiAnswers, string>;
++  chooseOne: string;
+   resultEyebrow: string;
+   resultTitle: string;
+   /** 结果卡上「配料」小标题 —— 让四个特征读成配方而不是标签堆。 */
+@@ -228,25 +225,7 @@ export const uiCopy: Localized<UiCopy> = {
+     // 13 句烘焙房口吻的作答提示,每题一句。老板点名喜欢第一句那种感觉
+     // (「用烘焙术语讲测验规则」),这里铺满全程,最后一题回扣第一句。
+     //
+-    // 硬约束:每句只能讲「怎么作答」,**不得出现任何映射到计分轴的词** ——
+-    // 冷/热(温度轴)、甜/苦/盐/糖(甜度轴)、浓/淡/深/重(浓淡轴)、独处/一起(独同轴)。
+-    // 初稿犯过这个错:q7 写「面团温着好说话」在温度轴上偏 hot,
+-    // q10 写「盐比糖重要」在甜度轴上直接偏 bitter —— 装饰文案会污染测量结果。
+-    chooseOne: {
+-      q1: "Go with your first instinct—overproofed dough goes flat.",
+-      q2: "Don't overthink it. The dough is already rising.",
+-      q3: "No house standard here—just yours.",
+-      q4: "Whichever one your hand reaches for.",
+-      q5: "First thought is usually the honest one.",
+-      q6: "No two bakers answer the same.",
+-      q7: "Don't measure this one. Just answer.",
+-      q8: "You already know. Tap it.",
+-      q9: "Recipes are guidelines. This one's all you.",
+-      q10: "Answer like nobody's watching the counter.",
+-      q11: "Whichever you'd actually pick on a Tuesday.",
+-      q12: "Don't let this one sit too long.",
+-      q13: "Last one. Same as the first—don't overthink.",
+-    },
++    chooseOne: "Go with your first instinct—overproofed dough goes flat.",
+     resultEyebrow: "Fresh from the oven · Your HBTI",
+     resultTitle: "Fresh out of the oven: you.",
+     recipeNoLabel: "Recipe no.",
+@@ -392,21 +371,7 @@ export const uiCopy: Localized<UiCopy> = {
+     next: "下一题",
+     questionProgress: (current, total) => `第 ${current} 题，共 ${total} 题`,
+     questionProgressFlavor: (current, total) => `第 ${current} 炉 / 共 ${total} 炉`,
+-    chooseOne: {
+-      q1: "凭第一感觉选。面团醒过头，就不松软了。",
+-      q2: "别想太久，面团已经在发了。",
+-      q3: "这儿没有标准答案，只有你的答案。",
+-      q4: "手先伸向哪个，就是哪个。",
+-      q5: "第一反应，通常最诚实。",
+-      q6: "没有两个师傅答得一样。",
+-      q7: "这题不用量，直接答。",
+-      q8: "你已经知道了，点下去。",
+-      q9: "配方只是参考，这题全凭你。",
+-      q10: "当柜台前没人看着你那样答。",
+-      q11: "挑你平常真的会选的那个。",
+-      q12: "这题别放太久。",
+-      q13: "最后一题。和第一题一样，别多想。",
+-    },
++    chooseOne: "凭第一感觉选。面团醒过头，就不松软了。",
+     resultEyebrow: "刚出炉 · 你的 HBTI",
+     resultTitle: "刚出炉的，是你。",
+     recipeNoLabel: "配方编号",
+@@ -553,21 +518,7 @@ export const uiCopy: Localized<UiCopy> = {
+     questionProgress: (current, total) => `Soalan ${current} daripada ${total}`,
+     // 可见文案用紧凑写法:320px 上「Bakaran 13 daripada 13」会换行,撑高进度块。
+     questionProgressFlavor: (current, total) => `Bakaran ${current}/${total}`,
+-    chooseOne: {
+-      q1: "Ikut naluri pertama—doh yang terlebih menunggu akan kempis.",
+-      q2: "Jangan fikir lama. Doh itu sudah naik.",
+-      q3: "Tiada piawai kedai di sini—hanya milik anda.",
+-      q4: "Mana yang tangan anda capai dulu.",
+-      q5: "Fikiran pertama selalunya yang jujur.",
+-      q6: "Tiada dua pembuat roti menjawab sama.",
+-      q7: "Yang ini tak perlu disukat. Jawab sahaja.",
+-      q8: "Anda sudah tahu. Tekan sahaja.",
+-      q9: "Resipi cuma panduan. Yang ini milik anda.",
+-      q10: "Jawab seolah tiada sesiapa memerhati di kaunter.",
+-      q11: "Yang anda betul-betul akan pilih pada hari biasa.",
+-      q12: "Jangan biarkan yang ini terlalu lama.",
+-      q13: "Yang terakhir. Sama seperti yang pertama—jangan fikir lama.",
+-    },
++    chooseOne: "Ikut naluri pertama—doh yang terlebih menunggu akan kempis.",
+     resultEyebrow: "Baru keluar ketuhar · HBTI anda",
+     resultTitle: "Baru keluar dari ketuhar: anda.",
+     recipeNoLabel: "No. resipi",
+diff --git a/hbti-web/tests/frontend-flow.test.tsx b/hbti-web/tests/frontend-flow.test.tsx
+index 639232a..7e4ddff 100644
+--- a/hbti-web/tests/frontend-flow.test.tsx
++++ b/hbti-web/tests/frontend-flow.test.tsx
+@@ -278,14 +278,14 @@ describe("customer HBTI journey", () => {
+     const answerPath = [
+       /Something iced: 'Wake up. It's fine now.'/, // q1  iced
+       /Ease you into the day/, //                     q2  light
+-      /Name the first fix while it's still warm/, //  q3  bitter
++      /A little bitterness/, //                       q3  bitter
+       /Alone, unhurried, no talking, no sharing/, //  q4  alone
+       /Refreshing the longer someone stays/, //       q7  iced
+       /Warm up slowly, but you linger/, //            q9  light
+       /The honest part: someone has to say it/, //    q10 bitter
+       /Don't call me\. I have plans with myself\./, //q13 alone
+-      /Break it into steps, work alongside/, //q8  light
+-      /The over-baked batch/, //                    q11 bitter
++      /Light with room to breathe/, //                q8  light
++      /The hard-won parts/, //                        q11 bitter
+       /Alone time\. Crowds drain the battery\./, //   q12 alone
+       /Early morning, before the world gets loud/, // q5  morning
+       /^A cup/, //                                    q6  drink

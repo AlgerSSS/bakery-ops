@@ -76,7 +76,7 @@ export const questions = [
         label: {
           en: "Lead with what works, then tune it together",
           "zh-CN": "先说做成的地方，再一起调",
-          "ms-MY": "Puji yang menjadi, kemudian halusi",
+          "ms-MY": "Mula dengan yang menjadi, kemudian kita halusi",
         },
       },
       {
@@ -85,7 +85,7 @@ export const questions = [
         label: {
           en: "Name the first fix while it's still warm",
           "zh-CN": "趁热点出第一个要改的",
-          "ms-MY": "Tunjuk pembetulan selagi ia panas",
+          "ms-MY": "Tunjuk pembetulan pertama selagi ia panas",
         },
       },
     ],
@@ -246,18 +246,18 @@ export const questions = [
         value: "strong",
         emoji: "⚡",
         label: {
-          en: "Show the whole bake—they'll catch on",
+          en: "Run the whole bake once—they'll catch the rhythm",
           "zh-CN": "完整做一炉给他看，节奏一次就有了",
-          "ms-MY": "Buat sekali habis—dia dapat iramanya",
+          "ms-MY": "Buat satu bakaran penuh sekali—dia akan dapat iramanya",
         },
       },
       {
         value: "light",
         emoji: "🌤",
         label: {
-          en: "Break it into steps, work alongside",
+          en: "Break it into steps and work alongside them",
           "zh-CN": "拆成几步，陪着他一段一段来",
-          "ms-MY": "Pecahkan ikut langkah, temani dia",
+          "ms-MY": "Pecahkan kepada langkah dan temani dia satu-satu",
         },
       },
     ],
@@ -287,7 +287,7 @@ export const questions = [
         value: "bitter",
         emoji: "🔥",
         label: {
-          en: "The over-baked batch—fixed tomorrow",
+          en: "The one you over-baked—tomorrow you won't",
           "zh-CN": "烤过头的那一炉，明天不会了",
           "ms-MY": "Yang terlebih bakar—esok tidak lagi",
         },

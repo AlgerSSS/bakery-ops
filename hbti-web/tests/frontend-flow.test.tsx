@@ -284,8 +284,8 @@ describe("customer HBTI journey", () => {
       /Warm up slowly, but you linger/, //            q9  light
       /The honest part: someone has to say it/, //    q10 bitter
       /Don't call me\. I have plans with myself\./, //q13 alone
-      /Break it into steps, work alongside/, //q8  light
-      /The over-baked batch/, //                    q11 bitter
+      /Break it into steps and work alongside them/, //q8  light
+      /The one you over-baked/, //                    q11 bitter
       /Alone time\. Crowds drain the battery\./, //   q12 alone
       /Early morning, before the world gets loud/, // q5  morning
       /^A cup/, //                                    q6  drink

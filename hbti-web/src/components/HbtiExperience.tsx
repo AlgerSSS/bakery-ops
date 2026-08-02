@@ -695,12 +695,7 @@ function QuestionStep({
 }) {
   return (
     <section className={styles.questionPanel}>
-      <Progress
-        current={index + 1}
-        total={questions.length}
-        label={copy.questionProgress(index + 1, questions.length)}
-        flavor={copy.questionProgressFlavor(index + 1, questions.length)}
-      />
+      <Progress current={index + 1} total={questions.length} label={copy.questionProgress(index + 1, questions.length)} />
       <p className={styles.eyebrow}>{copy.chooseOne[question.id]}</p>
       <h1
         id={`question-${question.id}`}
@@ -768,14 +763,10 @@ function Progress({
   current,
   total,
   label,
-  flavor,
 }: {
   current: number;
   total: number;
-  /** 字面表述,给屏幕阅读器 */
   label: string;
-  /** 烘焙口径,只给眼睛看 */
-  flavor: string;
 }) {
   // 连续进度条：13 题时分段小药丸会换行成三排，很难看。
   // 用一条填充式进度条，宽度按 current/total 走；role/aria-* 原样保留。
@@ -796,9 +787,7 @@ function Progress({
           aria-hidden="true"
         />
       </div>
-      {/* 可见的烘焙口径计数是装饰:进度已由上面的 progressbar 用字面文案播报,
-          这里再念一遍「第 9 炉」只会让人听着猜自己答到第几题。 */}
-      <p aria-hidden="true">{flavor}</p>
+      <p>{label}</p>
     </div>
   );
 }
@@ -833,14 +822,8 @@ function ResultStep({
       >
         <div className={styles.ticketNotchLeft} aria-hidden="true" />
         <div className={styles.ticketNotchRight} aria-hidden="true" />
-        {/* 票头左侧从「HBTI / HSDA」改成「配方编号 HSDA」:同一串字母,
-            读成配方号而不是测评代码。零额外高度。
-            没有做「火候」「出炉时间」—— 结果数据里只有 code / name / traits /
-            description / signatureOrder,那两项没有对应事实,编出来就是造假。 */}
         <header className={styles.ticketHeader}>
-          <span>
-            {copy.recipeNoLabel} {code}
-          </span>
+          <span>HBTI / {code}</span>
           <span>HOT CRUSH</span>
         </header>
         <div
@@ -852,10 +835,6 @@ function ResultStep({
           ))}
         </div>
         <h2>{result.name}</h2>
-        {/* 「配料」小标题:同样四个特征,加了标签就从标签堆读成配方单。
-            试过放同一行首位以省高度,反而更差 —— 英文/马来文的标签会挤掉
-            横向空间,标签行从 1 行变 2 行,整页 867/889 比独立一行的 853 还高。 */}
-        <p className={styles.traitsLabel}>{copy.traitsLabel}</p>
         <div className={styles.traitLine}>
           {result.traits.map((trait) => (
             <span key={trait}>{trait}</span>

@@ -91,13 +91,17 @@ beforeEach(() => {
   mocks.rateLimiter.consumeOtpRequest.mockResolvedValue({
     allowed: true,
     retryAfterSeconds: 0,
+    phoneAttemptsToday: 1,
   });
   mocks.res.createGuestSession.mockResolvedValue({
     deviceId: "device-1",
     token: "guest-token",
   });
   mocks.res.getCaptchaConfig.mockResolvedValue({ enable: false });
-  mocks.res.sendVerifyCode.mockResolvedValue(undefined);
+  mocks.res.sendVerifyCode.mockResolvedValue({
+    code: "000",
+    bodyKeys: ["code", "data"],
+  });
   mocks.store.createChallenge.mockResolvedValue({
     token: challengeToken,
     expiresAt,
@@ -157,6 +161,8 @@ describe("POST /api/auth/otp/request", () => {
     await expect(response.json()).resolves.toEqual({
       challengeToken,
       maskedPhone: "+86 139****5678",
+      // 当天第一次，界面照常说「已发送」。
+      resendMayNotArrive: false,
     });
     expect(mocks.rateLimiter.consumeOtpRequest).toHaveBeenCalledWith({
       phoneE164: "+8613912345678",
@@ -207,6 +213,34 @@ describe("POST /api/auth/otp/request", () => {
     });
     expect(mocks.store.createChallenge).not.toHaveBeenCalled();
     expect(mocks.res.sendVerifyCode).not.toHaveBeenCalled();
+  });
+
+  it("同号码当天第二次发码时如实告知新短信可能收不到", async () => {
+    // RES 对同一号码当天的重复发码回 "000" 却不真的送达（19 次请求精确关联：
+    // 当日首次 11/13 到达，重复 0/6）。我们拦不住 RES，但不能跟着它一起
+    // 笃定地说「已发送」——顾客会一直干等，然后继续点重发。
+    mocks.rateLimiter.consumeOtpRequest.mockResolvedValue({
+      allowed: true,
+      retryAfterSeconds: 0,
+      phoneAttemptsToday: 2,
+    });
+
+    const response = await requestOtp(
+      mutationRequest("/api/auth/otp/request", {
+        phone: {
+          countryCode: "86",
+          isoCode: "CN",
+          phone: "13912345678",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      resendMayNotArrive: true,
+    });
+    // 仍然照发——RES 的规则是推断出来的，不该由我们替它拒绝顾客。
+    expect(mocks.res.sendVerifyCode).toHaveBeenCalledTimes(1);
   });
 
   it("enforces rate limits before creating an RES guest session", async () => {

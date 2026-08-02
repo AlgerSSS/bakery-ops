@@ -30,6 +30,12 @@ export interface UiCopy {
   captchaRequired: string;
   authErrorTitle: string;
   authNetworkError: string;
+  /** 请求超时：短信可能已经发出，别催顾客重发（重发多半送不到）。 */
+  authSendTimeout: string;
+  /** 服务端告知这个号码今天已经发过码，新的多半不会到。 */
+  authResendMayNotArrive: string;
+  /** 超时之后的补充说明。 */
+  authMaybeSentNote: string;
   conflictTitle: string;
   conflictBody: string;
   confirmConflict: string;
@@ -221,6 +227,12 @@ export const uiCopy: Localized<UiCopy> = {
     authErrorTitle: "We couldn’t verify your account.",
     authNetworkError:
       "We couldn’t connect to member verification. Check your connection and try again.",
+    authSendTimeout:
+      "That took longer than expected. The code may still be on its way.",
+    authResendMayNotArrive:
+      "This number already had a code today. A new one often doesn’t come through—use the earlier code, or try another number.",
+    authMaybeSentNote:
+      "Give it a minute before asking for another one.",
     conflictTitle: "Use this member account?",
     conflictBody:
       "RES found another sign-in connected to this phone number. Confirm to keep this phone as the account you use for HBTI.",
@@ -413,6 +425,10 @@ export const uiCopy: Localized<UiCopy> = {
     captchaRequired: "手机号验证暂时不可用，请稍后再试。",
     authErrorTitle: "暂时无法验证你的账户。",
     authNetworkError: "暂时无法连接会员验证，请检查网络后再试。",
+    authSendTimeout: "这次等得有点久，验证码可能已经在路上了。",
+    authResendMayNotArrive:
+      "这个号码今天已经收过一次验证码，新的往往发不出来——请用之前那条，或换一个号码。",
+    authMaybeSentNote: "先等一分钟再考虑重新发送。",
     conflictTitle: "使用这个会员账户吗？",
     conflictBody:
       "RES 发现这个手机号还关联了其他登录方式。确认后，将使用这个手机号对应的账户完成 HBTI。",
@@ -587,6 +603,12 @@ export const uiCopy: Localized<UiCopy> = {
     authErrorTitle: "Kami tidak dapat mengesahkan akaun anda.",
     authNetworkError:
       "Kami tidak dapat menyambung ke pengesahan ahli. Semak sambungan anda dan cuba lagi.",
+    authSendTimeout:
+      "Ini mengambil masa lebih lama daripada biasa. Kod mungkin masih dalam perjalanan.",
+    authResendMayNotArrive:
+      "Nombor ini sudah menerima kod hari ini. Kod baharu selalunya tidak sampai—gunakan kod terdahulu, atau cuba nombor lain.",
+    authMaybeSentNote:
+      "Tunggu seminit sebelum meminta kod baharu.",
     conflictTitle: "Gunakan akaun ahli ini?",
     conflictBody:
       "RES menemui log masuk lain yang dikaitkan dengan nombor ini. Sahkan untuk menggunakan akaun telefon ini bagi HBTI.",

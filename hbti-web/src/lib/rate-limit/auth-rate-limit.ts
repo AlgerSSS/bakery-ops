@@ -40,6 +40,15 @@ const OTP_REQUEST_RULES: readonly AuthRateLimitRule[] = [
 export interface AuthRateLimitDecision {
   allowed: boolean;
   retryAfterSeconds: number;
+  /**
+   * 这个号码在当前 24 小时窗口内的第几次发码请求（含本次）。
+   *
+   * 用途不是限流，是**说实话**：实测同一号码当天第二次及以后的验证码，RES 会回
+   * "000" 却不真的发出去（19 次请求精确关联，首次 11/13 到达，重复 0/6）。
+   * 拿到这个计数，界面就能提示「今天已经发过一次，可能收不到新的」，
+   * 而不是每次都笃定地说「已发送」然后让顾客干等。
+   */
+  phoneAttemptsToday: number;
 }
 
 export interface OtpRequestRateLimitInput {
@@ -96,6 +105,8 @@ export class PgAuthRateLimiter {
           new Date(windowStart + rule.windowMs),
         );
         return {
+          scope: rule.scope,
+          count,
           allowed: count <= rule.limit,
           retryAfterSeconds: Math.max(
             1,
@@ -112,6 +123,9 @@ export class PgAuthRateLimiter {
         denied.length === 0
           ? 0
           : Math.max(...denied.map((decision) => decision.retryAfterSeconds)),
+      phoneAttemptsToday:
+        decisions.find((decision) => decision.scope === "otp-phone-day")
+          ?.count ?? 1,
     };
   }
 

@@ -22,6 +22,45 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+describe("ResH5MemberAuthClient 的整体时限", () => {
+  // 发码要串行走三次 RES 调用，每次各自 12 秒。没有共享时限的话最坏 36 秒，
+  // 而函数上限 30 秒、浏览器 25 秒——于是顾客看到「网络错误」时短信其实正在路上，
+  // 接着他去点重发，而重发正是 RES 会静默丢掉的那一类。
+  it("把调用方的时限串进每一次 RES 请求", async () => {
+    const controller = new AbortController();
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(jsonResponse({ code: "000", data: { authorizeInfo: null, token: "t" } }));
+    const client = new ResH5MemberAuthClient(
+      config,
+      fetcher,
+      controller.signal,
+    );
+
+    await client.createGuestSession("device-1");
+
+    const init = fetcher.mock.calls[0][1];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+    expect(init?.signal?.aborted).toBe(false);
+    // 调用方一喊停，正在飞的这次请求就得跟着停——这正是 AbortSignal.any 的作用。
+    controller.abort();
+    expect(init?.signal?.aborted).toBe(true);
+  });
+
+  it("不传时限时仍然有每次调用自己的超时", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(jsonResponse({ code: "000", data: { authorizeInfo: null, token: "t" } }));
+    const client = new ResH5MemberAuthClient(config, fetcher);
+
+    await client.createGuestSession("device-1");
+
+    const init = fetcher.mock.calls[0][1];
+    expect(init?.signal).toBeInstanceOf(AbortSignal);
+    expect(init?.signal?.aborted).toBe(false);
+  });
+});
+
 describe("ResH5MemberAuthClient", () => {
   it.each([
     "https://attacker.example",
@@ -136,6 +175,8 @@ describe("ResH5MemberAuthClient", () => {
       token: "guest-token",
     };
 
+    // 回执是刻意带回来的：RES 说了什么必须能落进日志，否则「回了 000 却没发短信」
+    // 在线上只表现为一个光秃秃的 200，无从诊断。
     await expect(
       client.sendVerifyCode({
         session,
@@ -145,7 +186,7 @@ describe("ResH5MemberAuthClient", () => {
           countryCode: "86",
         },
       }),
-    ).resolves.toBeUndefined();
+    ).resolves.toMatchObject({ code: "000" });
 
     const [url, init] = fetcher.mock.calls[0];
     expect(String(url)).toBe(

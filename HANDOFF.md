@@ -6,6 +6,25 @@
 
 ---
 
+## 迁移 101：给 hbti_gift_stock 补 RLS（2026-08-03，已在生产执行）
+
+077 建 `hbti_gift_stock` 时漏了财务站迁移 059 立的不变量——**共用库 public 下每张普通表
+都要启用 RLS**。是财务站的 `db-integration --all` 门禁（`tables_without_rls`）先发现的。
+
+已执行 `bakery-ops/src/modules/data/migrations/101_hbti_gift_stock_rls.sql`：
+public 下现在 0 张表未启用 RLS；库存表照常可读（9 行 / 初始 1376 件 / 已发 1 件）。
+
+安全性依据：同为本项目所建的 `hbti_auth_token`、`hbti_rate_limit` 本来就是 `rls=true`
+且零策略、一直正常；各项目都以 `postgres` 连库，该角色 `rolbypassrls=true`；
+`anon`/`authenticated` 在这张表上本来就没有任何授权。RLS 在这里是「关掉默认敞开」的兜底。
+
+> ⚠️ **两条共用库的规矩，下次建表前先看：**
+> 1. **新建表必须 `ENABLE ROW LEVEL SECURITY`**，否则又要靠对方的门禁来发现。
+> 2. **号段：财务站 001-099、bakery-ops 100-199、res_api 200-299**
+>    （`100_beverage_caliber.sql` 里定的）。077/078 当时越进了财务站号段，已应用不追改；
+>    本次回到 101。新建迁移前先 `SELECT max(version) FROM schema_migrations` 确认。
+
+
 ## HBTI 发券 503 定因并修复：RES 令牌是**空闲超时**（2026-08-02/03，已上线）
 
 08-01、08-02 两次发券中断，`/api/health` 503。此前仓库里到处写着「令牌约 24 小时自然失效」，

@@ -140,6 +140,15 @@ export async function solveCaptcha(
         container(),
         appId,
         (result) => {
+          // `trerror_` 前缀是腾讯的容灾降级票据：SDK 自己连不上后端时吐出来的占位串。
+          // 腾讯的设计意图是让业务方 fail-open 放行，但 RES **不认**——拿它去核验
+          // 必然得到 CaptchaCode 21（`diff`），短信一条也发不出。2026-08-04 线上就是
+          // 这么挂的：CSP 少放行两个域 → SDK 降级 → 我们原样转发 → RES 拒绝。
+          // 与其发一个注定被拒的请求、白烧顾客当天一次发码额度，不如当场说清楚。
+          if (result?.ticket?.startsWith("trerror")) {
+            finish({ status: "unavailable" });
+            return;
+          }
           // RES 要的是 {token, randstr}，而 SDK 给的是 {ticket, randstr}。
           // 这个改名写错不会报错，只会一路走到「missing required param: captcha」。
           if (result?.ticket && result?.randstr) {

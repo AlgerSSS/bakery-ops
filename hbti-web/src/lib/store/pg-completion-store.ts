@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { reviewAlertPayload, sendAlert } from "@/lib/alert";
 
-import type { HbtiCode } from "@/content/types";
+import type { HbtiAnswers, HbtiCode } from "@/content/types";
 import { getDb, memberStore, type SqlRunner } from "@/lib/db/postgres";
 import type {
   CompletionAcquisition,
@@ -232,6 +232,7 @@ export class PgCompletionStore implements CompletionStore {
   async acquireProcessing(
     key: CompletionStoreKey,
     record: ProcessingCompletionRecord,
+    answers?: Readonly<HbtiAnswers>,
   ): Promise<CompletionAcquisition> {
     assertKey(key);
     const p = profileOf(record);
@@ -269,13 +270,74 @@ export class PgCompletionStore implements CompletionStore {
          OR m.hbti_campaign_version IS DISTINCT FROM ${key.campaignVersion}
       RETURNING 1 AS acquired
     `;
-    if (rows.length === 1) return { acquired: true };
+    if (rows.length === 1) {
+      // 抢到锁 = 本期第一次。题目级答案与 hbti_completed_at 同一时刻落库。
+      await this.recordAnswers(key, record, answers);
+      return { acquired: true };
+    }
 
     const existing = await this.get(key);
     if (existing === null) {
       throw new Error("Completion lock disappeared during acquisition.");
     }
     return { acquired: false, record: existing };
+  }
+
+  /**
+   * 题目级答案落库。只在抢锁成功那一刻写一次。
+   *
+   * 刻意不与抢锁合成一条 CTE：合成后本表的任何故障（迁移没上、约束撞、盘满）
+   * 都会回滚抢锁，把「答案存不下」升级成「券发不出」。postgres.js 无显式 begin 时
+   * 每条语句自成事务，所以抢锁先提交、答案后写，失败方向是安全的（丢答案不丢券）。
+   *
+   * 幂等：抢锁成功本身就是「本期第一次」的证明。剩余重复只来自 clearLocked 之后的重试
+   * （stale locked 90 秒），用 1 小时窗口 + answers 相等的 NOT EXISTS 挡掉——
+   * 顾客改了答案再来照样记新行。
+   *
+   * 与 CAS 的关系：本方法不读也不写 hbti_status / hbti_attempt_id / hbti_record，
+   * 所以 markPrepared / markIssued / markReview / markUnrewarded 的
+   * `WHERE hbti_attempt_id = $1` 判词完全不受影响。
+   */
+  private async recordAnswers(
+    key: CompletionStoreKey,
+    record: ProcessingCompletionRecord,
+    answers: Readonly<HbtiAnswers> | undefined,
+  ): Promise<void> {
+    if (!answers) return;
+    const p = profileOf(record);
+    const store = memberStore();
+    const json = this.sql.json(
+      answers as unknown as Parameters<SqlRunner["json"]>[0],
+    );
+    try {
+      await this.sql`
+        INSERT INTO fact_hbti_response (
+          store, member_id, campaign_version, answered_at, attempt_id,
+          answers, hbti_code, visit_time, category, color, gender, age
+        )
+        SELECT ${store}, ${key.memberId}, ${key.campaignVersion}, clock_timestamp(),
+               ${record.attemptId}, ${json}, ${p.code}, ${p.visitTime},
+               ${p.category}, ${p.color}, ${p.gender}, ${p.age}
+        WHERE NOT EXISTS (
+          SELECT 1 FROM fact_hbti_response f
+           WHERE f.store = ${store}
+             AND f.member_id = ${key.memberId}
+             AND f.campaign_version = ${key.campaignVersion}
+             AND f.answered_at > clock_timestamp() - interval '1 hour'
+             AND f.answers = ${json}
+        )
+      `;
+    } catch (error) {
+      // 只告警，不抛。抛出去会被 acquireCompletion 的 catch 转成 STORE_UNAVAILABLE(503)，
+      // 顾客答完 13 题却拿不到券——代价不对等。
+      // 代价：迁移 300 没上线时这里静默失败，所以 checkCompletionStoreFromEnv 必须探活这张表。
+      console.error("[HBTI answers] persist failed", {
+        memberId: key.memberId,
+        campaignVersion: key.campaignVersion,
+        attemptId: record.attemptId,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    }
   }
 
   async markPrepared(
@@ -457,8 +519,11 @@ export async function createCompletionStoreFromEnv(): Promise<PgCompletionStore>
 }
 
 export async function checkCompletionStoreFromEnv(): Promise<void> {
-  // 健康检查要证明「这张表真的能读」，不是「进程还活着」。
+  // 健康检查要证明「这两张表真的能读」，不是「进程还活着」。
+  // fact_hbti_response 必须在列：recordAnswers 是 catch-and-log，
+  // 迁移 300 没上线时它一声不响地丢答案，只有这里能把它变成 /api/health 503。
   await getDb()`SELECT 1 FROM pos_member LIMIT 1`;
+  await getDb()`SELECT 1 FROM fact_hbti_response LIMIT 1`;
 }
 
 /**
@@ -586,7 +651,12 @@ export async function deliverPendingReviewAlerts(
   };
 }
 
-/** 有 expires_at 的表；顺序无关，逐张有界删除。 */
+/**
+ * 有 expires_at 的表；顺序无关，逐张有界删除。
+ *
+ * ⚠️ fact_hbti_response 不在此列，也永远不要加进来：它是永久事实不是带 TTL 的操作行，
+ * 而且它没有 expires_at 列，加进来会直接 42703。
+ */
 const EXPIRING = [
   { table: "hbti_auth_token", col: "expires_at" },
   { table: "hbti_rate_limit", col: "expires_at" },

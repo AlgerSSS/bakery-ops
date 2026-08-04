@@ -14,3 +14,6 @@ storageState*.json
 # （前导斜杠是 2026-08-01 补的：原来的 "_*" 无锚点、会匹配任意层级，
 #   把 bakery-ops/src/app/api/import/_auth.ts 也一起排除掉了。）
 res_api/_*
+
+# 生产库备份：pg_dump 全量转储，含全部业务数据。只在本机与异地存储保留，绝不入 git。
+backups/

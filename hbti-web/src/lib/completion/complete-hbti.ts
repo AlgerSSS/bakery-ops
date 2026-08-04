@@ -186,6 +186,7 @@ export async function completeHbti(
     attemptId,
     startedAt,
     completion,
+    parsed.data.answers,
   );
   if (!acquisition.acquired) {
     return handleExistingCompletion({
@@ -721,15 +722,20 @@ async function acquireCompletion(
   attemptId: string,
   startedAt: string,
   completion: HbtiCompletionSnapshot,
+  answers: HbtiAnswersInput,
 ) {
   try {
-    return await store.acquireProcessing(key, {
-      status: "processing",
-      phase: "locked",
-      attemptId,
-      startedAt,
-      completion,
-    });
+    return await store.acquireProcessing(
+      key,
+      {
+        status: "processing",
+        phase: "locked",
+        attemptId,
+        startedAt,
+        completion,
+      },
+      answers,
+    );
   } catch {
     throw new CompleteHbtiError(
       "STORE_UNAVAILABLE",

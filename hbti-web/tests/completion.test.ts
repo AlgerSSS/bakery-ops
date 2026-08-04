@@ -28,6 +28,7 @@ import type {
 class FakeCompletionStore implements CompletionStore {
   readonly records = new Map<string, CompletionRecord>();
   readonly acquiredKeys: CompletionStoreKey[] = [];
+  readonly acquiredAnswers: (Readonly<Record<string, string>> | undefined)[] = [];
   beforeClearLocked?: (
     key: CompletionStoreKey,
     attemptId: string,
@@ -45,8 +46,12 @@ class FakeCompletionStore implements CompletionStore {
   async acquireProcessing(
     key: CompletionStoreKey,
     record: ProcessingCompletionRecord,
+    answers?: Readonly<Record<string, string>>,
   ): Promise<CompletionAcquisition> {
     this.acquiredKeys.push(key);
+    // 记下来是为了钉死透传：acquireProcessing 的 answers 是可选形参，
+    // complete-hbti.ts 漏传时 tsc 不会响，只有断言会响。
+    this.acquiredAnswers.push(answers);
     const serialized = this.serialize(key);
     const existing = this.records.get(serialized);
 
@@ -258,6 +263,11 @@ describe("completeHbti", () => {
     // 066 起幂等键是 member_id 本身（完成记录已收进 pos_member）。
     // 手机号仍然不得出现在键或返回体里。
     expect(storeKey.memberId).toBe(memberId);
+
+    // 13 题原始作答必须原样透传到 store（→ fact_hbti_response，迁移 300）。
+    // acquireProcessing 的第三个形参是可选的，漏传时 tsc 完全不响 ——
+    // 这条断言是唯一会响的地方。答案一旦不落库就永久丢失，从结果 code 反推不出来。
+    expect(store.acquiredAnswers[0]).toEqual(validAnswers);
     expect(JSON.stringify({ result, storeKey })).not.toContain(phone);
     expect(JSON.stringify({ result, storeKey })).not.toContain("2025550123");
   });

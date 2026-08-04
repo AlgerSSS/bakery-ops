@@ -80,6 +80,13 @@ const nextMemberId = () => {
   return `90000000000000${String(10000 + memberSeq).slice(-5)}`;
 };
 
+/** 13 题齐全的作答，迁移 300 的 CHECK 要求一个不缺。 */
+const answers13 = {
+  q1: "iced", q2: "light", q3: "bitter", q4: "alone", q5: "morning",
+  q6: "bakery", q7: "iced", q8: "light", q9: "light", q10: "bitter",
+  q11: "bitter", q12: "alone", q13: "alone",
+} as const;
+
 const locked = (attemptId: string): LockedCompletionRecord => ({
   status: "processing",
   phase: "locked",
@@ -159,6 +166,10 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
     const leftoverTokens = await root`
       SELECT count(*)::int AS n FROM hbti_auth_token WHERE expires_at < now() - interval '365 days'`;
     expect(leftoverTokens[0].n).toBe(0);
+    // 迁移 300 的新表同样不能留残留——它没有 TTL，漏一行就永远在那儿。
+    const leftoverAnswers = await root`
+      SELECT count(*)::int AS n FROM fact_hbti_response WHERE member_id LIKE '91%'`;
+    expect(leftoverAnswers[0].n).toBe(0);
     await root.end();
   }, 60_000);
 
@@ -482,6 +493,76 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
       const single = await tx`
         SELECT count(*)::int AS n FROM pos_member WHERE member_id = ${memberId}`;
       expect(single[0].n).toBe(1);
+    });
+  });
+
+  describe("fact_hbti_response（迁移 300：题目级答案）", () => {
+    it("抢锁成功时写下 13 题，且与 pos_member 的 code 一致", async () => {
+      const key = nextKey();
+      const attemptId = randomUUID();
+      await store.acquireProcessing(key, locked(attemptId), answers13);
+
+      const rows = await tx`
+        SELECT answers, hbti_code, attempt_id, campaign_version
+        FROM fact_hbti_response WHERE member_id = ${key.memberId}`;
+      expect(rows).toHaveLength(1);
+      expect(Object.keys(rows[0].answers as object)).toHaveLength(13);
+      expect((rows[0].answers as Record<string, string>).q13).toBe("alone");
+      expect(rows[0].attempt_id).toBe(attemptId);
+      expect(rows[0].campaign_version).toBe(key.campaignVersion);
+
+      const member = await tx`
+        SELECT hbti_code FROM pos_member
+        WHERE store = ${STORE} AND member_id = ${key.memberId}`;
+      expect(rows[0].hbti_code).toBe(member[0].hbti_code);
+    });
+
+    it("不传 answers 时不写任何行——假 store 与旧调用方不会因此报错", async () => {
+      const key = nextKey();
+      await store.acquireProcessing(key, locked(randomUUID()));
+      const rows = await tx`
+        SELECT 1 FROM fact_hbti_response WHERE member_id = ${key.memberId}`;
+      expect(rows).toHaveLength(0);
+    });
+
+    it("clearLocked 之后带同一份答案重来，1 小时窗口内不重复记", async () => {
+      const key = nextKey();
+      const first = randomUUID();
+      await store.acquireProcessing(key, locked(first), answers13);
+      await store.clearLocked(key, first);
+      await store.acquireProcessing(key, locked(randomUUID()), answers13);
+
+      const rows = await tx`
+        SELECT count(*)::int AS n FROM fact_hbti_response WHERE member_id = ${key.memberId}`;
+      expect(rows[0].n).toBe(1);
+    });
+
+    it("改了答案再来则记新行——顾客重做不该被当成重复", async () => {
+      const key = nextKey();
+      const first = randomUUID();
+      await store.acquireProcessing(key, locked(first), answers13);
+      await store.clearLocked(key, first);
+      await store.acquireProcessing(key, locked(randomUUID()), {
+        ...answers13,
+        q1: "hot",
+      });
+
+      const rows = await tx`
+        SELECT count(*)::int AS n FROM fact_hbti_response WHERE member_id = ${key.memberId}`;
+      expect(rows[0].n).toBe(2);
+    });
+
+    it("答案绝不进 hbti_record——进了会让此后每次读取都 parse 失败", async () => {
+      const key = nextKey();
+      const attemptId = randomUUID();
+      await store.acquireProcessing(key, locked(attemptId), answers13);
+
+      const rows = await tx`
+        SELECT hbti_record FROM pos_member
+        WHERE store = ${STORE} AND member_id = ${key.memberId}`;
+      expect(JSON.stringify(rows[0].hbti_record)).not.toContain("q13");
+      // 而且必须还能被 schema 解回来
+      await expect(store.get(key)).resolves.not.toBeNull();
     });
   });
 

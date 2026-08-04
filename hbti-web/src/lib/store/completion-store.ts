@@ -1,5 +1,6 @@
 import type {
   CategoryAnswer,
+  HbtiAnswers,
   HbtiCode,
   VisitTimeAnswer,
 } from "@/content/types";
@@ -147,9 +148,16 @@ export type CompletionAcquisition =
  */
 export interface CompletionStore {
   get(key: CompletionStoreKey): Promise<CompletionRecord | null>;
+  /**
+   * `answers` 是 13 道题的原始作答，只写 fact_hbti_response，**绝不进 hbti_record**：
+   * completionSnapshotSchema 是 z.strictObject，多一个字段会让该会员此后每一次读取
+   * 都 parse 失败，而保留期是 548 天。
+   * 设成可选是为了让内存假 store 不必实现它；代价是漏传时 tsc 不响，靠集成测试兜。
+   */
   acquireProcessing(
     key: CompletionStoreKey,
     record: ProcessingCompletionRecord,
+    answers?: Readonly<HbtiAnswers>,
   ): Promise<CompletionAcquisition>;
   markPrepared(
     key: CompletionStoreKey,

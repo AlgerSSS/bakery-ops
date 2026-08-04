@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { ReviewCompletionRecord } from "@/lib/store/completion-store";
 
 /**
@@ -46,6 +48,15 @@ function readAlertWebhook(): string | undefined {
 export function hasAlertDestination(): boolean {
   return readAlertWebhook() !== undefined;
 }
+
+/**
+ * 飞书/Lark 自定义群机器人的 hook 路径。它**不吃** `{"text": …}`——
+ * 收到形状不对的包体照样回 HTTP 200，只在 JSON 里给一个非零 `code`。
+ * 所以既要按它的形状发，也要按它的 `code` 判成败，否则告警会「静默成功」。
+ */
+const LARK_BOT_HOOK_PATH = "/open-apis/bot/v2/hook/";
+
+const larkBotReceiptSchema = z.object({ code: z.number() });
 
 /**
  * 人工复核告警的唯一格式。即时发送与 Cron 重试必须共用它，否则同一条记录
@@ -99,14 +110,26 @@ export async function sendAlert({
   const webhook = readAlertWebhook();
   if (!webhook) return "skipped";
 
+  const isLarkBot = new URL(webhook).pathname.startsWith(LARK_BOT_HOOK_PATH);
   try {
     const response = await fetch(webhook, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: message }),
+      body: JSON.stringify(
+        isLarkBot
+          ? { msg_type: "text", content: { text: message } }
+          : { text: message },
+      ),
       signal: AbortSignal.timeout(ALERT_TIMEOUT_MS),
     });
-    return response.ok ? "sent" : "failed";
+    if (!response.ok) return "failed";
+    if (!isLarkBot) return "sent";
+
+    // 读不出 code 就当没送到——宁可让 Cron 重试，也不要假成功。
+    const receipt = larkBotReceiptSchema.safeParse(
+      await response.json().catch(() => null),
+    );
+    return receipt.success && receipt.data.code === 0 ? "sent" : "failed";
   } catch {
     return "failed";
   }

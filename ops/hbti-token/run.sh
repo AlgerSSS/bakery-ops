@@ -75,9 +75,16 @@ if [ "$CODE" != "0" ] && [ "$CODE" != "75" ]; then
     ALERT_WEBHOOK=$(grep -E '^ALERT_WEBHOOK=' "$ROOT/.env" | tail -1 | cut -d= -f2- | tr -d '"')
   fi
   if [ -n "${ALERT_WEBHOOK:-}" ]; then
+    # 飞书/Lark 群机器人不吃 {"text":…}:形状不对照样 200,错误号只在包体里。
+    ALERT_TEXT="[HOT CRUSH] HBTI 发券令牌轮换失败 exit=$CODE，日志 $LOG"
+    case "$ALERT_WEBHOOK" in
+      */open-apis/bot/v2/hook/*)
+        ALERT_BODY="{\"msg_type\":\"text\",\"content\":{\"text\":\"$ALERT_TEXT\"}}" ;;
+      *)
+        ALERT_BODY="{\"text\":\"$ALERT_TEXT\"}" ;;
+    esac
     curl -s -m 10 -X POST -H 'Content-Type: application/json' \
-      -d "{\"text\":\"[HOT CRUSH] HBTI 发券令牌轮换失败 exit=$CODE，日志 $LOG\"}" \
-      "$ALERT_WEBHOOK" >/dev/null 2>&1 || true
+      -d "$ALERT_BODY" "$ALERT_WEBHOOK" >/dev/null 2>&1 || true
   fi
 elif [ "$CODE" = "0" ]; then
   rm -f "$LOG_DIR/LAST_FAILURE"

@@ -6,10 +6,10 @@
 
 ---
 
-## HBTI 上线加固已完成并提交（2026-08-04，Codex，分支 `claude/hbti-launch-hardening`，未部署）
+## HBTI 上线加固已合入 main（2026-08-04，Codex，已推送，未部署）
 
 全量门禁在本机通过：`npx tsc --noEmit`、`npx eslint .`（0 error / 0 warning）、
-`npx vitest run`（29 文件 283 用例全过，含真库集成）、`npx next build`、
+`npx vitest run`（29 文件 286 用例全过，含真库集成）、`npx next build`、
 `npx playwright test`（42 条 e2e 全过）。集成用例需要一次性 Postgres：
 `docker run --rm --name hbti-test-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=hbti_test -p 127.0.0.1:55432:5432 postgres:17-alpine`，
 再按 059/060/063/066（财务站 `sql/`）+ 077/078/101（`bakery-ops/src/modules/data/migrations/`）
@@ -35,14 +35,38 @@
   `scripts/create-member-link.mjs` → `scripts/print-hbti-urls.mjs`（只印 `/` 与 `/demo`）。
   测试里 `HBTI_LINK_SECRET`、`HBTI_MEMBER_HASH_SECRET` 的桩已清干净。
 
+已确认的线上事实：
+
+- **推送不会触发部署**。`vercel project inspect hotcrush-hbti` 没有 Git 连接，最新生产部署
+  是 4 小时前的 `hotcrush-hbti-5gclm5rpc`（CLI 手动）。推 main 之后线上 `/api/health` 仍返回
+  200 且**响应里没有 `alert` 字段**——加固版一定带这个字段，所以线上跑的还是旧包，
+  `ALERT_WEBHOOK` 的 503 门禁尚未生效。
+- **三个退休变量已从 Vercel 生产删除**（本轮执行）：`HBTI_LINK_SECRET`、
+  `HBTI_LINK_TTL_SECONDS`、`HBTI_MEMBER_HASH_SECRET`。删前确认 hot 仓库、财务站、
+  Contabo `/opt/hotcrush` 均无读者。生产现存 HBTI_* 只剩 `HBTI_AUTH_SECRET`、
+  `HBTI_LINK_BASE_URL`、`HBTI_CAMPAIGN_VERSION`。
+
+**告警通道盘点（找过了，没有现成的）**：`/opt/hotcrush/*/.env` 里 `ALERT_WEBHOOK=` 是空的，
+服务器上不存在任何 `open-apis/bot/v2/hook` 地址。唯一在用的 Lark 投递是**应用 API**
+（`scripts/recruit_*.py` → `/im/v1/messages`，凭据在 Contabo `/opt/hotcrush/scripts/lark_app.json`，
+600 权限，只发 4 个个人 open_id，没有群 chat_id）。复用它得把 app_secret 放进 Vercel 或另建中转，
+都不如给一个群机器人 hook。
+
+顺带修掉一个会「静默成功」的坑：四个告警发送点原本都发 `{"text":…}`（Slack 形状），
+而飞书/Lark 群机器人**不吃这个形状**——它照样回 HTTP 200，只把错误号放在包体 `code` 里。
+现在 `hbti-web/src/lib/alert.ts` 与 `res_api/daily-refresh.sh`、`ops/hbti-token/{run,keepalive}.sh`
+都按目的地选形状（URL 含 `/open-apis/bot/v2/hook/` 就发 `{"msg_type":"text","content":{"text":…}}`），
+并且 hbti-web 侧只有 `code === 0` 才算 sent，读不出回执一律按失败让 Cron 重试。
+
 下一步（尚未做，需要人):
 
-1. **Vercel 生产环境变量仍有三个已退休的键**：`HBTI_LINK_SECRET`、`HBTI_LINK_TTL_SECONDS`、
-   `HBTI_MEMBER_HASH_SECRET`。代码已完全不读它们；确认无其他消费者后由人删除
-   （`npx vercel env rm <NAME> production`）。本轮没有动生产配置。
-2. **`ALERT_WEBHOOK` 生产未配置**：不配就 `/api/health` 503，等于挡住发券。上线前必须配一个
-   真实可达的 HTTPS 目的地，并发一条不含 PII 的 canary 验证。
+1. **`ALERT_WEBHOOK` 仍然没有目的地**。请在目标 Lark 群加一个自定义机器人，把 hook URL 给我：
+   一个 URL 同时点亮四条链路（hbti-web review 告警、POS 每晚刷新、令牌轮换、令牌保温）。
+   配好后必须发一条不含 PII 的 canary，确认群里真的收到——不能只看 HTTP 200。
+2. **RES 持久凭证仍不存在**：线上 RES 200 靠 `ops/hbti-token` 的 BO 会话保温撑着，
+   不是受限长期凭证。这条要 RES 侧发，代码补不了。
 3. 部署仍是显式动作：`hbti-web` 走 `npx vercel --prod`（`deploy.sh` 只部署 bakery-ops/res_api）。
+   部署前先把第 1 条配好，否则新版 `/api/health` 会 503。
 
 ---
 

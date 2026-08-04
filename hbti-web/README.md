@@ -57,8 +57,13 @@ secret store. Never commit RES credentials or secret-bearing environment files.
   must match `MEMBER_STORE` in `~/hot/res_api`, or the same member is written
   twice instead of being enriched. Defaults to `吉隆坡Pavilion门店`.
 - `CRON_SECRET`: protects the reconciliation endpoint; at least 32 characters.
-- `ALERT_WEBHOOK`: required production destination for durable review alerts.
-  Missing configuration makes `/api/health` return 503.
+- `ALERT_WEBHOOK`: required production destination for durable review alerts;
+  must be an HTTPS URL without embedded credentials. Missing or malformed
+  configuration makes `/api/health` return 503. A Lark/Feishu custom bot URL
+  (path `/open-apis/bot/v2/hook/…`) receives
+  `{"msg_type":"text","content":{"text":…}}` and is only treated as delivered
+  when the response body carries `code: 0`; any other destination receives
+  `{"text":…}` and is judged by HTTP status alone.
 - `RES_VULCAN_TOKEN`: HBTI-specific RES service credential, scoped to member
   lookup, coupon readback/template lookup, and one-coupon issuance.
 - `RES_*`: tenant, organisation, brand, shop, coupon-template, member-wallet,
@@ -84,7 +89,9 @@ Local secret-bearing files should be mode `0600`.
 Before a customer SMS batch:
 
 1. Confirm the production deployment is Ready and the custom domain aliases it.
-2. Send a non-sensitive alert canary and confirm the destination receives it.
+2. Send a non-sensitive alert canary and confirm a human sees it in the target
+   channel. HTTP 200 alone is not proof: a Lark bot answers 200 with a nonzero
+   body `code` when the message is rejected.
 3. Confirm `/api/health` returns 200 with `alert`, `db`, and `res` all `ok`.
 4. Run the authenticated reconciliation endpoint and confirm `ok: true`.
 5. Confirm there are no unresolved `processing`, `prepared`, or `review`

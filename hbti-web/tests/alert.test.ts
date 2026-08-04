@@ -69,4 +69,63 @@ describe("sendAlert", () => {
       sendAlert({ severity: "error", title: "需要人工处理" }),
     ).resolves.toBe("failed");
   });
+
+  describe("飞书/Lark 群机器人", () => {
+    const HOOK = "https://open.larksuite.com/open-apis/bot/v2/hook/abc-123";
+
+    it("按 Lark 的形状发，而不是通用的 {text}", async () => {
+      vi.stubEnv("ALERT_WEBHOOK", HOOK);
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ code: 0, msg: "success" }), {
+            status: 200,
+          }),
+        );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        sendAlert({ severity: "error", title: "需要人工处理" }),
+      ).resolves.toBe("sent");
+      expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toEqual({
+        msg_type: "text",
+        content: { text: "[HOT CRUSH][ERROR] 需要人工处理" },
+      });
+    });
+
+    it("200 + 非零 code 算没送到，不能报成 sent", async () => {
+      // Lark 对形状不对/机器人被移除的请求照样回 200，错误号只在包体里。
+      // 这里判错了，运营就永远等不到那条「进入人工复核」。
+      vi.stubEnv("ALERT_WEBHOOK", HOOK);
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ code: 19024, msg: "param invalid" }), {
+            status: 200,
+          }),
+        ),
+      );
+
+      await expect(
+        sendAlert({ severity: "error", title: "需要人工处理" }),
+      ).resolves.toBe("failed");
+    });
+
+    it("回执读不出来时按失败处理，留给 Cron 重试", async () => {
+      vi.stubEnv("ALERT_WEBHOOK", HOOK);
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      vi.stubGlobal(
+        "fetch",
+        vi
+          .fn()
+          .mockResolvedValue(new Response("<html>proxy</html>", { status: 200 })),
+      );
+
+      await expect(
+        sendAlert({ severity: "error", title: "需要人工处理" }),
+      ).resolves.toBe("failed");
+    });
+  });
 });

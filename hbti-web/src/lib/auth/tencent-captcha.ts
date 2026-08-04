@@ -13,6 +13,9 @@
 const SDK_SRC = "https://ca.turing.captcha.qcloud.com/TJNCaptcha-global.js";
 const CONTAINER_ID = "tencent-captcha-container";
 
+/** 等顾客解题的上限。宽到不会打断真人，短到不会让故障变成无声的死路。 */
+const SOLVE_DEADLINE_MS = 150_000;
+
 export interface CaptchaSolution {
   token: string;
   randstr: string;
@@ -122,8 +125,16 @@ export async function solveCaptcha(
     const finish = (outcome: CaptchaOutcome) => {
       if (settled) return;
       settled = true;
+      window.clearTimeout(timer);
       resolve(outcome);
     };
+    // 兜底时限。SDK 起来了但取不到题目时（例如 CSP 少放行一个域），回调**永远不会**
+    // 触发：顾客点了按钮什么也不发生，服务端连一条日志都没有——2026-08-04 实测踩过。
+    // 给得很宽（真人解题慢不该被打断），只为了把「无声的死路」换成一句能行动的话。
+    const timer = window.setTimeout(
+      () => finish({ status: "unavailable" }),
+      SOLVE_DEADLINE_MS,
+    );
     try {
       const instance = new Captcha(
         container(),

@@ -65,24 +65,45 @@ bash 会把逗号首字节吃进变量名，配 `set -u` 就是在告警那一�
 跑在 C locale 下才一直没暴露；人手在 SSH 里跑就会炸）。已改成 `${CODE}` / `${LOG}`。
 本地用假 Lark 端点实跑过三个脚本的告警片段：`code:0` 静默通过，`code:19024` 落哨兵行。
 
+**告警目的地已经打通并人工验收（2026-08-04）**。没有等群机器人：这台服务器上本来就有
+一条在用的 Lark 应用 API 通道（招聘早报天天在发），于是加了个中转把 webhook 翻译过去。
+
+- 服务：`/opt/hotcrush/alert-relay/server.mjs` + systemd `hotcrush-alert-relay`，
+  只听 `127.0.0.1:8791`；仓库副本在 `ops/alert-relay/`（含 README 与 unit 文件）。
+- 入口：Caddy 在既有的 `gw.hotcrush.net` 上加了 `handle_path /hbti-alert/*`。
+  改前备份了 Caddyfile，`caddy validate` 通过，reload 后确认 AI 网关根路径仍 200。
+- 凭据：URL 路径里的随机段（`/opt/hotcrush/alert-relay/.env` 的 `ALERT_PATH_TOKEN`）。
+  **完整 URL 不入库**。收件人 `ALERT_OPEN_IDS` 当前只有本人，要加人从
+  `/opt/hotcrush/scripts/lark_app.json` 的 recipients 取 open_id。
+- 四处都已配好并各发过一条 canary，**用户在 Lark 里逐条确认收到**：
+  hbti-web 形状、POS 每晚刷新、令牌轮换、令牌保温。后三条是直接抽**线上脚本原文**
+  的告警段执行的，不是仿写；中转日志的「已送达」计数增量对得上。
+- 三个脚本已 scp 到位，线上与仓库 md5 一致（`daily-refresh.sh 72470585`、
+  `run.sh 5a65f33d`、`keepalive.sh c2d01f8a`）。`ALERT_WEBHOOK` 也已写进 Vercel 生产，
+  **但要下一次部署才会生效**——hbti-web 目前线上仍是旧包。
+- 判定规则四处一致：HTTP 2xx 才算送到；Lark 群机器人另外要包体 `code:0`。
+  中转拒收时回 502，脚本会往 LAST_FAILURE / KEEPALIVE_LAST_BAD 记「告警未送达 + 回执」。
+  五种结局都实测过：Lark code:0 / code:19024 / 中转 200 / 中转 502 / 端口不通(http=000)。
+
+以后要换成群机器人：把 hook URL 直接填进那四处 `ALERT_WEBHOOK` 即可，中转可停用——
+四个发送点本来就认 Lark 形状。
+
 下一步（尚未做，需要人):
 
-1. **`ALERT_WEBHOOK` 仍然没有目的地**。请在目标 Lark 群加自定义机器人，把 hook URL 给我。
-   注意：**一个 URL 不会自动点亮四条链路**，四个运行时各自读各自的配置，必须逐个配 + 逐个发 canary：
-
-   | 运行时 | 配在哪 | 生效还需要 |
-   |---|---|---|
-   | hbti-web（review 告警） | Vercel 生产环境变量 | **重新部署**才会带上新变量 |
-   | res_api 每晚刷新 | Contabo `/opt/hotcrush/res_api/.env` | `./deploy.sh core` 把改过的 `daily-refresh.sh` 同步上去 |
-   | hbti-token 轮换 | Contabo `/opt/hotcrush/hbti-token/.env` | **deploy.sh 不管这个目录**，`run.sh` 要手动 scp |
-   | hbti-token 保温 | 同上（同一个 `.env`） | 同上，`keepalive.sh` 要手动 scp |
-
-   线上三个脚本的 md5 已与仓库不一致（本轮改过），配完 URL 不同步脚本 = 仍然发错形状。
-   验收标准是**有人在群里看到那条 canary**，不是 HTTP 200。
-2. **RES 持久凭证仍不存在**：线上 RES 200 靠 `ops/hbti-token` 的 BO 会话保温撑着，
-   不是受限长期凭证。这条要 RES 侧发，代码补不了。
-3. 部署仍是显式动作：`hbti-web` 走 `npx vercel --prod`（`deploy.sh` 只部署 bakery-ops/res_api）。
-   部署前先把第 1 条配好，否则新版 `/api/health` 会 503。
+1. **RES 持久凭证——原样卡着，本轮没有进展，别被下面这条探测误导**。
+   `RES_VULCAN_TOKEN` **不是服务凭证**，是从 BO 浏览器会话里借出来的令牌
+   （见 `ops/hbti-token/rotate.mjs` 开头注释与第 81–92 行「借 BO 会话里的 vulcan-token」），
+   靠 keepalive 每 30 分钟保温、run.sh 每 6 小时重借。
+   本轮顺手探过一次：拿它打 `POST /api/report/data/queryData`（report 211，只读）返回
+   **HTTP 401 `未授权`**。这**只**说明这枚借来的令牌连报表都读不了，
+   **不能**据此推出「RES 有一套受限服务令牌机制、只差报表作用域」——那是两回事，
+   报表作用域跟 HBTI 用的会员查询/券模板/发券/回读也没有关系。
+   诉求仍然是原来那句：**请 RES 为 HBTI 的那几个接口发一枚长期有效的受限凭证**
+   （按手机号查会员、按名称查券模板、发一张券、回读券列表；corporation 450020844 /
+   shop 406994127）。在拿到之前，轮换 + 保温这套**不能删**，它是目前唯一让线上
+   `res: ok` 的东西。
+2. 部署仍是显式动作：`hbti-web` 走 `npx vercel --prod`（`deploy.sh` 只部署 bakery-ops/res_api）。
+   现在 `ALERT_WEBHOOK` 已配，部署后 `/api/health` 应当返回 200 且 `alert: ok`。
 
 ---
 

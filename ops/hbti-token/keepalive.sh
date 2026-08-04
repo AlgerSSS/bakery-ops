@@ -74,17 +74,28 @@ if [ "${code:-}" != "200" ]; then
         *)
           ALERT_BODY="{\"text\":\"$ALERT_TEXT\"}" ;;
       esac
-      # 200 不等于送达:Lark 把错误号放在包体 code 里,读不到 code:0 就当没送到。
-      ALERT_RECEIPT=$(curl -s -m 10 -X POST -H 'Content-Type: application/json' \
-        -d "$ALERT_BODY" "$ALERT_WEBHOOK" 2>/dev/null | tr -d ' \n' || true)
+      # 判「送到了」要两条都过:HTTP 2xx(任何目的地,含告警中转的 502),
+      # 以及 Lark 的包体 code:0(它用 200 + 非零 code 表示拒收)。
+      ALERT_RAW=$(curl -s -m 10 -X POST -H 'Content-Type: application/json' \
+        -d "$ALERT_BODY" -w '\n%{http_code}' "$ALERT_WEBHOOK" 2>/dev/null || true)
+      ALERT_HTTP=${ALERT_RAW##*$'\n'}
+      ALERT_RECEIPT=$(printf '%s' "${ALERT_RAW%$'\n'*}" | tr -d ' \n')
+      ALERT_FAILED=""
+      case "$ALERT_HTTP" in
+        2??) ;;
+        *) ALERT_FAILED="http=${ALERT_HTTP:-ERR}" ;;
+      esac
       case "$ALERT_WEBHOOK" in
         */open-apis/bot/v2/hook/*)
           case "$ALERT_RECEIPT" in
             *'"code":0'*) ;;
-            *) printf '%s 告警未送达 receipt=%s\n' "$(date -u '+%FT%TZ')" \
-                 "${ALERT_RECEIPT:-<empty>}" >> "$SENTINEL" ;;
+            *) ALERT_FAILED="${ALERT_FAILED:+$ALERT_FAILED }lark_code" ;;
           esac ;;
       esac
+      if [ -n "$ALERT_FAILED" ]; then
+        printf '%s 告警未送达 %s receipt=%s\n' "$(date -u '+%FT%TZ')" "$ALERT_FAILED" \
+          "${ALERT_RECEIPT:-<empty>}" >> "$SENTINEL"
+      fi
     fi
   fi
   exit 1

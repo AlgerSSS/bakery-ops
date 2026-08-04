@@ -1,0 +1,22 @@
+[Unit]
+Description=Hot Crush alert relay (webhook -> Lark app API)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/hotcrush/alert-relay
+EnvironmentFile=/opt/hotcrush/alert-relay/.env
+ExecStart=/usr/bin/node /opt/hotcrush/alert-relay/server.mjs
+Restart=always
+RestartSec=5
+# 只读 lark_app.json（600 root）与自己的 .env；不需要任何写权限。
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+StandardOutput=append:/opt/hotcrush/alert-relay/relay.log
+StandardError=append:/opt/hotcrush/alert-relay/relay.log
+
+[Install]
+WantedBy=multi-user.target

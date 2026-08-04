@@ -63,10 +63,10 @@ echo "$(date '+%F %T') final exit=$CODE (business date $REFRESH_BUSINESS_DATE, a
 if [ "$CODE" != "0" ]; then
   echo "$(date '+%F %T') FAILED code=$CODE log=$LOG" > "$LOG_DIR/LAST_FAILURE"
   # 只取 ALERT_WEBHOOK 这一个键，不 source 整个 .env（避免把数据库口令等灌进 shell 环境）。
-  if [ -z "$ALERT_WEBHOOK" ] && [ -f .env ]; then
+  if [ -z "${ALERT_WEBHOOK:-}" ] && [ -f .env ]; then
     ALERT_WEBHOOK=$(grep -E '^ALERT_WEBHOOK=' .env | tail -1 | cut -d= -f2- | tr -d '"'"'")
   fi
-  if [ -n "$ALERT_WEBHOOK" ]; then
+  if [ -n "${ALERT_WEBHOOK:-}" ]; then
     # 飞书/Lark 群机器人不吃 {"text":…}：形状不对它照样回 200，只在包体里给非零 code，
     # 于是「发过了」和「没送到」长得一模一样。按目的地选形状。
     # ${CODE} 必须带花括号：紧跟中文逗号时，UTF-8 locale 下 bash 会把逗号的首字节
@@ -78,17 +78,28 @@ if [ "$CODE" != "0" ]; then
       *)
         ALERT_BODY="{\"text\":\"$ALERT_TEXT\"}" ;;
     esac
-    # 200 不等于送达：Lark 把错误号放在包体 code 里，读不到 code:0 就当没送到。
-    ALERT_RECEIPT=$(curl -s -m 10 -X POST -H 'Content-Type: application/json' \
-      -d "$ALERT_BODY" "$ALERT_WEBHOOK" 2>/dev/null | tr -d ' \n' || true)
+    # 判「送到了」要两条都过：HTTP 2xx（任何目的地，含告警中转的 502），
+    # 以及 Lark 的包体 code:0（它用 200 + 非零 code 表示拒收）。
+    ALERT_RAW=$(curl -s -m 10 -X POST -H 'Content-Type: application/json' \
+      -d "$ALERT_BODY" -w '\n%{http_code}' "$ALERT_WEBHOOK" 2>/dev/null || true)
+    ALERT_HTTP=${ALERT_RAW##*$'\n'}
+    ALERT_RECEIPT=$(printf '%s' "${ALERT_RAW%$'\n'*}" | tr -d ' \n')
+    ALERT_FAILED=""
+    case "$ALERT_HTTP" in
+      2??) ;;
+      *) ALERT_FAILED="http=${ALERT_HTTP:-ERR}" ;;
+    esac
     case "$ALERT_WEBHOOK" in
       */open-apis/bot/v2/hook/*)
         case "$ALERT_RECEIPT" in
           *'"code":0'*) ;;
-          *) echo "$(date '+%F %T') ALERT UNDELIVERED receipt=${ALERT_RECEIPT:-<empty>}" \
-               >> "$LOG_DIR/LAST_FAILURE" ;;
+          *) ALERT_FAILED="${ALERT_FAILED:+$ALERT_FAILED }lark_code" ;;
         esac ;;
     esac
+    if [ -n "$ALERT_FAILED" ]; then
+      echo "$(date '+%F %T') ALERT UNDELIVERED $ALERT_FAILED receipt=${ALERT_RECEIPT:-<empty>}" \
+        >> "$LOG_DIR/LAST_FAILURE"
+    fi
   fi
 else
   rm -f "$LOG_DIR/LAST_FAILURE"

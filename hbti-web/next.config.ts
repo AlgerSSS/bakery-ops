@@ -12,11 +12,18 @@ const isDevServer = process.env.NODE_ENV !== "production";
  * 2026-08-04 RES 在租户级打开了图形验证码，`sendVerifyCode` 从此服务端强制要求
  * captcha 参数，登录必须在浏览器里跑腾讯的 SDK 才能拿到解。
  *
- * 三个域缺一不可，是从 `TJNCaptcha-global.js` 里逐个挖出来的：
+ * 这份清单**不是读源码猜的**——SDK 混淆得厉害，域名有的是运行时拼出来的，静态
+ * 搜索一定会漏。做法是在 RES 自己那个能跑通的 H5 上把 SDK 拉起来触发一次，
+ * 记录它实际接触的每一个主机；再在本站触发一次，用 `securitypolicyviolation`
+ * 事件核对到零违规为止：
  *   · `*.captcha.qcloud.com`  —— SDK 脚本与它的样式表
- *   · `*.captcha.gtimg.com`   —— 题目接口与切图资源（`global.turing.` 和 `turing.` 两个主机）
+ *   · `*.captcha.gtimg.com`   —— 题目接口与切图资源
+ *   · `www.turingfraud.net`   —— 腾讯天御的风控/设备指纹上报，**只给 connect-src**，
+ *                                不进 script-src：它只需要能收数据，不需要在本页执行代码
  *   · `www.tycaptcha.com`     —— SDK 里写死的国际备用域（`intlFormalBakDomain`），
- *                                主域不可达时走它，不放行等于自断容灾
+ *                                实测未被访问，留着是为了主域不可达时还有容灾
+ *   · `worker-src blob:`      —— SDK 会从 blob 起一个 Web Worker，默认落到
+ *                                `default-src 'self'` 会被挡掉
  *
  * **只放行 qcloud 一个域是不够的**：脚本能加载、题目取不到，弹层永远出不来，
  * 回调不触发，顾客看到的是一个点了没反应的按钮，服务端连请求都收不到（实测踩过）。
@@ -30,6 +37,9 @@ const TENCENT_CAPTCHA_ORIGINS = [
   "https://www.tycaptcha.com",
 ].join(" ");
 
+/** 风控上报只需要能被连上，不该获得在本页执行脚本的权限。 */
+const TENCENT_RISK_ORIGIN = "https://www.turingfraud.net";
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -40,8 +50,9 @@ const contentSecurityPolicy = [
   `style-src 'self' 'unsafe-inline' ${TENCENT_CAPTCHA_ORIGINS}`,
   `font-src 'self' https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com data: ${TENCENT_CAPTCHA_ORIGINS}`,
   `img-src 'self' data: blob: ${TENCENT_CAPTCHA_ORIGINS}`,
-  `connect-src 'self' ${TENCENT_CAPTCHA_ORIGINS}`,
+  `connect-src 'self' ${TENCENT_CAPTCHA_ORIGINS} ${TENCENT_RISK_ORIGIN}`,
   `frame-src ${TENCENT_CAPTCHA_ORIGINS}`,
+  "worker-src 'self' blob:",
   "upgrade-insecure-requests",
 ].join("; ");
 

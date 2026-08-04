@@ -4,7 +4,7 @@ import { isIP } from "node:net";
 import { getDb, type SqlRunner } from "@/lib/db/postgres";
 import { bumpRateLimitBucket } from "@/lib/rate-limit/pg-rate-limit";
 
-interface AuthRateLimitRule {
+export interface AuthRateLimitRule {
   scope: string;
   identity: "phone" | "ip";
   limit: number;
@@ -18,7 +18,7 @@ const OTP_PHONE_DAY_RULE: AuthRateLimitRule = {
   windowMs: 24 * 60 * 60_000,
 };
 
-const OTP_REQUEST_RULES: readonly AuthRateLimitRule[] = [
+export const OTP_REQUEST_RULES: readonly AuthRateLimitRule[] = [
   {
     scope: "otp-phone-minute",
     identity: "phone",
@@ -26,16 +26,26 @@ const OTP_REQUEST_RULES: readonly AuthRateLimitRule[] = [
     windowMs: 60_000,
   },
   OTP_PHONE_DAY_RULE,
+  // IP 配额按「一个门店 = 一个出口 IP」定，不是按单个住户。顾客扫码时多半连店里
+  // 的 WiFi，整店共用一个公网地址；移动数据在本地运营商的 CGNAT 下同样是几十个
+  // 用户共享一个 IPv4。邀请链接下线后（`/api/session` 恒 410）每个顾客都必须走
+  // OTP，所以这两条闸门在 100% 的顾客路径上。按旧值 10/10 分、50/天，一场 200 人
+  // 的活动里第 51 个人开始就再也收不到验证码，而且现场看不出原因（前端只显示
+  // 「验证码未送达」）。
+  //
+  // 放大后成本仍然是封死的：真正花钱的闸门在手机号那一侧（1/分钟、5/天/号），
+  // 单个号码最多 5 条短信，与 IP 配额无关。IP 桶的职责只是挡「一台机器轮换大量
+  // 号码做枚举」——400/天把单个来源的爆炸半径限得依然很死。
   {
     scope: "otp-ip-ten-minute",
     identity: "ip",
-    limit: 10,
+    limit: 60,
     windowMs: 10 * 60_000,
   },
   {
     scope: "otp-ip-day",
     identity: "ip",
-    limit: 50,
+    limit: 400,
     windowMs: 24 * 60 * 60_000,
   },
 ];
@@ -68,18 +78,35 @@ export interface OtpRequestRateLimitInput {
 export const UNTRUSTED_IP_IDENTITY = "untrusted-ip";
 
 /**
- * 兜底桶的 IP 配额按正常配额的 1/5 收紧（10 分钟 2 次、每天 10 次）。
+ * 兜底桶的 IP 配额按正常配额的 1/30 收紧（10 分钟 2 次、每天 13 次）。
  *
- * 正常 IP 配额是按家庭宽带 / 共享 NAT 下可能有多个真实用户定的；而 Vercel 边缘
- * 总会覆写 `x-vercel-forwarded-for`，真实用户正常不会落进兜底桶——落进去的基本是
- * 边缘配置异常或在故意伪造头。1/5 的取舍：偶发异常的真实流量不至于完全不可用，
- * 而「主动发垃圾头挤进兜底桶」的攻击被压到每天最多 10 条短信。
+ * 正常 IP 配额是按门店共用出口 IP 定的；而 Vercel 边缘总会覆写
+ * `x-vercel-forwarded-for`，真实用户正常不会落进兜底桶——落进去的基本是边缘配置
+ * 异常或在故意伪造头。
+ *
+ * 除数从 5 提到 30 是随正常配额一起调的：正常配额为门店场景放大了 6~8 倍，除数
+ * 若不动，兜底桶会跟着涨到每天 80 条短信——那等于放宽了唯一针对伪造头的闸门。
+ * 30 让兜底桶的绝对值停在原来的量级（2 / 13），伪造者拿不到额外好处，而偶发的
+ * 边缘异常流量仍有少量可用额度。
  */
-const UNTRUSTED_IP_LIMIT_DIVISOR = 5;
+const UNTRUSTED_IP_LIMIT_DIVISOR = 30;
 
 /**
- * 发码限流：手机号 1/分、5 次获准发送/天；IP 10/10 分、50/天。
- * IP 落入兜底身份时两条 IP 规则自动收紧到 1/5。IP 与手机号分钟桶始终计数；
+ * 一条规则在给定身份下的实际配额。收紧兜底桶的算式只此一处，调用方与测试都读它，
+ * 否则改了正常配额、忘了兜底桶会跟着放大，是看不出来的。
+ */
+export function effectiveRuleLimit(
+  rule: AuthRateLimitRule,
+  untrustedIp: boolean,
+): number {
+  return untrustedIp && rule.identity === "ip"
+    ? Math.max(1, Math.floor(rule.limit / UNTRUSTED_IP_LIMIT_DIVISOR))
+    : rule.limit;
+}
+
+/**
+ * 发码限流：手机号 1/分、5 次获准发送/天；IP 60/10 分、400/天。
+ * IP 落入兜底身份时两条 IP 规则自动收紧到 1/30。IP 与手机号分钟桶始终计数；
  * 只有这些门禁全部通过才原子增加手机号每日发送额度，避免攻击者用分钟内的
  * 拒绝请求耗尽受害者整天的 OTP 配额。
  */
@@ -124,10 +151,7 @@ export class PgAuthRateLimiter {
         `${rule.scope}:${windowStart}:${identities[rule.identity]}`,
         new Date(windowStart + rule.windowMs),
       );
-      const limit =
-        untrustedIp && rule.identity === "ip"
-          ? Math.max(1, Math.floor(rule.limit / UNTRUSTED_IP_LIMIT_DIVISOR))
-          : rule.limit;
+      const limit = effectiveRuleLimit(rule, untrustedIp);
       return {
         scope: rule.scope,
         count,

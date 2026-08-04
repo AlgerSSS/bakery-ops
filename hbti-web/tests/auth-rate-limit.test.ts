@@ -4,6 +4,8 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  effectiveRuleLimit,
+  OTP_REQUEST_RULES,
   PgAuthRateLimiter,
   readClientIp,
   UNTRUSTED_IP_IDENTITY,
@@ -38,6 +40,38 @@ describe("PgAuthRateLimiter", () => {
       "Invalid auth rate-limit input.",
     );
     expect(sql.mock.calls).toHaveLength(0);
+  });
+});
+
+// 这四个数字是业务参数，不是实现细节：IP 那两条按「一个门店 = 一个出口 IP」定，
+// 改小会在活动现场表现为「验证码收不到」，改大会放宽枚举防护。钉住它们，免得
+// 后来的人顺手调一个数字而没人察觉。
+describe("发码配额", () => {
+  const rule = (scope: string) => {
+    const found = OTP_REQUEST_RULES.find((r) => r.scope === scope);
+    if (!found) throw new Error(`规则不存在: ${scope}`);
+    return found;
+  };
+
+  it.each([
+    ["otp-phone-minute", 1, 60_000],
+    ["otp-phone-day", 5, 24 * 60 * 60_000],
+    ["otp-ip-ten-minute", 60, 10 * 60_000],
+    ["otp-ip-day", 400, 24 * 60 * 60_000],
+  ])("%s 是 %i 次 / %i 毫秒", (scope, limit, windowMs) => {
+    expect(rule(scope)).toMatchObject({ limit, windowMs });
+  });
+
+  it("兜底身份只收紧 IP 规则，手机号配额不受影响", () => {
+    expect(effectiveRuleLimit(rule("otp-phone-minute"), true)).toBe(1);
+    expect(effectiveRuleLimit(rule("otp-phone-day"), true)).toBe(5);
+  });
+
+  // 正常配额为门店场景放大后，兜底桶的绝对值必须留在原来的量级（约 2 / 10），
+  // 否则「发伪造头挤进兜底桶」的攻击会跟着放大。
+  it("兜底身份下 IP 配额收紧到个位数与十位数", () => {
+    expect(effectiveRuleLimit(rule("otp-ip-ten-minute"), true)).toBe(2);
+    expect(effectiveRuleLimit(rule("otp-ip-day"), true)).toBe(13);
   });
 });
 

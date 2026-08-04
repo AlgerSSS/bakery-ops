@@ -206,6 +206,9 @@ describe("cron reconciliation route", () => {
   });
 
   it("fails closed before database reconciliation when RES readiness fails", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     routeMocks.resolveEnabledCouponTemplateByName.mockRejectedValue(
       new Error("expired credential"),
     );
@@ -213,8 +216,46 @@ describe("cron reconciliation route", () => {
     const response = await GET(request());
 
     expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({ ok: false });
     expect(routeMocks.createCompletionStoreFromEnv).not.toHaveBeenCalled();
     expect(routeMocks.reconcilePendingCompletions).not.toHaveBeenCalled();
+    // 503 也要带上清理与告警的结果——裸 { ok: false } 分不清哪一路挂了。
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      purged: 0,
+      purgeOk: true,
+      alerts: { claimed: 0, sent: 0 },
+      alertsOk: true,
+    });
+    consoleError.mockRestore();
+  });
+
+  // 这条是 2026-08-04 那个真实故障的回归闸：清理曾排在 RES 探测之后、同一个 try 里，
+  // RES 一抖就整个 handler 走 catch，连续四个调度点一次都没收过过期行。
+  it("RES 探测失败时仍然执行清理与告警重试", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    routeMocks.purgeExpired.mockResolvedValue(111);
+    routeMocks.deliverPendingReviewAlerts.mockResolvedValue({
+      claimed: 2,
+      sent: 2,
+    });
+    routeMocks.resolveEnabledCouponTemplateByName.mockRejectedValue(
+      new Error("expired credential"),
+    );
+
+    const response = await GET(request());
+
+    expect(routeMocks.purgeExpired).toHaveBeenCalledTimes(1);
+    expect(routeMocks.deliverPendingReviewAlerts).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      purged: 111,
+      purgeOk: true,
+      alerts: { claimed: 2, sent: 2 },
+      alertsOk: true,
+    });
+    consoleError.mockRestore();
   });
 });

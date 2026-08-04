@@ -9,7 +9,7 @@
 ## HBTI 上线加固已合入 main（2026-08-04，Codex，已推送，未部署）
 
 全量门禁在本机通过：`npx tsc --noEmit`、`npx eslint .`（0 error / 0 warning）、
-`npx vitest run`（29 文件 286 用例全过，含真库集成）、`npx next build`、
+`npx vitest run`（29 文件 287 用例全过，含真库集成）、`npx next build`、
 `npx playwright test`（42 条 e2e 全过）。集成用例需要一次性 Postgres：
 `docker run --rm --name hbti-test-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=hbti_test -p 127.0.0.1:55432:5432 postgres:17-alpine`，
 再按 059/060/063/066（财务站 `sql/`）+ 077/078/101（`bakery-ops/src/modules/data/migrations/`）
@@ -87,6 +87,29 @@ bash 会把逗号首字节吃进变量名，配 `set -u` 就是在告警那一�
 
 以后要换成群机器人：把 hook URL 直接填进那四处 `ALERT_WEBHOOK` 即可，中转可停用——
 四个发送点本来就认 Lark 形状。
+
+**上线前复检又挡下两个会直接打挂线上的东西（2026-08-04，均已修）**：
+
+1. **池主机名钉错了**。`postgres.ts` 里写死的是 `aws-0-ap-southeast-1.pooler.supabase.com`，
+   那字符串只出现在我自己写的测试夹具里；共享库 `ecsgqcmwtjmcpzqytdqw` 的真实池主机是
+   **`aws-1-us-east-1.pooler.supabase.com`**（res_api 与 bakery-ops 的 `.env` 都连它）。
+   按原样部署 = 每次取连接都抛异常。改成校验域名后缀 `.pooler.supabase.com` + 端口 6543，
+   不再钉死我无法核对的区域。
+2. **`ssl: "verify-full"` 对这个库根本连不上**。Supabase 用自签根签发数据库证书
+   （链：`*.pooler.supabase.com` ← `Supabase Intermediate 2021 CA` ← `Supabase Root 2021 CA`），
+   公共 CA 库里没有它，实测报 `self-signed certificate in certificate chain`。
+   退回 `require` 又等于不校验证书（就是本轮要修的洞）。正解是显式带上那张根：
+   已内联在 `src/lib/db/supabase-ca.ts`（公开证书，可入库；下载源与握手送来的根 SHA-256
+   逐字节一致，2031-04-26 过期，到期前必须换）。实测用 getDb() 的同一套参数打真库
+   `select` 成功，且把 servername 改错会被拒——主机名校验确实生效。
+
+   > 内联而不是读 `certs/*.crt`：Vercel 打包不保证带上散文件，读文件会在运行时才炸。
+
+**仍未核实的一项**：Vercel 生产的 `DATABASE_URL` 是只写变量（`vercel env pull` 返回
+`[SENSITIVE]`），所以**没人能确认它现在是不是 `:6543`**。新版对端口 fail closed——
+若线上填的是 `:5432`，部署后每个请求都会抛。上线前必须二选一：
+人工到 Vercel 面板确认 host/port，或者用 res_api/.env 里那套同一个共享库凭据
+把它重设为 `…@aws-1-us-east-1.pooler.supabase.com:6543/postgres`（该组合已实测可连）。
 
 下一步（尚未做，需要人):
 

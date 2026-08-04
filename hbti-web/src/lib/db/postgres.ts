@@ -1,5 +1,7 @@
 import postgres from "postgres";
 
+import { SUPABASE_ROOT_CA_2021 } from "@/lib/db/supabase-ca";
+
 /**
  * 共享 Supabase 生产库的连接。这个库同时被财务站（Vercel）、~/hot/res_api 爬虫、
  * ~/hot/bakery-ops 和 Contabo 上的 Python 脚本使用——HBTI 是第五个消费方。
@@ -29,8 +31,13 @@ type GlobalWithClient = typeof globalThis & {
   [CLIENT_KEY]?: postgres.Sql;
 };
 
-const SUPABASE_TRANSACTION_POOLER_HOST =
-  "aws-0-ap-southeast-1.pooler.supabase.com";
+const SUPABASE_POOLER_HOST_SUFFIX = ".pooler.supabase.com";
+
+/**
+ * Supabase 用自签根签发数据库证书，公共 CA 库里没有它。所以 `ssl: "require"`
+ * 会静默降级成「加密但不校验证书」，而 `ssl: "verify-full"` 直接连不上。
+ * 把那张根显式作为信任锚，才既校验链也校验主机名——见 `supabase-ca.ts` 的来源说明。
+ */
 
 export function getDb(): postgres.Sql {
   const scope = globalThis as GlobalWithClient;
@@ -56,9 +63,9 @@ export function getDb(): postgres.Sql {
     throw new Error("DATABASE_URL is invalid.");
   }
   if (process.env.VERCEL === "1") {
-    if (connectionUrl.hostname !== SUPABASE_TRANSACTION_POOLER_HOST) {
+    if (!connectionUrl.hostname.endsWith(SUPABASE_POOLER_HOST_SUFFIX)) {
       throw new Error(
-        "DATABASE_URL must use the verified Supabase transaction pooler host on Vercel.",
+        "DATABASE_URL must use the Supabase connection pooler host on Vercel.",
       );
     }
     if (connectionUrl.port !== "6543") {
@@ -73,7 +80,7 @@ export function getDb(): postgres.Sql {
     idle_timeout: 20,
     connect_timeout: 10,
     prepare: false,
-    ssl: "verify-full",
+    ssl: { ca: SUPABASE_ROOT_CA_2021, rejectUnauthorized: true },
     connection: { application_name: "hotcrush-hbti" },
     onnotice: () => {},
   });

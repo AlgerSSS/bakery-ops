@@ -74,8 +74,17 @@ if [ "${code:-}" != "200" ]; then
         *)
           ALERT_BODY="{\"text\":\"$ALERT_TEXT\"}" ;;
       esac
-      curl -s -m 10 -X POST -H 'Content-Type: application/json' \
-        -d "$ALERT_BODY" "$ALERT_WEBHOOK" >/dev/null 2>&1 || true
+      # 200 不等于送达:Lark 把错误号放在包体 code 里,读不到 code:0 就当没送到。
+      ALERT_RECEIPT=$(curl -s -m 10 -X POST -H 'Content-Type: application/json' \
+        -d "$ALERT_BODY" "$ALERT_WEBHOOK" 2>/dev/null | tr -d ' \n' || true)
+      case "$ALERT_WEBHOOK" in
+        */open-apis/bot/v2/hook/*)
+          case "$ALERT_RECEIPT" in
+            *'"code":0'*) ;;
+            *) printf '%s 告警未送达 receipt=%s\n' "$(date -u '+%FT%TZ')" \
+                 "${ALERT_RECEIPT:-<empty>}" >> "$SENTINEL" ;;
+          esac ;;
+      esac
     fi
   fi
   exit 1

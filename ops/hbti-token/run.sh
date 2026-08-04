@@ -76,15 +76,26 @@ if [ "$CODE" != "0" ] && [ "$CODE" != "75" ]; then
   fi
   if [ -n "${ALERT_WEBHOOK:-}" ]; then
     # 飞书/Lark 群机器人不吃 {"text":…}:形状不对照样 200,错误号只在包体里。
-    ALERT_TEXT="[HOT CRUSH] HBTI 发券令牌轮换失败 exit=$CODE，日志 $LOG"
+    # ${CODE} 必须带花括号:紧跟中文逗号时,UTF-8 locale 下 bash 会把逗号的首字节
+    # 吃进变量名,配上 set -u 就是在告警这一步直接崩掉。
+    ALERT_TEXT="[HOT CRUSH] HBTI 发券令牌轮换失败 exit=${CODE}，日志 ${LOG}"
     case "$ALERT_WEBHOOK" in
       */open-apis/bot/v2/hook/*)
         ALERT_BODY="{\"msg_type\":\"text\",\"content\":{\"text\":\"$ALERT_TEXT\"}}" ;;
       *)
         ALERT_BODY="{\"text\":\"$ALERT_TEXT\"}" ;;
     esac
-    curl -s -m 10 -X POST -H 'Content-Type: application/json' \
-      -d "$ALERT_BODY" "$ALERT_WEBHOOK" >/dev/null 2>&1 || true
+    # 200 不等于送达:Lark 把错误号放在包体 code 里,读不到 code:0 就当没送到。
+    ALERT_RECEIPT=$(curl -s -m 10 -X POST -H 'Content-Type: application/json' \
+      -d "$ALERT_BODY" "$ALERT_WEBHOOK" 2>/dev/null | tr -d ' \n' || true)
+    case "$ALERT_WEBHOOK" in
+      */open-apis/bot/v2/hook/*)
+        case "$ALERT_RECEIPT" in
+          *'"code":0'*) ;;
+          *) echo "$(date '+%F %T') ALERT UNDELIVERED receipt=${ALERT_RECEIPT:-<empty>}" \
+               >> "$LOG_DIR/LAST_FAILURE" ;;
+        esac ;;
+    esac
   fi
 elif [ "$CODE" = "0" ]; then
   rm -f "$LOG_DIR/LAST_FAILURE"

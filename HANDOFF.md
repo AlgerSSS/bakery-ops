@@ -56,13 +56,29 @@
 而飞书/Lark 群机器人**不吃这个形状**——它照样回 HTTP 200，只把错误号放在包体 `code` 里。
 现在 `hbti-web/src/lib/alert.ts` 与 `res_api/daily-refresh.sh`、`ops/hbti-token/{run,keepalive}.sh`
 都按目的地选形状（URL 含 `/open-apis/bot/v2/hook/` 就发 `{"msg_type":"text","content":{"text":…}}`），
-并且 hbti-web 侧只有 `code === 0` 才算 sent，读不出回执一律按失败让 Cron 重试。
+并且都核对回执：hbti-web 只有 `code === 0` 才算 sent、读不出回执按失败让 Cron 重试；
+三个 shell 读不到 `"code":0` 就往 `LAST_FAILURE` / `KEEPALIVE_LAST_BAD` 追加一行
+「告警未送达 + 原始回执」，不再 `>/dev/null || true` 一扔了事。
+
+同一处还修了个 locale 炸弹：`exit=$CODE，日志` 里 `$CODE` 紧贴中文逗号，**UTF-8 locale 下**
+bash 会把逗号首字节吃进变量名，配 `set -u` 就是在告警那一步直接崩掉（服务器 cron 没有 LANG、
+跑在 C locale 下才一直没暴露；人手在 SSH 里跑就会炸）。已改成 `${CODE}` / `${LOG}`。
+本地用假 Lark 端点实跑过三个脚本的告警片段：`code:0` 静默通过，`code:19024` 落哨兵行。
 
 下一步（尚未做，需要人):
 
-1. **`ALERT_WEBHOOK` 仍然没有目的地**。请在目标 Lark 群加一个自定义机器人，把 hook URL 给我：
-   一个 URL 同时点亮四条链路（hbti-web review 告警、POS 每晚刷新、令牌轮换、令牌保温）。
-   配好后必须发一条不含 PII 的 canary，确认群里真的收到——不能只看 HTTP 200。
+1. **`ALERT_WEBHOOK` 仍然没有目的地**。请在目标 Lark 群加自定义机器人，把 hook URL 给我。
+   注意：**一个 URL 不会自动点亮四条链路**，四个运行时各自读各自的配置，必须逐个配 + 逐个发 canary：
+
+   | 运行时 | 配在哪 | 生效还需要 |
+   |---|---|---|
+   | hbti-web（review 告警） | Vercel 生产环境变量 | **重新部署**才会带上新变量 |
+   | res_api 每晚刷新 | Contabo `/opt/hotcrush/res_api/.env` | `./deploy.sh core` 把改过的 `daily-refresh.sh` 同步上去 |
+   | hbti-token 轮换 | Contabo `/opt/hotcrush/hbti-token/.env` | **deploy.sh 不管这个目录**，`run.sh` 要手动 scp |
+   | hbti-token 保温 | 同上（同一个 `.env`） | 同上，`keepalive.sh` 要手动 scp |
+
+   线上三个脚本的 md5 已与仓库不一致（本轮改过），配完 URL 不同步脚本 = 仍然发错形状。
+   验收标准是**有人在群里看到那条 canary**，不是 HTTP 200。
 2. **RES 持久凭证仍不存在**：线上 RES 200 靠 `ops/hbti-token` 的 BO 会话保温撑着，
    不是受限长期凭证。这条要 RES 侧发，代码补不了。
 3. 部署仍是显式动作：`hbti-web` 走 `npx vercel --prod`（`deploy.sh` 只部署 bakery-ops/res_api）。

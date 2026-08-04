@@ -15,6 +15,7 @@ import { ResH5AuthDiagnosticError } from "@/lib/res/h5-member-auth";
 import {
   createAuthRateLimiterFromEnv,
   readClientIp,
+  UNTRUSTED_IP_IDENTITY,
 } from "@/lib/rate-limit/auth-rate-limit";
 import {
   readHbtiAuthConfig,
@@ -87,9 +88,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     const rateLimiter = await createAuthRateLimiterFromEnv(
       authConfig.authSecret,
     );
+    const clientIp = readClientIp(request);
     const rateLimit = await rateLimiter.consumeOtpRequest({
       phoneE164: phone.identity.e164,
-      ipAddress: readClientIp(request),
+      ipAddress: clientIp,
     });
     if (!rateLimit.allowed) {
       return noStoreJson(
@@ -108,6 +110,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       Promise.resolve(
         createResH5MemberAuthClientFromEnv(
           AbortSignal.timeout(RES_DEADLINE_MS),
+          // 验证码绑 IP。兜底身份不是真 IP，宁可不带也不能把假值送去核验。
+          clientIp === UNTRUSTED_IP_IDENTITY ? undefined : clientIp,
         ),
       ),
     ]);

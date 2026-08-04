@@ -221,10 +221,21 @@ export class ResH5MemberAuthClient {
    * 「网络错误」，短信其实正在路上，然后他们去点重发，而重发是 RES 会静默丢掉的。
    * 共享时限把总耗时钉死在一个比浏览器超时更早的数上，服务端总有机会把真实结果说完。
    */
+  /**
+   * @param clientIp 顾客的真实外网 IP，随请求转发给 RES。
+   *
+   * 图形验证码是**绑 IP** 的：腾讯的 `DescribeCaptchaResult` 要求业务方传的
+   * `UserIp` 是「验证码用户的外网 IP」。RES 自己的 H5 是浏览器直连，它看到的
+   * 就是顾客 IP；而我们是浏览器 → 本服务 → RES，RES 看到的是 Vercel 的出口 IP，
+   * 于是腾讯判定解题方与核验方不是同一个人，RES 回
+   * `CRM-00-1105 captcha rejected! diff`，短信一条也发不出去（2026-08-04 实测）。
+   * 把顾客 IP 显式带上是我们这一侧唯一能补的信息。
+   */
   constructor(
     private readonly config: ResH5MemberAuthConfig,
     private readonly fetcher: FetchLike = fetch,
     private readonly deadlineSignal?: AbortSignal,
+    private readonly clientIp?: string,
   ) {
     if (config.baseUrl !== RES_H5_BASE_URL) {
       throw new Error(
@@ -540,6 +551,14 @@ export class ResH5MemberAuthClient {
             "ctx-deviceid": deviceId,
             "ctx-pagepath": "/login",
             "ctx-params": "/login?type=phone",
+            // 见构造函数上的说明：验证码绑 IP，不带这个 RES 会拿我们的出口 IP
+            // 去腾讯核验，必然判为不一致。两个头都发——RES 用哪个我们看不到。
+            ...(this.clientIp
+              ? {
+                  "x-forwarded-for": this.clientIp,
+                  "x-real-ip": this.clientIp,
+                }
+              : {}),
           },
           body: JSON.stringify(body),
           signal: requestSignal,

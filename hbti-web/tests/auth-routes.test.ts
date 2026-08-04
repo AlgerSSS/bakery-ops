@@ -47,6 +47,9 @@ vi.mock("@/lib/rate-limit/auth-rate-limit", () => ({
   createAuthRateLimiterFromEnv: mocks.createRateLimiter,
   readClientIp: (request: Request) =>
     request.headers.get("x-forwarded-for") ?? "unknown",
+  // 路由要拿它判断「这是不是一个真 IP」，再决定要不要把 IP 转发给 RES 做
+  // 验证码核验。mock 漏掉这个导出，整条发码路径会在导入期就炸。
+  UNTRUSTED_IP_IDENTITY: "untrusted-ip",
 }));
 
 vi.mock("@/lib/server-config", () => ({
@@ -260,6 +263,36 @@ describe("POST /api/auth/otp/request", () => {
       expect.objectContaining({
         captcha: { token: "tkt-abc", randstr: "@rnd" },
       }),
+    );
+  });
+
+  // 2026-08-04 线上实测：不带顾客 IP，RES 会拿我们的出口 IP 去腾讯核验，
+  // 判为解题方与核验方不一致，回 `CRM-00-1105 captcha rejected! diff`，一条短信也发不出。
+  it("把顾客真实 IP 转发给 RES —— 图形验证码是绑 IP 的", async () => {
+    await requestOtp(
+      mutationRequest("/api/auth/otp/request", {
+        phone: { countryCode: "60", isoCode: "MY", phone: "123456789" },
+      }),
+    );
+
+    expect(mocks.createResClient).toHaveBeenCalledWith(
+      expect.anything(),
+      "203.0.113.10",
+    );
+  });
+
+  it("IP 判不出来时宁可不带，也不把兜底身份当成 IP 送去核验", async () => {
+    await requestOtp(
+      mutationRequest(
+        "/api/auth/otp/request",
+        { phone: { countryCode: "60", isoCode: "MY", phone: "123456789" } },
+        { "X-Forwarded-For": "untrusted-ip" },
+      ),
+    );
+
+    expect(mocks.createResClient).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
     );
   });
 

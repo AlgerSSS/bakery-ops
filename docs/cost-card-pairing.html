@@ -1,0 +1,4247 @@
+<title>成本卡 ↔ POS 商品 对照表</title>
+<style>
+:root{--fact:#b8801a;--dim:#1f7d72;--view:#4a6b9e;--warn:#bb4527;--new:#38875a;--mut2:#828d9b;
+ --bg:#f4f6f8;--surf:#fff;--surf2:#eef1f5;--line:#d8dee6;--line2:#c3ccd6;--ink:#14181f;--ink2:#3d4652;--mut:#5b6673;
+ --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+ --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;--r:3px}
+@media(prefers-color-scheme:dark){:root{--fact:#d9a03c;--dim:#3fa89a;--view:#7396c9;--warn:#e0714c;--new:#5aae78;--mut2:#6b7482;
+ --bg:#0f1319;--surf:#161b23;--surf2:#1c222b;--line:#28303b;--line2:#374252;--ink:#e3e8ef;--ink2:#c2cad4;--mut:#8b95a3}}
+:root[data-theme=dark]{--fact:#d9a03c;--dim:#3fa89a;--view:#7396c9;--warn:#e0714c;--new:#5aae78;--mut2:#6b7482;
+ --bg:#0f1319;--surf:#161b23;--surf2:#1c222b;--line:#28303b;--line2:#374252;--ink:#e3e8ef;--ink2:#c2cad4;--mut:#8b95a3}
+:root[data-theme=light]{--bg:#f4f6f8;--surf:#fff;--surf2:#eef1f5;--line:#d8dee6;--line2:#c3ccd6;--ink:#14181f;--ink2:#3d4652;--mut:#5b6673;--mut2:#828d9b}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;font-variant-numeric:tabular-nums;margin:0;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding:0 18px 90px}
+code,.mono{font-family:var(--mono)}
+header{padding:48px 0 22px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--mut2);margin:0 0 12px}
+h1{font-size:clamp(25px,4vw,38px);line-height:1.15;letter-spacing:-.02em;font-weight:680;margin:0 0 12px;text-wrap:balance}
+.sub{color:var(--mut);max-width:66ch;margin:0;font-size:15px}
+.sub b{color:var(--ink2);font-weight:600}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:1px;background:var(--line);
+ border:1px solid var(--line);border-radius:var(--r);margin:26px 0 0;overflow:hidden}
+.st{background:var(--surf);padding:12px 14px}
+.st b{display:block;font-family:var(--mono);font-size:21px;font-weight:640;letter-spacing:-.02em}
+.st span{display:block;color:var(--mut);font-size:12px;margin-top:1px}
+.st-ok b{color:var(--new)} .st-dis b{color:var(--warn)} .st-none b{color:var(--mut2)}
+.ctrl{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 93%,transparent);backdrop-filter:blur(10px);
+ border-bottom:1px solid var(--line);padding:10px 0;margin-top:26px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#q{font-family:var(--mono);font-size:13px;padding:6px 10px;border:1px solid var(--line2);border-radius:var(--r);
+ background:var(--surf);color:var(--ink);min-width:190px;flex:1 1 190px}
+.chip{font-size:12.5px;font-family:var(--mono);padding:6px 10px;border:1px solid var(--line2);border-radius:var(--r);
+ background:var(--surf);color:var(--mut);cursor:pointer;white-space:nowrap}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.go{background:var(--new);border-color:var(--new);color:#fff;font-weight:600}
+#prog{margin-left:auto;font-family:var(--mono);font-size:12.5px;color:var(--mut2)}
+.row{background:var(--surf);border:1px solid var(--line);border-left:3px solid var(--line2);border-radius:var(--r);margin:7px 0;padding:11px 13px}
+.row[hidden]{display:none}
+.row.is-dis{border-left-color:var(--warn)}
+.row.is-none{border-left-color:var(--mut2)}
+.row[data-state=done]{border-left-color:var(--new);background:color-mix(in srgb,var(--new) 4%,var(--surf))}
+.row[data-state=na]{opacity:.5}
+.rh{display:flex;flex-wrap:wrap;gap:10px;align-items:baseline}
+.rn b{font-size:14.5px;font-weight:620}
+.rn small{display:block;font-family:var(--mono);font-size:11px;color:var(--mut2);margin-top:1px}
+.rm{display:flex;flex-wrap:wrap;gap:12px;font-family:var(--mono);font-size:12px;color:var(--mut);margin-left:auto}
+.rm .stale{color:var(--warn)} .rm .muted{color:var(--mut2)}
+.rs{display:flex;align-items:center;gap:8px;flex-basis:100%;order:9;margin-top:2px}
+.pick{font-family:var(--mono);font-size:12.5px;color:var(--new);font-weight:600}
+.na{font-size:11.5px;font-family:var(--mono);padding:3px 8px;border:1px solid var(--line2);border-radius:2px;
+ background:none;color:var(--mut2);cursor:pointer;margin-left:auto}
+.na:hover{border-color:var(--mut);color:var(--ink2)}
+.dis{margin:7px 0 0;font-size:12.5px;color:var(--warn);line-height:1.5}
+.none{margin:7px 0 0;font-size:12.5px;color:var(--mut2)}
+.cds{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.cd{display:flex;align-items:baseline;gap:8px;padding:5px 9px;border:1px solid var(--line2);border-radius:var(--r);
+ background:var(--surf2);cursor:pointer;font-family:var(--mono);font-size:12px;color:var(--ink2);text-align:left}
+.cd:hover{border-color:var(--dim)}
+.cd[aria-pressed=true]{background:var(--dim);border-color:var(--dim);color:#fff}
+.cd[aria-pressed=true] .cd-m,.cd[aria-pressed=true] .cd-c,.cd[aria-pressed=true] .cd-r{color:rgba(255,255,255,.85)}
+.cd-dead{opacity:.55}
+.cd-n{font-family:var(--sans);font-size:13px}
+.cd-m{font-size:10.5px;color:var(--mut2)}
+.cd-c{font-size:11px;color:var(--mut)}
+.cd-r{font-size:11px;color:var(--dim);font-weight:600}
+.cd-r.bad{color:var(--warn)} .cd-r.low{color:var(--fact)}
+h2{font-size:17px;margin:34px 0 4px;font-weight:650;letter-spacing:-.01em}
+.sd{color:var(--mut);margin:0 0 12px;font-size:13.5px;max-width:70ch}
+#out{position:fixed;inset:auto 0 0 0;background:var(--surf);border-top:1px solid var(--line2);padding:14px 18px;
+ max-height:46vh;overflow:auto;box-shadow:0 -8px 24px rgba(0,0,0,.14);z-index:40}
+#out[hidden]{display:none}
+#out pre{font-family:var(--mono);font-size:11.5px;background:var(--surf2);border:1px solid var(--line);border-radius:var(--r);
+ padding:11px;overflow-x:auto;margin:8px 0 0;line-height:1.5}
+#out .oh{display:flex;gap:10px;align-items:center}
+#out h3{margin:0;font-size:14px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div class="wrap">
+<header>
+ <p class="eyebrow">HOT CRUSH · 成本卡 ↔ POS 商品 · 2026-08-04 实测</p>
+ <h1>63 个在卖商品的成本卡对照</h1>
+ <p class="sub">左边是 POS 在卖的商品，右边是成本卡里的候选。<b>百分比是名字相似度，不是把握度</b> —— 品类不同的已经过滤掉了，剩下的口味词要人眼看。选完点右上角导出 SQL。<br>成本率一律用<b>实收单价</b>做分母，不用菜单牌价（实测牌价有陈旧值，标 ⚠ 的那些差 8% 以上）。</p>
+ <div class="stats">
+  <div class="st"><b>63</b><span>近30天在卖</span></div>
+  <div class="st st-ok"><b>6</b><span>完全同名</span></div>
+  <div class="st"><b>35</b><span>待人工选</span></div>
+  <div class="st st-dis"><b>5</b><span>有争议</span></div>
+  <div class="st st-none"><b>22</b><span>无候选</span></div>
+ </div>
+</header>
+
+<div class="ctrl">
+ <input id="q" type="search" placeholder="搜商品名…" aria-label="搜索商品">
+ <button class="chip" data-f="pending" aria-pressed="false">未选</button>
+ <button class="chip" data-f="dis" aria-pressed="false">有争议</button>
+ <button class="chip" data-f="none" aria-pressed="false">无候选</button>
+ <button class="chip go" id="exp">导出 SQL</button>
+ <span id="prog"></span>
+</div>
+
+<h2>近 30 天在卖 · 按销售额排序</h2>
+<p class="sd">合计净销 RM 1,434,943。前 3 个商品占 37% —— <b>先把它们对准，其余的错了影响有限</b>。</p>
+<div class="row is-dis" data-item="1993240842097405956"
+   data-s="招牌黑松露牛排惠灵顿 signature black truffle wellington steak croissant" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>招牌黑松露牛排惠灵顿</b><small>Signature Black Truffle Wellington Steak Croissant</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 227,869</span>
+    <span title="近30天件数">7,982 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 28.55</span>
+    <span class="muted" title="菜单价">牌价 RM 29.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240842097405956">不适用</button></div>
+ </div>
+ <p class="dis">⚠ 两张卡成本率 82.8% vs 64.7%，全店第一大单品，月差 RM4.4万</p>
+ <div class="cds"><button class="cd" data-item="1993240842097405956" data-cid="34" data-cname="招牌惠灵顿">
+<span class="cd-n">招牌惠灵顿</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 23.66</span>
+<span class="cd-r bad">83%</span>
+</button><button class="cd" data-item="1993240842097405956" data-cid="35" data-cname="招牌惠灵顿(联豪)">
+<span class="cd-n">招牌惠灵顿(联豪)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 18.49</span>
+<span class="cd-r">65%</span>
+</button></div>
+</div>
+<div class="row" data-item="1993240843506692105"
+   data-s="趁热心动蛋挞 hot crush egg tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>趁热心动蛋挞</b><small>Hot Crush Egg Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 180,765</span>
+    <span title="近30天件数">20,709 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 8.73</span>
+    <span class="muted" title="菜单价">牌价 RM 9.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240843506692105">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240843506692105" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r">48%</span>
+</button><button class="cd" data-item="1993240843506692105" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r">66%</span>
+</button><button class="cd" data-item="1993240843506692105" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r bad">81%</span>
+</button><button class="cd" data-item="1993240843506692105" data-cid="51" data-cname="心动草莓蛋挞(圆大挞)">
+<span class="cd-n">心动草莓蛋挞(圆大挞)</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 14.06</span>
+<span class="cd-r bad">161%</span>
+</button><button class="cd" data-item="1993240843506692105" data-cid="48" data-cname="玫瑰草莓奶油蛋挞">
+<span class="cd-n">玫瑰草莓奶油蛋挞</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 11.27</span>
+<span class="cd-r bad">129%</span>
+</button><button class="cd" data-item="1993240843506692105" data-cid="46" data-cname="草莓奶油蛋挞">
+<span class="cd-n">草莓奶油蛋挞</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 10.12</span>
+<span class="cd-r bad">116%</span>
+</button></div>
+</div>
+<div class="row is-dis" data-item="1993240842835603462"
+   data-s="奶酪核桃马卡龙 hot crush cheese walnut macaron" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>奶酪核桃马卡龙</b><small>Hot Crush Cheese Walnut Macaron</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 126,973</span>
+    <span title="近30天件数">10,006 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 12.69</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 16.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240842835603462">不适用</button></div>
+ </div>
+ <p class="dis">⚠ 两张同品卡(64 老卡 8.17 / 502 新卡 4.70)，同料不同量，月差 RM3.5万</p>
+ <div class="cds"><button class="cd" data-item="1993240842835603462" data-cid="502" data-cname="奶酪核桃马卡龙新">
+<span class="cd-n">奶酪核桃马卡龙新</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 4.70</span>
+<span class="cd-r">37%</span>
+</button><button class="cd" data-item="1993240842835603462" data-cid="64" data-cname="趁热奶酪核桃马卡龙">
+<span class="cd-n">趁热奶酪核桃马卡龙</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 8.17</span>
+<span class="cd-r">64%</span>
+</button><button class="cd" data-item="1993240842835603462" data-cid="473" data-cname="鲜芭乐核桃马卡龙">
+<span class="cd-n">鲜芭乐核桃马卡龙</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 4.40</span>
+<span class="cd-r">35%</span>
+</button><button class="cd" data-item="1993240842835603462" data-cid="471" data-cname="鲜草莓核桃马卡龙">
+<span class="cd-n">鲜草莓核桃马卡龙</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 6.21</span>
+<span class="cd-r">49%</span>
+</button><button class="cd" data-item="1993240842835603462" data-cid="472" data-cname="开心果核桃马卡龙">
+<span class="cd-n">开心果核桃马卡龙</span>
+<span class="cd-m">54%</span>
+<span class="cd-c">RM 4.82</span>
+<span class="cd-r">38%</span>
+</button><button class="cd" data-item="1993240842835603462" data-cid="93" data-cname="咖啡马卡龙">
+<span class="cd-n">咖啡马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.27</span>
+<span class="cd-r bad">81%</span>
+</button></div>
+</div>
+<div class="row" data-item="1993240833817849856"
+   data-s="法式心动草莓奶油挞 french strawberry cream tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式心动草莓奶油挞</b><small>French Strawberry Cream Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 91,777</span>
+    <span title="近30天件数">6,217 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 14.76</span>
+    <span class="muted" title="菜单价">牌价 RM 15.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240833817849856">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240833817849856" data-cid="46" data-cname="草莓奶油蛋挞">
+<span class="cd-n">草莓奶油蛋挞</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 10.12</span>
+<span class="cd-r">69%</span>
+</button><button class="cd" data-item="1993240833817849856" data-cid="51" data-cname="心动草莓蛋挞(圆大挞)">
+<span class="cd-n">心动草莓蛋挞(圆大挞)</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 14.06</span>
+<span class="cd-r bad">95%</span>
+</button><button class="cd" data-item="1993240833817849856" data-cid="48" data-cname="玫瑰草莓奶油蛋挞">
+<span class="cd-n">玫瑰草莓奶油蛋挞</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 11.27</span>
+<span class="cd-r bad">76%</span>
+</button><button class="cd" data-item="1993240833817849856" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r">28%</span>
+</button><button class="cd" data-item="1993240833817849856" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r">39%</span>
+</button><button class="cd" data-item="1993240833817849856" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r">48%</span>
+</button></div>
+</div>
+<div class="row" data-item="2032057643656318976"
+   data-s="轻糖伊朗开心果奶油巧克力拿破仑酥 light sugar iranian pistachio cream chocolate mille-feuille" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>轻糖伊朗开心果奶油巧克力拿破仑酥</b><small>Light Sugar Iranian Pistachio Cream Chocolate Mille-Feuille</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 74,339</span>
+    <span title="近30天件数">6,358 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 11.69</span>
+    <span class="muted" title="菜单价">牌价 RM 11.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2032057643656318976">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2032057643656318976" data-cid="75" data-cname="半糖伊朗开心果奶油拿破仑酥">
+<span class="cd-n">半糖伊朗开心果奶油拿破仑酥</span>
+<span class="cd-m">70%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2032057643656318976" data-cid="65" data-cname="开心果拿破仑(全部)测试">
+<span class="cd-n">开心果拿破仑(全部)测试</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 4.23</span>
+<span class="cd-r">36%</span>
+</button><button class="cd cd-dead" data-item="2032057643656318976" data-cid="66" data-cname="开心果拿破仑(半边)测试">
+<span class="cd-n">开心果拿破仑(半边)测试</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 1.60</span>
+<span class="cd-r low">14%</span>
+</button><button class="cd" data-item="2032057643656318976" data-cid="67" data-cname="草莓拿破仑(全部)">
+<span class="cd-n">草莓拿破仑(全部)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.39</span>
+<span class="cd-r">29%</span>
+</button><button class="cd cd-dead" data-item="2032057643656318976" data-cid="68" data-cname="草莓拿破仑(半边)测试">
+<span class="cd-n">草莓拿破仑(半边)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r">27%</span>
+</button></div>
+</div>
+<div class="row" data-item="2000059080596840455"
+   data-s="心动蓝莓奶油蛋糕泡芙 hot crush blueberry cream cake puff" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>心动蓝莓奶油蛋糕泡芙</b><small>Hot Crush Blueberry Cream Cake Puff</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 66,160</span>
+    <span title="近30天件数">3,968 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 16.67</span>
+    <span class="muted" title="菜单价">牌价 RM 17.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2000059080596840455">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2000059080596840455" data-cid="39" data-cname="蓝莓奶油泡芙(小)">
+<span class="cd-n">蓝莓奶油泡芙(小)</span>
+<span class="cd-m">66%</span>
+<span class="cd-c">RM 10.86</span>
+<span class="cd-r">65%</span>
+</button><button class="cd" data-item="2000059080596840455" data-cid="38" data-cname="草莓奶油泡芙(大)">
+<span class="cd-n">草莓奶油泡芙(大)</span>
+<span class="cd-m">57%</span>
+<span class="cd-c">RM 12.62</span>
+<span class="cd-r bad">76%</span>
+</button><button class="cd" data-item="2000059080596840455" data-cid="40" data-cname="草莓奶油泡芙(小)">
+<span class="cd-n">草莓奶油泡芙(小)</span>
+<span class="cd-m">57%</span>
+<span class="cd-c">RM 14.03</span>
+<span class="cd-r bad">84%</span>
+</button><button class="cd cd-dead" data-item="2000059080596840455" data-cid="41" data-cname="巧克力抹茶树莓奶油泡芙(下架)">
+<span class="cd-n">巧克力抹茶树莓奶油泡芙(下架)</span>
+<span class="cd-m">55%</span>
+<span class="cd-c">RM 19.41</span>
+<span class="cd-r bad">116%</span>
+</button><button class="cd" data-item="2000059080596840455" data-cid="42" data-cname="巧克力泡芙">
+<span class="cd-n">巧克力泡芙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.72</span>
+<span class="cd-r bad">82%</span>
+</button></div>
+</div>
+<div class="row" data-item="2071222685652021248"
+   data-s="伊朗开心果核桃马卡龙top1 french iranian pistachio walnut macaron" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>伊朗开心果核桃马卡龙TOP1</b><small>French Iranian Pistachio Walnut Macaron</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 58,340</span>
+    <span title="近30天件数">3,633 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 16.06</span>
+    <span class="muted" title="菜单价">牌价 RM 16.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2071222685652021248">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2071222685652021248" data-cid="472" data-cname="开心果核桃马卡龙">
+<span class="cd-n">开心果核桃马卡龙</span>
+<span class="cd-m">82%</span>
+<span class="cd-c">RM 4.82</span>
+<span class="cd-r">30%</span>
+</button><button class="cd" data-item="2071222685652021248" data-cid="502" data-cname="奶酪核桃马卡龙新">
+<span class="cd-n">奶酪核桃马卡龙新</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 4.70</span>
+<span class="cd-r">29%</span>
+</button><button class="cd" data-item="2071222685652021248" data-cid="64" data-cname="趁热奶酪核桃马卡龙">
+<span class="cd-n">趁热奶酪核桃马卡龙</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 8.17</span>
+<span class="cd-r">51%</span>
+</button><button class="cd" data-item="2071222685652021248" data-cid="473" data-cname="鲜芭乐核桃马卡龙">
+<span class="cd-n">鲜芭乐核桃马卡龙</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 4.40</span>
+<span class="cd-r">27%</span>
+</button><button class="cd" data-item="2071222685652021248" data-cid="471" data-cname="鲜草莓核桃马卡龙">
+<span class="cd-n">鲜草莓核桃马卡龙</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 6.21</span>
+<span class="cd-r">39%</span>
+</button><button class="cd" data-item="2071222685652021248" data-cid="93" data-cname="咖啡马卡龙">
+<span class="cd-n">咖啡马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.27</span>
+<span class="cd-r">64%</span>
+</button></div>
+</div>
+<div class="row" data-item="2071222444018167814"
+   data-s="榛子巧克力奶酪马卡龙top2 french rich dark chocolate hazelnut macaron" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>榛子巧克力奶酪马卡龙TOP2</b><small>French Rich Dark Chocolate Hazelnut Macaron</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 50,560</span>
+    <span title="近30天件数">2,613 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 19.35</span>
+    <span class="muted" title="菜单价">牌价 RM 19.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2071222444018167814">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2071222444018167814" data-cid="94" data-cname="榛子马卡龙">
+<span class="cd-n">榛子马卡龙</span>
+<span class="cd-m">54%</span>
+<span class="cd-c">RM 14.62</span>
+<span class="cd-r bad">76%</span>
+</button><button class="cd" data-item="2071222444018167814" data-cid="502" data-cname="奶酪核桃马卡龙新">
+<span class="cd-n">奶酪核桃马卡龙新</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 4.70</span>
+<span class="cd-r low">24%</span>
+</button><button class="cd" data-item="2071222444018167814" data-cid="64" data-cname="趁热奶酪核桃马卡龙">
+<span class="cd-n">趁热奶酪核桃马卡龙</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 8.17</span>
+<span class="cd-r">42%</span>
+</button><button class="cd" data-item="2071222444018167814" data-cid="93" data-cname="咖啡马卡龙">
+<span class="cd-n">咖啡马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.27</span>
+<span class="cd-r">53%</span>
+</button><button class="cd" data-item="2071222444018167814" data-cid="472" data-cname="开心果核桃马卡龙">
+<span class="cd-n">开心果核桃马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.82</span>
+<span class="cd-r low">25%</span>
+</button><button class="cd" data-item="2071222444018167814" data-cid="473" data-cname="鲜芭乐核桃马卡龙">
+<span class="cd-n">鲜芭乐核桃马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.40</span>
+<span class="cd-r low">23%</span>
+</button></div>
+</div>
+<div class="row" data-item="1993240834056925192"
+   data-s="法式浓醇巧克力蛋糕泡芙 french chocolate cream cake puff" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式浓醇巧克力蛋糕泡芙</b><small>French Chocolate Cream Cake Puff</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 45,884</span>
+    <span title="近30天件数">2,336 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 19.64</span>
+    <span class="muted" title="菜单价">牌价 RM 20.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240834056925192">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240834056925192" data-cid="42" data-cname="巧克力泡芙">
+<span class="cd-n">巧克力泡芙</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 13.72</span>
+<span class="cd-r">70%</span>
+</button><button class="cd cd-dead" data-item="1993240834056925192" data-cid="41" data-cname="巧克力抹茶树莓奶油泡芙(下架)">
+<span class="cd-n">巧克力抹茶树莓奶油泡芙(下架)</span>
+<span class="cd-m">54%</span>
+<span class="cd-c">RM 19.41</span>
+<span class="cd-r bad">99%</span>
+</button><button class="cd" data-item="1993240834056925192" data-cid="38" data-cname="草莓奶油泡芙(大)">
+<span class="cd-n">草莓奶油泡芙(大)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 12.62</span>
+<span class="cd-r">64%</span>
+</button><button class="cd" data-item="1993240834056925192" data-cid="40" data-cname="草莓奶油泡芙(小)">
+<span class="cd-n">草莓奶油泡芙(小)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.03</span>
+<span class="cd-r bad">71%</span>
+</button><button class="cd" data-item="1993240834056925192" data-cid="39" data-cname="蓝莓奶油泡芙(小)">
+<span class="cd-n">蓝莓奶油泡芙(小)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.86</span>
+<span class="cd-r">55%</span>
+</button></div>
+</div>
+<div class="row" data-item="1993240834581213191"
+   data-s="心动草莓奶油爆浆泡芙 hot crush strawberry cream cake puff" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>心动草莓奶油爆浆泡芙</b><small>Hot Crush Strawberry Cream Cake Puff</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 43,525</span>
+    <span title="近30天件数">2,216 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 19.64</span>
+    <span class="muted" title="菜单价">牌价 RM 20.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240834581213191">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240834581213191" data-cid="38" data-cname="草莓奶油泡芙(大)">
+<span class="cd-n">草莓奶油泡芙(大)</span>
+<span class="cd-m">66%</span>
+<span class="cd-c">RM 12.62</span>
+<span class="cd-r">64%</span>
+</button><button class="cd" data-item="1993240834581213191" data-cid="40" data-cname="草莓奶油泡芙(小)">
+<span class="cd-n">草莓奶油泡芙(小)</span>
+<span class="cd-m">66%</span>
+<span class="cd-c">RM 14.03</span>
+<span class="cd-r bad">71%</span>
+</button><button class="cd" data-item="1993240834581213191" data-cid="39" data-cname="蓝莓奶油泡芙(小)">
+<span class="cd-n">蓝莓奶油泡芙(小)</span>
+<span class="cd-m">57%</span>
+<span class="cd-c">RM 10.86</span>
+<span class="cd-r">55%</span>
+</button><button class="cd cd-dead" data-item="1993240834581213191" data-cid="41" data-cname="巧克力抹茶树莓奶油泡芙(下架)">
+<span class="cd-n">巧克力抹茶树莓奶油泡芙(下架)</span>
+<span class="cd-m">55%</span>
+<span class="cd-c">RM 19.41</span>
+<span class="cd-r bad">99%</span>
+</button><button class="cd" data-item="1993240834581213191" data-cid="42" data-cname="巧克力泡芙">
+<span class="cd-n">巧克力泡芙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.72</span>
+<span class="cd-r">70%</span>
+</button></div>
+</div>
+<div class="row" data-item="1993240832639250440"
+   data-s="法式心动树莓奶油挞 french raspberry cream tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式心动树莓奶油挞</b><small>French Raspberry Cream Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 34,911</span>
+    <span title="近30天件数">1,415 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 24.67</span>
+    <span class="muted" title="菜单价">牌价 RM 25.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240832639250440">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240832639250440" data-cid="52" data-cname="心动树莓奶油挞(圆大挞)">
+<span class="cd-n">心动树莓奶油挞(圆大挞)</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 15.55</span>
+<span class="cd-r">63%</span>
+</button><button class="cd" data-item="1993240832639250440" data-cid="50" data-cname="抹茶树莓挞(圆大挞)">
+<span class="cd-n">抹茶树莓挞(圆大挞)</span>
+<span class="cd-m">51%</span>
+<span class="cd-c">RM 10.69</span>
+<span class="cd-r">43%</span>
+</button><button class="cd" data-item="1993240832639250440" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r low">17%</span>
+</button><button class="cd" data-item="1993240832639250440" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r low">23%</span>
+</button><button class="cd" data-item="1993240832639250440" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r">29%</span>
+</button><button class="cd" data-item="1993240832639250440" data-cid="51" data-cname="心动草莓蛋挞(圆大挞)">
+<span class="cd-n">心动草莓蛋挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.06</span>
+<span class="cd-r">57%</span>
+</button></div>
+</div>
+<div class="row" data-item="2043241897790578693"
+   data-s="芙洛芙拉开心果碱水结 berlin volufra pistachio pretzel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>芙洛芙拉开心果碱水结</b><small>Berlin Volufra Pistachio Pretzel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 33,284</span>
+    <span title="近30天件数">2,454 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 13.56</span>
+    <span class="muted" title="菜单价">牌价 RM 13.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2043241897790578693">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2043241897790578693" data-cid="82" data-cname="开心果片碱水结">
+<span class="cd-n">开心果片碱水结</span>
+<span class="cd-m">82%</span>
+<span class="cd-c">RM 10.11</span>
+<span class="cd-r bad">75%</span>
+</button><button class="cd" data-item="2043241897790578693" data-cid="86" data-cname="开心果碎碱水结">
+<span class="cd-n">开心果碎碱水结</span>
+<span class="cd-m">82%</span>
+<span class="cd-c">RM 8.67</span>
+<span class="cd-r">64%</span>
+</button><button class="cd" data-item="2043241897790578693" data-cid="83" data-cname="咖啡坚果碱水结">
+<span class="cd-n">咖啡坚果碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.40</span>
+<span class="cd-r bad">114%</span>
+</button><button class="cd" data-item="2043241897790578693" data-cid="91" data-cname="咸蛋黄碱水结">
+<span class="cd-n">咸蛋黄碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.00</span>
+<span class="cd-r bad">96%</span>
+</button><button class="cd" data-item="2043241897790578693" data-cid="32" data-cname="心动黑巧克力薄脆碱水结">
+<span class="cd-n">心动黑巧克力薄脆碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.87</span>
+<span class="cd-r">58%</span>
+</button><button class="cd" data-item="2043241897790578693" data-cid="79" data-cname="抹茶奶油碱水结">
+<span class="cd-n">抹茶奶油碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.04</span>
+<span class="cd-r">59%</span>
+</button></div>
+</div>
+<div class="row" data-item="1993240833113206789"
+   data-s="法式双重莓果奶油挞 french double berries cream tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式双重莓果奶油挞</b><small>French Double Berries Cream Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 32,270</span>
+    <span title="近30天件数">1,427 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 22.61</span>
+    <span class="muted" title="菜单价">牌价 RM 23.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240833113206789">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240833113206789" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r low">19%</span>
+</button><button class="cd" data-item="1993240833113206789" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r">26%</span>
+</button><button class="cd" data-item="1993240833113206789" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r">31%</span>
+</button><button class="cd" data-item="1993240833113206789" data-cid="52" data-cname="心动树莓奶油挞(圆大挞)">
+<span class="cd-n">心动树莓奶油挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.55</span>
+<span class="cd-r">69%</span>
+</button><button class="cd" data-item="1993240833113206789" data-cid="51" data-cname="心动草莓蛋挞(圆大挞)">
+<span class="cd-n">心动草莓蛋挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.06</span>
+<span class="cd-r">62%</span>
+</button><button class="cd" data-item="1993240833113206789" data-cid="50" data-cname="抹茶树莓挞(圆大挞)">
+<span class="cd-n">抹茶树莓挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.69</span>
+<span class="cd-r">47%</span>
+</button></div>
+</div>
+<div class="row" data-item="1993240833591357442"
+   data-s="法式心动蓝莓奶油挞 french blueberry cream tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式心动蓝莓奶油挞</b><small>French Blueberry Cream Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 31,866</span>
+    <span title="近30天件数">1,798 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 17.72</span>
+    <span class="muted" title="菜单价">牌价 RM 18.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240833591357442">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240833591357442" data-cid="47" data-cname="蓝莓奶油蛋挞">
+<span class="cd-n">蓝莓奶油蛋挞</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 10.14</span>
+<span class="cd-r">57%</span>
+</button><button class="cd" data-item="1993240833591357442" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r low">24%</span>
+</button><button class="cd" data-item="1993240833591357442" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r">33%</span>
+</button><button class="cd" data-item="1993240833591357442" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r">40%</span>
+</button><button class="cd" data-item="1993240833591357442" data-cid="52" data-cname="心动树莓奶油挞(圆大挞)">
+<span class="cd-n">心动树莓奶油挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.55</span>
+<span class="cd-r bad">88%</span>
+</button><button class="cd" data-item="1993240833591357442" data-cid="51" data-cname="心动草莓蛋挞(圆大挞)">
+<span class="cd-n">心动草莓蛋挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.06</span>
+<span class="cd-r bad">79%</span>
+</button></div>
+</div>
+<div class="row" data-item="1993240842554585088"
+   data-s="蜂蜜开心果坚果棒 honey pistachio nut bar" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>蜂蜜开心果坚果棒</b><small>Honey Pistachio Nut Bar</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 31,774</span>
+    <span title="近30天件数">1,775 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 17.90</span>
+    <span class="muted" title="菜单价">牌价 RM 19.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240842554585088">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240842554585088" data-cid="63" data-cname="趁热蜂蜜开心果坚果棒">
+<span class="cd-n">趁热蜂蜜开心果坚果棒</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 9.76</span>
+<span class="cd-r">55%</span>
+</button><button class="cd" data-item="1993240842554585088" data-cid="62" data-cname="蜂蜜蔓越莓坚果棒">
+<span class="cd-n">蜂蜜蔓越莓坚果棒</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 6.59</span>
+<span class="cd-r">37%</span>
+</button><button class="cd" data-item="1993240842554585088" data-cid="92" data-cname="牛肉坚果棒">
+<span class="cd-n">牛肉坚果棒</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.78</span>
+<span class="cd-r bad">77%</span>
+</button></div>
+</div>
+<div class="row" data-item="1998621415888441349"
+   data-s="法式心动巧克力蛋挞 french chocolate tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式心动巧克力蛋挞</b><small>French Chocolate Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 28,967</span>
+    <span title="近30天件数">2,277 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 12.72</span>
+    <span class="muted" title="菜单价">牌价 RM 13.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998621415888441349">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1998621415888441349" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r">45%</span>
+</button><button class="cd" data-item="1998621415888441349" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r">33%</span>
+</button><button class="cd" data-item="1998621415888441349" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r">55%</span>
+</button><button class="cd" data-item="1998621415888441349" data-cid="52" data-cname="心动树莓奶油挞(圆大挞)">
+<span class="cd-n">心动树莓奶油挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.55</span>
+<span class="cd-r bad">122%</span>
+</button><button class="cd" data-item="1998621415888441349" data-cid="51" data-cname="心动草莓蛋挞(圆大挞)">
+<span class="cd-n">心动草莓蛋挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.06</span>
+<span class="cd-r bad">111%</span>
+</button><button class="cd" data-item="1998621415888441349" data-cid="50" data-cname="抹茶树莓挞(圆大挞)">
+<span class="cd-n">抹茶树莓挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.69</span>
+<span class="cd-r bad">84%</span>
+</button></div>
+</div>
+<div class="row" data-item="2043242515674476553"
+   data-s="芙洛芙拉番茄牛肉碱水结 berlin volufra tomato beef pretzel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>芙洛芙拉番茄牛肉碱水结</b><small>Berlin Volufra Tomato Beef Pretzel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 28,439</span>
+    <span title="近30天件数">1,944 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 14.63</span>
+    <span class="muted" title="菜单价">牌价 RM 14.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2043242515674476553">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2043242515674476553" data-cid="90" data-cname="番茄牛肉碱水结">
+<span class="cd-n">番茄牛肉碱水结</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 8.25</span>
+<span class="cd-r">56%</span>
+</button><button class="cd" data-item="2043242515674476553" data-cid="83" data-cname="咖啡坚果碱水结">
+<span class="cd-n">咖啡坚果碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.40</span>
+<span class="cd-r bad">105%</span>
+</button><button class="cd" data-item="2043242515674476553" data-cid="91" data-cname="咸蛋黄碱水结">
+<span class="cd-n">咸蛋黄碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.00</span>
+<span class="cd-r bad">89%</span>
+</button><button class="cd" data-item="2043242515674476553" data-cid="82" data-cname="开心果片碱水结">
+<span class="cd-n">开心果片碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.11</span>
+<span class="cd-r">69%</span>
+</button><button class="cd" data-item="2043242515674476553" data-cid="86" data-cname="开心果碎碱水结">
+<span class="cd-n">开心果碎碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.67</span>
+<span class="cd-r">59%</span>
+</button><button class="cd" data-item="2043242515674476553" data-cid="32" data-cname="心动黑巧克力薄脆碱水结">
+<span class="cd-n">心动黑巧克力薄脆碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.87</span>
+<span class="cd-r">54%</span>
+</button></div>
+</div>
+<div class="row" data-item="1998622692429058055"
+   data-s="法式心动开心果蛋挞 french pistachio tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式心动开心果蛋挞</b><small>French Pistachio Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 27,628</span>
+    <span title="近30天件数">2,168 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 12.74</span>
+    <span class="muted" title="菜单价">牌价 RM 13.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998622692429058055">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1998622692429058055" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r">55%</span>
+</button><button class="cd" data-item="1998622692429058055" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r">33%</span>
+</button><button class="cd" data-item="1998622692429058055" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r">45%</span>
+</button><button class="cd" data-item="1998622692429058055" data-cid="52" data-cname="心动树莓奶油挞(圆大挞)">
+<span class="cd-n">心动树莓奶油挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.55</span>
+<span class="cd-r bad">122%</span>
+</button><button class="cd" data-item="1998622692429058055" data-cid="51" data-cname="心动草莓蛋挞(圆大挞)">
+<span class="cd-n">心动草莓蛋挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.06</span>
+<span class="cd-r bad">110%</span>
+</button><button class="cd" data-item="1998622692429058055" data-cid="50" data-cname="抹茶树莓挞(圆大挞)">
+<span class="cd-n">抹茶树莓挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.69</span>
+<span class="cd-r bad">84%</span>
+</button></div>
+</div>
+<div class="row is-dis" data-item="1993240835671732224"
+   data-s="法式黑巧薄脆碱水结 berlin volufra cocoa crispy pretzel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式黑巧薄脆碱水结</b><small>Berlin Volufra Cocoa Crispy Pretzel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 27,264</span>
+    <span title="近30天件数">2,153 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 12.66</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 9.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240835671732224">不适用</button></div>
+ </div>
+ <p class="dis">⚠ 应挂 88(法式丹麦面团)而非 32(碱水结可颂面团)，差 RM1.37/件</p>
+ <div class="cds"><button class="cd" data-item="1993240835671732224" data-cid="88" data-cname="黑巧薄脆碱水结">
+<span class="cd-n">黑巧薄脆碱水结</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 9.24</span>
+<span class="cd-r bad">73%</span>
+</button><button class="cd" data-item="1993240835671732224" data-cid="32" data-cname="心动黑巧克力薄脆碱水结">
+<span class="cd-n">心动黑巧克力薄脆碱水结</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 7.87</span>
+<span class="cd-r">62%</span>
+</button><button class="cd" data-item="1993240835671732224" data-cid="83" data-cname="咖啡坚果碱水结">
+<span class="cd-n">咖啡坚果碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.40</span>
+<span class="cd-r bad">122%</span>
+</button><button class="cd" data-item="1993240835671732224" data-cid="91" data-cname="咸蛋黄碱水结">
+<span class="cd-n">咸蛋黄碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.00</span>
+<span class="cd-r bad">103%</span>
+</button><button class="cd" data-item="1993240835671732224" data-cid="82" data-cname="开心果片碱水结">
+<span class="cd-n">开心果片碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.11</span>
+<span class="cd-r bad">80%</span>
+</button><button class="cd" data-item="1993240835671732224" data-cid="86" data-cname="开心果碎碱水结">
+<span class="cd-n">开心果碎碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.67</span>
+<span class="cd-r">69%</span>
+</button></div>
+</div>
+<div class="row" data-item="2071222826400276482"
+   data-s="鲜草莓奶油奶酪马卡龙: french strawberry cream macaron" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>鲜草莓奶油奶酪马卡龙:</b><small>French Strawberry Cream Macaron</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 25,540</span>
+    <span title="近30天件数">1,177 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 21.70</span>
+    <span class="muted" title="菜单价">牌价 RM 22.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2071222826400276482">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2071222826400276482" data-cid="502" data-cname="奶酪核桃马卡龙新">
+<span class="cd-n">奶酪核桃马卡龙新</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 4.70</span>
+<span class="cd-r low">22%</span>
+</button><button class="cd" data-item="2071222826400276482" data-cid="64" data-cname="趁热奶酪核桃马卡龙">
+<span class="cd-n">趁热奶酪核桃马卡龙</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 8.17</span>
+<span class="cd-r">38%</span>
+</button><button class="cd" data-item="2071222826400276482" data-cid="471" data-cname="鲜草莓核桃马卡龙">
+<span class="cd-n">鲜草莓核桃马卡龙</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 6.21</span>
+<span class="cd-r">29%</span>
+</button><button class="cd" data-item="2071222826400276482" data-cid="93" data-cname="咖啡马卡龙">
+<span class="cd-n">咖啡马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.27</span>
+<span class="cd-r">47%</span>
+</button><button class="cd" data-item="2071222826400276482" data-cid="472" data-cname="开心果核桃马卡龙">
+<span class="cd-n">开心果核桃马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.82</span>
+<span class="cd-r low">22%</span>
+</button><button class="cd" data-item="2071222826400276482" data-cid="94" data-cname="榛子马卡龙">
+<span class="cd-n">榛子马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.62</span>
+<span class="cd-r">67%</span>
+</button></div>
+</div>
+<div class="row is-dis" data-item="2029763496652070917"
+   data-s="蓝莓软心巴斯克 french wild blueberry melty basque" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>蓝莓软心巴斯克</b><small>French Wild Blueberry Melty Basque</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 20,617</span>
+    <span title="近30天件数">1,205 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 17.11</span>
+    <span class="muted" title="菜单价">牌价 RM 17.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2029763496652070917">不适用</button></div>
+ </div>
+ <p class="dis">⚠ 71/72 号卡配方漏算蛋糕体：八寸900g面糊只写了1.7g，少算约2.4倍</p>
+ <div class="cds"><button class="cd" data-item="2029763496652070917" data-cid="71" data-cname="蓝莓香缇软心巴斯克">
+<span class="cd-n">蓝莓香缇软心巴斯克</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 3.05</span>
+<span class="cd-r low">18%</span>
+</button><button class="cd" data-item="2029763496652070917" data-cid="56" data-cname="野果蓝莓黑巧巴斯克">
+<span class="cd-n">野果蓝莓黑巧巴斯克</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 4.79</span>
+<span class="cd-r">28%</span>
+</button><button class="cd" data-item="2029763496652070917" data-cid="72" data-cname="树莓香缇软心巴斯克">
+<span class="cd-n">树莓香缇软心巴斯克</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r low">18%</span>
+</button><button class="cd cd-dead" data-item="2029763496652070917" data-cid="54" data-cname="奥利奥巴斯克(下架)">
+<span class="cd-n">奥利奥巴斯克(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.25</span>
+<span class="cd-r low">19%</span>
+</button><button class="cd" data-item="2029763496652070917" data-cid="74" data-cname="巧克力刨花巴斯克">
+<span class="cd-n">巧克力刨花巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.26</span>
+<span class="cd-r low">19%</span>
+</button><button class="cd" data-item="2029763496652070917" data-cid="73" data-cname="巧克力巴斯克">
+<span class="cd-n">巧克力巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.91</span>
+<span class="cd-r">35%</span>
+</button></div>
+</div>
+<div class="row" data-item="1993240842357452809"
+   data-s="蜂蜜蔓越莓坚果棒 honey cranberry nut bar" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>蜂蜜蔓越莓坚果棒</b><small>Honey Cranberry Nut Bar</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 20,053</span>
+    <span title="近30天件数">1,105 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 18.15</span>
+    <span class="muted" title="菜单价">牌价 RM 19.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240842357452809">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240842357452809" data-cid="62" data-cname="蜂蜜蔓越莓坚果棒">
+<span class="cd-n">蜂蜜蔓越莓坚果棒</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 6.59</span>
+<span class="cd-r">36%</span>
+</button><button class="cd" data-item="1993240842357452809" data-cid="63" data-cname="趁热蜂蜜开心果坚果棒">
+<span class="cd-n">趁热蜂蜜开心果坚果棒</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 9.76</span>
+<span class="cd-r">54%</span>
+</button><button class="cd" data-item="1993240842357452809" data-cid="92" data-cname="牛肉坚果棒">
+<span class="cd-n">牛肉坚果棒</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.78</span>
+<span class="cd-r bad">76%</span>
+</button></div>
+</div>
+<div class="row is-dis" data-item="2029763613371166728"
+   data-s="树莓软心巴斯克 french rich raspberry melty basque" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>树莓软心巴斯克</b><small>French Rich Raspberry Melty Basque</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 19,875</span>
+    <span title="近30天件数">1,103 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 18.02</span>
+    <span class="muted" title="菜单价">牌价 RM 18.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2029763613371166728">不适用</button></div>
+ </div>
+ <p class="dis">⚠ 同上，71/72 号卡配方缺陷</p>
+ <div class="cds"><button class="cd" data-item="2029763613371166728" data-cid="72" data-cname="树莓香缇软心巴斯克">
+<span class="cd-n">树莓香缇软心巴斯克</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r low">17%</span>
+</button><button class="cd" data-item="2029763613371166728" data-cid="71" data-cname="蓝莓香缇软心巴斯克">
+<span class="cd-n">蓝莓香缇软心巴斯克</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 3.05</span>
+<span class="cd-r low">17%</span>
+</button><button class="cd cd-dead" data-item="2029763613371166728" data-cid="54" data-cname="奥利奥巴斯克(下架)">
+<span class="cd-n">奥利奥巴斯克(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.25</span>
+<span class="cd-r low">18%</span>
+</button><button class="cd" data-item="2029763613371166728" data-cid="74" data-cname="巧克力刨花巴斯克">
+<span class="cd-n">巧克力刨花巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.26</span>
+<span class="cd-r low">18%</span>
+</button><button class="cd" data-item="2029763613371166728" data-cid="73" data-cname="巧克力巴斯克">
+<span class="cd-n">巧克力巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.91</span>
+<span class="cd-r">33%</span>
+</button><button class="cd" data-item="2029763613371166728" data-cid="57" data-cname="开心果巴斯克">
+<span class="cd-n">开心果巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2071223001403416582"
+   data-s="青提茉莉奶酪马卡龙 french shine muscat jasmine macaron" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>青提茉莉奶酪马卡龙</b><small>French Shine Muscat Jasmine Macaron</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 17,650</span>
+    <span title="近30天件数">1,062 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 16.62</span>
+    <span class="muted" title="菜单价">牌价 RM 17.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2071223001403416582">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2071223001403416582" data-cid="474" data-cname="鲜青提马卡龙">
+<span class="cd-n">鲜青提马卡龙</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 5.51</span>
+<span class="cd-r">33%</span>
+</button><button class="cd" data-item="2071223001403416582" data-cid="502" data-cname="奶酪核桃马卡龙新">
+<span class="cd-n">奶酪核桃马卡龙新</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 4.70</span>
+<span class="cd-r">28%</span>
+</button><button class="cd" data-item="2071223001403416582" data-cid="64" data-cname="趁热奶酪核桃马卡龙">
+<span class="cd-n">趁热奶酪核桃马卡龙</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 8.17</span>
+<span class="cd-r">49%</span>
+</button><button class="cd" data-item="2071223001403416582" data-cid="93" data-cname="咖啡马卡龙">
+<span class="cd-n">咖啡马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.27</span>
+<span class="cd-r">62%</span>
+</button><button class="cd" data-item="2071223001403416582" data-cid="472" data-cname="开心果核桃马卡龙">
+<span class="cd-n">开心果核桃马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.82</span>
+<span class="cd-r">29%</span>
+</button><button class="cd" data-item="2071223001403416582" data-cid="94" data-cname="榛子马卡龙">
+<span class="cd-n">榛子马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.62</span>
+<span class="cd-r bad">88%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1993490556155867143"
+   data-s="手打爆爽柠檬茶 beryl splash" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>手打爆爽柠檬茶</b><small>Beryl Splash</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 14,422</span>
+    <span title="近30天件数">8,362 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 1.72</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 14.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490556155867143">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="2065039434700853251"
+   data-s="巧克力冷萃 chocolate cold brew" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>巧克力冷萃</b><small>Chocolate Cold Brew</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 10,576</span>
+    <span title="近30天件数">913 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 11.58</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 15.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2065039434700853251">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2065039434700853251" data-cid="61" data-cname="巧克力曲奇">
+<span class="cd-n">巧克力曲奇</span>
+<span class="cd-m">33%</span>
+<span class="cd-c">RM 6.51</span>
+<span class="cd-r">56%</span>
+</button><button class="cd" data-item="2065039434700853251" data-cid="42" data-cname="巧克力泡芙">
+<span class="cd-n">巧克力泡芙</span>
+<span class="cd-m">33%</span>
+<span class="cd-c">RM 13.72</span>
+<span class="cd-r bad">118%</span>
+</button><button class="cd" data-item="2065039434700853251" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">33%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r">50%</span>
+</button><button class="cd" data-item="2065039434700853251" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">33%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r">40%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1993490555077931009"
+   data-s="趁热泰奶拿铁 thai milk latte" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>趁热泰奶拿铁</b><small>Thai Milk Latte</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 9,344</span>
+    <span title="近30天件数">703 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 13.29</span>
+    <span class="muted" title="菜单价">牌价 RM 13.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490555077931009">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="2071222909481050117"
+   data-s="红心芭乐奶酪马卡龙top3 french pink guava cream macaron" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>红心芭乐奶酪马卡龙TOP3</b><small>French Pink Guava Cream Macaron</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 7,051</span>
+    <span title="近30天件数">402 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 17.54</span>
+    <span class="muted" title="菜单价">牌价 RM 18.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2071222909481050117">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2071222909481050117" data-cid="502" data-cname="奶酪核桃马卡龙新">
+<span class="cd-n">奶酪核桃马卡龙新</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 4.70</span>
+<span class="cd-r">27%</span>
+</button><button class="cd" data-item="2071222909481050117" data-cid="64" data-cname="趁热奶酪核桃马卡龙">
+<span class="cd-n">趁热奶酪核桃马卡龙</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 8.17</span>
+<span class="cd-r">47%</span>
+</button><button class="cd" data-item="2071222909481050117" data-cid="473" data-cname="鲜芭乐核桃马卡龙">
+<span class="cd-n">鲜芭乐核桃马卡龙</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 4.40</span>
+<span class="cd-r">25%</span>
+</button><button class="cd" data-item="2071222909481050117" data-cid="93" data-cname="咖啡马卡龙">
+<span class="cd-n">咖啡马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.27</span>
+<span class="cd-r">59%</span>
+</button><button class="cd" data-item="2071222909481050117" data-cid="472" data-cname="开心果核桃马卡龙">
+<span class="cd-n">开心果核桃马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.82</span>
+<span class="cd-r">28%</span>
+</button><button class="cd" data-item="2071222909481050117" data-cid="94" data-cname="榛子马卡龙">
+<span class="cd-n">榛子马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.62</span>
+<span class="cd-r bad">83%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1993490556608851976"
+   data-s="手打粉红芭乐柠檬茶 pink tango" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>手打粉红芭乐柠檬茶</b><small>Pink Tango</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 5,926</span>
+    <span title="近30天件数">482 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 12.29</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 14.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490556608851976">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490558055886857"
+   data-s="京都抹茶拿铁 matcha latte" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>京都抹茶拿铁</b><small>Matcha Latte</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 5,727</span>
+    <span title="近30天件数">462 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 12.40</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 16.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490558055886857">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="2082695171728056325"
+   data-s="黑松露牛肉坚果棒 black truffle beef nut bar" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>黑松露牛肉坚果棒</b><small>Black Truffle Beef Nut Bar</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 4,328</span>
+    <span title="近30天件数">236 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 18.34</span>
+    <span class="muted" title="菜单价">牌价 RM 18.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2082695171728056325">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2082695171728056325" data-cid="92" data-cname="牛肉坚果棒">
+<span class="cd-n">牛肉坚果棒</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 13.78</span>
+<span class="cd-r bad">75%</span>
+</button><button class="cd" data-item="2082695171728056325" data-cid="62" data-cname="蜂蜜蔓越莓坚果棒">
+<span class="cd-n">蜂蜜蔓越莓坚果棒</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 6.59</span>
+<span class="cd-r">36%</span>
+</button><button class="cd" data-item="2082695171728056325" data-cid="63" data-cname="趁热蜂蜜开心果坚果棒">
+<span class="cd-n">趁热蜂蜜开心果坚果棒</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 9.76</span>
+<span class="cd-r">53%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1993490557552570371"
+   data-s="泰式鲜奶提拉米苏 thai milk tea tiramisu" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>泰式鲜奶提拉米苏</b><small>Thai Milk Tea Tiramisu</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 4,192</span>
+    <span title="近30天件数">250 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 16.77</span>
+    <span class="muted" title="菜单价">牌价 RM 17.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490557552570371">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="2065039623842992131"
+   data-s="开心果冷萃 pistachio cold brew" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>开心果冷萃</b><small>Pistachio Cold Brew</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 3,891</span>
+    <span title="近30天件数">248 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 15.69</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 17.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2065039623842992131">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2065039623842992131" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">33%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r">45%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1993490554549448711"
+   data-s="拿铁 latte" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>拿铁</b><small>Latte</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 3,564</span>
+    <span title="近30天件数">385 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 9.26</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 12.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490554549448711">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="2065040060386156552"
+   data-s="草莓冷萃 strawberry cold brew" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>草莓冷萃</b><small>Strawberry Cold Brew</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 3,231</span>
+    <span title="近30天件数">275 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 11.75</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 15.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2065040060386156552">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="2065039830852874246"
+   data-s="香草冷萃 vanilla cold brew" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>香草冷萃</b><small>vanilla cold brew</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 2,433</span>
+    <span title="近30天件数">147 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 16.55</span>
+    <span class="muted" title="菜单价">牌价 RM 17.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2065039830852874246">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="1993240839635349505"
+   data-s="墨西哥藤椒鸡肉贝果 mexican jalapeño chicken bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>墨西哥藤椒鸡肉贝果</b><small>Mexican Jalapeño Chicken Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 2,095</span>
+    <span title="近30天件数">219 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 9.57</span>
+    <span class="muted" title="菜单价">牌价 RM 10.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240839635349505">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240839635349505" data-cid="12" data-cname="墨西哥辣椒贝果">
+<span class="cd-n">墨西哥辣椒贝果</span>
+<span class="cd-m">59%</span>
+<span class="cd-c">RM 5.15</span>
+<span class="cd-r">54%</span>
+</button><button class="cd" data-item="1993240839635349505" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r">31%</span>
+</button><button class="cd cd-dead" data-item="1993240839635349505" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r">52%</span>
+</button><button class="cd" data-item="1993240839635349505" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r">48%</span>
+</button><button class="cd" data-item="1993240839635349505" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r">48%</span>
+</button><button class="cd cd-dead" data-item="1993240839635349505" data-cid="15" data-cname="海盐贝果(下架)">
+<span class="cd-n">海盐贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r">44%</span>
+</button></div>
+</div>
+<div class="row" data-item="2039559820851322882"
+   data-s="红豆松松鲜吐司 fluffy red bean chicken floss toast" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>红豆松松鲜吐司</b><small>Fluffy Red Bean Chicken Floss Toast</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 2,005</span>
+    <span title="近30天件数">141 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 14.22</span>
+    <span class="muted" title="菜单价">牌价 RM 14.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2039559820851322882">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2039559820851322882" data-cid="78" data-cname="红豆松松吐司">
+<span class="cd-n">红豆松松吐司</span>
+<span class="cd-m">86%</span>
+<span class="cd-c">RM 8.72</span>
+<span class="cd-r">61%</span>
+</button><button class="cd" data-item="2039559820851322882" data-cid="1" data-cname="A牧场牛乳鲜吐司">
+<span class="cd-n">A牧场牛乳鲜吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 9.80</span>
+<span class="cd-r">69%</span>
+</button><button class="cd" data-item="2039559820851322882" data-cid="3" data-cname="巧克力榴莲吐司">
+<span class="cd-n">巧克力榴莲吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.41</span>
+<span class="cd-r bad">94%</span>
+</button><button class="cd" data-item="2039559820851322882" data-cid="5" data-cname="星空流失吐司">
+<span class="cd-n">星空流失吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 11.95</span>
+<span class="cd-r bad">84%</span>
+</button><button class="cd" data-item="2039559820851322882" data-cid="2" data-cname="榴莲吐司">
+<span class="cd-n">榴莲吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 12.06</span>
+<span class="cd-r bad">85%</span>
+</button><button class="cd" data-item="2039559820851322882" data-cid="4" data-cname="草莓巧克力爆浆吐司">
+<span class="cd-n">草莓巧克力爆浆吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.52</span>
+<span class="cd-r bad">74%</span>
+</button></div>
+</div>
+<div class="row" data-item="1993240839438217217"
+   data-s="意式黑巧浓醇贝果 french lava chocolate bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>意式黑巧浓醇贝果</b><small>French Lava Chocolate Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 1,915</span>
+    <span title="近30天件数">224 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 8.55</span>
+    <span class="muted" title="菜单价">牌价 RM 9.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240839438217217">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240839438217217" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r">35%</span>
+</button><button class="cd cd-dead" data-item="1993240839438217217" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r">58%</span>
+</button><button class="cd" data-item="1993240839438217217" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r">54%</span>
+</button><button class="cd" data-item="1993240839438217217" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r">53%</span>
+</button><button class="cd cd-dead" data-item="1993240839438217217" data-cid="15" data-cname="海盐贝果(下架)">
+<span class="cd-n">海盐贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r">50%</span>
+</button><button class="cd" data-item="1993240839438217217" data-cid="17" data-cname="焦糖贝果">
+<span class="cd-n">焦糖贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.32</span>
+<span class="cd-r">62%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="2065040216145825792"
+   data-s="抹茶冷萃 mocha cold brew" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>抹茶冷萃</b><small>Mocha Cold Brew</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 1,796</span>
+    <span title="近30天件数">109 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 16.48</span>
+    <span class="muted" title="菜单价">牌价 RM 17.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2065040216145825792">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490555342172162"
+   data-s="趁热玫瑰拿铁 rose latte" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>趁热玫瑰拿铁</b><small>Rose Latte</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 1,613</span>
+    <span title="近30天件数">100 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 16.13</span>
+    <span class="muted" title="菜单价">牌价 RM 16.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490555342172162">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490554813689860"
+   data-s="美式咖啡 americano" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>美式咖啡</b><small>Americano</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 1,549</span>
+    <span title="近30天件数">221 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 7.01</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 8.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490554813689860">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490558387236872"
+   data-s="京都冰抹茶 kyoto matcha" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>京都冰抹茶</b><small>Kyoto Matcha</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 1,522</span>
+    <span title="近30天件数">165 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 9.22</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 12.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490558387236872">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490557095391237"
+   data-s="手打美式咖啡柠檬茶 triple energy" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>手打美式咖啡柠檬茶</b><small>Triple Energy</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 646</span>
+    <span title="近30天件数">54 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 11.95</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 13.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490557095391237">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="1993240840079945728"
+   data-s="泰式咖喱土豆贝果 curry smashed potato cheese bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>泰式咖喱土豆贝果</b><small>Curry Smashed Potato Cheese Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 219</span>
+    <span title="近30天件数">22 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 9.97</span>
+    <span class="muted" title="菜单价">牌价 RM 10.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240840079945728">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240840079945728" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r">30%</span>
+</button><button class="cd cd-dead" data-item="1993240840079945728" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r">49%</span>
+</button><button class="cd" data-item="1993240840079945728" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r">46%</span>
+</button><button class="cd" data-item="1993240840079945728" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r">46%</span>
+</button><button class="cd cd-dead" data-item="1993240840079945728" data-cid="15" data-cname="海盐贝果(下架)">
+<span class="cd-n">海盐贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r">43%</span>
+</button><button class="cd" data-item="1993240840079945728" data-cid="17" data-cname="焦糖贝果">
+<span class="cd-n">焦糖贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.32</span>
+<span class="cd-r">53%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="2073777943179755523"
+   data-s="可尔必思茉莉冷萃 calpis jasmine breeze cold brew" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>可尔必思茉莉冷萃</b><small>Calpis Jasmine Breeze Cold Brew</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 120</span>
+    <span title="近30天件数">1,018 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 0.12</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 12.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2073777943179755523">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1998617846862888969"
+   data-s="红色条纹帆布包 hot crush red stripes canvas tote bag" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>红色条纹帆布包</b><small>Hot Crush Red Stripes Canvas Tote Bag</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 68</span>
+    <span title="近30天件数">3 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 22.60</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 33.90 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998617846862888969">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="2032056190707466244"
+   data-s="心动白巧草莓玫瑰蝴蝶酥 hot crush white chocolate strawberry rose palmier" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>心动白巧草莓玫瑰蝴蝶酥</b><small>Hot Crush White Chocolate Strawberry Rose Palmier</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 60</span>
+    <span title="近30天件数">2 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 29.90</span>
+    <span class="muted" title="菜单价">牌价 RM 29.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2032056190707466244">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2032056190707466244" data-cid="37" data-cname="白巧克力蝴蝶酥">
+<span class="cd-n">白巧克力蝴蝶酥</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 19.34</span>
+<span class="cd-r">65%</span>
+</button><button class="cd" data-item="2032056190707466244" data-cid="36" data-cname="心动黑巧蝴蝶酥">
+<span class="cd-n">心动黑巧蝴蝶酥</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 18.26</span>
+<span class="cd-r">61%</span>
+</button><button class="cd" data-item="2032056190707466244" data-cid="85" data-cname="迷你蝴蝶酥">
+<span class="cd-n">迷你蝴蝶酥</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 1.33</span>
+<span class="cd-r low">4%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="2079044062945812482"
+   data-s="golden tropic cold brew golden tropic cold brew" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>Golden Tropic cold Brew</b><small>Golden Tropic Cold Brew</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 56</span>
+    <span title="近30天件数">11 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 5.09</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 14.00 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2079044062945812482">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1998616877651509254"
+   data-s="蝴蝶形纸香片 hot crush butterfly scent card" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>蝴蝶形纸香片</b><small>Hot Crush Butterfly Scent Card</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 52</span>
+    <span title="近30天件数">27 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 1.91</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 12.90 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998616877651509254">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1998617041774628869"
+   data-s="玫瑰花形纸香片 hot crush rosé bloom scent card" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>玫瑰花形纸香片</b><small>Hot Crush Rosé Bloom Scent Card</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 52</span>
+    <span title="近30天件数">27 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 1.91</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 12.90 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998617041774628869">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="2032058068090519552"
+   data-s="轻糖草莓玫瑰奶油拿破仑酥 light sugar strawberry rose cream mille-feuille" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>轻糖草莓玫瑰奶油拿破仑酥</b><small>Light Sugar Strawberry Rose Cream Mille-Feuille</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 36</span>
+    <span title="近30天件数">3 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 11.90</span>
+    <span class="muted" title="菜单价">牌价 RM 11.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2032058068090519552">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2032058068090519552" data-cid="75" data-cname="半糖伊朗开心果奶油拿破仑酥">
+<span class="cd-n">半糖伊朗开心果奶油拿破仑酥</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2032058068090519552" data-cid="67" data-cname="草莓拿破仑(全部)">
+<span class="cd-n">草莓拿破仑(全部)</span>
+<span class="cd-m">50%</span>
+<span class="cd-c">RM 3.39</span>
+<span class="cd-r">28%</span>
+</button><button class="cd cd-dead" data-item="2032058068090519552" data-cid="68" data-cname="草莓拿破仑(半边)测试">
+<span class="cd-n">草莓拿破仑(半边)测试</span>
+<span class="cd-m">50%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r">26%</span>
+</button><button class="cd cd-dead" data-item="2032058068090519552" data-cid="65" data-cname="开心果拿破仑(全部)测试">
+<span class="cd-n">开心果拿破仑(全部)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.23</span>
+<span class="cd-r">36%</span>
+</button><button class="cd cd-dead" data-item="2032058068090519552" data-cid="66" data-cname="开心果拿破仑(半边)测试">
+<span class="cd-n">开心果拿破仑(半边)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 1.60</span>
+<span class="cd-r low">13%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1998616470128742400"
+   data-s="爱心形纸香片 hot crush heart scent card" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>爱心形纸香片</b><small>Hot Crush Heart Scent Card</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 26</span>
+    <span title="近30天件数">2 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 12.90</span>
+    <span class="muted" title="菜单价">牌价 RM 12.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998616470128742400">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="1993240837504643081"
+   data-s="法式莓果奶油爆浆冰可颂 hot crush strawberry iced croissant" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式莓果奶油爆浆冰可颂</b><small>Hot Crush Strawberry Iced Croissant</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 23</span>
+    <span title="近30天件数">1 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 23.00</span>
+    <span class="muted" title="菜单价">牌价 RM 23.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240837504643081">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240837504643081" data-cid="27" data-cname="树莓奶油可颂">
+<span class="cd-n">树莓奶油可颂</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837504643081" data-cid="29" data-cname="玫瑰奶油可颂">
+<span class="cd-n">玫瑰奶油可颂</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 8.22</span>
+<span class="cd-r">36%</span>
+</button><button class="cd" data-item="1993240837504643081" data-cid="28" data-cname="草莓奶油可颂">
+<span class="cd-n">草莓奶油可颂</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 16.16</span>
+<span class="cd-r bad">70%</span>
+</button><button class="cd" data-item="1993240837504643081" data-cid="26" data-cname="蓝莓奶油可颂">
+<span class="cd-n">蓝莓奶油可颂</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 13.02</span>
+<span class="cd-r">57%</span>
+</button><button class="cd" data-item="1993240837504643081" data-cid="25" data-cname="原味可颂">
+<span class="cd-n">原味可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.27</span>
+<span class="cd-r low">14%</span>
+</button><button class="cd" data-item="1993240837504643081" data-cid="31" data-cname="岩烧可颂">
+<span class="cd-n">岩烧可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.86</span>
+<span class="cd-r low">21%</span>
+</button></div>
+</div>
+<div class="row" data-item="2028069256364572672"
+   data-s="法式蜂巢酥皮黑椒牛肉派 french black pepper beef honeycomb pie" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式蜂巢酥皮黑椒牛肉派</b><small>French Black Pepper Beef Honeycomb Pie</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 16</span>
+    <span title="近30天件数">1 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 16.00</span>
+    <span class="muted" title="菜单价">牌价 RM 16.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2028069256364572672">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2028069256364572672" data-cid="69" data-cname="菲力牛肉派">
+<span class="cd-n">菲力牛肉派</span>
+<span class="cd-m">51%</span>
+<span class="cd-c">RM 16.91</span>
+<span class="cd-r bad">106%</span>
+</button><button class="cd" data-item="2028069256364572672" data-cid="70" data-cname="菲力牛肉派(网状)">
+<span class="cd-n">菲力牛肉派(网状)</span>
+<span class="cd-m">49%</span>
+<span class="cd-c">RM 13.73</span>
+<span class="cd-r bad">86%</span>
+</button></div>
+</div>
+<div class="row" data-item="2043242349529706505"
+   data-s="芙洛芙拉迪拜巧克力碱水结 berlin volufra dubai chocolate pretzel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>芙洛芙拉迪拜巧克力碱水结</b><small>Berlin Volufra Dubai Chocolate Pretzel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 15</span>
+    <span title="近30天件数">1 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 14.90</span>
+    <span class="muted" title="菜单价">牌价 RM 14.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2043242349529706505">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2043242349529706505" data-cid="89" data-cname="迪拜巧克力碱水结">
+<span class="cd-n">迪拜巧克力碱水结</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 7.91</span>
+<span class="cd-r">53%</span>
+</button><button class="cd" data-item="2043242349529706505" data-cid="81" data-cname="榛子巧克力碱水结">
+<span class="cd-n">榛子巧克力碱水结</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 6.20</span>
+<span class="cd-r">42%</span>
+</button><button class="cd" data-item="2043242349529706505" data-cid="32" data-cname="心动黑巧克力薄脆碱水结">
+<span class="cd-n">心动黑巧克力薄脆碱水结</span>
+<span class="cd-m">61%</span>
+<span class="cd-c">RM 7.87</span>
+<span class="cd-r">53%</span>
+</button><button class="cd" data-item="2043242349529706505" data-cid="83" data-cname="咖啡坚果碱水结">
+<span class="cd-n">咖啡坚果碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.40</span>
+<span class="cd-r bad">103%</span>
+</button><button class="cd" data-item="2043242349529706505" data-cid="91" data-cname="咸蛋黄碱水结">
+<span class="cd-n">咸蛋黄碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.00</span>
+<span class="cd-r bad">87%</span>
+</button><button class="cd" data-item="2043242349529706505" data-cid="82" data-cname="开心果片碱水结">
+<span class="cd-n">开心果片碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.11</span>
+<span class="cd-r">68%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1998617142664417283"
+   data-s="爱心形冰箱贴 hot crush heart fridge magnet" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>爱心形冰箱贴</b><small>Hot Crush Heart Fridge Magnet</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 13</span>
+    <span title="近30天件数">2 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 6.45</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 12.90 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998617142664417283">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="1998617712120872962"
+   data-s="翅膀双子塔冰箱贴 hot crush petronas twin towers fridge magnet" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>翅膀双子塔冰箱贴</b><small>Hot Crush Petronas Twin Towers Fridge Magnet</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 13</span>
+    <span title="近30天件数">1 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 12.90</span>
+    <span class="muted" title="菜单价">牌价 RM 12.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998617712120872962">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1998617712120872962" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r">33%</span>
+</button><button class="cd" data-item="1998617712120872962" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r">45%</span>
+</button><button class="cd" data-item="1998617712120872962" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r">55%</span>
+</button><button class="cd" data-item="1998617712120872962" data-cid="52" data-cname="心动树莓奶油挞(圆大挞)">
+<span class="cd-n">心动树莓奶油挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.55</span>
+<span class="cd-r bad">121%</span>
+</button><button class="cd" data-item="1998617712120872962" data-cid="51" data-cname="心动草莓蛋挞(圆大挞)">
+<span class="cd-n">心动草莓蛋挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.06</span>
+<span class="cd-r bad">109%</span>
+</button><button class="cd" data-item="1998617712120872962" data-cid="50" data-cname="抹茶树莓挞(圆大挞)">
+<span class="cd-n">抹茶树莓挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.69</span>
+<span class="cd-r bad">83%</span>
+</button></div>
+</div>
+<div class="row" data-item="2046098687007965193"
+   data-s="法式番茄牛肉挞 french tomato beef savory tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式番茄牛肉挞</b><small>French Tomato Beef Savory Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 13</span>
+    <span title="近30天件数">1 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 12.60</span>
+    <span class="muted" title="菜单价">牌价 RM 12.60</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2046098687007965193">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2046098687007965193" data-cid="84" data-cname="番茄牛肉塔">
+<span class="cd-n">番茄牛肉塔</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 6.24</span>
+<span class="cd-r">50%</span>
+</button><button class="cd" data-item="2046098687007965193" data-cid="49" data-cname="菲力牛肉塔">
+<span class="cd-n">菲力牛肉塔</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 7.09</span>
+<span class="cd-r">56%</span>
+</button><button class="cd" data-item="2046098687007965193" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r">33%</span>
+</button><button class="cd" data-item="2046098687007965193" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r">46%</span>
+</button><button class="cd" data-item="2046098687007965193" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r">56%</span>
+</button><button class="cd" data-item="2046098687007965193" data-cid="52" data-cname="心动树莓奶油挞(圆大挞)">
+<span class="cd-n">心动树莓奶油挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.55</span>
+<span class="cd-r bad">123%</span>
+</button></div>
+</div>
+<div class="row" data-item="2005913498286374920"
+   data-s="法式草莓黑巧拿破仑酥 french chololate strawberry napoleon" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式草莓黑巧拿破仑酥</b><small>French Chololate Strawberry Napoleon</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 6</span>
+    <span title="近30天件数">1 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 6.00</span>
+    <span class="muted" title="菜单价">牌价 RM 6.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2005913498286374920">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2005913498286374920" data-cid="67" data-cname="草莓拿破仑(全部)">
+<span class="cd-n">草莓拿破仑(全部)</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 3.39</span>
+<span class="cd-r">56%</span>
+</button><button class="cd cd-dead" data-item="2005913498286374920" data-cid="68" data-cname="草莓拿破仑(半边)测试">
+<span class="cd-n">草莓拿破仑(半边)测试</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r">53%</span>
+</button><button class="cd" data-item="2005913498286374920" data-cid="75" data-cname="半糖伊朗开心果奶油拿破仑酥">
+<span class="cd-n">半糖伊朗开心果奶油拿破仑酥</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2005913498286374920" data-cid="65" data-cname="开心果拿破仑(全部)测试">
+<span class="cd-n">开心果拿破仑(全部)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.23</span>
+<span class="cd-r bad">70%</span>
+</button><button class="cd cd-dead" data-item="2005913498286374920" data-cid="66" data-cname="开心果拿破仑(半边)测试">
+<span class="cd-n">开心果拿破仑(半边)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 1.60</span>
+<span class="cd-r">27%</span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1998617444339728385"
+   data-s="蝴蝶形冰箱贴 hot crush butterfly fridge magnet" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>蝴蝶形冰箱贴</b><small>Hot Crush Butterfly Fridge Magnet</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">22 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 0.00</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 12.90 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998617444339728385">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1998617582923730952"
+   data-s="玫瑰花形冰箱贴 hot crush rosé bloom fridge magnet" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>玫瑰花形冰箱贴</b><small>Hot Crush Rosé Bloom Fridge Magnet</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">1 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 0.00</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 12.90 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998617582923730952">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="2029763681595715587"
+   data-s="抹茶巴斯克 japanese rich matcha melty basque" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>抹茶巴斯克</b><small>Japanese Rich Matcha Melty Basque</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">1 件</span>
+    <span title="实收单价（成本率分母用它）">实收 RM 0.00</span>
+    <span class="stale" title="与实收差 >8%，此列已陈旧">牌价 RM 18.90 ⚠</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2029763681595715587">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2029763681595715587" data-cid="53" data-cname="抹茶巴斯克">
+<span class="cd-n">抹茶巴斯克</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 11.49</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2029763681595715587" data-cid="54" data-cname="奥利奥巴斯克(下架)">
+<span class="cd-n">奥利奥巴斯克(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.25</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763681595715587" data-cid="74" data-cname="巧克力刨花巴斯克">
+<span class="cd-n">巧克力刨花巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.26</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763681595715587" data-cid="73" data-cname="巧克力巴斯克">
+<span class="cd-n">巧克力巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.91</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763681595715587" data-cid="57" data-cname="开心果巴斯克">
+<span class="cd-n">开心果巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763681595715587" data-cid="72" data-cname="树莓香缇软心巴斯克">
+<span class="cd-n">树莓香缇软心巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+
+<h2>近 30 天没有销售 · 60 个</h2>
+<p class="sd">菜单里有但这一个月没卖出去的。可以先跳过，等要用再对。</p>
+<div class="row" data-item="1993240831947190275"
+   data-s="法式野果蓝莓黑巧巴斯克 french wild blueberry cocoa melty basque" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式野果蓝莓黑巧巴斯克</b><small>French Wild Blueberry Cocoa Melty Basque</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 29.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240831947190275">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240831947190275" data-cid="56" data-cname="野果蓝莓黑巧巴斯克">
+<span class="cd-n">野果蓝莓黑巧巴斯克</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 4.79</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240831947190275" data-cid="71" data-cname="蓝莓香缇软心巴斯克">
+<span class="cd-n">蓝莓香缇软心巴斯克</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 3.05</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240831947190275" data-cid="54" data-cname="奥利奥巴斯克(下架)">
+<span class="cd-n">奥利奥巴斯克(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.25</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240831947190275" data-cid="74" data-cname="巧克力刨花巴斯克">
+<span class="cd-n">巧克力刨花巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.26</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240831947190275" data-cid="73" data-cname="巧克力巴斯克">
+<span class="cd-n">巧克力巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.91</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240831947190275" data-cid="57" data-cname="开心果巴斯克">
+<span class="cd-n">开心果巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2071222327047405572"
+   data-s="浓醇咖啡奶酪马卡龙 french rich coffee macaron" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>浓醇咖啡奶酪马卡龙</b><small>French Rich Coffee Macaron</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 17.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2071222327047405572">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2071222327047405572" data-cid="93" data-cname="咖啡马卡龙">
+<span class="cd-n">咖啡马卡龙</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 10.27</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2071222327047405572" data-cid="502" data-cname="奶酪核桃马卡龙新">
+<span class="cd-n">奶酪核桃马卡龙新</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 4.70</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2071222327047405572" data-cid="64" data-cname="趁热奶酪核桃马卡龙">
+<span class="cd-n">趁热奶酪核桃马卡龙</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 8.17</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2071222327047405572" data-cid="472" data-cname="开心果核桃马卡龙">
+<span class="cd-n">开心果核桃马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.82</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2071222327047405572" data-cid="94" data-cname="榛子马卡龙">
+<span class="cd-n">榛子马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.62</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2071222327047405572" data-cid="473" data-cname="鲜芭乐核桃马卡龙">
+<span class="cd-n">鲜芭乐核桃马卡龙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.40</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row is-none" data-item="2078898558823899142"
+   data-s="golden tropic cold brew golden tropic cold brew" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>Golden Tropic Cold Brew</b><small>Golden Tropic Cold Brew</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 14.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2078898558823899142">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="2057687961079840770"
+   data-s="pistachio green jewel pistachio green jewel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>Pistachio Green jewel</b><small>Pistachio Green jewel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 18.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2057687961079840770">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="1993240832173682696"
+   data-s="法式草莓牛乳巴斯克 french strawberry rosée melty basque" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式草莓牛乳巴斯克</b><small>French Strawberry Rosée Melty Basque</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 29.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240832173682696">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240832173682696" data-cid="55" data-cname="草莓巴斯克">
+<span class="cd-n">草莓巴斯克</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 9.30</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240832173682696" data-cid="54" data-cname="奥利奥巴斯克(下架)">
+<span class="cd-n">奥利奥巴斯克(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.25</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832173682696" data-cid="74" data-cname="巧克力刨花巴斯克">
+<span class="cd-n">巧克力刨花巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.26</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832173682696" data-cid="73" data-cname="巧克力巴斯克">
+<span class="cd-n">巧克力巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.91</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832173682696" data-cid="57" data-cname="开心果巴斯克">
+<span class="cd-n">开心果巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832173682696" data-cid="53" data-cname="抹茶巴斯克">
+<span class="cd-n">抹茶巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 11.49</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240832433729544"
+   data-s="法式浓郁抹茶巴斯克 french matcha melty basque" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式浓郁抹茶巴斯克</b><small>French Matcha Melty Basque</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 28.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240832433729544">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240832433729544" data-cid="53" data-cname="抹茶巴斯克">
+<span class="cd-n">抹茶巴斯克</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 11.49</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240832433729544" data-cid="54" data-cname="奥利奥巴斯克(下架)">
+<span class="cd-n">奥利奥巴斯克(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.25</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832433729544" data-cid="74" data-cname="巧克力刨花巴斯克">
+<span class="cd-n">巧克力刨花巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.26</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832433729544" data-cid="73" data-cname="巧克力巴斯克">
+<span class="cd-n">巧克力巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.91</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832433729544" data-cid="57" data-cname="开心果巴斯克">
+<span class="cd-n">开心果巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832433729544" data-cid="72" data-cname="树莓香缇软心巴斯克">
+<span class="cd-n">树莓香缇软心巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240832907685897"
+   data-s="法式抹茶奶油挞 french kyoto matcha raspberry tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式抹茶奶油挞</b><small>French Kyoto Matcha Raspberry Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 23.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240832907685897">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240832907685897" data-cid="50" data-cname="抹茶树莓挞(圆大挞)">
+<span class="cd-n">抹茶树莓挞(圆大挞)</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 10.69</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832907685897" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832907685897" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832907685897" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832907685897" data-cid="52" data-cname="心动树莓奶油挞(圆大挞)">
+<span class="cd-n">心动树莓奶油挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.55</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240832907685897" data-cid="51" data-cname="心动草莓蛋挞(圆大挞)">
+<span class="cd-n">心动草莓蛋挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.06</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240833352282115"
+   data-s="法式心动草莓玫瑰蛋挞 french rosé cream tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式心动草莓玫瑰蛋挞</b><small>French Rosé Cream Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 19.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240833352282115">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240833352282115" data-cid="48" data-cname="玫瑰草莓奶油蛋挞">
+<span class="cd-n">玫瑰草莓奶油蛋挞</span>
+<span class="cd-m">59%</span>
+<span class="cd-c">RM 11.27</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240833352282115" data-cid="46" data-cname="草莓奶油蛋挞">
+<span class="cd-n">草莓奶油蛋挞</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 10.12</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240833352282115" data-cid="51" data-cname="心动草莓蛋挞(圆大挞)">
+<span class="cd-n">心动草莓蛋挞(圆大挞)</span>
+<span class="cd-m">51%</span>
+<span class="cd-c">RM 14.06</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240833352282115" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240833352282115" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240833352282115" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240834358915078"
+   data-s="法式巧克力抹茶蛋糕泡芙 french chocolate matcha cream cake puff" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式巧克力抹茶蛋糕泡芙</b><small>French Chocolate Matcha Cream Cake Puff</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 25.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240834358915078">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd cd-dead" data-item="1993240834358915078" data-cid="41" data-cname="巧克力抹茶树莓奶油泡芙(下架)">
+<span class="cd-n">巧克力抹茶树莓奶油泡芙(下架)</span>
+<span class="cd-m">67%</span>
+<span class="cd-c">RM 19.41</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240834358915078" data-cid="42" data-cname="巧克力泡芙">
+<span class="cd-n">巧克力泡芙</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 13.72</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240834358915078" data-cid="38" data-cname="草莓奶油泡芙(大)">
+<span class="cd-n">草莓奶油泡芙(大)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 12.62</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240834358915078" data-cid="40" data-cname="草莓奶油泡芙(小)">
+<span class="cd-n">草莓奶油泡芙(小)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 14.03</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240834358915078" data-cid="39" data-cname="蓝莓奶油泡芙(小)">
+<span class="cd-n">蓝莓奶油泡芙(小)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.86</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240834832871424"
+   data-s="雪顶草莓奶油蛋糕泡芙 cold foam strawberry cream cake puff" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>雪顶草莓奶油蛋糕泡芙</b><small>Cold Foam Strawberry Cream Cake Puff</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 18.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240834832871424">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240834832871424" data-cid="38" data-cname="草莓奶油泡芙(大)">
+<span class="cd-n">草莓奶油泡芙(大)</span>
+<span class="cd-m">62%</span>
+<span class="cd-c">RM 12.62</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240834832871424" data-cid="40" data-cname="草莓奶油泡芙(小)">
+<span class="cd-n">草莓奶油泡芙(小)</span>
+<span class="cd-m">62%</span>
+<span class="cd-c">RM 14.03</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240834832871424" data-cid="39" data-cname="蓝莓奶油泡芙(小)">
+<span class="cd-n">蓝莓奶油泡芙(小)</span>
+<span class="cd-m">55%</span>
+<span class="cd-c">RM 10.86</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240834832871424" data-cid="41" data-cname="巧克力抹茶树莓奶油泡芙(下架)">
+<span class="cd-n">巧克力抹茶树莓奶油泡芙(下架)</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 19.41</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240834832871424" data-cid="42" data-cname="巧克力泡芙">
+<span class="cd-n">巧克力泡芙</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.72</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240835239718914"
+   data-s="心动黑巧蝴蝶酥 hot crush dark chocolate palmier" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>心动黑巧蝴蝶酥</b><small>Hot Crush Dark Chocolate Palmier</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 27.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240835239718914">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240835239718914" data-cid="36" data-cname="心动黑巧蝴蝶酥">
+<span class="cd-n">心动黑巧蝴蝶酥</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 18.26</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240835239718914" data-cid="37" data-cname="白巧克力蝴蝶酥">
+<span class="cd-n">白巧克力蝴蝶酥</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 19.34</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240835239718914" data-cid="85" data-cname="迷你蝴蝶酥">
+<span class="cd-n">迷你蝴蝶酥</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 1.33</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240835428462599"
+   data-s="法式粉红玫瑰碱水结 french pink rosé pretzel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式粉红玫瑰碱水结</b><small>French Pink Rosé Pretzel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 12.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240835428462599">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240835428462599" data-cid="83" data-cname="咖啡坚果碱水结">
+<span class="cd-n">咖啡坚果碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.40</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240835428462599" data-cid="91" data-cname="咸蛋黄碱水结">
+<span class="cd-n">咸蛋黄碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.00</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240835428462599" data-cid="82" data-cname="开心果片碱水结">
+<span class="cd-n">开心果片碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.11</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240835428462599" data-cid="86" data-cname="开心果碎碱水结">
+<span class="cd-n">开心果碎碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.67</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240835428462599" data-cid="32" data-cname="心动黑巧克力薄脆碱水结">
+<span class="cd-n">心动黑巧克力薄脆碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.87</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240835428462599" data-cid="79" data-cname="抹茶奶油碱水结">
+<span class="cd-n">抹茶奶油碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.04</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1993240835868864519"
+   data-s="意式浓郁抹茶罗马面包 italian matcha lava moritozzo" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>意式浓郁抹茶罗马面包</b><small>Italian Matcha Lava Moritozzo</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 16.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240835868864519">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993240836124717064"
+   data-s="意式黑巧奶油罗马面包 italian chocolate cream lava moritozzo" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>意式黑巧奶油罗马面包</b><small>Italian Chocolate Cream Lava Moritozzo</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 16.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240836124717064">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993240836376375297"
+   data-s="意式多重莓果奶油罗马面包 italian berries cream lava moritozzo" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>意式多重莓果奶油罗马面包</b><small>Italian Berries Cream Lava Moritozzo</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 18.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240836376375297">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="1993240836825165828"
+   data-s="心动岩烧黄油可颂 hot crush butter croissant" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>心动岩烧黄油可颂</b><small>Hot Crush Butter Croissant</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 12.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240836825165828">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240836825165828" data-cid="31" data-cname="岩烧可颂">
+<span class="cd-n">岩烧可颂</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 4.86</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240836825165828" data-cid="25" data-cname="原味可颂">
+<span class="cd-n">原味可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.27</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240836825165828" data-cid="30" data-cname="杏仁可颂">
+<span class="cd-n">杏仁可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240836825165828" data-cid="27" data-cname="树莓奶油可颂">
+<span class="cd-n">树莓奶油可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240836825165828" data-cid="29" data-cname="玫瑰奶油可颂">
+<span class="cd-n">玫瑰奶油可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.22</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240836825165828" data-cid="28" data-cname="草莓奶油可颂">
+<span class="cd-n">草莓奶油可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 16.16</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240837068435464"
+   data-s="心动太妃扁桃仁可颂 hot crush toffee almond croissant" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>心动太妃扁桃仁可颂</b><small>hot Crush Toffee Almond Croissant</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 13.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240837068435464">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240837068435464" data-cid="25" data-cname="原味可颂">
+<span class="cd-n">原味可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.27</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837068435464" data-cid="31" data-cname="岩烧可颂">
+<span class="cd-n">岩烧可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.86</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837068435464" data-cid="30" data-cname="杏仁可颂">
+<span class="cd-n">杏仁可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837068435464" data-cid="27" data-cname="树莓奶油可颂">
+<span class="cd-n">树莓奶油可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837068435464" data-cid="29" data-cname="玫瑰奶油可颂">
+<span class="cd-n">玫瑰奶油可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.22</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837068435464" data-cid="28" data-cname="草莓奶油可颂">
+<span class="cd-n">草莓奶油可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 16.16</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240837307510789"
+   data-s="法式玫瑰奶油爆浆冰可颂 iced french rosy cream croissant" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式玫瑰奶油爆浆冰可颂</b><small>Iced French Rosy Cream Croissant</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 23.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240837307510789">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240837307510789" data-cid="29" data-cname="玫瑰奶油可颂">
+<span class="cd-n">玫瑰奶油可颂</span>
+<span class="cd-m">73%</span>
+<span class="cd-c">RM 8.22</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837307510789" data-cid="27" data-cname="树莓奶油可颂">
+<span class="cd-n">树莓奶油可颂</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837307510789" data-cid="28" data-cname="草莓奶油可颂">
+<span class="cd-n">草莓奶油可颂</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 16.16</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837307510789" data-cid="26" data-cname="蓝莓奶油可颂">
+<span class="cd-n">蓝莓奶油可颂</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 13.02</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837307510789" data-cid="25" data-cname="原味可颂">
+<span class="cd-n">原味可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.27</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837307510789" data-cid="31" data-cname="岩烧可颂">
+<span class="cd-n">岩烧可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.86</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240837739524105"
+   data-s="法式开心果莓果爆浆冰可颂 iced french pistachio and raspberry croissant" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式开心果莓果爆浆冰可颂</b><small>Iced French Pistachio and Raspberry Croissant</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 25.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240837739524105">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240837739524105" data-cid="25" data-cname="原味可颂">
+<span class="cd-n">原味可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.27</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837739524105" data-cid="31" data-cname="岩烧可颂">
+<span class="cd-n">岩烧可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.86</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837739524105" data-cid="30" data-cname="杏仁可颂">
+<span class="cd-n">杏仁可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837739524105" data-cid="27" data-cname="树莓奶油可颂">
+<span class="cd-n">树莓奶油可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837739524105" data-cid="29" data-cname="玫瑰奶油可颂">
+<span class="cd-n">玫瑰奶油可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.22</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837739524105" data-cid="28" data-cname="草莓奶油可颂">
+<span class="cd-n">草莓奶油可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 16.16</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240837978599431"
+   data-s="法式蓝莓奶油爆浆冰可颂 iced french blueberry cream croissant" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式蓝莓奶油爆浆冰可颂</b><small>Iced French Blueberry Cream Croissant</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 23.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240837978599431">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240837978599431" data-cid="26" data-cname="蓝莓奶油可颂">
+<span class="cd-n">蓝莓奶油可颂</span>
+<span class="cd-m">73%</span>
+<span class="cd-c">RM 13.02</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837978599431" data-cid="27" data-cname="树莓奶油可颂">
+<span class="cd-n">树莓奶油可颂</span>
+<span class="cd-m">61%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837978599431" data-cid="28" data-cname="草莓奶油可颂">
+<span class="cd-n">草莓奶油可颂</span>
+<span class="cd-m">61%</span>
+<span class="cd-c">RM 16.16</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837978599431" data-cid="29" data-cname="玫瑰奶油可颂">
+<span class="cd-n">玫瑰奶油可颂</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 8.22</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837978599431" data-cid="25" data-cname="原味可颂">
+<span class="cd-n">原味可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.27</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240837978599431" data-cid="31" data-cname="岩烧可颂">
+<span class="cd-n">岩烧可颂</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.86</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240838163148807"
+   data-s="法式蓝莓奶油碱水冰贝果 iced french blueberry cream soda bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式蓝莓奶油碱水冰贝果</b><small>Iced French Blueberry Cream Soda Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 13.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240838163148807">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240838163148807" data-cid="20" data-cname="蓝莓奶油贝果">
+<span class="cd-n">蓝莓奶油贝果</span>
+<span class="cd-m">73%</span>
+<span class="cd-c">RM 6.26</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240838163148807" data-cid="19" data-cname="草莓奶油贝果(下架)">
+<span class="cd-n">草莓奶油贝果(下架)</span>
+<span class="cd-m">61%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240838163148807" data-cid="9" data-cname="蓝莓贝果">
+<span class="cd-n">蓝莓贝果</span>
+<span class="cd-m">54%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240838163148807" data-cid="16" data-cname="碱水红豆贝果">
+<span class="cd-n">碱水红豆贝果</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 4.28</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240838163148807" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">51%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240838163148807" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240838364475396"
+   data-s="法式草莓奶油碱水冰贝果 iced french strawberry cream bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式草莓奶油碱水冰贝果</b><small>Iced French Strawberry Cream Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 12.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240838364475396">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd cd-dead" data-item="1993240838364475396" data-cid="19" data-cname="草莓奶油贝果(下架)">
+<span class="cd-n">草莓奶油贝果(下架)</span>
+<span class="cd-m">73%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240838364475396" data-cid="20" data-cname="蓝莓奶油贝果">
+<span class="cd-n">蓝莓奶油贝果</span>
+<span class="cd-m">61%</span>
+<span class="cd-c">RM 6.26</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240838364475396" data-cid="18" data-cname="草莓贝果(下架)">
+<span class="cd-n">草莓贝果(下架)</span>
+<span class="cd-m">54%</span>
+<span class="cd-c">RM 5.75</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240838364475396" data-cid="16" data-cname="碱水红豆贝果">
+<span class="cd-n">碱水红豆贝果</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 4.28</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240838364475396" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">51%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240838364475396" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240838813265928"
+   data-s="太妃焦糖奶油爆浆冰贝果 iced lava toffee caramel cream bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>太妃焦糖奶油爆浆冰贝果</b><small>Iced Lava Toffee Caramel Cream Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 12.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240838813265928">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240838813265928" data-cid="17" data-cname="焦糖贝果">
+<span class="cd-n">焦糖贝果</span>
+<span class="cd-m">52%</span>
+<span class="cd-c">RM 5.32</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240838813265928" data-cid="19" data-cname="草莓奶油贝果(下架)">
+<span class="cd-n">草莓奶油贝果(下架)</span>
+<span class="cd-m">51%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240838813265928" data-cid="20" data-cname="蓝莓奶油贝果">
+<span class="cd-n">蓝莓奶油贝果</span>
+<span class="cd-m">51%</span>
+<span class="cd-c">RM 6.26</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240838813265928" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">50%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240838813265928" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240838813265928" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240839052341256"
+   data-s="芝麻红豆黄油贝果 iced red bean butter bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>芝麻红豆黄油贝果</b><small>Iced Red Bean Butter Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 12.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240839052341256">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240839052341256" data-cid="16" data-cname="碱水红豆贝果">
+<span class="cd-n">碱水红豆贝果</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 4.28</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240839052341256" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">51%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240839052341256" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240839052341256" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240839052341256" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240839052341256" data-cid="15" data-cname="海盐贝果(下架)">
+<span class="cd-n">海盐贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240839878619139"
+   data-s="双重乳酪贝果 double cheese bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>双重乳酪贝果</b><small>Double Cheese Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 10.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240839878619139">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240839878619139" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240839878619139" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240839878619139" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240839878619139" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240839878619139" data-cid="15" data-cname="海盐贝果(下架)">
+<span class="cd-n">海盐贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240839878619139" data-cid="17" data-cname="焦糖贝果">
+<span class="cd-n">焦糖贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.32</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240840281272329"
+   data-s="日式抹茶红豆贝果 japanese matcha red bean bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>日式抹茶红豆贝果</b><small>Japanese Matcha Red Bean Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 10.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240840281272329">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240840281272329" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">59%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840281272329" data-cid="16" data-cname="碱水红豆贝果">
+<span class="cd-n">碱水红豆贝果</span>
+<span class="cd-m">53%</span>
+<span class="cd-c">RM 4.28</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840281272329" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240840281272329" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840281272329" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240840281272329" data-cid="15" data-cname="海盐贝果(下架)">
+<span class="cd-n">海盐贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240840486793220"
+   data-s="法式爆浆蓝莓冰贝果 french lava blueberry cream bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式爆浆蓝莓冰贝果</b><small>French Lava Blueberry Cream Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 9.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240840486793220">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240840486793220" data-cid="9" data-cname="蓝莓贝果">
+<span class="cd-n">蓝莓贝果</span>
+<span class="cd-m">59%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840486793220" data-cid="20" data-cname="蓝莓奶油贝果">
+<span class="cd-n">蓝莓奶油贝果</span>
+<span class="cd-m">54%</span>
+<span class="cd-c">RM 6.26</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840486793220" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240840486793220" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840486793220" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840486793220" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240840730062850"
+   data-s="法式蒜香乳酪贝果 french garlic cheese bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式蒜香乳酪贝果</b><small>French Garlic Cheese Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 10.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240840730062850">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240840730062850" data-cid="11" data-cname="蒜香贝果">
+<span class="cd-n">蒜香贝果</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 4.98</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840730062850" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240840730062850" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840730062850" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840730062850" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1993240840730062850" data-cid="15" data-cname="海盐贝果(下架)">
+<span class="cd-n">海盐贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240840948166657"
+   data-s="手作厚芋泥流心吐司 handmade taro fluffy loaf" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>手作厚芋泥流心吐司</b><small>Handmade Taro Fluffy Loaf</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 16.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240840948166657">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240840948166657" data-cid="1" data-cname="A牧场牛乳鲜吐司">
+<span class="cd-n">A牧场牛乳鲜吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 9.80</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840948166657" data-cid="3" data-cname="巧克力榴莲吐司">
+<span class="cd-n">巧克力榴莲吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.41</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840948166657" data-cid="5" data-cname="星空流失吐司">
+<span class="cd-n">星空流失吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 11.95</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840948166657" data-cid="2" data-cname="榴莲吐司">
+<span class="cd-n">榴莲吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 12.06</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840948166657" data-cid="78" data-cname="红豆松松吐司">
+<span class="cd-n">红豆松松吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.72</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240840948166657" data-cid="4" data-cname="草莓巧克力爆浆吐司">
+<span class="cd-n">草莓巧克力爆浆吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.52</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="1993240841187241986"
+   data-s="草莓黑巧爆浆熔岩吐司 triple chocolate lava toast" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>草莓黑巧爆浆熔岩吐司</b><small>Triple Chocolate Lava Toast</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 22.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240841187241986">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240841187241986" data-cid="4" data-cname="草莓巧克力爆浆吐司">
+<span class="cd-n">草莓巧克力爆浆吐司</span>
+<span class="cd-m">55%</span>
+<span class="cd-c">RM 10.52</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240841187241986" data-cid="1" data-cname="A牧场牛乳鲜吐司">
+<span class="cd-n">A牧场牛乳鲜吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 9.80</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240841187241986" data-cid="3" data-cname="巧克力榴莲吐司">
+<span class="cd-n">巧克力榴莲吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.41</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240841187241986" data-cid="5" data-cname="星空流失吐司">
+<span class="cd-n">星空流失吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 11.95</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240841187241986" data-cid="2" data-cname="榴莲吐司">
+<span class="cd-n">榴莲吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 12.06</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240841187241986" data-cid="78" data-cname="红豆松松吐司">
+<span class="cd-n">红豆松松吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.72</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1993240841384374279"
+   data-s="猫山王榴莲黑巧乳酪包 choco musang king durian bun" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>猫山王榴莲黑巧乳酪包</b><small>choco Musang King Durian Bun</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 23.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240841384374279">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993240841627643904"
+   data-s="猫山王榴莲芝芝乳酪包 musang king durian cheese bun" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>猫山王榴莲芝芝乳酪包</b><small>Musang King Durian Cheese Bun</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 21.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240841627643904">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="1993240841820581896"
+   data-s="牧场牛乳鲜吐司 fresh milk toast" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>牧场牛乳鲜吐司</b><small>Fresh Milk Toast</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 19.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993240841820581896">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="1993240841820581896" data-cid="1" data-cname="A牧场牛乳鲜吐司">
+<span class="cd-n">A牧场牛乳鲜吐司</span>
+<span class="cd-m">89%</span>
+<span class="cd-c">RM 9.80</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240841820581896" data-cid="3" data-cname="巧克力榴莲吐司">
+<span class="cd-n">巧克力榴莲吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.41</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240841820581896" data-cid="5" data-cname="星空流失吐司">
+<span class="cd-n">星空流失吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 11.95</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240841820581896" data-cid="2" data-cname="榴莲吐司">
+<span class="cd-n">榴莲吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 12.06</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240841820581896" data-cid="78" data-cname="红豆松松吐司">
+<span class="cd-n">红豆松松吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.72</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1993240841820581896" data-cid="4" data-cname="草莓巧克力爆浆吐司">
+<span class="cd-n">草莓巧克力爆浆吐司</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.52</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row is-none" data-item="1993490556822761475"
+   data-s="手打泰式芒果柠檬茶 power crush" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>手打泰式芒果柠檬茶</b><small>Power CRush</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 14.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490556822761475">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490557347049475"
+   data-s="意式脆皮冰可可 italian crispy iced cocoa" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>意式脆皮冰可可</b><small>Italian Crispy Iced Cocoa</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 18.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490557347049475">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490557800034305"
+   data-s="法式玫瑰抹茶拿铁 strawberry rose latte" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式玫瑰抹茶拿铁</b><small>Strawberry Rose Latte</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 16.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490557800034305">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490558877970437"
+   data-s="意式浓厚黑巧酸奶昔 cocoa" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>意式浓厚黑巧酸奶昔</b><small>Cocoa</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 22.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490558877970437">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490559075102720"
+   data-s="日式抹茶牛油果奶昔 avo matcha" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>日式抹茶牛油果奶昔</b><small>Avo Matcha</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 22.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490559075102720">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490559402258437"
+   data-s="泰式芒果酸奶昔 golden mango" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>泰式芒果酸奶昔</b><small>Golden Mango</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 19.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490559402258437">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1993490559683276805"
+   data-s="红颜草莓酸奶昔 strawberry glaze" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>红颜草莓酸奶昔</b><small>Strawberry Glaze</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 19.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1993490559683276805">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1998617994204598278"
+   data-s="双层咖啡杯 hot crush dual-layer  coffee cup" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>双层咖啡杯</b><small>Hot Crush Dual-Layer  Coffee Cup</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 0.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998617994204598278">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1998618102711238657"
+   data-s="陶瓷咖啡杯 hot crush ceramic coffee cup" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>陶瓷咖啡杯</b><small>Hot Crush Ceramic Coffee Cup</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 39.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998618102711238657">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="1998618213243731974"
+   data-s="蝴蝶结耳机包 hot crush petite bow earbuds case" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>蝴蝶结耳机包</b><small>Hot Crush Petite Bow Earbuds Case</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 49.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1998618213243731974">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="1999682638033776649"
+   data-s="海盐贝果 sea salt bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>海盐贝果</b><small>Sea Salt Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 10.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="1999682638033776649">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd cd-dead" data-item="1999682638033776649" data-cid="15" data-cname="海盐贝果(下架)">
+<span class="cd-n">海盐贝果(下架)</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1999682638033776649" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="1999682638033776649" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1999682638033776649" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1999682638033776649" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="1999682638033776649" data-cid="17" data-cname="焦糖贝果">
+<span class="cd-n">焦糖贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.32</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2005913040687812617"
+   data-s="法式菲力牛肉挞 hot crush french fillet beef tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式菲力牛肉挞</b><small>Hot Crush French Fillet Beef Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 14.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2005913040687812617">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2005913040687812617" data-cid="49" data-cname="菲力牛肉塔">
+<span class="cd-n">菲力牛肉塔</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 7.09</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2005913040687812617" data-cid="84" data-cname="番茄牛肉塔">
+<span class="cd-n">番茄牛肉塔</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 6.24</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2005913040687812617" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2005913040687812617" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2005913040687812617" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2005913040687812617" data-cid="52" data-cname="心动树莓奶油挞(圆大挞)">
+<span class="cd-n">心动树莓奶油挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.55</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2028069387977637895"
+   data-s="法式千层酥皮黑椒牛肉派 french crispy black pepper beef layer pie" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式千层酥皮黑椒牛肉派</b><small>French Crispy Black pepper Beef Layer pie</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 16.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2028069387977637895">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2028069387977637895" data-cid="69" data-cname="菲力牛肉派">
+<span class="cd-n">菲力牛肉派</span>
+<span class="cd-m">51%</span>
+<span class="cd-c">RM 16.91</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2028069387977637895" data-cid="70" data-cname="菲力牛肉派(网状)">
+<span class="cd-n">菲力牛肉派(网状)</span>
+<span class="cd-m">49%</span>
+<span class="cd-c">RM 13.73</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2029763759702044672"
+   data-s="车厘子巧克力巴斯克 french cherry dark chocolate lava basque" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>车厘子巧克力巴斯克</b><small>French Cherry Dark Chocolate Lava Basque</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 21.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2029763759702044672">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2029763759702044672" data-cid="73" data-cname="巧克力巴斯克">
+<span class="cd-n">巧克力巴斯克</span>
+<span class="cd-m">75%</span>
+<span class="cd-c">RM 5.91</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763759702044672" data-cid="74" data-cname="巧克力刨花巴斯克">
+<span class="cd-n">巧克力刨花巴斯克</span>
+<span class="cd-m">61%</span>
+<span class="cd-c">RM 3.26</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2029763759702044672" data-cid="54" data-cname="奥利奥巴斯克(下架)">
+<span class="cd-n">奥利奥巴斯克(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.25</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763759702044672" data-cid="57" data-cname="开心果巴斯克">
+<span class="cd-n">开心果巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763759702044672" data-cid="53" data-cname="抹茶巴斯克">
+<span class="cd-n">抹茶巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 11.49</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763759702044672" data-cid="72" data-cname="树莓香缇软心巴斯克">
+<span class="cd-n">树莓香缇软心巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2029763866937815040"
+   data-s="巧克力刨花巴斯克 french rich dark chocolate shavings basque" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>巧克力刨花巴斯克</b><small>French Rich Dark Chocolate Shavings Basque</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 18.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2029763866937815040">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2029763866937815040" data-cid="74" data-cname="巧克力刨花巴斯克">
+<span class="cd-n">巧克力刨花巴斯克</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 3.26</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763866937815040" data-cid="73" data-cname="巧克力巴斯克">
+<span class="cd-n">巧克力巴斯克</span>
+<span class="cd-m">73%</span>
+<span class="cd-c">RM 5.91</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2029763866937815040" data-cid="54" data-cname="奥利奥巴斯克(下架)">
+<span class="cd-n">奥利奥巴斯克(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.25</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763866937815040" data-cid="57" data-cname="开心果巴斯克">
+<span class="cd-n">开心果巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763866937815040" data-cid="53" data-cname="抹茶巴斯克">
+<span class="cd-n">抹茶巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 11.49</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2029763866937815040" data-cid="72" data-cname="树莓香缇软心巴斯克">
+<span class="cd-n">树莓香缇软心巴斯克</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2031655249348947971"
+   data-s="贝果新品 new bagel item" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>贝果新品</b><small>New Bagel Item</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 100.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2031655249348947971">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2031655249348947971" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2031655249348947971" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2031655249348947971" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2031655249348947971" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2031655249348947971" data-cid="15" data-cname="海盐贝果(下架)">
+<span class="cd-n">海盐贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2031655249348947971" data-cid="17" data-cname="焦糖贝果">
+<span class="cd-n">焦糖贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.32</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2032058352409808903"
+   data-s="轻糖香水柠檬拿破仑酥 light sugar perfumed lemon mille-feuille" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>轻糖香水柠檬拿破仑酥</b><small>Light Sugar Perfumed Lemon Mille-Feuille</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 8.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2032058352409808903">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2032058352409808903" data-cid="75" data-cname="半糖伊朗开心果奶油拿破仑酥">
+<span class="cd-n">半糖伊朗开心果奶油拿破仑酥</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2032058352409808903" data-cid="65" data-cname="开心果拿破仑(全部)测试">
+<span class="cd-n">开心果拿破仑(全部)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.23</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2032058352409808903" data-cid="66" data-cname="开心果拿破仑(半边)测试">
+<span class="cd-n">开心果拿破仑(半边)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 1.60</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2032058352409808903" data-cid="67" data-cname="草莓拿破仑(全部)">
+<span class="cd-n">草莓拿破仑(全部)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.39</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2032058352409808903" data-cid="68" data-cname="草莓拿破仑(半边)测试">
+<span class="cd-n">草莓拿破仑(半边)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2034671550812160003"
+   data-s="碱水红豆黄油冰贝果 iced red bean butter bagel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>碱水红豆黄油冰贝果</b><small>Iced Red Bean Butter Bagel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 9.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2034671550812160003">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2034671550812160003" data-cid="16" data-cname="碱水红豆贝果">
+<span class="cd-n">碱水红豆贝果</span>
+<span class="cd-m">73%</span>
+<span class="cd-c">RM 4.28</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2034671550812160003" data-cid="10" data-cname="抹茶奶酥红豆贝果">
+<span class="cd-n">抹茶奶酥红豆贝果</span>
+<span class="cd-m">51%</span>
+<span class="cd-c">RM 4.56</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2034671550812160003" data-cid="13" data-cname="咖喱贝果">
+<span class="cd-n">咖喱贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 2.96</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2034671550812160003" data-cid="21" data-cname="奥利奥奶油贝果(下架)">
+<span class="cd-n">奥利奥奶油贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.93</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2034671550812160003" data-cid="14" data-cname="巧克力贝果">
+<span class="cd-n">巧克力贝果</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.62</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2034671550812160003" data-cid="15" data-cname="海盐贝果(下架)">
+<span class="cd-n">海盐贝果(下架)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.24</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row is-none" data-item="2040806994205519880"
+   data-s="生椰拿铁 coconut latte" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>生椰拿铁</b><small>Coconut Latte</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 14.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2040806994205519880">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row is-none" data-item="2040807927601733641"
+   data-s="生椰拿铁 coconut latte" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>生椰拿铁</b><small>Coconut Latte</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 14.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2040807927601733641">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="2043242052161941508"
+   data-s="芙洛芙拉焦糖碱水结 berlin volufra caramel pretzel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>芙洛芙拉焦糖碱水结</b><small>Berlin Volufra Caramel Pretzel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 12.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2043242052161941508">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2043242052161941508" data-cid="80" data-cname="焦糖碱水结">
+<span class="cd-n">焦糖碱水结</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 7.28</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242052161941508" data-cid="87" data-cname="焦糖饼干碱水结">
+<span class="cd-n">焦糖饼干碱水结</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 4.04</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242052161941508" data-cid="83" data-cname="咖啡坚果碱水结">
+<span class="cd-n">咖啡坚果碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.40</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242052161941508" data-cid="91" data-cname="咸蛋黄碱水结">
+<span class="cd-n">咸蛋黄碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.00</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242052161941508" data-cid="82" data-cname="开心果片碱水结">
+<span class="cd-n">开心果片碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.11</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242052161941508" data-cid="86" data-cname="开心果碎碱水结">
+<span class="cd-n">开心果碎碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.67</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2043242186144784386"
+   data-s="芙洛芙拉咖啡碱水结 berlin volufra coffee pretzel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>芙洛芙拉咖啡碱水结</b><small>Berlin Volufra Coffee Pretzel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 13.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2043242186144784386">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2043242186144784386" data-cid="83" data-cname="咖啡坚果碱水结">
+<span class="cd-n">咖啡坚果碱水结</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 15.40</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242186144784386" data-cid="91" data-cname="咸蛋黄碱水结">
+<span class="cd-n">咸蛋黄碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.00</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242186144784386" data-cid="82" data-cname="开心果片碱水结">
+<span class="cd-n">开心果片碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.11</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242186144784386" data-cid="86" data-cname="开心果碎碱水结">
+<span class="cd-n">开心果碎碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.67</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242186144784386" data-cid="32" data-cname="心动黑巧克力薄脆碱水结">
+<span class="cd-n">心动黑巧克力薄脆碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.87</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242186144784386" data-cid="79" data-cname="抹茶奶油碱水结">
+<span class="cd-n">抹茶奶油碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.04</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row is-dis" data-item="2043242646398345225"
+   data-s="心动黑巧薄脆碱水结 french cocoa crispy pretzel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>心动黑巧薄脆碱水结</b><small>French Cocoa Crispy Pretzel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 10.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2043242646398345225">不适用</button></div>
+ </div>
+ <p class="dis">⚠ 应挂 88(法式丹麦面团)而非 32(碱水结可颂面团)，差 RM1.37/件</p>
+ <div class="cds"><button class="cd" data-item="2043242646398345225" data-cid="88" data-cname="黑巧薄脆碱水结">
+<span class="cd-n">黑巧薄脆碱水结</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 9.24</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242646398345225" data-cid="32" data-cname="心动黑巧克力薄脆碱水结">
+<span class="cd-n">心动黑巧克力薄脆碱水结</span>
+<span class="cd-m">63%</span>
+<span class="cd-c">RM 7.87</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242646398345225" data-cid="83" data-cname="咖啡坚果碱水结">
+<span class="cd-n">咖啡坚果碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.40</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242646398345225" data-cid="91" data-cname="咸蛋黄碱水结">
+<span class="cd-n">咸蛋黄碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 13.00</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242646398345225" data-cid="82" data-cname="开心果片碱水结">
+<span class="cd-n">开心果片碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.11</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242646398345225" data-cid="86" data-cname="开心果碎碱水结">
+<span class="cd-n">开心果碎碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.67</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2043242749330763777"
+   data-s="芝麻拿破仑酥 sesame napoleon pastry" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>芝麻拿破仑酥</b><small>Sesame Napoleon Pastry</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 6.00</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2043242749330763777">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2043242749330763777" data-cid="75" data-cname="半糖伊朗开心果奶油拿破仑酥">
+<span class="cd-n">半糖伊朗开心果奶油拿破仑酥</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">无成本</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2043242749330763777" data-cid="65" data-cname="开心果拿破仑(全部)测试">
+<span class="cd-n">开心果拿破仑(全部)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.23</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2043242749330763777" data-cid="66" data-cname="开心果拿破仑(半边)测试">
+<span class="cd-n">开心果拿破仑(半边)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 1.60</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2043242749330763777" data-cid="67" data-cname="草莓拿破仑(全部)">
+<span class="cd-n">草莓拿破仑(全部)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.39</span>
+<span class="cd-r"></span>
+</button><button class="cd cd-dead" data-item="2043242749330763777" data-cid="68" data-cname="草莓拿破仑(半边)测试">
+<span class="cd-n">草莓拿破仑(半边)测试</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 3.15</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row" data-item="2046098321482764292"
+   data-s="法式番茄牛肉塔 french tomato beef savory tart" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>法式番茄牛肉塔</b><small>French Tomato Beef Savory Tart</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 12.80</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2046098321482764292">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2046098321482764292" data-cid="84" data-cname="番茄牛肉塔">
+<span class="cd-n">番茄牛肉塔</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 6.24</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2046098321482764292" data-cid="49" data-cname="菲力牛肉塔">
+<span class="cd-n">菲力牛肉塔</span>
+<span class="cd-m">56%</span>
+<span class="cd-c">RM 7.09</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2046098321482764292" data-cid="43" data-cname="原味蛋挞">
+<span class="cd-n">原味蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 4.20</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2046098321482764292" data-cid="45" data-cname="巧克力蛋挞">
+<span class="cd-n">巧克力蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 5.77</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2046098321482764292" data-cid="44" data-cname="开心果蛋挞">
+<span class="cd-n">开心果蛋挞</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.05</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2046098321482764292" data-cid="52" data-cname="心动树莓奶油挞(圆大挞)">
+<span class="cd-n">心动树莓奶油挞(圆大挞)</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.55</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+<div class="row is-none" data-item="2053120045898424320"
+   data-s="杯子 杯子" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>杯子</b><small>杯子</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 1.50</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2053120045898424320">不适用</button></div>
+ </div>
+ 
+ <p class="none">成本卡里没有对应项 —— 需要新建，或标「不适用」</p>
+</div>
+<div class="row" data-item="2056559244295196677"
+   data-s="芙洛芙拉咸蛋黄碱水结 berlin volufra salted egg yolk pretzel" data-state="pending">
+ <div class="rh">
+  <div class="rn"><b>芙洛芙拉咸蛋黄碱水结</b><small>Berlin Volufra Salted Egg Yolk Pretzel</small></div>
+  <div class="rm">
+    <span title="近30天净销">RM 0</span>
+    <span title="近30天件数">0 件</span>
+    <span title="实收单价（成本率分母用它）">实收 —</span>
+    <span class="muted" title="菜单价">牌价 RM 18.90</span>
+  </div>
+  <div class="rs"><span class="pick"></span><button class="na" data-item="2056559244295196677">不适用</button></div>
+ </div>
+ 
+ <div class="cds"><button class="cd" data-item="2056559244295196677" data-cid="91" data-cname="咸蛋黄碱水结">
+<span class="cd-n">咸蛋黄碱水结</span>
+<span class="cd-m">100%</span>
+<span class="cd-c">RM 13.00</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2056559244295196677" data-cid="83" data-cname="咖啡坚果碱水结">
+<span class="cd-n">咖啡坚果碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 15.40</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2056559244295196677" data-cid="82" data-cname="开心果片碱水结">
+<span class="cd-n">开心果片碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 10.11</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2056559244295196677" data-cid="86" data-cname="开心果碎碱水结">
+<span class="cd-n">开心果碎碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.67</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2056559244295196677" data-cid="32" data-cname="心动黑巧克力薄脆碱水结">
+<span class="cd-n">心动黑巧克力薄脆碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 7.87</span>
+<span class="cd-r"></span>
+</button><button class="cd" data-item="2056559244295196677" data-cid="79" data-cname="抹茶奶油碱水结">
+<span class="cd-n">抹茶奶油碱水结</span>
+<span class="cd-m">45%</span>
+<span class="cd-c">RM 8.04</span>
+<span class="cd-r"></span>
+</button></div>
+</div>
+</div>
+
+<div id="out" hidden>
+ <div class="oh"><h3>映射 SQL</h3><button class="chip" id="cp">复制</button><button class="chip" id="cl">关闭</button></div>
+ <pre id="sql"></pre>
+</div>
+
+<script>
+(function(){
+ var KEY='hotcrush-cost-map-v1';
+ var sel={}; try{sel=JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){sel={}}
+ var rows=[].slice.call(document.querySelectorAll('.row'));
+ var chips=[].slice.call(document.querySelectorAll('.chip[data-f]'));
+ var q=document.getElementById('q'), prog=document.getElementById('prog');
+ var active={};
+ function paint(){
+  rows.forEach(function(r){
+   var id=r.dataset.item, s=sel[id];
+   var pick=r.querySelector('.pick');
+   [].forEach.call(r.querySelectorAll('.cd'),function(b){
+    b.setAttribute('aria-pressed', s&&s.cid==b.dataset.cid?'true':'false');});
+   if(s&&s.cid){ r.dataset.state='done'; pick.textContent='✓ '+s.cname; }
+   else if(s&&s.na){ r.dataset.state='na'; pick.textContent='— 不适用'; }
+   else { r.dataset.state='pending'; pick.textContent=''; }
+  });
+  var sellRows=rows.slice(0,63);
+  var done=sellRows.filter(function(r){return r.dataset.state!=='pending'}).length;
+  prog.textContent=done+' / '+sellRows.length+' 已处理';
+ }
+ function apply(){
+  var t=q.value.trim().toLowerCase();
+  var on=Object.keys(active).filter(function(k){return active[k]});
+  rows.forEach(function(r){
+   var okQ=!t||(r.dataset.s||'').indexOf(t)>=0;
+   var okF=!on.length||on.some(function(f){
+     return f==='pending'? r.dataset.state==='pending'
+          : f==='dis'? r.classList.contains('is-dis')
+          : r.classList.contains('is-none'); });
+   r.hidden=!(okQ&&okF);
+  });
+ }
+ document.addEventListener('click',function(e){
+  var b=e.target.closest('.cd');
+  if(b){ var id=b.dataset.item;
+   if(sel[id]&&sel[id].cid==b.dataset.cid) delete sel[id];
+   else sel[id]={cid:b.dataset.cid,cname:b.dataset.cname};
+   localStorage.setItem(KEY,JSON.stringify(sel)); paint(); apply(); return; }
+  var na=e.target.closest('.na');
+  if(na){ var i=na.dataset.item;
+   if(sel[i]&&sel[i].na) delete sel[i]; else sel[i]={na:true};
+   localStorage.setItem(KEY,JSON.stringify(sel)); paint(); apply(); return; }
+ });
+ chips.forEach(function(c){c.addEventListener('click',function(){
+   var f=c.dataset.f; active[f]=!active[f];
+   c.setAttribute('aria-pressed',active[f]?'true':'false'); apply(); });});
+ q.addEventListener('input',apply);
+ document.getElementById('exp').addEventListener('click',function(){
+  var vals=Object.keys(sel).filter(function(k){return sel[k].cid})
+    .map(function(k){ var r=rows.filter(function(x){return x.dataset.item===k})[0];
+      var zh=r?r.querySelector('.rn b').textContent:'';
+      return "  ('"+k+"', "+sel[k].cid+", 'manual', '"+zh.replace(/'/g,"''")+" → "+sel[k].cname.replace(/'/g,"''")+"')"; });
+  var na=Object.keys(sel).filter(function(k){return sel[k].na});
+  var s;
+  if(!vals.length){ s='-- 还没有选任何映射'; }
+  else { s="-- cost_card_product_link 人工对照结果 · "+vals.length+" 条\n"+
+   "-- 未映射（标为不适用）："+na.length+" 个\n\n"+
+   "INSERT INTO cost_card_product_link (pos_item_id, item_id, mapped_by, note) VALUES\n"+
+   vals.join(',\n')+"\nON CONFLICT (pos_item_id) DO UPDATE\n"+
+   "  SET item_id = EXCLUDED.item_id, mapped_at = now(), note = EXCLUDED.note;\n\n"+
+   "-- 验收：覆盖率应显著上升\n"+
+   "WITH s AS (SELECT split_part(item_key,'-',3) iid, SUM(net_sales) v\n"+
+   "           FROM item_hourly_sales WHERE date > current_date-30 GROUP BY 1)\n"+
+   "SELECT round(100.0*SUM(v) FILTER (WHERE EXISTS (\n"+
+   "         SELECT 1 FROM cost_card_product_link l WHERE l.pos_item_id=s.iid))/SUM(v),1) AS 覆盖率\n"+
+   "FROM s;";
+  }
+  document.getElementById('sql').textContent=s;
+  document.getElementById('out').hidden=false;
+ });
+ document.getElementById('cl').addEventListener('click',function(){document.getElementById('out').hidden=true;});
+ document.getElementById('cp').addEventListener('click',function(){
+  var t=document.getElementById('sql').textContent;
+  if(navigator.clipboard) navigator.clipboard.writeText(t);
+  this.textContent='已复制'; var b=this; setTimeout(function(){b.textContent='复制'},1400);
+ });
+ paint(); apply();
+})();
+</script>

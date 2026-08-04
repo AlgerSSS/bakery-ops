@@ -63,6 +63,14 @@ const samples: Record<CompletionRecord["status"], CompletionRecord[]> = {
       completion: snapshot,
       reason: "give_rejected",
       markedAt: "2026-08-02T00:00:02.000Z",
+      attemptId: "6f1f6f6a-5b7e-4d2a-9a3f-2f4c8d1e7b90",
+      baselineCouponIds: ["coupon-1"],
+      rewardContext: {
+        memberId: "member-1",
+        templateId: "template-1",
+        templateName: "HBTI Gift · Rose Fridge Magnet",
+      },
+      alert: { status: "pending" },
     },
   ],
   unrewarded: [
@@ -101,5 +109,29 @@ describe("completionRecordSchema", () => {
         markedAt: "2026-08-02T00:00:02.000Z",
       }),
     ).toThrow();
+  });
+
+  // 历史 review 行（2026-08 之前写下的四字段形态）必须仍能读出来，
+  // 且缺失的处置线索要补成可辨认的哨兵——否则那个会员在 548 天保留期内
+  // 每次查状态都会 503。
+  it("历史四字段 review 行仍可解析，并补上哨兵线索", () => {
+    const legacy = {
+      status: "review",
+      completion: JSON.parse(JSON.stringify(snapshot)),
+      reason: "give_rejected",
+      markedAt: "2026-08-01T00:00:02.000Z",
+    };
+    const parsed = completionRecordSchema.parse(legacy);
+    expect(parsed).toMatchObject({
+      status: "review",
+      reason: "give_rejected",
+      baselineCouponIds: [],
+      rewardContext: {
+        memberId: "legacy-unknown",
+        templateId: "legacy-unknown",
+        templateName: "legacy-unknown",
+      },
+      alert: { status: "pending" },
+    });
   });
 });

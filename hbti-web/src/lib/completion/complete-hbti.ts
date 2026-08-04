@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { z } from "zod";
 
+import { reviewAlertPayload, sendAlert } from "@/lib/alert";
 import type { HbtiAnswersInput } from "@/lib/hbti/schema";
 import { hbtiAnswersSchema } from "@/lib/hbti/schema";
 import { scoreHbti } from "@/lib/hbti/scoring";
@@ -267,7 +268,28 @@ export async function completeHbti(
       // 抛到这里的都已经自己清过锁；抽奖失败时也还没扣到库存。
       throw error;
     }
-    await releaseReward(dependencies.gifts, drawnTemplateName);
+    const released = await releaseReward(
+      dependencies.gifts,
+      drawnTemplateName,
+    );
+    if (!released && drawnTemplateName) {
+      return markForReview(
+        dependencies.store,
+        key,
+        {
+          attemptId,
+          completion,
+          baselineCouponIds: [],
+          rewardContext: {
+            memberId: key.memberId,
+            templateId: "unresolved-before-prepared",
+            templateName: drawnTemplateName,
+          },
+        },
+        "inventory_release_ambiguous",
+        safeIsoTimestamp(now),
+      );
+    }
     await clearLocked(dependencies.store, key, attemptId);
     throw new CompleteHbtiError(
       "RES_UNAVAILABLE",
@@ -295,7 +317,19 @@ export async function completeHbti(
   try {
     await markPrepared(dependencies.store, key, attemptId, prepared);
   } catch (error) {
-    await releaseReward(dependencies.gifts, drawnTemplateName);
+    const released = await releaseReward(
+      dependencies.gifts,
+      drawnTemplateName,
+    );
+    if (!released) {
+      return markForReview(
+        dependencies.store,
+        key,
+        prepared,
+        "inventory_release_ambiguous",
+        safeIsoTimestamp(now),
+      );
+    }
     throw error;
   }
 
@@ -353,8 +387,7 @@ export async function completeHbti(
     return markForReview(
       dependencies.store,
       key,
-      attemptId,
-      completion,
+      prepared,
       "readback_mismatch",
       safeIsoTimestamp(now),
     );
@@ -363,8 +396,7 @@ export async function completeHbti(
     return markForReview(
       dependencies.store,
       key,
-      attemptId,
-      completion,
+      prepared,
       "give_rejected",
       safeIsoTimestamp(now),
     );
@@ -556,8 +588,7 @@ export async function reconcilePreparedCompletion({
     return markForReview(
       dependencies.store,
       key,
-      record.attemptId,
-      record.completion,
+      record,
       "readback_unavailable",
       safeIsoTimestamp(now),
     );
@@ -595,8 +626,7 @@ export async function reconcilePreparedCompletion({
     return markForReview(
       dependencies.store,
       key,
-      record.attemptId,
-      record.completion,
+      record,
       "readback_mismatch",
       safeIsoTimestamp(now),
     );
@@ -607,8 +637,7 @@ export async function reconcilePreparedCompletion({
   return markForReview(
     dependencies.store,
     key,
-    record.attemptId,
-    record.completion,
+    record,
     "stale_reconciliation",
     safeIsoTimestamp(now),
   );
@@ -652,20 +681,22 @@ async function selectReward(
 /**
  * 归还一件抽中但没发出去的库存。
  *
- * 吞掉异常是有意的：调用它的地方本来就在处理另一个错误，归还失败不该把那个错误盖掉。
- * 代价是极少数情况下漏还一件——库存表少算一件，比顾客拿到一个被覆盖的错误要好。
+ * 失败不抛出，因为调用方本来就在处理另一个错误；但返回 false，强制调用方把完成记录
+ * 转成 durable review。归还失败可能是「UPDATE 已提交、响应断了」的结果未知，
+ * 所以绝不能自动再减一次 issued_count：必须按本期 issued 完成数和 gift_stock 对账。
  */
 async function releaseReward(
   gifts: GiftPoolDependency | undefined,
   templateName: string | null,
-): Promise<void> {
+): Promise<boolean> {
   if (!gifts || !templateName) {
-    return;
+    return true;
   }
   try {
     await gifts.release(templateName);
+    return true;
   } catch {
-    // 见上
+    return false;
   }
 }
 
@@ -763,34 +794,92 @@ async function finalizeIssued(
   }
 }
 
+/**
+ * 标记为需要人工处置。
+ *
+ * 参数收的是整条 `prepared` 记录而不是散装字段:review 必须带齐
+ * attemptId / baselineCouponIds / rewardContext,而这三样只在 prepared 里有。
+ * 让调用方自己挑字段传的话,漏传一个 tsc 也未必拦得住;收整条记录则由类型系统保证
+ * 「能标 review 就一定有线索」。
+ *
+ * 这些线索是运营唯一的抓手:库存此刻已经扣掉、RES 那边可能已经发出券,
+ * 没有 templateName 不知道该归还哪件,没有 memberId + 基线券 ID 不知道该查哪张券。
+ */
 async function markForReview(
   store: CompletionStore,
   key: CompletionStoreKey,
-  attemptId: string,
-  completion: HbtiCompletionSnapshot,
+  prepared: Pick<
+    PreparedCompletionRecord,
+    "attemptId" | "completion" | "baselineCouponIds" | "rewardContext"
+  >,
   reason: CompletionReviewReason,
   markedAt: string,
 ): Promise<CompleteHbtiResult> {
   const review: ReviewCompletionRecord = {
     status: "review",
-    completion,
+    completion: prepared.completion,
     reason,
     markedAt,
+    attemptId: prepared.attemptId,
+    baselineCouponIds: prepared.baselineCouponIds,
+    rewardContext: prepared.rewardContext,
+    // 告警状态与 review 一起原子写进同一个 hbti_record；即时发送失败时 Cron 会重试。
+    alert: { status: "pending" },
   };
   try {
-    await store.markReview(key, attemptId, review);
+    await store.markReview(key, prepared.attemptId, review);
   } catch {
-    const current = await getCompletion(store, key);
-    if (current?.status === "issued" || current?.status === "review") {
+    let current: CompletionRecord | null = null;
+    try {
+      current = await getCompletion(store, key);
+    } catch {
+      // 状态写入和确认读取都失败时，仍继续走独立 webhook 兜底。
+    }
+    if (current?.status === "review") {
+      await deliverReviewAlert(store, key, current);
       return resultFromRecord(current);
     }
+    if (current?.status === "issued") {
+      return resultFromRecord(current);
+    }
+    // 状态没能落库时仍发一次 best-effort 告警；不能让数据库故障把唯一线索也吞掉。
+    await sendAlert(reviewAlertPayload(review));
     throw new CompleteHbtiError(
       "STORE_UNAVAILABLE",
       "Completion service is temporarily unavailable.",
       true,
     );
   }
+
+  await deliverReviewAlert(store, key, review);
   return resultFromRecord(review);
+}
+
+async function deliverReviewAlert(
+  store: CompletionStore,
+  key: CompletionStoreKey,
+  review: ReviewCompletionRecord,
+): Promise<void> {
+  const outcome = await sendAlert(reviewAlertPayload(review));
+  if (outcome !== "sent") {
+    return;
+  }
+  if (!store.markReviewAlertSent) {
+    return;
+  }
+  try {
+    await store.markReviewAlertSent(
+      key,
+      review.attemptId,
+      safeIsoTimestamp(() => new Date()),
+    );
+  } catch (error) {
+    // webhook 已成功，只是 sent 标记失败：留 pending 让 Cron 至少重试一次，比漏报安全。
+    console.error("HBTI review alert delivery marker failed", {
+      attemptId: review.attemptId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+  }
 }
 
 /**

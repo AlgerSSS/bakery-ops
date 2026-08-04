@@ -20,6 +20,7 @@ import { createCompletionStoreFromEnv } from "@/lib/store/pg-completion-store";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+const RES_DEADLINE_MS = 24_000;
 
 const requestSchema = z.strictObject({
   answers: hbtiAnswersSchema,
@@ -51,6 +52,7 @@ const requestSchema = z.strictObject({
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
+    const resDeadline = AbortSignal.timeout(RES_DEADLINE_MS);
     const config = readHbtiServerConfig();
     const rejection = getJsonMutationRejection(
       request,
@@ -59,7 +61,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (rejection) {
       return rejection;
     }
-    const input = requestSchema.parse(await request.json());
+    // 会话检查放在 body 解析之前：未登录请求直接 401，
+    // 不能让匿名调用者不花任何成本就触发解析与校验层。
     const sessionToken = readHbtiSessionCookie(request);
     if (!sessionToken) {
       return noStoreJson(
@@ -74,6 +77,21 @@ export async function POST(request: Request): Promise<NextResponse> {
         { status: 401 },
       );
     }
+    // request.json() 在 body 不是合法 JSON 时抛的是 SyntaxError 而不是 ZodError，
+    // 若交给外层 catch 会掉进兜底分支被误报成 503 SERVICE_UNAVAILABLE——
+    // 客户端错误被计入服务可用性指标，且 retryable:true 会误导客户端重试
+    // 一个永远不会成功的请求。因此在这里单独捕获，按客户端错误返回 400，
+    // 与下面 ZodError 的处理（同样是请求方发错了东西）保持一致。
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return noStoreJson(
+        { error: "INVALID_REQUEST", retryable: false },
+        { status: 400 },
+      );
+    }
+    const input = requestSchema.parse(rawBody);
     const rateLimit = await consumeTokenRateLimit({
       scope: "complete",
       token: sessionToken,
@@ -104,7 +122,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       },
       {
         store: await createCompletionStoreFromEnv(),
-        res: createResApiClientFromEnv(),
+        res: createResApiClientFromEnv(resDeadline),
         couponTemplateName: config.couponTemplateName,
         gifts: {
           draw: () => drawGift(),

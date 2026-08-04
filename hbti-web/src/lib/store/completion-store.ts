@@ -71,13 +71,43 @@ export type CompletionReviewReason =
   | "give_rejected"
   | "readback_unavailable"
   | "readback_mismatch"
-  | "stale_reconciliation";
+  | "stale_reconciliation"
+  | "inventory_release_ambiguous";
 
+export interface CompletionReviewAlert {
+  status: "pending" | "delivering" | "sent";
+  lastAttemptAt?: string;
+}
+
+/**
+ * 需要人工处置的终态。
+ *
+ * `rewardContext` 与 `baselineCouponIds` 是**处置线索，不是冗余**：
+ * 进入 review 时库存已经扣掉、RES 那边可能已经发出券，运营必须能回答两个问题——
+ * 「该查哪张券」(memberId + 基线券 ID，用差集找出新增的那张)
+ * 「该归还哪件库存」(templateName)。
+ *
+ * 早期版本这里只有 completion/reason/markedAt，而 `write()` 是整体替换 hbti_record，
+ * 于是 prepared 阶段攒下的线索在标记 review 的那一刻全部消失，库存被永久占住且无从查起。
+ *
+ * **必填，不要改成可选。** 五个 markForReview 调用点全部在 prepared 建立之后
+ * （初次路径有 prepared，对账路径有 record），信息一定拿得到；设成可选只会让
+ * 同一个丢线索的 bug 重新变得合法。历史上写下的四字段行由
+ * pg-completion-store 的 legacy 读取分支兼容，不靠弱化这里的写入类型。
+ */
 export interface ReviewCompletionRecord {
   status: "review";
   completion: HbtiCompletionSnapshot;
   reason: CompletionReviewReason;
   markedAt: string;
+  attemptId: string;
+  baselineCouponIds: readonly string[];
+  rewardContext: {
+    memberId: string;
+    templateId: string;
+    templateName: string;
+  };
+  alert: CompletionReviewAlert;
 }
 
 /**
@@ -135,6 +165,11 @@ export interface CompletionStore {
     key: CompletionStoreKey,
     attemptId: string,
     record: ReviewCompletionRecord,
+  ): Promise<void>;
+  markReviewAlertSent?(
+    key: CompletionStoreKey,
+    attemptId: string,
+    sentAt: string,
   ): Promise<void>;
   markUnrewarded(
     key: CompletionStoreKey,

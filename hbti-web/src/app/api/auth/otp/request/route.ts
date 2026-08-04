@@ -45,7 +45,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       return rejection;
     }
 
-    const input = requestSchema.parse(await request.json());
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return noStoreJson({ error: "INVALID_REQUEST" }, { status: 400 });
+    }
+    const input = requestSchema.parse(rawBody);
     const phone = normalizeAuthPhone(input.phone);
     const authConfig = readHbtiAuthConfig();
     const rateLimiter = await createAuthRateLimiterFromEnv(

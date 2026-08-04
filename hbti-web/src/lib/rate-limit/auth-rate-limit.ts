@@ -1,4 +1,5 @@
 import { createHmac } from "node:crypto";
+import { isIP } from "node:net";
 
 import { getDb, type SqlRunner } from "@/lib/db/postgres";
 import { bumpRateLimitBucket } from "@/lib/rate-limit/pg-rate-limit";
@@ -10,6 +11,13 @@ interface AuthRateLimitRule {
   windowMs: number;
 }
 
+const OTP_PHONE_DAY_RULE: AuthRateLimitRule = {
+  scope: "otp-phone-day",
+  identity: "phone",
+  limit: 5,
+  windowMs: 24 * 60 * 60_000,
+};
+
 const OTP_REQUEST_RULES: readonly AuthRateLimitRule[] = [
   {
     scope: "otp-phone-minute",
@@ -17,12 +25,7 @@ const OTP_REQUEST_RULES: readonly AuthRateLimitRule[] = [
     limit: 1,
     windowMs: 60_000,
   },
-  {
-    scope: "otp-phone-day",
-    identity: "phone",
-    limit: 5,
-    windowMs: 24 * 60 * 60_000,
-  },
+  OTP_PHONE_DAY_RULE,
   {
     scope: "otp-ip-ten-minute",
     identity: "ip",
@@ -41,12 +44,10 @@ export interface AuthRateLimitDecision {
   allowed: boolean;
   retryAfterSeconds: number;
   /**
-   * 这个号码在当前 24 小时窗口内的第几次发码请求（含本次）。
+   * 这个号码在当前 24 小时窗口内第几次获准进入发码流程（含本次）。
    *
-   * 用途不是限流，是**说实话**：实测同一号码当天第二次及以后的验证码，RES 会回
-   * "000" 却不真的发出去（19 次请求精确关联，首次 11/13 到达，重复 0/6）。
-   * 拿到这个计数，界面就能提示「今天已经发过一次，可能收不到新的」，
-   * 而不是每次都笃定地说「已发送」然后让顾客干等。
+   * 被分钟/IP 门禁拒绝的请求不会消耗这个每日发送额度。它只用于在真正获准
+   * 调用 RES 时如实提示：当天第二次及以后，供应商可能返回成功但不再送达短信。
    */
   phoneAttemptsToday: number;
 }
@@ -58,8 +59,29 @@ export interface OtpRequestRateLimitInput {
 }
 
 /**
- * 发码限流，四条规则同时生效（手机号 1/分、5/天；IP 10/10 分、50/天）。
- * 计数器存在 `hbti_rate_limit`（迁移 063）；手机号与 IP 只以 HMAC 摘要入库。
+ * 无法确定客户端 IP 时使用的固定兜底身份。
+ *
+ * 必须对所有请求恒定、且不可能与任何合法 IP 字面量撞车：非法/缺失的 IP 若按
+ * 原始字符串各开一桶，伪造者轮换任意字符串就等于手握无限个独立限流桶，
+ * 既绕过配额又把 `hbti_rate_limit` 表撑爆。
+ */
+export const UNTRUSTED_IP_IDENTITY = "untrusted-ip";
+
+/**
+ * 兜底桶的 IP 配额按正常配额的 1/5 收紧（10 分钟 2 次、每天 10 次）。
+ *
+ * 正常 IP 配额是按家庭宽带 / 共享 NAT 下可能有多个真实用户定的；而 Vercel 边缘
+ * 总会覆写 `x-vercel-forwarded-for`，真实用户正常不会落进兜底桶——落进去的基本是
+ * 边缘配置异常或在故意伪造头。1/5 的取舍：偶发异常的真实流量不至于完全不可用，
+ * 而「主动发垃圾头挤进兜底桶」的攻击被压到每天最多 10 条短信。
+ */
+const UNTRUSTED_IP_LIMIT_DIVISOR = 5;
+
+/**
+ * 发码限流：手机号 1/分、5 次获准发送/天；IP 10/10 分、50/天。
+ * IP 落入兜底身份时两条 IP 规则自动收紧到 1/5。IP 与手机号分钟桶始终计数；
+ * 只有这些门禁全部通过才原子增加手机号每日发送额度，避免攻击者用分钟内的
+ * 拒绝请求耗尽受害者整天的 OTP 配额。
  */
 export class PgAuthRateLimiter {
   private readonly identityKey: Buffer;
@@ -90,42 +112,56 @@ export class PgAuthRateLimiter {
       throw new Error("Invalid auth rate-limit input.");
     }
 
+    const untrustedIp = ipAddress === UNTRUSTED_IP_IDENTITY;
     const identities = {
       phone: this.hashIdentity("phone", phoneE164),
       ip: this.hashIdentity("ip", ipAddress),
     };
-    // 四条规则全部自增，即使前面已经判定拒绝——与 Mongo 版行为一致。
-    // 只扣第一条会让攻击者靠触发最严格的那条来规避其余窗口的计数。
-    const decisions = await Promise.all(
-      OTP_REQUEST_RULES.map(async (rule) => {
-        const windowStart = Math.floor(now / rule.windowMs) * rule.windowMs;
-        const count = await bumpRateLimitBucket(
-          this.sql,
-          `${rule.scope}:${windowStart}:${identities[rule.identity]}`,
-          new Date(windowStart + rule.windowMs),
-        );
-        return {
-          scope: rule.scope,
-          count,
-          allowed: count <= rule.limit,
-          retryAfterSeconds: Math.max(
-            1,
-            Math.ceil((windowStart + rule.windowMs - now) / 1_000),
-          ),
-        };
-      }),
-    );
+    const consumeRule = async (rule: AuthRateLimitRule) => {
+      const windowStart = Math.floor(now / rule.windowMs) * rule.windowMs;
+      const count = await bumpRateLimitBucket(
+        this.sql,
+        `${rule.scope}:${windowStart}:${identities[rule.identity]}`,
+        new Date(windowStart + rule.windowMs),
+      );
+      const limit =
+        untrustedIp && rule.identity === "ip"
+          ? Math.max(1, Math.floor(rule.limit / UNTRUSTED_IP_LIMIT_DIVISOR))
+          : rule.limit;
+      return {
+        scope: rule.scope,
+        count,
+        allowed: count <= limit,
+        retryAfterSeconds: Math.max(
+          1,
+          Math.ceil((windowStart + rule.windowMs - now) / 1_000),
+        ),
+      };
+    };
 
-    const denied = decisions.filter((decision) => !decision.allowed);
+    // IP abuse counters and the atomic phone-minute gate always advance. The long-lived
+    // phone-day quota advances only for the one concurrent request that clears all gates.
+    const gateDecisions = await Promise.all(
+      OTP_REQUEST_RULES.filter((rule) => rule !== OTP_PHONE_DAY_RULE).map(
+        consumeRule,
+      ),
+    );
+    const gateDenied = gateDecisions.filter((decision) => !decision.allowed);
+    if (gateDenied.length > 0) {
+      return {
+        allowed: false,
+        retryAfterSeconds: Math.max(
+          ...gateDenied.map((decision) => decision.retryAfterSeconds),
+        ),
+        phoneAttemptsToday: 0,
+      };
+    }
+
+    const phoneDay = await consumeRule(OTP_PHONE_DAY_RULE);
     return {
-      allowed: denied.length === 0,
-      retryAfterSeconds:
-        denied.length === 0
-          ? 0
-          : Math.max(...denied.map((decision) => decision.retryAfterSeconds)),
-      phoneAttemptsToday:
-        decisions.find((decision) => decision.scope === "otp-phone-day")
-          ?.count ?? 1,
+      allowed: phoneDay.allowed,
+      retryAfterSeconds: phoneDay.allowed ? 0 : phoneDay.retryAfterSeconds,
+      phoneAttemptsToday: phoneDay.count,
     };
   }
 
@@ -144,13 +180,37 @@ export async function createAuthRateLimiterFromEnv(
 }
 
 export function readClientIp(request: Request): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const firstAddress = forwardedFor.split(",", 1)[0]?.trim();
-    if (firstAddress) {
-      return firstAddress.slice(0, 512);
-    }
+  // Vercel 会在边缘覆写 X-Forwarded-For，防止客户端伪造；专有头是有上游代理时
+  // 更可靠的同义来源。只在 VERCEL=1 的受控部署里信任它们，不能仅凭 NODE_ENV。
+  if (process.env.VERCEL === "1") {
+    return (
+      lastValidIp(request.headers.get("x-vercel-forwarded-for")) ??
+      lastValidIp(request.headers.get("x-forwarded-for")) ??
+      UNTRUSTED_IP_IDENTITY
+    );
   }
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  return realIp ? realIp.slice(0, 512) : "unknown";
+
+  // 本地开发/测试允许 XFF 来模拟代理后的请求。其他 production 运行时没有可信代理
+  // 契约，缺失专有签名时必须收敛到固定桶，不能按客户端原始头开无限个桶。
+  if (process.env.NODE_ENV !== "production") {
+    return (
+      lastValidIp(request.headers.get("x-forwarded-for")) ??
+      UNTRUSTED_IP_IDENTITY
+    );
+  }
+
+  return UNTRUSTED_IP_IDENTITY;
+}
+
+/**
+ * 取逗号分隔链的最后一段并校验；只返回合法 IP 字面量。
+ * 统一小写以消除 IPv6 十六进制的大小写写法变体，避免同一地址开出多个桶。
+ */
+function lastValidIp(headerValue: string | null): string | null {
+  if (!headerValue) {
+    return null;
+  }
+  const segments = headerValue.split(",");
+  const last = segments[segments.length - 1]?.trim().toLowerCase();
+  return last && isIP(last) ? last : null;
 }

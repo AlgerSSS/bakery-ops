@@ -47,6 +47,28 @@ describe("ResH5MemberAuthClient 的整体时限", () => {
     expect(init?.signal?.aborted).toBe(true);
   });
 
+  it("classifies an abort while reading the RES response body as a timeout", async () => {
+    const controller = new AbortController();
+    const response = {
+      ok: true,
+      status: 200,
+      json: vi.fn(async () => {
+        controller.abort();
+        throw new DOMException("aborted", "AbortError");
+      }),
+    } as unknown as Response;
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response);
+    const client = new ResH5MemberAuthClient(
+      config,
+      fetcher,
+      controller.signal,
+    );
+
+    await expect(client.createGuestSession("device-1")).rejects.toMatchObject({
+      timedOut: true,
+    });
+  });
+
   it("不传时限时仍然有每次调用自己的超时", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

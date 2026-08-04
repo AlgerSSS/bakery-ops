@@ -12,6 +12,9 @@ import postgres from "postgres";
  *   statement，开着会在偶发的连接复用上抛 "prepared statement already exists"。
  * - 缓存在 globalThis 上：Next.js 开发模式的模块热替换会让模块级变量重新初始化，
  *   每次热更新泄漏一个连接。
+ * - Vercel 只接受 `:6543`：Supabase 明确把 transaction pooler 定义为 serverless 入口。
+ *   `:5432` 是 direct/session 模式，每个 Lambda 会独占一个后端连接；流量一上来就耗尽
+ *   这个被多个系统共用的生产库连接数。这里 fail closed，避免配置错误静默上线。
  */
 /**
  * 顶层连接与「已经在调用方事务里」两种情形都要支持。postgres.js 的 `TransactionSql`
@@ -26,6 +29,9 @@ type GlobalWithClient = typeof globalThis & {
   [CLIENT_KEY]?: postgres.Sql;
 };
 
+const SUPABASE_TRANSACTION_POOLER_HOST =
+  "aws-0-ap-southeast-1.pooler.supabase.com";
+
 export function getDb(): postgres.Sql {
   const scope = globalThis as GlobalWithClient;
   const cached = scope[CLIENT_KEY];
@@ -37,11 +43,29 @@ export function getDb(): postgres.Sql {
   if (!connectionString) {
     throw new Error("DATABASE_URL is required.");
   }
+
+  let connectionUrl: URL;
+  try {
+    connectionUrl = new URL(connectionString);
+  } catch {
+    throw new Error("DATABASE_URL is invalid.");
+  }
   if (
-    !connectionString.startsWith("postgres://") &&
-    !connectionString.startsWith("postgresql://")
+    !["postgres:", "postgresql:"].includes(connectionUrl.protocol)
   ) {
     throw new Error("DATABASE_URL is invalid.");
+  }
+  if (process.env.VERCEL === "1") {
+    if (connectionUrl.hostname !== SUPABASE_TRANSACTION_POOLER_HOST) {
+      throw new Error(
+        "DATABASE_URL must use the verified Supabase transaction pooler host on Vercel.",
+      );
+    }
+    if (connectionUrl.port !== "6543") {
+      throw new Error(
+        "DATABASE_URL must use Supabase transaction pooler port 6543 on Vercel.",
+      );
+    }
   }
 
   const client = postgres(connectionString, {
@@ -49,7 +73,7 @@ export function getDb(): postgres.Sql {
     idle_timeout: 20,
     connect_timeout: 10,
     prepare: false,
-    ssl: "require",
+    ssl: "verify-full",
     connection: { application_name: "hotcrush-hbti" },
     onnotice: () => {},
   });

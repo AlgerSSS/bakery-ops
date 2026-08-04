@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const routeMocks = vi.hoisted(() => ({
+  hasAlertDestination: vi.fn(),
   createCompletionStoreFromEnv: vi.fn(),
   purgeExpired: vi.fn(),
+  deliverPendingReviewAlerts: vi.fn(),
   createResApiClientFromEnv: vi.fn(),
   readHbtiServerConfig: vi.fn(),
   reconcilePendingCompletions: vi.fn(),
   resolveEnabledCouponTemplateByName: vi.fn(),
+}));
+
+vi.mock("@/lib/alert", () => ({
+  hasAlertDestination: routeMocks.hasAlertDestination,
 }));
 
 vi.mock("@/lib/completion/reconcile-pending", () => ({
@@ -15,6 +21,7 @@ vi.mock("@/lib/completion/reconcile-pending", () => ({
 
 vi.mock("@/lib/store/pg-completion-store", () => ({
   createCompletionStoreFromEnv: routeMocks.createCompletionStoreFromEnv,
+  deliverPendingReviewAlerts: routeMocks.deliverPendingReviewAlerts,
   purgeExpired: routeMocks.purgeExpired,
 }));
 
@@ -36,10 +43,17 @@ const request = () =>
 
 describe("cron reconciliation route", () => {
   beforeEach(() => {
+    routeMocks.hasAlertDestination.mockReset();
+    routeMocks.hasAlertDestination.mockReturnValue(true);
     vi.stubEnv("CRON_SECRET", CRON_SECRET);
     routeMocks.createCompletionStoreFromEnv.mockReset();
     routeMocks.purgeExpired.mockReset();
     routeMocks.purgeExpired.mockResolvedValue(0);
+    routeMocks.deliverPendingReviewAlerts.mockReset();
+    routeMocks.deliverPendingReviewAlerts.mockResolvedValue({
+      claimed: 0,
+      sent: 0,
+    });
     routeMocks.createResApiClientFromEnv.mockReset();
     routeMocks.readHbtiServerConfig.mockReset();
     routeMocks.reconcilePendingCompletions.mockReset();
@@ -86,6 +100,8 @@ describe("cron reconciliation route", () => {
       errors: 0,
       purged: 0,
       purgeOk: true,
+      alerts: { claimed: 0, sent: 0 },
+      alertsOk: true,
     });
     expect(
       routeMocks.resolveEnabledCouponTemplateByName,
@@ -98,6 +114,27 @@ describe("cron reconciliation route", () => {
     expect(response.headers.get("cache-control")).toBe(
       "no-store, max-age=0",
     );
+  });
+
+  it("fails closed when review alerts have no destination", async () => {
+    routeMocks.hasAlertDestination.mockReturnValue(false);
+    routeMocks.reconcilePendingCompletions.mockResolvedValue({
+      scanned: 0,
+      issued: 0,
+      processing: 0,
+      review: 0,
+      errors: 0,
+    });
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      alertsOk: false,
+    });
+    expect(routeMocks.deliverPendingReviewAlerts).not.toHaveBeenCalled();
   });
 
   // 这次改动的核心分支:清理抛异常时,一次成功的对账不该被判失败。
@@ -128,6 +165,8 @@ describe("cron reconciliation route", () => {
       errors: 0,
       purged: 0,
       purgeOk: false,
+      alerts: { claimed: 0, sent: 0 },
+      alertsOk: true,
     });
     // 且没有掉进外层 catch--那会返回不带 scanned 的裸 { ok: false }。
     expect(consoleError).toHaveBeenCalledWith(
@@ -158,6 +197,8 @@ describe("cron reconciliation route", () => {
       errors: 1,
       purged: 0,
       purgeOk: true,
+      alerts: { claimed: 0, sent: 0 },
+      alertsOk: true,
     });
     expect(response.headers.get("cache-control")).toBe(
       "no-store, max-age=0",

@@ -147,6 +147,54 @@ describe("MemberSignIn 的重发闸门", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("验证由浏览器超时中止时显示服务超时，而不是误报断网", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          challengeToken: "challenge-1",
+          maskedPhone: "+60 12*****89",
+          resendMayNotArrive: false,
+        }),
+      )
+      .mockRejectedValueOnce(new DOMException("timed out", "TimeoutError"));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderSignIn();
+
+    await sendCodeFor(user, "123456789");
+    const codeInput = await screen.findByLabelText(copy.codeLabel);
+    await user.type(codeInput, "123456");
+    await user.click(screen.getByRole("button", { name: copy.verifyCode }));
+
+    expect(await screen.findByText(copy.authVerifyTimeout)).toBeInTheDocument();
+    expect(screen.queryByText(copy.authNetworkError)).not.toBeInTheDocument();
+  });
+
+  it("服务端验证故障不再伪装成验证码输入错误", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          challengeToken: "challenge-1",
+          maskedPhone: "+60 12*****89",
+          resendMayNotArrive: false,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ error: "VERIFICATION_FAILED" }, 503));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    renderSignIn();
+
+    await sendCodeFor(user, "123456789");
+    const codeInput = await screen.findByLabelText(copy.codeLabel);
+    await user.type(codeInput, "123456");
+    await user.click(screen.getByRole("button", { name: copy.verifyCode }));
+
+    expect(await screen.findByText(copy.authNetworkError)).toBeInTheDocument();
+    expect(screen.queryByText(copy.invalidCode)).not.toBeInTheDocument();
+  });
+
   it("真的断网了才说网络问题", async () => {
     vi.stubGlobal(
       "fetch",

@@ -415,16 +415,33 @@ describe("completeHbti 接入奖池后", () => {
     expect(gifts.drawn).toEqual([]);
   });
 
-  it("归还本身失败时不掩盖原始错误", async () => {
+  it("归还结果未知时保留库存占用并进入可处置的 review", async () => {
     const store = new FakeCompletionStore();
     const res = new FakeResCouponAdapter({ throwOnResolveTemplate: true });
     const gifts = new FakeGiftPool(["HBTI Gift · White Pencil"]);
     gifts.releaseError = new Error("stock update failed");
 
-    // 顾客看到的仍应是 RES_UNAVAILABLE，而不是 stock update failed。
     await expect(
       completeHbti(input, dependencies(store, res, gifts)),
-    ).rejects.toMatchObject({ code: "RES_UNAVAILABLE" });
+    ).resolves.toMatchObject({
+      status: "review",
+      reason: "inventory_release_ambiguous",
+    });
+    expect(gifts.netConsumed).toBe(1);
+    await expect(
+      store.get({
+        campaignVersion: input.campaignVersion,
+        memberId,
+      }),
+    ).resolves.toMatchObject({
+      status: "review",
+      reason: "inventory_release_ambiguous",
+      rewardContext: {
+        memberId,
+        templateName: "HBTI Gift · White Pencil",
+      },
+      alert: { status: "pending" },
+    });
   });
 
   it("周边发完时照常出结果，只是不发券", async () => {

@@ -17,9 +17,11 @@ import { publicCompletionPayload } from "../route";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+const RES_DEADLINE_MS = 20_000;
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
+    const resDeadline = AbortSignal.timeout(RES_DEADLINE_MS);
     const config = readHbtiServerConfig();
     if (!isTrustedRequestOrigin(request, config.linkBaseUrl)) {
       return noStoreJson(
@@ -43,7 +45,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       },
       {
         store: await createCompletionStoreFromEnv(),
-        res: createResApiClientFromEnv(),
+        res: createResApiClientFromEnv(resDeadline),
       },
     );
     if (!result) {

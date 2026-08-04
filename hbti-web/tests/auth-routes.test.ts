@@ -146,6 +146,18 @@ beforeEach(() => {
 });
 
 describe("POST /api/auth/otp/request", () => {
+  it("rejects malformed JSON without calling RES or the database", async () => {
+    const response = await requestOtp(malformedMutationRequest("/api/auth/otp/request"));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "INVALID_REQUEST",
+    });
+    expect(mocks.createRateLimiter).not.toHaveBeenCalled();
+    expect(mocks.createAuthStoreFromEnv).not.toHaveBeenCalled();
+    expect(mocks.createResClient).not.toHaveBeenCalled();
+  });
+
   it("sends one OTP through RES and returns only an opaque challenge", async () => {
     const response = await requestOtp(
       mutationRequest("/api/auth/otp/request", {
@@ -300,6 +312,17 @@ describe("POST /api/auth/otp/request", () => {
 });
 
 describe("POST /api/auth/otp/verify", () => {
+  it("rejects malformed JSON before acquiring a challenge", async () => {
+    const response = await verifyOtp(malformedMutationRequest("/api/auth/otp/verify"));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "INVALID_REQUEST",
+    });
+    expect(mocks.store.beginAttempt).not.toHaveBeenCalled();
+    expect(mocks.createResClient).not.toHaveBeenCalled();
+  });
+
   it("consumes the challenge and creates an opaque two-hour session", async () => {
     mocks.res.verifyLoginAndEnsureMember.mockResolvedValueOnce({
       memberId: "member-1",
@@ -538,6 +561,55 @@ describe("POST /api/auth/otp/verify", () => {
     }
   });
 
+  it("only labels an actually aborted RES call as verification timeout", async () => {
+    mocks.res.verifyLoginAndEnsureMember.mockRejectedValue(
+      new ResH5AuthDiagnosticError({
+        stage: "userinfo_transport",
+        timedOut: true,
+      }),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await verifyOtp(
+      mutationRequest("/api/auth/otp/verify", {
+        challengeToken,
+        code: "123456",
+        acceptMembership: true,
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "VERIFICATION_TIMEOUT",
+      retryable: true,
+    });
+    expect(mocks.store.releaseAttempt).toHaveBeenCalledWith(challengeToken);
+  });
+
+  it("does not hide an immediate RES HTTP failure behind timeout copy", async () => {
+    mocks.res.verifyLoginAndEnsureMember.mockRejectedValue(
+      new ResH5AuthDiagnosticError({
+        stage: "userinfo_transport",
+        httpStatus: 401,
+      }),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await verifyOtp(
+      mutationRequest("/api/auth/otp/verify", {
+        challengeToken,
+        code: "123456",
+        acceptMembership: true,
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "VERIFICATION_FAILED",
+    });
+    expect(mocks.store.releaseAttempt).toHaveBeenCalledWith(challengeToken);
+  });
+
   it("returns a useful retryable response for a rejected verification code", async () => {
     mocks.res.verifyLoginAndEnsureMember.mockRejectedValue(
       new ResH5VerificationCodeError(),
@@ -625,6 +697,21 @@ describe("GET /api/auth/session", () => {
 });
 
 describe("POST /api/auth/logout", () => {
+  it("rejects malformed JSON and still clears the browser cookie", async () => {
+    const response = await logout(
+      malformedMutationRequest("/api/auth/logout", {
+        Cookie: `hbti_session=${sessionToken}`,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "INVALID_REQUEST",
+    });
+    expect(mocks.store.deleteSession).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toContain("hbti_session=;");
+  });
+
   it("deletes the server session and clears the cookie", async () => {
     const response = await logout(
       mutationRequest(
@@ -645,6 +732,22 @@ describe("POST /api/auth/logout", () => {
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
   });
 });
+
+function malformedMutationRequest(
+  pathname: string,
+  headers: Record<string, string> = {},
+): Request {
+  return new Request(`${origin}${pathname}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: origin,
+      "Sec-Fetch-Site": "same-origin",
+      ...headers,
+    },
+    body: "{",
+  });
+}
 
 function mutationRequest(
   pathname: string,

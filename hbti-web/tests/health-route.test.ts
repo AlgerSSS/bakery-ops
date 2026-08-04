@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const routeMocks = vi.hoisted(() => ({
+  hasAlertDestination: vi.fn(),
   checkCompletionStoreFromEnv: vi.fn(),
   createResApiClientFromEnv: vi.fn(),
   readHbtiServerConfig: vi.fn(),
   resolveEnabledCouponTemplateByName: vi.fn(),
+}));
+
+vi.mock("@/lib/alert", () => ({
+  hasAlertDestination: routeMocks.hasAlertDestination,
 }));
 
 vi.mock("@/lib/store/pg-completion-store", () => ({
@@ -25,6 +30,7 @@ describe("health route", () => {
   beforeEach(() => {
     vi.resetModules();
     for (const m of Object.values(routeMocks)) m.mockReset();
+    routeMocks.hasAlertDestination.mockReturnValue(true);
     routeMocks.readHbtiServerConfig.mockReturnValue({
       couponTemplateName: "Pistachio Green Jewel",
     });
@@ -53,7 +59,20 @@ describe("health route", () => {
     await expect(response.json()).resolves.toEqual({
       status: "ok",
       service: "hbti-web",
-      checks: { db: "ok", res: "ok" },
+      checks: { alert: "ok", db: "ok", res: "ok" },
+    });
+  });
+
+  it("fails readiness when the operational alert destination is missing", async () => {
+    routeMocks.hasAlertDestination.mockReturnValue(false);
+    const GET = await load();
+    const response = await GET();
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      status: "degraded",
+      service: "hbti-web",
+      checks: { alert: "fail", db: "ok", res: "ok" },
     });
   });
 
@@ -70,7 +89,7 @@ describe("health route", () => {
     await expect(response.json()).resolves.toEqual({
       status: "degraded",
       service: "hbti-web",
-      checks: { db: "ok", res: "fail" },
+      checks: { alert: "ok", db: "ok", res: "fail" },
     });
     // allSettled 的价值:RES 先炸也不能让 db 检查被跳过,
     // 否则「db 正常」这个结论就是没根据的。
@@ -88,7 +107,7 @@ describe("health route", () => {
     await expect(response.json()).resolves.toEqual({
       status: "degraded",
       service: "hbti-web",
-      checks: { db: "fail", res: "ok" },
+      checks: { alert: "ok", db: "fail", res: "ok" },
     });
     expect(routeMocks.resolveEnabledCouponTemplateByName).toHaveBeenCalledTimes(
       1,
@@ -109,7 +128,7 @@ describe("health route", () => {
     await expect(response.json()).resolves.toEqual({
       status: "degraded",
       service: "hbti-web",
-      checks: { db: "fail", res: "fail" },
+      checks: { alert: "ok", db: "fail", res: "fail" },
     });
   });
 

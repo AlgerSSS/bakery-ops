@@ -1,26 +1,24 @@
 # Hot Crush HBTI
 
-Mobile-first, three-language HBTI experience for Hot Crush members. The RES
-official H5 remains the registration, profile, RM10 reward, and member-wallet
-surface. This application opens only from a personal SMS link, runs the six
-question HBTI flow, and safely requests the configured physical-gift coupon
-from RES after completion.
+Mobile-first, three-language HBTI experience for Hot Crush members. Visitors
+sign in with the verified RES H5 phone/OTP flow; an existing member continues
+immediately, while a new customer explicitly accepts membership before RES
+creates the account. The application then runs the thirteen-question HBTI flow
+and safely requests the configured physical-gift coupon after completion.
 
 ## Customer journey
 
-1. A registered member receives a personal `/t/<token>` link by SMS.
-2. The link validates the encrypted member binding without displaying the full
-   phone number.
+1. A visitor opens `/` and enters a phone number.
+2. RES sends an OTP. The server verifies the code and resolves the existing
+   member or, with explicit consent, creates the RES membership.
 3. The member completes all thirteen questions in English, Simplified Chinese,
    or Malay.
 4. The member sees one of 16 HBTI results, chooses one of nine colours, and may
    save or share a token-free result card.
 5. The server issues at most one configured coupon per member and campaign.
-6. Every completion state includes a link back to the verified RES member
-   wallet.
+6. Every terminal result includes a link back to the verified RES member wallet.
 
-The public `/` page deliberately cannot start the test because it has no member
-binding. It explains that a personal invitation is required.
+Legacy `/t/<token>` URLs redirect to `/`; private invitation tokens are retired.
 
 ## Local verification
 
@@ -37,61 +35,62 @@ npm run test:e2e
 
 Start the local site with `npm run dev`.
 
-To create a private test link, load the local environment and provide the test
-member as a temporary environment variable. Do not paste personal links into
-logs, tickets, or documentation.
+To print the canonical member sign-in and no-coupon demo URLs:
 
 ```bash
-HBTI_TEST_PHONE='<E.164 phone>' node scripts/create-member-link.mjs
+node scripts/print-hbti-urls.mjs
 ```
 
 ## Environment
 
 Copy `.env.example` to `.env.local` and supply the values through an approved
-secret store. Never commit either the RES credential or generated member links.
+secret store. Never commit RES credentials or secret-bearing environment files.
 
-- `HBTI_LINK_SECRET`: encrypts personal links; at least 32 bytes.
-- `HBTI_MEMBER_HASH_SECRET`: independent HMAC secret for idempotency; at least
-  32 bytes and stable for the campaign.
-- `HBTI_CAMPAIGN_VERSION`: stable campaign identifier.
+- `HBTI_AUTH_SECRET`: independent key for encrypted OTP challenges and member
+  sessions; at least 32 bytes.
+- `HBTI_CAMPAIGN_VERSION`: stable campaign idempotency identifier.
 - `HBTI_LINK_BASE_URL`: canonical HTTPS origin.
-- `HBTI_LINK_TTL_SECONDS`: personal-link lifetime.
-- `DATABASE_URL`: the shared Supabase Postgres. Completion locks, OTP
-  challenges, sessions and rate-limit counters live in the `hbti_*` tables from
-  migration `063_hbti_member_profile.sql`; the collected HBTI profile is written
-  onto `pos_member.hbti_*` for the member it belongs to.
+- `DATABASE_URL`: the shared Supabase Postgres transaction pooler (`:6543` on
+  Vercel). Completion/profile state lives on `pos_member.hbti_*`; authentication
+  and rate-limit state uses the HBTI tables; inventory uses `hbti_gift_stock`.
 - `HBTI_MEMBER_STORE`: the store name half of `pos_member`'s composite key. It
   must match `MEMBER_STORE` in `~/hot/res_api`, or the same member is written
   twice instead of being enriched. Defaults to `吉隆坡Pavilion门店`.
 - `CRON_SECRET`: protects the reconciliation endpoint; at least 32 characters.
-- `RES_VULCAN_TOKEN`: approved service credential for RES.
-- `RES_*`: tenant, organisation, brand, shop, coupon-template, and verified
-  member-wallet configuration.
+- `ALERT_WEBHOOK`: required production destination for durable review alerts.
+  Missing configuration makes `/api/health` return 503.
+- `RES_VULCAN_TOKEN`: HBTI-specific RES service credential, scoped to member
+  lookup, coupon readback/template lookup, and one-coupon issuance.
+- `RES_*`: tenant, organisation, brand, shop, coupon-template, member-wallet,
+  and verified H5 member-auth configuration.
 
 Local secret-bearing files should be mode `0600`.
 
 ## Operations
 
-- `GET /api/health` performs a read-only Postgres check and an authenticated,
-  read-only RES coupon-template lookup. HTTP 200 means both dependencies are
-  ready; HTTP 503 means the site must not send a new SMS batch.
+- `GET /api/health` performs a read-only Postgres check, an authenticated
+  read-only RES coupon-template lookup, and verifies that the alert destination
+  is configured. HTTP 200 means all launch dependencies are ready; HTTP 503
+  means the site must not send a new campaign batch.
 - `GET /api/cron/reconcile` is protected by `CRON_SECRET`. Vercel invokes it
-  daily at `19:00 UTC` (`03:00 Asia/Kuala_Lumpur`) to reconcile ambiguous
-  completions without blindly reissuing a coupon.
+  daily at `19:00 UTC` (`03:00 Asia/Kuala_Lumpur`) to retry durable review
+  alerts, reconcile ambiguous completions, and purge expired operational rows.
 - Records in `review` require an operator to check the member wallet before any
   manual action. Never retry a real coupon mutation merely because the browser
   timed out.
-- Rate limiting stores only a SHA-256 fingerprint of the invitation token, not
-  the raw token.
+- Rate limiting stores only HMAC fingerprints of phone and IP identities, not
+  their plaintext values.
 
 Before a customer SMS batch:
 
-1. Confirm the production deployment is Ready.
-2. Confirm the custom domain resolves to that deployment.
-3. Confirm `/api/health` returns 200.
-4. Confirm there are no unresolved `processing`, `prepared`, or `review`
+1. Confirm the production deployment is Ready and the custom domain aliases it.
+2. Send a non-sensitive alert canary and confirm the destination receives it.
+3. Confirm `/api/health` returns 200 with `alert`, `db`, and `res` all `ok`.
+4. Run the authenticated reconciliation endpoint and confirm `ok: true`.
+5. Confirm there are no unresolved `processing`, `prepared`, or `review`
    completion records.
-5. Generate links only for the intended member list and campaign version.
+6. Open `/` in a real mobile browser and complete an approved test-member flow.
+7. Start the campaign only for the intended audience and campaign version.
 
 ## Deployment and rollback
 
@@ -100,14 +99,15 @@ The Vercel project is `hotcrush-hbti`, with
 full release gate passes. Save the resulting deployment ID in `HANDOFF.md`.
 
 For rollback, promote the last verified Vercel deployment and re-run the health
-check. A rollback does not reverse coupons already issued in RES, nor completion
-records already written to `hbti_completion`. Migration 063 is additive — new
-tables and nullable columns only — so rolling the application back never
-requires touching the database.
+check. A rollback does not reverse coupons already issued in RES, inventory
+already drawn, or completion/profile records already written to `pos_member`.
+The 066/077/078 database cutover is forward-compatible with application
+rollback; do not roll back shared production tables during an application
+rollback.
 
 ## Safety boundary
 
-This repository intentionally does not implement RES registration, OTP, the
-RM10 profile-completion coupon, SMS delivery, or a public anonymous HBTI start.
-Those remain upstream responsibilities. The HBTI application owns only the
-personal-link test, result experience, and physical-gift coupon request.
+This repository does not send campaign invitations or replace the RES member
+system. It orchestrates the verified RES H5 OTP/member-registration APIs, owns
+the public HBTI result experience and physical-gift coupon request, and links
+members back to the official RES wallet/profile surfaces.

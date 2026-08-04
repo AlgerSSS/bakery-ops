@@ -131,6 +131,7 @@ interface ResH5AuthDiagnosticDetails {
   message?: string;
   providerCode?: string;
   httpStatus?: number;
+  timedOut?: boolean;
   topLevelKeys?: string[];
   dataKeys?: string[];
   dataValueTypes?: Record<string, SafeValueType>;
@@ -140,6 +141,7 @@ export class ResH5AuthDiagnosticError extends Error {
   readonly stage: ResH5AuthDiagnosticStage;
   readonly providerCode?: string;
   readonly httpStatus?: number;
+  readonly timedOut: boolean;
   readonly topLevelKeys: string[];
   readonly dataKeys: string[];
   readonly dataValueTypes: Record<string, SafeValueType>;
@@ -152,6 +154,7 @@ export class ResH5AuthDiagnosticError extends Error {
     this.stage = details.stage;
     this.providerCode = details.providerCode;
     this.httpStatus = details.httpStatus;
+    this.timedOut = details.timedOut === true;
     this.topLevelKeys = details.topLevelKeys ?? [];
     this.dataKeys = details.dataKeys ?? [];
     this.dataValueTypes = details.dataValueTypes ?? {};
@@ -473,6 +476,12 @@ export class ResH5MemberAuthClient {
     stage: ResH5AuthDiagnosticStage,
   ): Promise<ResH5HttpPayload> {
     assertHeaderValue(deviceId, "device ID");
+    const requestSignal = this.deadlineSignal
+      ? AbortSignal.any([
+          AbortSignal.timeout(PER_CALL_TIMEOUT_MS),
+          this.deadlineSignal,
+        ])
+      : AbortSignal.timeout(PER_CALL_TIMEOUT_MS);
     let response: Response;
     try {
       response = await this.fetcher(
@@ -497,18 +506,14 @@ export class ResH5MemberAuthClient {
             "ctx-params": "/login?type=phone",
           },
           body: JSON.stringify(body),
-          signal: this.deadlineSignal
-            ? AbortSignal.any([
-                AbortSignal.timeout(PER_CALL_TIMEOUT_MS),
-                this.deadlineSignal,
-              ])
-            : AbortSignal.timeout(PER_CALL_TIMEOUT_MS),
+          signal: requestSignal,
         },
       );
     } catch {
       throw new ResH5AuthDiagnosticError({
         stage,
         message: "RES H5 request failed.",
+        timedOut: requestSignal.aborted,
       });
     }
     if (!response.ok) {
@@ -528,6 +533,7 @@ export class ResH5MemberAuthClient {
         stage,
         message: "RES H5 request failed.",
         httpStatus: response.status,
+        timedOut: requestSignal.aborted,
       });
     }
   }

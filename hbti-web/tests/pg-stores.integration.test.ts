@@ -14,7 +14,7 @@
 import { randomUUID } from "node:crypto";
 
 import postgres from "postgres";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PgAuthStore } from "@/lib/auth/pg-auth-store";
 import type { SqlRunner } from "@/lib/db/postgres";
@@ -22,6 +22,7 @@ import { PgAuthRateLimiter } from "@/lib/rate-limit/auth-rate-limit";
 import { bumpRateLimitBucket } from "@/lib/rate-limit/pg-rate-limit";
 import {
   PgCompletionStore,
+  deliverPendingReviewAlerts,
   purgeExpired,
 } from "@/lib/store/pg-completion-store";
 import type {
@@ -29,6 +30,7 @@ import type {
   HbtiCompletionSnapshot,
   IssuedCompletionRecord,
   LockedCompletionRecord,
+  ReviewCompletionRecord,
   PreparedCompletionRecord,
   UnrewardedCompletionRecord,
 } from "@/lib/store/completion-store";
@@ -39,6 +41,8 @@ import {
 } from "@/lib/store/gift-pool";
 
 const DATABASE_URL = process.env.DATABASE_URL?.trim();
+const DATABASE_SSL =
+  process.env.DATABASE_SSL?.trim() === "disable" ? false : "require";
 const STORE = process.env.HBTI_MEMBER_STORE?.trim() || "吉隆坡Pavilion门店";
 const AUTH_SECRET = "integration-auth-secret-".repeat(2);
 
@@ -116,7 +120,7 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
 
   beforeAll(async () => {
     root = postgres(DATABASE_URL as string, {
-      ssl: "require",
+      ssl: DATABASE_SSL,
       max: 1,
       prepare: false,
       onnotice: () => {},
@@ -239,6 +243,107 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
       await expect(store.markIssued(key, attemptId, issued)).rejects.toThrow(
         "Completion was not in the processing state.",
       );
+    });
+
+    it("失败的 review 告警保持 pending，下一轮可重试并标 sent", async () => {
+      const key = nextKey();
+      const attemptId = randomUUID();
+      await store.acquireProcessing(key, locked(attemptId));
+      const preparedRecord = prepared(attemptId, key.memberId);
+      await store.markPrepared(key, attemptId, preparedRecord);
+      const review: ReviewCompletionRecord = {
+        status: "review",
+        completion: snapshot,
+        reason: "readback_mismatch",
+        markedAt: new Date().toISOString(),
+        attemptId,
+        baselineCouponIds: preparedRecord.baselineCouponIds,
+        rewardContext: preparedRecord.rewardContext,
+        alert: { status: "pending" },
+      };
+      await store.markReview(key, attemptId, review);
+
+      vi.stubEnv("ALERT_WEBHOOK", "https://alerts.example.test/hbti");
+      const fetchMock = vi.spyOn(globalThis, "fetch");
+      try {
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
+        await expect(deliverPendingReviewAlerts(tx)).resolves.toEqual({
+          claimed: 1,
+          sent: 0,
+        });
+        await expect(store.get(key)).resolves.toMatchObject({
+          status: "review",
+          alert: { status: "pending" },
+        });
+
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 200 }));
+        await expect(deliverPendingReviewAlerts(tx)).resolves.toEqual({
+          claimed: 1,
+          sent: 1,
+        });
+        await expect(store.get(key)).resolves.toMatchObject({
+          status: "review",
+          alert: { status: "sent" },
+        });
+      } finally {
+        fetchMock.mockRestore();
+        vi.unstubAllEnvs();
+      }
+    });
+
+    it("认领并持久升级最早的四字段 review 后再发送告警", async () => {
+      const key = nextKey();
+      const attemptId = randomUUID();
+      await store.acquireProcessing(key, locked(attemptId));
+      const preparedRecord = prepared(attemptId, key.memberId);
+      await store.markPrepared(key, attemptId, preparedRecord);
+      await store.markReview(key, attemptId, {
+        status: "review",
+        completion: snapshot,
+        reason: "give_rejected",
+        markedAt: new Date().toISOString(),
+        attemptId,
+        baselineCouponIds: preparedRecord.baselineCouponIds,
+        rewardContext: preparedRecord.rewardContext,
+        alert: { status: "pending" },
+      });
+      const legacy = {
+        status: "review",
+        completion: snapshot,
+        reason: "give_rejected",
+        markedAt: new Date().toISOString(),
+      };
+      await tx`
+        UPDATE pos_member
+        SET hbti_record = ${tx.json(legacy as unknown as Parameters<typeof tx.json>[0])}
+        WHERE store = ${STORE}
+          AND member_id = ${key.memberId}
+          AND hbti_campaign_version = ${key.campaignVersion}
+      `;
+
+      vi.stubEnv("ALERT_WEBHOOK", "https://alerts.example.test/hbti");
+      const fetchMock = vi
+        .spyOn(globalThis, "fetch")
+        .mockResolvedValue(new Response(null, { status: 200 }));
+      try {
+        await expect(deliverPendingReviewAlerts(tx)).resolves.toEqual({
+          claimed: 1,
+          sent: 1,
+        });
+        await expect(store.get(key)).resolves.toMatchObject({
+          status: "review",
+          attemptId: "00000000-0000-0000-0000-000000000000",
+          rewardContext: {
+            memberId: key.memberId,
+            templateId: "legacy-unknown",
+            templateName: "legacy-unknown",
+          },
+          alert: { status: "sent" },
+        });
+      } finally {
+        fetchMock.mockRestore();
+        vi.unstubAllEnvs();
+      }
     });
 
     it("对账扫描把从未对过账的排在最前（NULLS FIRST），并遵守 limit", async () => {
@@ -492,6 +597,36 @@ suite("Postgres 三个 store（真库 · 事务内 · 结束回滚）", { timeou
         now: input.now + 60_000,
       });
       expect(nextWindow.allowed).toBe(true);
+    });
+
+    it("分钟门禁拒绝的重复请求不消耗受害者的每日发送额度", async () => {
+      const limiter = new PgAuthRateLimiter(tx, AUTH_SECRET);
+      const input = {
+        phoneE164: "+60123450003",
+        ipAddress: "203.0.113.11",
+        now: Date.parse("2026-07-30T12:00:00.000Z"),
+      };
+
+      const first = await limiter.consumeOtpRequest(input);
+      expect(first).toMatchObject({
+        allowed: true,
+        phoneAttemptsToday: 1,
+      });
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await expect(limiter.consumeOtpRequest(input)).resolves.toMatchObject({
+          allowed: false,
+          phoneAttemptsToday: 0,
+        });
+      }
+
+      const nextMinute = await limiter.consumeOtpRequest({
+        ...input,
+        now: input.now + 60_000,
+      });
+      expect(nextMinute).toMatchObject({
+        allowed: true,
+        phoneAttemptsToday: 2,
+      });
     });
 
     it("发码限流只落主体的 HMAC，不落手机号或 IP 明文", async () => {

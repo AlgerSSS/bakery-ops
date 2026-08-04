@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 
+import { hasAlertDestination } from "@/lib/alert";
+
 import { createResApiClientFromEnv } from "@/lib/res/client";
 import { readHbtiServerConfig } from "@/lib/server-config";
 import { checkCompletionStoreFromEnv } from "@/lib/store/pg-completion-store";
 
 export const runtime = "nodejs";
+export const maxDuration = 15;
 
 const RES_READINESS_TTL_MS = 60_000;
+const RES_READINESS_DEADLINE_MS = 8_000;
 let resReadiness:
   | { expiresAt: number; promise: Promise<void> }
   | undefined;
@@ -16,7 +20,9 @@ export async function GET(): Promise<NextResponse> {
   let res: ReturnType<typeof createResApiClientFromEnv>;
   try {
     config = readHbtiServerConfig();
-    res = createResApiClientFromEnv();
+    res = createResApiClientFromEnv(
+      AbortSignal.timeout(RES_READINESS_DEADLINE_MS),
+    );
   } catch (error) {
     // 配置缺失与依赖故障是两回事,分开报,否则「degraded」什么也不说明。
     console.error("[health] configuration invalid", error);
@@ -39,12 +45,13 @@ export async function GET(): Promise<NextResponse> {
   if (resAccess.status === "rejected") {
     console.error("[health] RES access failed", resAccess.reason);
   }
-
   const checks = {
+    alert: hasAlertDestination() ? "ok" : "fail",
     db: db.status === "fulfilled" ? "ok" : "fail",
     res: resAccess.status === "fulfilled" ? "ok" : "fail",
   } as const;
-  const ok = checks.db === "ok" && checks.res === "ok";
+  const ok =
+    checks.alert === "ok" && checks.db === "ok" && checks.res === "ok";
   // 只报哪一路挂了,不回显异常内容 —— 这个端点无鉴权,错误信息里可能带
   // 上游 URL 或凭证片段。细节留在服务端日志。
   return json(

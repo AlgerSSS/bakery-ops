@@ -16,7 +16,12 @@ import type { UiCopy } from "@/content/ui";
 
 import styles from "./hbti.module.css";
 
-const REQUEST_TIMEOUT_MS = 15_000;
+/**
+ * 浏览器必须晚于服务端 30 秒 maxDuration 再放弃，外加一点响应回程余量。
+ * 否则浏览器先断开，顾客重试时原请求仍可能占着 challenge，反而得到
+ * 「已过期/已使用」并走进死路。
+ */
+const VERIFY_TIMEOUT_MS = 35_000;
 
 /**
  * 发码要等服务端串行走三次 RES 调用，所以给它单独一个更长的时限。
@@ -182,7 +187,7 @@ export function MemberSignIn({
           ...(confirmConflict ? { confirmConflict: true } : {}),
         }),
         cache: "no-store",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
       });
       const payload = await readOtpReply(response);
 
@@ -208,8 +213,10 @@ export function MemberSignIn({
         return;
       }
       setError(errorMessage(payload.error, copy));
-    } catch {
-      setError(copy.authNetworkError);
+    } catch (caught) {
+      setError(
+        isTimeout(caught) ? copy.authVerifyTimeout : copy.authNetworkError,
+      );
     } finally {
       setBusy(undefined);
     }
@@ -520,7 +527,6 @@ function errorMessage(error: string | undefined, copy: UiCopy): string {
       return copy.invalidPhone;
     case "INVALID_CODE":
     case "OTP_INVALID":
-    case "VERIFICATION_FAILED":
     case "INVALID_VERIFICATION_CODE":
       return copy.invalidCode;
     case "OTP_EXPIRED":
@@ -534,6 +540,10 @@ function errorMessage(error: string | undefined, copy: UiCopy): string {
     case "CAPTCHA_REQUIRED":
     case "CAPTCHA_REQUIRED_UNSUPPORTED":
       return copy.captchaRequired;
+    // 服务侧超时不是「码错了」——必须单独一条文案，
+    // 别让顾客以为自己输错了而去重输同一个码。
+    case "VERIFICATION_TIMEOUT":
+      return copy.authVerifyTimeout;
     default:
       return copy.authNetworkError;
   }

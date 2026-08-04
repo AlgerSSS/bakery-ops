@@ -97,6 +97,7 @@ export class ResApiClient implements ResCouponAdapter {
   constructor(
     private readonly config: ResClientConfig,
     private readonly fetcher: FetchLike = fetch,
+    private readonly deadlineSignal?: AbortSignal,
   ) {
     validateConfig(config);
   }
@@ -324,7 +325,12 @@ export class ResApiClient implements ResCouponAdapter {
           Cookie: `i18next=en_US; tenant=${this.config.tenant}`,
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(12_000),
+        signal: this.deadlineSignal
+          ? AbortSignal.any([
+              this.deadlineSignal,
+              AbortSignal.timeout(12_000),
+            ])
+          : AbortSignal.timeout(12_000),
       },
     );
 
@@ -335,17 +341,23 @@ export class ResApiClient implements ResCouponAdapter {
   }
 }
 
-export function createResApiClientFromEnv(): ResApiClient {
-  return new ResApiClient({
-    baseUrl: process.env.RES_BASE_URL ?? "https://bo.sea.restosuite.ai",
-    vulcanToken: requireEnvironmentVariable("RES_VULCAN_TOKEN"),
-    tenant: requireEnvironmentVariable("RES_TENANT"),
-    corporationId: requireEnvironmentVariable("RES_CORPORATION_ID"),
-    organizationId: requireEnvironmentVariable("RES_ORGANIZATION_ID"),
-    organizationType: requireEnvironmentVariable("RES_ORGANIZATION_TYPE"),
-    brandId: requireEnvironmentVariable("RES_BRAND_ID"),
-    shopId: requireEnvironmentVariable("RES_SHOP_ID"),
-  });
+export function createResApiClientFromEnv(
+  deadlineSignal?: AbortSignal,
+): ResApiClient {
+  return new ResApiClient(
+    {
+      baseUrl: process.env.RES_BASE_URL ?? "https://bo.sea.restosuite.ai",
+      vulcanToken: requireEnvironmentVariable("RES_VULCAN_TOKEN"),
+      tenant: requireEnvironmentVariable("RES_TENANT"),
+      corporationId: requireEnvironmentVariable("RES_CORPORATION_ID"),
+      organizationId: requireEnvironmentVariable("RES_ORGANIZATION_ID"),
+      organizationType: requireEnvironmentVariable("RES_ORGANIZATION_TYPE"),
+      brandId: requireEnvironmentVariable("RES_BRAND_ID"),
+      shopId: requireEnvironmentVariable("RES_SHOP_ID"),
+    },
+    fetch,
+    deadlineSignal,
+  );
 }
 
 function validateConfig(config: ResClientConfig): void {

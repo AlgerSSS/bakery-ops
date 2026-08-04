@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { reviewAlertPayload, sendAlert } from "@/lib/alert";
+
 import type { HbtiCode } from "@/content/types";
 import { getDb, memberStore, type SqlRunner } from "@/lib/db/postgres";
 import type {
@@ -48,6 +50,30 @@ const completionSnapshotSchema = z.strictObject({
   age: z.string().trim().min(1).max(32).optional(),
 });
 
+const reviewReasonSchema = z.enum([
+  "ambiguous_give",
+  "give_rejected",
+  "readback_unavailable",
+  "readback_mismatch",
+  "stale_reconciliation",
+  "inventory_release_ambiguous",
+]);
+
+const reviewAlertSchema = z.strictObject({
+  status: z.enum(["pending", "delivering", "sent"]),
+  lastAttemptAt: z.string().min(1).optional(),
+});
+
+/**
+ * 历史 review 行缺失处置线索时的填充值。
+ *
+ * 用可辨认的哨兵而不是空字符串:运营看到 `legacy-unknown` 会知道
+ * 「这条是老记录,线索当初就没存」,看到空值则会以为是抽奖没发生。
+ * UUID 哨兵是全零,格式上仍满足 attemptId 的 uuid 约束。
+ */
+const LEGACY_REVIEW_UNKNOWN = "legacy-unknown";
+const LEGACY_REVIEW_SENTINEL_UUID = "00000000-0000-0000-0000-000000000000";
+
 /**
  * 出库时唯一的校验。导出是为了让 completion-record-schema.test.ts 能逐个状态验往返——
  * 少一支分支的话 tsc 是不会响的（get() 把 parse 的结果直接当成 CompletionRecord 返回，
@@ -87,18 +113,59 @@ export const completionRecordSchema = z.union([
       confirmedAt: z.string().min(1),
     }),
   }),
+  // review 的当前形态：处置线索与可重试告警状态都必填。
   z.strictObject({
     status: z.literal("review"),
     completion: completionSnapshotSchema,
-    reason: z.enum([
-      "ambiguous_give",
-      "give_rejected",
-      "readback_unavailable",
-      "readback_mismatch",
-      "stale_reconciliation",
-    ]),
+    reason: reviewReasonSchema,
     markedAt: z.string().min(1),
+    attemptId: z.string().uuid(),
+    baselineCouponIds: z.array(z.string().min(1)).readonly(),
+    rewardContext: z.strictObject({
+      memberId: z.string().min(1),
+      templateId: z.string().min(1),
+      templateName: z.string().min(1),
+    }),
+    alert: reviewAlertSchema,
   }),
+  // 处置线索修复后、持久告警加入前写下的 review：线索完整，但没有 alert。
+  z
+    .strictObject({
+      status: z.literal("review"),
+      completion: completionSnapshotSchema,
+      reason: reviewReasonSchema,
+      markedAt: z.string().min(1),
+      attemptId: z.string().uuid(),
+      baselineCouponIds: z.array(z.string().min(1)).readonly(),
+      rewardContext: z.strictObject({
+        memberId: z.string().min(1),
+        templateId: z.string().min(1),
+        templateName: z.string().min(1),
+      }),
+    })
+    .transform((legacy) => ({
+      ...legacy,
+      alert: { status: "pending" as const },
+    })),
+  // 最早的四字段 review：同时补处置线索哨兵与待发送告警。
+  z
+    .strictObject({
+      status: z.literal("review"),
+      completion: completionSnapshotSchema,
+      reason: reviewReasonSchema,
+      markedAt: z.string().min(1),
+    })
+    .transform((legacy) => ({
+      ...legacy,
+      attemptId: LEGACY_REVIEW_SENTINEL_UUID,
+      baselineCouponIds: [] as readonly string[],
+      rewardContext: {
+        memberId: LEGACY_REVIEW_UNKNOWN,
+        templateId: LEGACY_REVIEW_UNKNOWN,
+        templateName: LEGACY_REVIEW_UNKNOWN,
+      },
+      alert: { status: "pending" as const },
+    })),
   z.strictObject({
     status: z.literal("unrewarded"),
     completion: completionSnapshotSchema,
@@ -241,6 +308,33 @@ export class PgCompletionStore implements CompletionStore {
     if (updated !== 1) throw new Error("Completion was not in the processing state.");
   }
 
+  async markReviewAlertSent(
+    key: CompletionStoreKey,
+    attemptId: string,
+    sentAt: string,
+  ): Promise<void> {
+    assertKey(key);
+    if (!Number.isFinite(Date.parse(sentAt))) {
+      throw new Error("Invalid review alert timestamp.");
+    }
+    const updated = await this.sql`
+      UPDATE pos_member
+      SET hbti_record = jsonb_set(
+        hbti_record,
+        '{alert}',
+        jsonb_build_object('status', 'sent', 'lastAttemptAt', ${sentAt}::text),
+        true
+      )
+      WHERE store = ${memberStore()} AND member_id = ${key.memberId}
+        AND hbti_campaign_version = ${key.campaignVersion}
+        AND hbti_status = 'review'
+        AND hbti_record->>'attemptId' = ${attemptId}
+    `;
+    if (updated.count !== 1) {
+      throw new Error("Review alert record no longer exists.");
+    }
+  }
+
   async markUnrewarded(
     key: CompletionStoreKey,
     attemptId: string,
@@ -367,6 +461,131 @@ export async function checkCompletionStoreFromEnv(): Promise<void> {
   await getDb()`SELECT 1 FROM pos_member LIMIT 1`;
 }
 
+/**
+ * 重试没有成功送达的 review 告警。
+ *
+ * 告警状态和 review 同在 hbti_record 里，所以终态落库即拥有一个 pending 告警，
+ * 不存在「状态写成了、进程却在 enqueue 前被杀」的窗口。claim 用单条 UPDATE +
+ * SKIP LOCKED；函数在发送后、标 sent 前被杀时，十分钟后可重新认领，语义是 at-least-once。
+ */
+export async function deliverPendingReviewAlerts(
+  runner: SqlRunner = getDb(),
+  limit = 20,
+): Promise<{ claimed: number; sent: number }> {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+    throw new Error("Invalid review alert limit.");
+  }
+
+  const rows = await runner`
+    WITH candidates AS (
+      SELECT ctid
+      FROM pos_member
+      WHERE store = ${memberStore()}
+        AND hbti_status = 'review'
+        AND (
+          COALESCE(hbti_record #>> '{alert,status}', 'pending') = 'pending'
+          OR (
+            hbti_record #>> '{alert,status}' = 'delivering'
+            AND COALESCE(
+              (hbti_record #>> '{alert,lastAttemptAt}')::timestamptz,
+              '-infinity'::timestamptz
+            ) <= now() - interval '10 minutes'
+          )
+        )
+      ORDER BY hbti_completed_at NULLS FIRST
+      LIMIT ${limit}
+      FOR UPDATE SKIP LOCKED
+    )
+    UPDATE pos_member AS member
+    SET hbti_record = jsonb_set(
+      CASE
+        WHEN member.hbti_record ? 'attemptId' THEN member.hbti_record
+        ELSE member.hbti_record || jsonb_build_object(
+          'attemptId', ${LEGACY_REVIEW_SENTINEL_UUID}::text,
+          'baselineCouponIds', jsonb_build_array(),
+          'rewardContext', jsonb_build_object(
+            'memberId', member.member_id,
+            'templateId', ${LEGACY_REVIEW_UNKNOWN}::text,
+            'templateName', ${LEGACY_REVIEW_UNKNOWN}::text
+          )
+        )
+      END,
+      '{alert}',
+      jsonb_build_object('status', 'delivering', 'lastAttemptAt', now()::text),
+      true
+    )
+    FROM candidates
+    WHERE member.ctid = candidates.ctid
+    RETURNING
+      member.member_id,
+      member.hbti_campaign_version,
+      member.hbti_record
+  `;
+
+  const outcomes = await Promise.allSettled(
+    rows.map(async (row) => {
+      const parsed = completionRecordSchema.parse(row.hbti_record);
+      if (parsed.status !== "review") {
+        throw new Error("Claimed alert is not a review record.");
+      }
+      const attemptId = parsed.attemptId;
+      const record: ReviewCompletionRecord = parsed;
+      const outcome = await sendAlert(reviewAlertPayload(record));
+      const nextStatus = outcome === "sent" ? "sent" : "pending";
+      const finalRecord: ReviewCompletionRecord = {
+        ...record,
+        alert: {
+          status: nextStatus,
+          lastAttemptAt: new Date().toISOString(),
+        },
+      };
+      const updated = await runner<{ hbti_record: unknown }[]>`
+        UPDATE pos_member
+        SET hbti_record = ${jsonRecord(runner, finalRecord)}
+        WHERE store = ${memberStore()}
+          AND member_id = ${String(row.member_id)}
+          AND hbti_campaign_version = ${String(row.hbti_campaign_version)}
+          AND hbti_status = 'review'
+          AND hbti_record->>'attemptId' = ${attemptId}
+          AND hbti_record #>> '{alert,status}' = 'delivering'
+        RETURNING hbti_record
+      `;
+      if (updated.length !== 1) {
+        console.error("[HBTI review alert] claim changed before outcome persisted", {
+          memberId: String(row.member_id),
+          attemptId,
+        });
+        return false;
+      }
+
+      const persisted = completionRecordSchema.parse(updated[0].hbti_record);
+      if (
+        persisted.status !== "review" ||
+        persisted.alert.status !== nextStatus
+      ) {
+        throw new Error(
+          `Review alert outcome was not persisted: expected ${nextStatus}.`,
+        );
+      }
+      return outcome === "sent";
+    }),
+  );
+
+  const failed = outcomes.find(
+    (outcome): outcome is PromiseRejectedResult =>
+      outcome.status === "rejected",
+  );
+  if (failed) {
+    throw failed.reason;
+  }
+  return {
+    claimed: rows.length,
+    sent: outcomes.filter(
+      (outcome) => outcome.status === "fulfilled" && outcome.value,
+    ).length,
+  };
+}
+
 /** 有 expires_at 的表；顺序无关，逐张有界删除。 */
 const EXPIRING = [
   { table: "hbti_auth_token", col: "expires_at" },
@@ -375,28 +594,96 @@ const EXPIRING = [
 
 /**
  * PG 没有 TTL 索引，过期行要自己清。正确性不依赖它——所有读路径都带 expires_at 过滤——
- * 所以只做有界删除，由每日 Cron 顺带调用。
+ * 所以清理只求「跟得上」，不求「一次清干净」。
  *
  * pos_member 上过期的完成记录**不删行**，只把 hbti_ 状态清空：那是会员主表，
  * 行的存在与否由 res_api 决定，不该被 HBTI 的保留期左右。
+ *
+ * ── 为什么从「每表固定 1000 行」改成「按时间预算循环」 ──
+ * 一次 OTP 请求产生 4 个限流桶 + 1 个 challenge = 5 行，而 Cron 每天只跑一次。
+ * 固定 1000 行/表意味着日均只撑得住约 200 次 OTP，超过就单调积压——
+ * 表和索引一起长大，而读路径的 expires_at 过滤要扫的死行越来越多。
+ * 实测(2026-08-03)两张表 100% 的行都已过期却仍留在库里，说明这个上限当时就已经不够。
+ *
+ * 每轮每个来源只处理一批，避免第一张表用完整个预算、让后两处永久饥饿。
+ * 每条查询还会在剩余预算耗尽时主动 cancel；`SKIP LOCKED` 避免等住 res_api 正在写的会员行。
+ *
+ * pos_member 的清空同样要有界。它原来是一条无 LIMIT 的 UPDATE：
+ * 活动结束后大批记录同时到期时，一次 Cron 就会扫全表、锁住大量会员行，
+ * 而这张表 res_api 也在写。
  */
+const PURGE_BATCH = 1_000;
+const PURGE_BUDGET_MS = 10_000;
+
+async function runPurgeQuery<T>(
+  query: PromiseLike<T> & { cancel(): void },
+  deadline: number,
+): Promise<T> {
+  const timer = setTimeout(
+    () => query.cancel(),
+    Math.max(1, deadline - Date.now()),
+  );
+  try {
+    return await query;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function purgeExpired(
   runner: SqlRunner = getDb(),
-  limitPerTable = 1_000,
+  budgetMs = PURGE_BUDGET_MS,
 ): Promise<number> {
+  const deadline = Date.now() + budgetMs;
+  const sources = [
+    ...EXPIRING.map((source) => ({ kind: "delete" as const, ...source })),
+    { kind: "member" as const },
+  ].map((source) => ({ ...source, active: true }));
+  let activeSources = sources.length;
   let removed = 0;
-  for (const { table, col } of EXPIRING) {
-    const res = await runner`
-      DELETE FROM ${runner(table)} WHERE ctid IN (
-        SELECT ctid FROM ${runner(table)} WHERE ${runner(col)} <= now() LIMIT ${limitPerTable}
-      )
-    `;
-    removed += res.count;
+
+  // Round-robin：每轮每个仍有积压的来源各拿一批，谁也不能独占每日预算。
+  while (activeSources > 0 && Date.now() < deadline) {
+    for (const source of sources) {
+      if (!source.active || Date.now() >= deadline) {
+        continue;
+      }
+
+      const result =
+        source.kind === "delete"
+          ? await runPurgeQuery(
+              runner`
+                DELETE FROM ${runner(source.table)} WHERE ctid IN (
+                  SELECT ctid FROM ${runner(source.table)}
+                   WHERE ${runner(source.col)} <= now()
+                   LIMIT ${PURGE_BATCH}
+                   FOR UPDATE SKIP LOCKED
+                )
+              `,
+              deadline,
+            )
+          : await runPurgeQuery(
+              runner`
+                UPDATE pos_member SET
+                  hbti_status = NULL, hbti_attempt_id = NULL,
+                  hbti_record = NULL, hbti_expires_at = NULL
+                WHERE ctid IN (
+                  SELECT ctid FROM pos_member
+                   WHERE hbti_expires_at IS NOT NULL AND hbti_expires_at <= now()
+                   LIMIT ${PURGE_BATCH}
+                   FOR UPDATE SKIP LOCKED
+                )
+              `,
+              deadline,
+            );
+
+      removed += result.count;
+      if (result.count < PURGE_BATCH) {
+        source.active = false;
+        activeSources -= 1;
+      }
+    }
   }
-  const cleared = await runner`
-    UPDATE pos_member SET
-      hbti_status = NULL, hbti_attempt_id = NULL, hbti_record = NULL, hbti_expires_at = NULL
-    WHERE hbti_expires_at IS NOT NULL AND hbti_expires_at <= now()
-  `;
-  return removed + cleared.count;
+
+  return removed;
 }

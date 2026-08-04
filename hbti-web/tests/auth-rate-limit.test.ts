@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   PgAuthRateLimiter,
   readClientIp,
+  UNTRUSTED_IP_IDENTITY,
 } from "@/lib/rate-limit/auth-rate-limit";
 import type { SqlRunner } from "@/lib/db/postgres";
 
@@ -41,29 +42,91 @@ describe("PgAuthRateLimiter", () => {
 });
 
 describe("readClientIp", () => {
-  it("取 x-forwarded-for 的第一段并截断，不回显整个头", () => {
+  it("Vercel 部署优先采用边缘专有头", () => {
+    vi.stubEnv("VERCEL", "1");
+    try {
+      const request = new Request("https://hbti.example/api", {
+        headers: {
+          "x-vercel-forwarded-for": "198.51.100.23",
+          "x-forwarded-for": "203.0.113.7",
+        },
+      });
+      expect(readClientIp(request)).toBe("198.51.100.23");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("Vercel 缺失专有头时采用边缘覆写的标准 XFF，避免所有顾客共用一个桶", () => {
+    vi.stubEnv("VERCEL", "1");
+    try {
+      const request = new Request("https://hbti.example/api", {
+        headers: { "x-forwarded-for": "203.0.113.7" },
+      });
+      expect(readClientIp(request)).toBe("203.0.113.7");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("非 Vercel 的 production 不信任 XFF，统一进入固定兜底桶", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL", "");
+    try {
+      const request = new Request("https://hbti.example/api", {
+        headers: { "x-forwarded-for": "203.0.113.7" },
+      });
+      expect(readClientIp(request)).toBe(UNTRUSTED_IP_IDENTITY);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("x-forwarded-for 取最后一段：客户端塞在链首的伪造值开不了新桶", () => {
     const request = new Request("https://hbti.example/api", {
-      headers: {
-        "x-forwarded-for": ` 203.0.113.7 , 10.0.0.1, ${"b".repeat(600)}`,
-      },
+      headers: { "x-forwarded-for": "1.2.3.4, 10.0.0.1, 203.0.113.7" },
     });
     expect(readClientIp(request)).toBe("203.0.113.7");
   });
 
-  it("没有 x-forwarded-for 时回落 x-real-ip，也做长度上限", () => {
-    const long = "c".repeat(600);
+  it("接受合法 IPv6 字面量，并统一小写消除写法变体", () => {
+    const request = new Request("https://hbti.example/api", {
+      headers: { "x-forwarded-for": "2001:DB8::1" },
+    });
+    expect(readClientIp(request)).toBe("2001:db8::1");
+  });
+
+  it("链尾不是合法 IP 时不回显原始字符串，收敛到固定兜底身份", () => {
+    const request = new Request("https://hbti.example/api", {
+      headers: {
+        "x-forwarded-for": `203.0.113.7, ${"b".repeat(600)}`,
+      },
+    });
+    expect(readClientIp(request)).toBe(UNTRUSTED_IP_IDENTITY);
+  });
+
+  it("不信任 x-real-ip：即使提供合法伪造值也只能进固定兜底桶", () => {
+    // x-real-ip 不是边缘覆写的可信来源，客户端可任意伪造；
+    // 接受它就等于留下「轮换合法伪造 IP 开无限桶」的口子。
     expect(
       readClientIp(
         new Request("https://hbti.example/api", {
-          headers: { "x-real-ip": long },
+          headers: { "x-real-ip": "192.0.2.1" },
         }),
       ),
-    ).toHaveLength(512);
+    ).toBe(UNTRUSTED_IP_IDENTITY);
+    expect(
+      readClientIp(
+        new Request("https://hbti.example/api", {
+          headers: { "x-real-ip": "c".repeat(600) },
+        }),
+      ),
+    ).toBe(UNTRUSTED_IP_IDENTITY);
   });
 
-  it("两个头都没有时给出 unknown，而不是空串", () => {
+  it("所有头都缺失时给出固定兜底身份，而不是空串或 unknown", () => {
     expect(readClientIp(new Request("https://hbti.example/api"))).toBe(
-      "unknown",
+      UNTRUSTED_IP_IDENTITY,
     );
   });
 });

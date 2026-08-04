@@ -30,6 +30,8 @@ export interface UiCopy {
   captchaRequired: string;
   /** 顾客自己关掉了人机验证弹层——不是故障，给一句能行动的提示。 */
   captchaDismissed: string;
+  /** RES 收下请求却拒绝发码。不是网络问题，别把顾客指向重试同一条路。 */
+  authSendRejected: string;
   authErrorTitle: string;
   authNetworkError: string;
   /** 请求超时：短信可能已经发出，别催顾客重发（重发多半送不到）。 */
@@ -230,6 +232,8 @@ export const uiCopy: Localized<UiCopy> = {
       "Phone verification is temporarily unavailable. Please try again later.",
     captchaDismissed:
       "Please complete the quick security check to get your code.",
+    authSendRejected:
+      "Our SMS provider would not send a code just now. Please try again in a few minutes, or ask a member of staff.",
     authErrorTitle: "We couldn’t verify your account.",
     authNetworkError:
       "We couldn’t connect to member verification. Check your connection and try again.",
@@ -432,6 +436,7 @@ export const uiCopy: Localized<UiCopy> = {
     rateLimited: "请求太频繁，请稍等片刻再试。",
     captchaRequired: "手机号验证暂时不可用，请稍后再试。",
     captchaDismissed: "请完成人机验证，我们才能把验证码发给你。",
+    authSendRejected: "短信服务这会儿没有把验证码发出去。请过几分钟再试，或找店员帮忙。",
     authErrorTitle: "暂时无法验证你的账户。",
     authNetworkError: "暂时无法连接会员验证，请检查网络后再试。",
     authSendTimeout: "这次等得有点久，验证码可能已经在路上了。",
@@ -612,6 +617,8 @@ export const uiCopy: Localized<UiCopy> = {
       "Pengesahan telefon tidak tersedia buat sementara waktu. Cuba lagi kemudian.",
     captchaDismissed:
       "Sila lengkapkan semakan keselamatan ringkas untuk menerima kod anda.",
+    authSendRejected:
+      "Penyedia SMS kami tidak menghantar kod buat masa ini. Cuba lagi dalam beberapa minit, atau minta bantuan kakitangan.",
     authErrorTitle: "Kami tidak dapat mengesahkan akaun anda.",
     authNetworkError:
       "Kami tidak dapat menyambung ke pengesahan ahli. Semak sambungan anda dan cuba lagi.",

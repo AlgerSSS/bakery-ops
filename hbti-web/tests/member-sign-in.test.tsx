@@ -210,6 +210,40 @@ describe("MemberSignIn 的重发闸门", () => {
     expect(screen.queryByText(copy.invalidCode)).not.toBeInTheDocument();
   });
 
+  // 2026-08-04 真机复现：验证码解出来了、RES 也收下了，却回业务错误 CRM-00-1105
+  // 拒绝发码。前端把它落进 default 分支显示「请检查网络」——顾客的网络毫无问题，
+  // 那句话只会让人反复重试同一条走不通的路。
+  it("RES 拒绝发码时说的是短信没发出去，不是「检查网络」", async () => {
+    stubFetch(
+      vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ error: "SERVICE_UNAVAILABLE" }, 503)),
+    );
+    const user = userEvent.setup();
+    renderSignIn();
+
+    await sendCodeFor(user, "123456789");
+
+    expect(await screen.findByText(copy.authSendRejected)).toBeInTheDocument();
+    expect(screen.queryByText(copy.authNetworkError)).not.toBeInTheDocument();
+  });
+
+  // 同理：CAPTCHA_UNSUPPORTED 是新增的码，漏掉映射就又会掉回「检查网络」。
+  it("验证码供应商不支持时说的是验证暂不可用", async () => {
+    stubFetch(
+      vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ error: "CAPTCHA_UNSUPPORTED" }, 503)),
+    );
+    const user = userEvent.setup();
+    renderSignIn();
+
+    await sendCodeFor(user, "123456789");
+
+    expect(await screen.findByText(copy.captchaRequired)).toBeInTheDocument();
+    expect(screen.queryByText(copy.authNetworkError)).not.toBeInTheDocument();
+  });
+
   it("真的断网了才说网络问题", async () => {
     stubFetch(
       vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),

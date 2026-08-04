@@ -150,6 +150,14 @@ interface ResH5AuthDiagnosticDetails {
   stage: ResH5AuthDiagnosticStage;
   message?: string;
   providerCode?: string;
+  /**
+   * RES 自己那句话，已按 `readSafeProviderMessage` 抹掉 4 位以上数字串。
+   *
+   * 只记 code 不记 msg 会让排障停在半路：2026-08-04 线上回 `CRM-00-1105`，
+   * 这个码既不在 RES 的客户端语言包里、也没有公开文档，光有码谁也不知道
+   * 是频率限制还是号码本身有问题。
+   */
+  providerMessage?: string;
   httpStatus?: number;
   timedOut?: boolean;
   topLevelKeys?: string[];
@@ -160,6 +168,7 @@ interface ResH5AuthDiagnosticDetails {
 export class ResH5AuthDiagnosticError extends Error {
   readonly stage: ResH5AuthDiagnosticStage;
   readonly providerCode?: string;
+  readonly providerMessage?: string;
   readonly httpStatus?: number;
   readonly timedOut: boolean;
   readonly topLevelKeys: string[];
@@ -173,6 +182,7 @@ export class ResH5AuthDiagnosticError extends Error {
     this.name = "ResH5AuthDiagnosticError";
     this.stage = details.stage;
     this.providerCode = details.providerCode;
+    this.providerMessage = details.providerMessage;
     this.httpStatus = details.httpStatus;
     this.timedOut = details.timedOut === true;
     this.topLevelKeys = details.topLevelKeys ?? [];
@@ -635,6 +645,7 @@ function createDiagnosticError(
     stage,
     message,
     providerCode: readSafeProviderCode(body?.code),
+    providerMessage: readSafeProviderMessage(body?.msg ?? body?.message),
     httpStatus: payload.status,
     topLevelKeys: readSafeKeys(body),
     dataKeys: readSafeKeys(data),

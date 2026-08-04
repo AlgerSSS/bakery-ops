@@ -612,7 +612,14 @@ function errorMessage(error: string | undefined, copy: UiCopy): string {
       return copy.rateLimited;
     case "CAPTCHA_REQUIRED":
     case "CAPTCHA_REQUIRED_UNSUPPORTED":
+    // CAPTCHA_UNSUPPORTED 是 2026-08-04 新增的码。漏掉映射就会掉进 default 的
+    // 「请检查网络」——把顾客指向一个和故障毫无关系的方向。
+    case "CAPTCHA_UNSUPPORTED":
       return copy.captchaRequired;
+    // RES 收下了请求却拒绝发码（例如线上见过的 CRM-00-1105）。这既不是网络问题
+    // 也不是顾客填错了，说「检查网络」会让人反复重试同一条走不通的路。
+    case "SERVICE_UNAVAILABLE":
+      return copy.authSendRejected;
     // 服务侧超时不是「码错了」——必须单独一条文案，
     // 别让顾客以为自己输错了而去重输同一个码。
     case "VERIFICATION_TIMEOUT":

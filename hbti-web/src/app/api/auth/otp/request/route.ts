@@ -167,6 +167,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         error instanceof ResH5AuthDiagnosticError
           ? error.providerCode
           : undefined,
+      // RES 自己那句话（已抹掉长数字串）。只记 code 排障会停在半路：`CRM-00-1105`
+      // 既不在 RES 客户端语言包里也没有公开文档，光有码分不清是频率限制还是别的。
+      providerMessage:
+        error instanceof ResH5AuthDiagnosticError
+          ? error.providerMessage
+          : undefined,
       httpStatus:
         error instanceof ResH5AuthDiagnosticError
           ? error.httpStatus

@@ -16,7 +16,22 @@ import type { UiCopy } from "@/content/ui";
 
 import styles from "./hbti.module.css";
 
-const REQUEST_TIMEOUT_MS = 15_000;
+/**
+ * 浏览器必须晚于服务端 30 秒 maxDuration 再放弃，外加一点响应回程余量。
+ * 否则浏览器先断开，顾客重试时原请求仍可能占着 challenge，反而得到
+ * 「已过期/已使用」并走进死路。
+ */
+const VERIFY_TIMEOUT_MS = 35_000;
+
+/**
+ * 发码要等服务端串行走三次 RES 调用，所以给它单独一个更长的时限。
+ *
+ * 必须大于路由里的 RES_DEADLINE_MS（18 秒），否则会出现最糟的一种失败：
+ * 浏览器先放弃、顾客看到「网络错误」，而短信其实已经发出去了——顾客接着去点重发，
+ * 而实测同号码当天的重发正是 RES 会静默丢掉的那一类。宁可多转几秒，
+ * 也不能对着一次已经成功的发送报错。
+ */
+const SEND_TIMEOUT_MS = 25_000;
 
 const countries = supportedCountries;
 
@@ -41,6 +56,16 @@ interface OtpReply {
   authenticated?: boolean;
   draftKey?: string;
   error?: string;
+  /** 这个号码今天已经发过码了；实测这种情况下新的短信多半不会送达。 */
+  resendMayNotArrive?: boolean;
+}
+
+/** 请求超时（含 AbortSignal.timeout）——与「网线断了」不是一回事，提示语也不同。 */
+function isTimeout(caught: unknown): boolean {
+  return (
+    caught instanceof DOMException &&
+    (caught.name === "TimeoutError" || caught.name === "AbortError")
+  );
 }
 
 export function MemberSignIn({
@@ -57,6 +82,10 @@ export function MemberSignIn({
   const [error, setError] = useState<string>();
   const [confirmation, setConfirmation] = useState<Confirmation>();
   const [resendSeconds, setResendSeconds] = useState(0);
+  // 倒计时归属于哪个号码。「换个号码」不该把它清零——号码没变，冷却就该继续，
+  // 否则顾客可以立刻再发一次，而那一次 RES 多半不会送达。只有真的换了号才重置。
+  const [cooldownPhone, setCooldownPhone] = useState<string>();
+  const [sendCaveat, setSendCaveat] = useState<"mayNotArrive" | "maybeSent">();
   const codeRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -69,6 +98,7 @@ export function MemberSignIn({
     return () => window.clearInterval(timer);
   }, [resendSeconds]);
 
+
   async function requestCode() {
     const nationalPhone = normalizeNationalNumber(phone, country);
     if (!country.pattern.test(nationalPhone)) {
@@ -79,7 +109,9 @@ export function MemberSignIn({
     setBusy("sending");
     setError(undefined);
     setConfirmation(undefined);
+    setSendCaveat(undefined);
 
+    const cooldownKey = `${country.countryCode}:${nationalPhone}`;
     try {
       const response = await fetch("/api/auth/otp/request", {
         method: "POST",
@@ -92,7 +124,7 @@ export function MemberSignIn({
           },
         }),
         cache: "no-store",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       });
       const payload = await readOtpReply(response);
       if (
@@ -109,9 +141,24 @@ export function MemberSignIn({
       setResendSeconds(
         validRetrySeconds(payload.retryAfterSeconds) ?? 60,
       );
+      setCooldownPhone(cooldownKey);
+      if (payload.resendMayNotArrive === true) {
+        setSendCaveat("mayNotArrive");
+      }
       window.setTimeout(() => codeRef.current?.focus(), 120);
-    } catch {
-      setError(copy.authNetworkError);
+    } catch (caught) {
+      // 超时和「网线断了」必须分开说。请求已经发出去、只是没等到回复时，
+      // 短信很可能已经在路上，这时催顾客重试是最坏的建议——重发正是 RES 丢掉的那类。
+      if (isTimeout(caught)) {
+        // 绝不动 challengeToken：这次若是「重发」超时，之前那次拿到的令牌仍然有效，
+        // 清掉就等于把顾客手里能用的验证码作废了。
+        setResendSeconds(60);
+        setCooldownPhone(cooldownKey);
+        setSendCaveat("maybeSent");
+        setError(copy.authSendTimeout);
+      } else {
+        setError(copy.authNetworkError);
+      }
     } finally {
       setBusy(undefined);
     }
@@ -140,7 +187,7 @@ export function MemberSignIn({
           ...(confirmConflict ? { confirmConflict: true } : {}),
         }),
         cache: "no-store",
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
       });
       const payload = await readOtpReply(response);
 
@@ -166,8 +213,10 @@ export function MemberSignIn({
         return;
       }
       setError(errorMessage(payload.error, copy));
-    } catch {
-      setError(copy.authNetworkError);
+    } catch (caught) {
+      setError(
+        isTimeout(caught) ? copy.authVerifyTimeout : copy.authNetworkError,
+      );
     } finally {
       setBusy(undefined);
     }
@@ -179,11 +228,26 @@ export function MemberSignIn({
     setCode("");
     setError(undefined);
     setConfirmation(undefined);
-    setResendSeconds(0);
+    // 这里**不再**把 resendSeconds 归零。此前归零而号码原样留在输入框里，
+    // 顾客点一下「换个号码」再点「发送」就能立刻再发一次——绕过了 1 次/分钟的限流，
+    // 而那一次 RES 多半静默丢弃。冷却对不对号，由下面的 cooldownApplies 在渲染时判断。
   }
 
   const isSending = busy === "sending";
   const isVerifying = busy === "verifying";
+
+  // 冷却和提示都归属于「发码时用的那个号码」。换了号码它们自然失效——在渲染时算，
+  // 而不是拿 effect 去同步 state（那样既会多渲染一轮，也正是 react-hooks 规则要拦的写法）。
+  //
+  // 这也修掉了原来的漏洞：「换个号码」按钮把倒计时清零却把号码原样留在输入框里，
+  // 顾客点两下就能立刻再发一次，绕过 1 次/分钟的限流——而那一次 RES 多半静默丢弃。
+  const cooldownKey = `${country.countryCode}:${normalizeNationalNumber(
+    phone,
+    country,
+  )}`;
+  const cooldownApplies = cooldownPhone === cooldownKey;
+  const cooldownLeft = cooldownApplies ? resendSeconds : 0;
+  const activeCaveat = cooldownApplies ? sendCaveat : undefined;
 
   return (
     <section className={styles.authPanel}>
@@ -279,13 +343,24 @@ export function MemberSignIn({
                 {error}
               </p>
             )}
+            {activeCaveat === "maybeSent" && (
+              <p className={styles.inlineNote} role="status">
+                {copy.authMaybeSentNote}
+              </p>
+            )}
+            {/* 冷却对这个号码仍然有效时，发送键也要锁住。只锁「重发」键是不够的：
+                点一下「换个号码」就回到这张表单，号码还原样在框里，一按就又发一次。 */}
             <button
               className={styles.primaryButton}
               type="submit"
-              disabled={isSending}
+              disabled={isSending || cooldownLeft > 0}
             >
-              {isSending ? copy.sendingCode : copy.sendCode}
-              {!isSending && <ForwardIcon />}
+              {cooldownLeft > 0
+                ? copy.resendIn(cooldownLeft)
+                : isSending
+                  ? copy.sendingCode
+                  : copy.sendCode}
+              {!isSending && cooldownLeft === 0 && <ForwardIcon />}
             </button>
           </form>
         ) : confirmation ? (
@@ -343,6 +418,11 @@ export function MemberSignIn({
                 {copy.changePhone}
               </button>
             </div>
+            {activeCaveat === "mayNotArrive" && (
+              <p className={styles.inlineNote} role="status">
+                {copy.authResendMayNotArrive}
+              </p>
+            )}
             <label htmlFor="member-code">{copy.codeLabel}</label>
             <input
               ref={codeRef}
@@ -382,11 +462,11 @@ export function MemberSignIn({
             <button
               className={styles.resendButton}
               type="button"
-              disabled={resendSeconds > 0 || isSending}
+              disabled={cooldownLeft > 0 || isSending}
               onClick={() => void requestCode()}
             >
-              {resendSeconds > 0
-                ? copy.resendIn(resendSeconds)
+              {cooldownLeft > 0
+                ? copy.resendIn(cooldownLeft)
                 : copy.resendCode}
             </button>
           </form>
@@ -447,7 +527,6 @@ function errorMessage(error: string | undefined, copy: UiCopy): string {
       return copy.invalidPhone;
     case "INVALID_CODE":
     case "OTP_INVALID":
-    case "VERIFICATION_FAILED":
     case "INVALID_VERIFICATION_CODE":
       return copy.invalidCode;
     case "OTP_EXPIRED":
@@ -461,6 +540,10 @@ function errorMessage(error: string | undefined, copy: UiCopy): string {
     case "CAPTCHA_REQUIRED":
     case "CAPTCHA_REQUIRED_UNSUPPORTED":
       return copy.captchaRequired;
+    // 服务侧超时不是「码错了」——必须单独一条文案，
+    // 别让顾客以为自己输错了而去重输同一个码。
+    case "VERIFICATION_TIMEOUT":
+      return copy.authVerifyTimeout;
     default:
       return copy.authNetworkError;
   }

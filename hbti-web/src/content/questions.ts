@@ -60,28 +60,32 @@ export const questions = [
   },
   {
     id: "q3",
+    // 甜度轴。原题「关于甜,你的立场」把测量维度直接摆上台面 —— 是问卷不是体验,
+    // 老板评价「太直接」。改成试吃新配方给反馈:场景在烘焙房,但选的是**怎么开口**
+    // (先护着人 vs 先说实话),不是选口味。与 q10「朋友难过时」区分:那是人际安慰,
+    // 这是手艺反馈。
     prompt: {
-      en: "Your official position on sweetness—",
-      "zh-CN": "关于『甜』，你的立场——",
-      "ms-MY": "Pendirian anda tentang manis—",
+      en: "A new recipe, still warm. They ask what you think—",
+      "zh-CN": "新配方刚出炉，他问你觉得怎么样——",
+      "ms-MY": "Resipi baharu, masih panas. Dia tanya pendapat anda—",
     },
     options: [
       {
         value: "dolce",
-        emoji: "🍯",
+        emoji: "🤝",
         label: {
-          en: "Life's bitter enough. Sweet is allowed.",
-          "zh-CN": "生活已经够苦了，甜一点不丢人",
-          "ms-MY": "Hidup dah cukup pahit. Manis itu halal.",
+          en: "Lead with what works, then tune it together",
+          "zh-CN": "先说做成的地方，再一起调",
+          "ms-MY": "Puji yang menjadi, kemudian halusi",
         },
       },
       {
         value: "bitter",
-        emoji: "🖤",
+        emoji: "🔍",
         label: {
-          en: "A little bitterness is what depth tastes like",
-          "zh-CN": "有点苦，才尝得出层次",
-          "ms-MY": "Sedikit pahit, baru terasa lapisannya",
+          en: "Name the first fix while it's still warm",
+          "zh-CN": "趁热点出第一个要改的",
+          "ms-MY": "Tunjuk pembetulan selagi ia panas",
         },
       },
     ],
@@ -228,56 +232,64 @@ export const questions = [
   },
   {
     id: "q8",
+    // 浓淡轴。原题「你喜欢的故事(和日子)」一个题干两个主语,老板评价「主体意义
+    // 很不明确」;选项用「浓/淡」是口味词,和叙事主语对不上,也完全脱离烘焙。
+    // 改成带新人:同样测「你把自己开到多大」,但落在烘焙房的真实动作上。
+    // 与 q2(咖啡拟人)、q9(新环境)区分:那两个是被动感受与社交起手,这个是主动带人。
     prompt: {
-      en: "The stories (and days) you like best are—",
-      "zh-CN": "你喜欢的故事（和日子），最好——",
-      "ms-MY": "Cerita (dan hari) yang anda suka biar—",
+      en: "Someone new starts today. You—",
+      "zh-CN": "今天来了个新人，你——",
+      "ms-MY": "Ada orang baharu hari ini. Anda—",
     },
     options: [
       {
         value: "strong",
         emoji: "⚡",
         label: {
-          en: "Rich and dramatic—make it count",
-          "zh-CN": "浓一点，起伏大一点，才过瘾",
-          "ms-MY": "Pekat dan penuh warna, baru puas",
+          en: "Show the whole bake—they'll catch on",
+          "zh-CN": "完整做一炉给他看，节奏一次就有了",
+          "ms-MY": "Buat sekali habis—dia dapat iramanya",
         },
       },
       {
         value: "light",
         emoji: "🌤",
         label: {
-          en: "Light with room to breathe",
-          "zh-CN": "淡一点，留白多一点，才舒服",
-          "ms-MY": "Ringan dan berruang, baru selesa",
+          en: "Break it into steps, work alongside",
+          "zh-CN": "拆成几步，陪着他一段一段来",
+          "ms-MY": "Pecahkan ikut langkah, temani dia",
         },
       },
     ],
   },
   {
     id: "q11",
+    // 甜度轴。原题「回忆过去,你最先想起」与 q3 语义过近(都在问偏甜还是偏苦),
+    // 且完全脱离烘焙,老板评价「太片面、目的不明」。保留原题的魂(回望时先想起什么),
+    // 但落到收工复盘这个烘焙房场景。三票现在是三种互不重叠的行为:
+    // q3 手艺反馈 / q10 安慰朋友 / q11 自我复盘。两个选项都是称职的收工方式。
     prompt: {
-      en: "Looking back, you remember first—",
-      "zh-CN": "回忆过去，你最先想起——",
-      "ms-MY": "Bila mengimbas kembali, anda teringat dulu—",
+      en: "Shutters down. What your mind replays is—",
+      "zh-CN": "关店了，你脑子里回放的是——",
+      "ms-MY": "Kedai tutup. Yang bermain semula dalam fikiran anda—",
     },
     options: [
       {
         value: "dolce",
-        emoji: "🍯",
+        emoji: "🧺",
         label: {
-          en: "The sweet moments, even in hard times",
-          "zh-CN": "那些甜的瞬间，哪怕当时很难",
-          "ms-MY": "Saat-saat manis, walau masa itu susah",
+          en: "The trays that sold out before noon",
+          "zh-CN": "中午前就卖光的那几盘",
+          "ms-MY": "Dulang yang habis sebelum tengah hari",
         },
       },
       {
         value: "bitter",
-        emoji: "🖤",
+        emoji: "🔥",
         label: {
-          en: "The hard-won parts—bitter, but worth it",
-          "zh-CN": "那些来之不易的部分，苦得值得",
-          "ms-MY": "Bahagian yang payah—pahit, tapi berbaloi",
+          en: "The over-baked batch—fixed tomorrow",
+          "zh-CN": "烤过头的那一炉，明天不会了",
+          "ms-MY": "Yang terlebih bakar—esok tidak lagi",
         },
       },
     ],

@@ -24,7 +24,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (rejection) {
       return rejection;
     }
-    requestSchema.parse(await request.json());
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      response = noStoreJson({ error: "INVALID_REQUEST" }, { status: 400 });
+      clearHbtiSessionCookie(response);
+      return response;
+    }
+    requestSchema.parse(rawBody);
 
     const token = readHbtiSessionCookie(request);
     if (token) {

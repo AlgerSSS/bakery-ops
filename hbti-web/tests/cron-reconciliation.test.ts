@@ -92,6 +92,11 @@ class PendingStore implements CompletionStore {
     this.record = record;
   }
 
+  async markUnrewarded(): Promise<void> {
+    // unrewarded 早在 markPrepared 之前就定下了，而对账只扫 prepared 记录，到不了这里。
+    throw new Error("reconciliation must not mark a completion unrewarded");
+  }
+
   async clearLocked(): Promise<boolean> {
     return false;
   }
@@ -177,6 +182,10 @@ class RotatingPendingStore implements CompletionStore {
 
   async markReview(): Promise<void> {
     throw new Error("read-only reconciliation must not finalize review");
+  }
+
+  async markUnrewarded(): Promise<void> {
+    throw new Error("read-only reconciliation must not mark unrewarded");
   }
 
   async clearLocked(): Promise<boolean> {

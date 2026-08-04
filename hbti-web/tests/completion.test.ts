@@ -2,7 +2,7 @@
 const memberId = "2083088506766532613";
 
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   completeHbti,
@@ -82,6 +82,15 @@ class FakeCompletionStore implements CompletionStore {
     record: Extract<CompletionRecord, { status: "review" }>,
   ): Promise<void> {
     this.beforeMarkReview?.(key, attemptId, record);
+    this.assertOwner(key, attemptId);
+    this.records.set(this.serialize(key), record);
+  }
+
+  async markUnrewarded(
+    key: CompletionStoreKey,
+    attemptId: string,
+    record: Extract<CompletionRecord, { status: "unrewarded" }>,
+  ): Promise<void> {
     this.assertOwner(key, attemptId);
     this.records.set(this.serialize(key), record);
   }
@@ -756,6 +765,57 @@ describe("completeHbti", () => {
     expect(res.giveInputs).toHaveLength(1);
   });
 
+  it("sends the fallback alert when review persistence and reread both fail", async () => {
+    const store = new FakeCompletionStore();
+    const res = new FakeResCouponAdapter({ couponsAddedOnGive: 2 });
+    const originalGet = store.get.bind(store);
+    let failReread = false;
+    store.beforeMarkReview = () => {
+      failReread = true;
+      throw new Error("review write failed");
+    };
+    store.get = async (key) => {
+      if (failReread) throw new Error("review reread failed");
+      return originalGet(key);
+    };
+    vi.stubEnv("ALERT_WEBHOOK", "https://alerts.example/hbti");
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(null, { status: 204 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      await expect(
+        completeHbti(
+          {
+            phone: "+12025550123",
+            expectedMemberId: memberId,
+            campaignVersion: "2026-08-pistachio-v1",
+            answers: validAnswers,
+            color: "pistachio",
+          },
+          {
+            store,
+            res,
+            couponTemplateName: "Pistachio Green Jewel",
+          },
+        ),
+      ).rejects.toMatchObject({
+        code: "STORE_UNAVAILABLE",
+        retryable: true,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(String(fetchMock.mock.calls[0][1]?.body)).toContain(
+        "HBTI 发券进入人工复核",
+      );
+    } finally {
+      vi.unstubAllEnvs();
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    }
+  });
+
   it("never unlocks a non-success give response for a blind retry", async () => {
     const store = new FakeCompletionStore();
     const res = new FakeResCouponAdapter({
@@ -1059,6 +1119,14 @@ describe("completeHbti", () => {
       },
       reason: "readback_mismatch",
       markedAt: "2026-07-30T08:00:00.000Z",
+      attemptId: "0d9a1c3e-77f5-4a6b-8c21-5e9f0b3d4a72",
+      baselineCouponIds: ["coupon-baseline"],
+      rewardContext: {
+        memberId,
+        templateId: "template-1",
+        templateName: "HBTI Gift · Rose Fridge Magnet",
+      },
+      alert: { status: "pending" },
     });
 
     await expect(

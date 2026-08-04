@@ -101,6 +101,11 @@ function summarize(
   for (const outcome of outcomes) {
     if (outcome === null) {
       summary.errors += 1;
+    } else if (outcome.status === "unrewarded") {
+      // 对账只扫 prepared 记录，而 unrewarded 早在 markPrepared 之前就定下了，
+      // 到不了这里。真出现就是状态机有问题——记成 error 让 cron 报 503。
+      // 原来的 summary[status] += 1 遇到未知状态会算出 NaN，序列化成 null 悄悄咽掉。
+      summary.errors += 1;
     } else {
       summary[outcome.status] += 1;
     }

@@ -39,7 +39,6 @@ vi.mock("@/lib/auth/session-cookie", () => ({
 import { POST } from "@/app/api/complete/route";
 
 const ORIGIN = "https://hbti-test.hotcrush.net";
-const LINK_SECRET = "l".repeat(48);
 const CAMPAIGN_VERSION = "2026-08-pistachio-v1";
 const validAnswers = {
   q1: "iced",
@@ -142,7 +141,9 @@ describe("complete route", () => {
       );
 
       expect(response.status).toBe(400);
-      expect(routeMocks.readHbtiAuthSession).not.toHaveBeenCalled();
+      // 会话检查已移到 body 解析之前：这里会话有效，会继续走到 schema 校验才 400。
+      expect(routeMocks.readHbtiAuthSession).toHaveBeenCalled();
+      expect(routeMocks.consumeTokenRateLimit).not.toHaveBeenCalled();
       expect(routeMocks.completeHbti).not.toHaveBeenCalled();
     },
   );
@@ -167,6 +168,49 @@ describe("complete route", () => {
     expect(routeMocks.createResApiClientFromEnv).not.toHaveBeenCalled();
     expect(routeMocks.completeHbti).not.toHaveBeenCalled();
     expect(routeMocks.consumeTokenRateLimit).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_REQUEST for a non-JSON body instead of falling through to 503", async () => {
+    const response = await POST(
+      new Request(`${ORIGIN}/api/complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: ORIGIN,
+          "Sec-Fetch-Site": "same-origin",
+        },
+        body: "not-json",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "INVALID_REQUEST",
+      retryable: false,
+    });
+    expect(routeMocks.completeHbti).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated callers before parsing the body", async () => {
+    routeMocks.readHbtiSessionCookie.mockReturnValue(null);
+    const response = await POST(
+      new Request(`${ORIGIN}/api/complete`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: ORIGIN,
+          "Sec-Fetch-Site": "same-origin",
+        },
+        body: "not-json",
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "AUTHENTICATION_REQUIRED",
+      retryable: false,
+    });
+    expect(routeMocks.completeHbti).not.toHaveBeenCalled();
   });
 
   it("returns 429 with Retry-After before creating RES or database dependencies", async () => {
@@ -235,8 +279,6 @@ describe("complete route", () => {
 });
 
 function stubValidServerEnvironment(): void {
-  vi.stubEnv("HBTI_LINK_SECRET", LINK_SECRET);
-  vi.stubEnv("HBTI_MEMBER_HASH_SECRET", "m".repeat(48));
   vi.stubEnv("HBTI_LINK_BASE_URL", ORIGIN);
   vi.stubEnv("HBTI_CAMPAIGN_VERSION", CAMPAIGN_VERSION);
   vi.stubEnv("RES_COUPON_TEMPLATE_NAME", "Pistachio Green Jewel");

@@ -140,8 +140,6 @@ function statusRequest(): Request {
 }
 
 function stubValidServerEnvironment(): void {
-  vi.stubEnv("HBTI_LINK_SECRET", "l".repeat(48));
-  vi.stubEnv("HBTI_MEMBER_HASH_SECRET", "m".repeat(48));
   vi.stubEnv("HBTI_LINK_BASE_URL", ORIGIN);
   vi.stubEnv("HBTI_CAMPAIGN_VERSION", CAMPAIGN_VERSION);
   vi.stubEnv("RES_COUPON_TEMPLATE_NAME", "Pistachio Green Jewel");

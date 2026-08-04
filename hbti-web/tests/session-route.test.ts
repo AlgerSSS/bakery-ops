@@ -1,18 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { POST } from "@/app/api/session/route";
-import { createMemberLinkToken } from "@/lib/member-link/crypto";
 
 const ORIGIN = "https://hbti-test.hotcrush.net";
 
 describe("retired invitation session route", () => {
-  it("retires a previously valid invitation without accepting its bearer", async () => {
-    const token = createMemberLinkToken({
-      phone: "+1 202 555 0123",
-      campaignVersion: "2026-08-pistachio-v1",
-      expiresAt: Math.floor(Date.now() / 1_000) + 3_600,
-      secret: "test-only-retired-link-secret".repeat(2),
-    });
+  it("retires a legacy invitation bearer without accepting or echoing it", async () => {
+    // 邀请链接停用前发出去的 token 仍会被点开：这里只保证服务端既不解析它，
+    // 也不把它回显到响应体里。
+    const token = "eyJsZWdhY3kiOiJpbnZpdGF0aW9uLXRva2VuIn0.signature";
 
     await expectRetiredResponse(
       POST(

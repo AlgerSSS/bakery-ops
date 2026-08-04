@@ -1,4 +1,4 @@
-import type { Localized } from "@/content/types";
+import type { HbtiAnswers, Localized } from "@/content/types";
 
 export interface UiCopy {
   brand: string;
@@ -30,6 +30,14 @@ export interface UiCopy {
   captchaRequired: string;
   authErrorTitle: string;
   authNetworkError: string;
+  /** 请求超时：短信可能已经发出，别催顾客重发（重发多半送不到）。 */
+  authSendTimeout: string;
+  /** RES 验证超时：不是验证码错，文案绝不能暗示顾客去重输验证码。 */
+  authVerifyTimeout: string;
+  /** 服务端告知这个号码今天已经发过码，新的多半不会到。 */
+  authResendMayNotArrive: string;
+  /** 超时之后的补充说明。 */
+  authMaybeSentNote: string;
   conflictTitle: string;
   conflictBody: string;
   confirmConflict: string;
@@ -61,10 +69,20 @@ export interface UiCopy {
   resume: string;
   back: string;
   next: string;
+  /** 进度的**字面**表述,只做 aria-label。屏幕阅读器不该靠隐喻猜自己答到第几题。 */
   questionProgress: (current: number, total: number) => string;
-  chooseOne: string;
+  /** 进度的**可见**表述,烘焙口径,aria-hidden。 */
+  questionProgressFlavor: (current: number, total: number) => string;
+  /** 按题 id 键控而非索引:题目重排不会让提示语错位。
+   *  Record<keyof HbtiAnswers, …> 让 TS 强制 13 条齐全 —— 漏一条编译就不过,
+   *  不会出现某个语言某一题渲染成 undefined。 */
+  chooseOne: Record<keyof HbtiAnswers, string>;
   resultEyebrow: string;
   resultTitle: string;
+  /** 结果卡上「配料」小标题 —— 让四个特征读成配方而不是标签堆。 */
+  /** 结果卡票头的「配方编号」前缀 —— HBTI 四个字母当配方号。 */
+  recipeNoLabel: string;
+  traitsLabel: string;
   signatureLabel: string;
   discoverGift: string;
   retake: string;
@@ -97,6 +115,15 @@ export interface UiCopy {
   rewardName: string;
   rewardNote: string;
   openWallet: string;
+  /** 周边发完时的结果页。不是错误提示——面包人格照常出，只是柜台没礼物了。 */
+  giftSoldOutEyebrow: string;
+  giftSoldOutTitle: string;
+  giftSoldOutBody: string;
+  giftSoldOutLabel: string;
+  giftSoldOutName: string;
+  giftSoldOutNote: string;
+  /** 9 件周边的显示名。Record 强制三语各写满 9 条，漏一件编译就不过。 */
+  giftNames: Record<GiftTemplateName, string>;
   processingTitle: string;
   processingBody: string;
   reviewTitle: string;
@@ -107,6 +134,33 @@ export interface UiCopy {
   networkError: string;
   retry: string;
   saved: string;
+}
+
+/**
+ * 9 件完成礼周边的 RES 券模板名，必须与 077_hbti_gift_stock.sql 里的
+ * template_name 逐字节一致（分隔符是 U+00B7 中点，两侧各一个空格）。
+ *
+ * 存在的理由：完成接口返回的是这个内部字符串，直接渲染给顾客会变成
+ * 「HBTI Gift · Rose Fridge Magnet」。giftNames 用 Record 把它们映射成三语显示名，
+ * 少一件就编译不过。
+ */
+export const giftTemplateNames = [
+  "HBTI Gift · White Pencil",
+  "HBTI Gift · Red Pencil",
+  "HBTI Gift · Black Pencil",
+  "HBTI Gift · Heart Scent Card",
+  "HBTI Gift · Rose Scent Card",
+  "HBTI Gift · Butterfly Scent Card",
+  "HBTI Gift · Rose Fridge Magnet",
+  "HBTI Gift · KL Fridge Magnet",
+  "HBTI Gift · Bow Fridge Magnet",
+] as const;
+export type GiftTemplateName = (typeof giftTemplateNames)[number];
+
+export function isGiftTemplateName(
+  value: string,
+): value is GiftTemplateName {
+  return (giftTemplateNames as readonly string[]).includes(value);
 }
 
 export const colorChoices = [
@@ -175,6 +229,14 @@ export const uiCopy: Localized<UiCopy> = {
     authErrorTitle: "We couldn’t verify your account.",
     authNetworkError:
       "We couldn’t connect to member verification. Check your connection and try again.",
+    authSendTimeout:
+      "That took longer than expected. The code may still be on its way.",
+    authVerifyTimeout:
+      "Verification took too long on our side. Please try again in a moment.",
+    authResendMayNotArrive:
+      "This number already had a code today. A new one often doesn’t come through—use the earlier code, or try another number.",
+    authMaybeSentNote:
+      "Give it a minute before asking for another one.",
     conflictTitle: "Use this member account?",
     conflictBody:
       "RES found another sign-in connected to this phone number. Confirm to keep this phone as the account you use for HBTI.",
@@ -207,16 +269,40 @@ export const uiCopy: Localized<UiCopy> = {
     introTitle: "Which bread on our shelf is you?",
     introBody:
       "Sixteen bread personalities, baked fresh every morning. A few small questions to claim the one with your name on it.",
-    introTime: "13 little choices · about 90 seconds",
+    introTime: "13 little choices · about 60 seconds",
     introReward: "P.S. There's a little something waiting at the counter once yours is out of the oven.",
     begin: "Claim my bread",
     resume: "The dough's still proofing—continue",
     back: "Back",
     next: "Next",
-    questionProgress: (current, total) => `Choice ${current} of ${total}`,
-    chooseOne: "Go with your first instinct—overproofed dough goes flat.",
+    questionProgress: (current, total) => `Question ${current} of ${total}`,
+    questionProgressFlavor: (current, total) => `Batch ${current} of ${total}`,
+    // 13 句烘焙房口吻的作答提示,每题一句。老板点名喜欢第一句那种感觉
+    // (「用烘焙术语讲测验规则」),这里铺满全程,最后一题回扣第一句。
+    //
+    // 硬约束:每句只能讲「怎么作答」,**不得出现任何映射到计分轴的词** ——
+    // 冷/热(温度轴)、甜/苦/盐/糖(甜度轴)、浓/淡/深/重(浓淡轴)、独处/一起(独同轴)。
+    // 初稿犯过这个错:q7 写「面团温着好说话」在温度轴上偏 hot,
+    // q10 写「盐比糖重要」在甜度轴上直接偏 bitter —— 装饰文案会污染测量结果。
+    chooseOne: {
+      q1: "Go with your first instinct—overproofed dough goes flat.",
+      q2: "Don't overthink it. The dough is already rising.",
+      q3: "No house standard here—just yours.",
+      q4: "Whichever one your hand reaches for.",
+      q5: "First thought is usually the honest one.",
+      q6: "No two bakers answer the same.",
+      q7: "Don't measure this one. Just answer.",
+      q8: "You already know. Tap it.",
+      q9: "Recipes are guidelines. This one's all you.",
+      q10: "Answer like nobody's watching the counter.",
+      q11: "Whichever you'd actually pick on a Tuesday.",
+      q12: "Don't let this one sit too long.",
+      q13: "Last one. Same as the first—don't overthink.",
+    },
     resultEyebrow: "Fresh from the oven · Your HBTI",
     resultTitle: "Fresh out of the oven: you.",
+    recipeNoLabel: "Recipe no.",
+    traitsLabel: "Ingredients",
     signatureLabel: "Your table order",
     discoverGift: "Collect my fresh-out gift",
     retake: "Bake it again",
@@ -272,9 +358,30 @@ export const uiCopy: Localized<UiCopy> = {
     successBody:
       "It’s ready in the Hot Crush account you just verified.",
     rewardLabel: "Your member reward",
-    rewardName: "Pistachio Green Jewel",
+    // 兜底名，只在券名还没到手时出现（例如演示模式）。此前这里写死
+    // "Pistachio Green Jewel"——那是一张饮品券，压根不在这 9 件周边里，
+    // 顾客照着去柜台会扑空。改成呼应开场 introReward 的说法。
+    rewardName: "A little something from the counter",
     rewardNote: "Physical Gift Coupon · one-time redemption",
     openWallet: "View it in my member wallet",
+    giftSoldOutEyebrow: "Still warm · Straight from the oven",
+    giftSoldOutTitle: "Your bread type is yours to keep.",
+    giftSoldOutBody:
+      "Every gift on the counter has found a home. Your result stays in your member account—come say hello on your next visit.",
+    giftSoldOutLabel: "The gift counter",
+    giftSoldOutName: "All claimed for now",
+    giftSoldOutNote: "Nothing to redeem this time",
+    giftNames: {
+      "HBTI Gift · White Pencil": "White Pencil",
+      "HBTI Gift · Red Pencil": "Red Pencil",
+      "HBTI Gift · Black Pencil": "Black Pencil",
+      "HBTI Gift · Heart Scent Card": "Heart Scent Card",
+      "HBTI Gift · Rose Scent Card": "Rose Scent Card",
+      "HBTI Gift · Butterfly Scent Card": "Butterfly Scent Card",
+      "HBTI Gift · Rose Fridge Magnet": "Rose Fridge Magnet",
+      "HBTI Gift · KL Fridge Magnet": "Kuala Lumpur Fridge Magnet",
+      "HBTI Gift · Bow Fridge Magnet": "Ribbon Bow Fridge Magnet",
+    },
     processingTitle: "Your gift is being prepared.",
     processingBody:
       "Keep this page open for a moment. Your result is saved and we’re confirming the coupon.",
@@ -322,6 +429,11 @@ export const uiCopy: Localized<UiCopy> = {
     captchaRequired: "手机号验证暂时不可用，请稍后再试。",
     authErrorTitle: "暂时无法验证你的账户。",
     authNetworkError: "暂时无法连接会员验证，请检查网络后再试。",
+    authSendTimeout: "这次等得有点久，验证码可能已经在路上了。",
+    authVerifyTimeout: "会员验证服务超时，请稍等片刻再试。",
+    authResendMayNotArrive:
+      "这个号码今天已经收过一次验证码，新的往往发不出来——请用之前那条，或换一个号码。",
+    authMaybeSentNote: "先等一分钟再考虑重新发送。",
     conflictTitle: "使用这个会员账户吗？",
     conflictBody:
       "RES 发现这个手机号还关联了其他登录方式。确认后，将使用这个手机号对应的账户完成 HBTI。",
@@ -350,16 +462,33 @@ export const uiCopy: Localized<UiCopy> = {
     introEyebrow: "Freshly Crafted Every Day · 每日新鲜制作",
     introTitle: "你是货架上的哪一块？",
     introBody: "16 种面包性格，每天新鲜出炉。几个小问题，认领那块和你同名的。",
-    introTime: "13 个小选择 · 大约 90 秒",
+    introTime: "13 个小选择 · 大约 60 秒",
     introReward: "顺便说一句：出炉之后，柜台有一份小心意等你。",
     begin: "认领我的面包",
     resume: "面团还醒着，接着来",
     back: "返回",
     next: "下一题",
-    questionProgress: (current, total) => `第 ${current} / ${total} 题`,
-    chooseOne: "凭第一感觉选。面团醒过头，就不松软了。",
+    questionProgress: (current, total) => `第 ${current} 题，共 ${total} 题`,
+    questionProgressFlavor: (current, total) => `第 ${current} 炉 / 共 ${total} 炉`,
+    chooseOne: {
+      q1: "凭第一感觉选。面团醒过头，就不松软了。",
+      q2: "别想太久，面团已经在发了。",
+      q3: "这儿没有标准答案，只有你的答案。",
+      q4: "手先伸向哪个，就是哪个。",
+      q5: "第一反应，通常最诚实。",
+      q6: "没有两个师傅答得一样。",
+      q7: "这题不用量，直接答。",
+      q8: "你已经知道了，点下去。",
+      q9: "配方只是参考，这题全凭你。",
+      q10: "当柜台前没人看着你那样答。",
+      q11: "挑你平常真的会选的那个。",
+      q12: "这题别放太久。",
+      q13: "最后一题。和第一题一样，别多想。",
+    },
     resultEyebrow: "刚出炉 · 你的 HBTI",
     resultTitle: "刚出炉的，是你。",
+    recipeNoLabel: "配方编号",
+    traitsLabel: "配料",
     signatureLabel: "你的专属搭配",
     discoverGift: "收下这份出炉礼",
     retake: "重烤一次",
@@ -412,9 +541,27 @@ export const uiCopy: Localized<UiCopy> = {
     successTitle: "礼物券已放进你的会员账户。",
     successBody: "它已经进入你刚刚验证的 Hot Crush 账户。",
     rewardLabel: "你的会员礼物",
-    rewardName: "Pistachio Green Jewel",
+    rewardName: "柜台的一份小心意",
     rewardNote: "周边实物兑换券 · 仅可兑换一次",
     openWallet: "去会员账户查看",
+    giftSoldOutEyebrow: "趁热 · 刚出炉",
+    giftSoldOutTitle: "这块面包，是你的了。",
+    giftSoldOutBody:
+      "柜台的小礼物已经全被领走了。你的结果留在会员账户里——下次来店里，记得给我们看看。",
+    giftSoldOutLabel: "礼物柜台",
+    giftSoldOutName: "小礼物暂时领完了",
+    giftSoldOutNote: "这次没有可兑换的券",
+    giftNames: {
+      "HBTI Gift · White Pencil": "白色铅笔",
+      "HBTI Gift · Red Pencil": "红色铅笔",
+      "HBTI Gift · Black Pencil": "黑色铅笔",
+      "HBTI Gift · Heart Scent Card": "爱心纸香卡",
+      "HBTI Gift · Rose Scent Card": "玫瑰纸香卡",
+      "HBTI Gift · Butterfly Scent Card": "蝴蝶纸香卡",
+      "HBTI Gift · Rose Fridge Magnet": "玫瑰冰箱贴",
+      "HBTI Gift · KL Fridge Magnet": "吉隆坡冰箱贴",
+      "HBTI Gift · Bow Fridge Magnet": "蝴蝶结冰箱贴",
+    },
     processingTitle: "正在准备你的礼物。",
     processingBody: "请暂时保留这个页面。你的结果已经保存，我们正在确认礼物券。",
     reviewTitle: "你的结果已经保存。",
@@ -461,6 +608,14 @@ export const uiCopy: Localized<UiCopy> = {
     authErrorTitle: "Kami tidak dapat mengesahkan akaun anda.",
     authNetworkError:
       "Kami tidak dapat menyambung ke pengesahan ahli. Semak sambungan anda dan cuba lagi.",
+    authSendTimeout:
+      "Ini mengambil masa lebih lama daripada biasa. Kod mungkin masih dalam perjalanan.",
+    authVerifyTimeout:
+      "Pengesahan ahli mengambil masa terlalu lama. Sila cuba lagi sebentar nanti.",
+    authResendMayNotArrive:
+      "Nombor ini sudah menerima kod hari ini. Kod baharu selalunya tidak sampai—gunakan kod terdahulu, atau cuba nombor lain.",
+    authMaybeSentNote:
+      "Tunggu seminit sebelum meminta kod baharu.",
     conflictTitle: "Gunakan akaun ahli ini?",
     conflictBody:
       "RES menemui log masuk lain yang dikaitkan dengan nombor ini. Sahkan untuk menggunakan akaun telefon ini bagi HBTI.",
@@ -493,16 +648,34 @@ export const uiCopy: Localized<UiCopy> = {
     introTitle: "Anda roti yang mana di rak kami?",
     introBody:
       "Enam belas personaliti roti, dibakar segar setiap pagi. Beberapa soalan kecil untuk menuntut yang tertulis nama anda.",
-    introTime: "13 pilihan kecil · kira-kira 90 saat",
+    introTime: "13 pilihan kecil · kira-kira 60 saat",
     introReward: "P.S. Ada sedikit buah tangan menanti di kaunter selepas roti anda keluar ketuhar.",
     begin: "Tuntut roti saya",
     resume: "Doh masih menunggu—sambung",
     back: "Kembali",
     next: "Seterusnya",
-    questionProgress: (current, total) => `Pilihan ${current} daripada ${total}`,
-    chooseOne: "Ikut naluri pertama—doh yang terlebih menunggu akan kempis.",
+    questionProgress: (current, total) => `Soalan ${current} daripada ${total}`,
+    // 可见文案用紧凑写法:320px 上「Bakaran 13 daripada 13」会换行,撑高进度块。
+    questionProgressFlavor: (current, total) => `Bakaran ${current}/${total}`,
+    chooseOne: {
+      q1: "Ikut naluri pertama—doh yang terlebih menunggu akan kempis.",
+      q2: "Jangan fikir lama. Doh itu sudah naik.",
+      q3: "Tiada piawai kedai di sini—hanya milik anda.",
+      q4: "Mana yang tangan anda capai dulu.",
+      q5: "Fikiran pertama selalunya yang jujur.",
+      q6: "Tiada dua pembuat roti menjawab sama.",
+      q7: "Yang ini tak perlu disukat. Jawab sahaja.",
+      q8: "Anda sudah tahu. Tekan sahaja.",
+      q9: "Resipi cuma panduan. Yang ini milik anda.",
+      q10: "Jawab seolah tiada sesiapa memerhati di kaunter.",
+      q11: "Yang anda betul-betul akan pilih pada hari biasa.",
+      q12: "Jangan biarkan yang ini terlalu lama.",
+      q13: "Yang terakhir. Sama seperti yang pertama—jangan fikir lama.",
+    },
     resultEyebrow: "Baru keluar ketuhar · HBTI anda",
     resultTitle: "Baru keluar dari ketuhar: anda.",
+    recipeNoLabel: "No. resipi",
+    traitsLabel: "Bahan",
     signatureLabel: "Pesanan khas anda",
     discoverGift: "Terima hadiah keluar ketuhar",
     retake: "Bakar sekali lagi",
@@ -558,9 +731,29 @@ export const uiCopy: Localized<UiCopy> = {
     successBody:
       "Ia sedia dalam akaun Hot Crush yang baru anda sahkan.",
     rewardLabel: "Ganjaran ahli anda",
-    rewardName: "Pistachio Green Jewel",
+    rewardName: "Sedikit buah tangan dari kaunter",
     rewardNote: "Kupon Hadiah Fizikal · penebusan sekali sahaja",
     openWallet: "Lihat dalam dompet ahli saya",
+    giftSoldOutEyebrow: "Masih panas · Baru keluar ketuhar",
+    giftSoldOutTitle: "Roti ini milik anda.",
+    giftSoldOutBody:
+      "Semua buah tangan di kaunter sudah bertuan. Keputusan anda tersimpan dalam akaun ahli—singgah menyapa kami pada kunjungan seterusnya.",
+    giftSoldOutLabel: "Kaunter hadiah",
+    giftSoldOutName: "Semua sudah dituntut",
+    giftSoldOutNote: "Tiada kupon untuk ditebus kali ini",
+    giftNames: {
+      "HBTI Gift · White Pencil": "Pensel Putih",
+      "HBTI Gift · Red Pencil": "Pensel Merah",
+      "HBTI Gift · Black Pencil": "Pensel Hitam",
+      "HBTI Gift · Heart Scent Card": "Kad Wangi Hati",
+      "HBTI Gift · Rose Scent Card": "Kad Wangi Mawar",
+      "HBTI Gift · Butterfly Scent Card": "Kad Wangi Rama-Rama",
+      "HBTI Gift · Rose Fridge Magnet": "Magnet Peti Sejuk Mawar",
+      // 用 KL 而不是 Kuala Lumpur：本地读者本来就这么说，而奖品卡的 strong 是
+      // 1.45rem，全称在 320px 下要折成三行（ui.ts:554 已经为马来文的长度做过一次妥协）。
+      "HBTI Gift · KL Fridge Magnet": "Magnet Peti Sejuk KL",
+      "HBTI Gift · Bow Fridge Magnet": "Magnet Peti Sejuk Reben",
+    },
     processingTitle: "Hadiah anda sedang disediakan.",
     processingBody:
       "Biarkan halaman ini terbuka sebentar. Keputusan anda telah disimpan dan kami sedang mengesahkan kupon.",

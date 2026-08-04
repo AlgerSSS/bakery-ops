@@ -91,13 +91,17 @@ beforeEach(() => {
   mocks.rateLimiter.consumeOtpRequest.mockResolvedValue({
     allowed: true,
     retryAfterSeconds: 0,
+    phoneAttemptsToday: 1,
   });
   mocks.res.createGuestSession.mockResolvedValue({
     deviceId: "device-1",
     token: "guest-token",
   });
   mocks.res.getCaptchaConfig.mockResolvedValue({ enable: false });
-  mocks.res.sendVerifyCode.mockResolvedValue(undefined);
+  mocks.res.sendVerifyCode.mockResolvedValue({
+    code: "000",
+    bodyKeys: ["code", "data"],
+  });
   mocks.store.createChallenge.mockResolvedValue({
     token: challengeToken,
     expiresAt,
@@ -142,6 +146,18 @@ beforeEach(() => {
 });
 
 describe("POST /api/auth/otp/request", () => {
+  it("rejects malformed JSON without calling RES or the database", async () => {
+    const response = await requestOtp(malformedMutationRequest("/api/auth/otp/request"));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "INVALID_REQUEST",
+    });
+    expect(mocks.createRateLimiter).not.toHaveBeenCalled();
+    expect(mocks.createAuthStoreFromEnv).not.toHaveBeenCalled();
+    expect(mocks.createResClient).not.toHaveBeenCalled();
+  });
+
   it("sends one OTP through RES and returns only an opaque challenge", async () => {
     const response = await requestOtp(
       mutationRequest("/api/auth/otp/request", {
@@ -157,6 +173,8 @@ describe("POST /api/auth/otp/request", () => {
     await expect(response.json()).resolves.toEqual({
       challengeToken,
       maskedPhone: "+86 139****5678",
+      // 当天第一次，界面照常说「已发送」。
+      resendMayNotArrive: false,
     });
     expect(mocks.rateLimiter.consumeOtpRequest).toHaveBeenCalledWith({
       phoneE164: "+8613912345678",
@@ -207,6 +225,34 @@ describe("POST /api/auth/otp/request", () => {
     });
     expect(mocks.store.createChallenge).not.toHaveBeenCalled();
     expect(mocks.res.sendVerifyCode).not.toHaveBeenCalled();
+  });
+
+  it("同号码当天第二次发码时如实告知新短信可能收不到", async () => {
+    // RES 对同一号码当天的重复发码回 "000" 却不真的送达（19 次请求精确关联：
+    // 当日首次 11/13 到达，重复 0/6）。我们拦不住 RES，但不能跟着它一起
+    // 笃定地说「已发送」——顾客会一直干等，然后继续点重发。
+    mocks.rateLimiter.consumeOtpRequest.mockResolvedValue({
+      allowed: true,
+      retryAfterSeconds: 0,
+      phoneAttemptsToday: 2,
+    });
+
+    const response = await requestOtp(
+      mutationRequest("/api/auth/otp/request", {
+        phone: {
+          countryCode: "86",
+          isoCode: "CN",
+          phone: "13912345678",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      resendMayNotArrive: true,
+    });
+    // 仍然照发——RES 的规则是推断出来的，不该由我们替它拒绝顾客。
+    expect(mocks.res.sendVerifyCode).toHaveBeenCalledTimes(1);
   });
 
   it("enforces rate limits before creating an RES guest session", async () => {
@@ -266,6 +312,17 @@ describe("POST /api/auth/otp/request", () => {
 });
 
 describe("POST /api/auth/otp/verify", () => {
+  it("rejects malformed JSON before acquiring a challenge", async () => {
+    const response = await verifyOtp(malformedMutationRequest("/api/auth/otp/verify"));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "INVALID_REQUEST",
+    });
+    expect(mocks.store.beginAttempt).not.toHaveBeenCalled();
+    expect(mocks.createResClient).not.toHaveBeenCalled();
+  });
+
   it("consumes the challenge and creates an opaque two-hour session", async () => {
     mocks.res.verifyLoginAndEnsureMember.mockResolvedValueOnce({
       memberId: "member-1",
@@ -504,6 +561,55 @@ describe("POST /api/auth/otp/verify", () => {
     }
   });
 
+  it("only labels an actually aborted RES call as verification timeout", async () => {
+    mocks.res.verifyLoginAndEnsureMember.mockRejectedValue(
+      new ResH5AuthDiagnosticError({
+        stage: "userinfo_transport",
+        timedOut: true,
+      }),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await verifyOtp(
+      mutationRequest("/api/auth/otp/verify", {
+        challengeToken,
+        code: "123456",
+        acceptMembership: true,
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "VERIFICATION_TIMEOUT",
+      retryable: true,
+    });
+    expect(mocks.store.releaseAttempt).toHaveBeenCalledWith(challengeToken);
+  });
+
+  it("does not hide an immediate RES HTTP failure behind timeout copy", async () => {
+    mocks.res.verifyLoginAndEnsureMember.mockRejectedValue(
+      new ResH5AuthDiagnosticError({
+        stage: "userinfo_transport",
+        httpStatus: 401,
+      }),
+    );
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await verifyOtp(
+      mutationRequest("/api/auth/otp/verify", {
+        challengeToken,
+        code: "123456",
+        acceptMembership: true,
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "VERIFICATION_FAILED",
+    });
+    expect(mocks.store.releaseAttempt).toHaveBeenCalledWith(challengeToken);
+  });
+
   it("returns a useful retryable response for a rejected verification code", async () => {
     mocks.res.verifyLoginAndEnsureMember.mockRejectedValue(
       new ResH5VerificationCodeError(),
@@ -591,6 +697,21 @@ describe("GET /api/auth/session", () => {
 });
 
 describe("POST /api/auth/logout", () => {
+  it("rejects malformed JSON and still clears the browser cookie", async () => {
+    const response = await logout(
+      malformedMutationRequest("/api/auth/logout", {
+        Cookie: `hbti_session=${sessionToken}`,
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "INVALID_REQUEST",
+    });
+    expect(mocks.store.deleteSession).not.toHaveBeenCalled();
+    expect(response.headers.get("set-cookie")).toContain("hbti_session=;");
+  });
+
   it("deletes the server session and clears the cookie", async () => {
     const response = await logout(
       mutationRequest(
@@ -611,6 +732,22 @@ describe("POST /api/auth/logout", () => {
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
   });
 });
+
+function malformedMutationRequest(
+  pathname: string,
+  headers: Record<string, string> = {},
+): Request {
+  return new Request(`${origin}${pathname}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Origin: origin,
+      "Sec-Fetch-Site": "same-origin",
+      ...headers,
+    },
+    body: "{",
+  });
+}
 
 function mutationRequest(
   pathname: string,

@@ -6,6 +6,218 @@
 
 ---
 
+## HBTI 上线加固已完成并提交（2026-08-04，Codex，分支 `claude/hbti-launch-hardening`，未部署）
+
+全量门禁在本机通过：`npx tsc --noEmit`、`npx eslint .`（0 error / 0 warning）、
+`npx vitest run`（29 文件 283 用例全过，含真库集成）、`npx next build`、
+`npx playwright test`（42 条 e2e 全过）。集成用例需要一次性 Postgres：
+`docker run --rm --name hbti-test-postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=hbti_test -p 127.0.0.1:55432:5432 postgres:17-alpine`，
+再按 059/060/063/066（财务站 `sql/`）+ 077/078/101（`bakery-ops/src/modules/data/migrations/`）
+顺序灌一遍 schema，跑测试时带 `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:55432/hbti_test DATABASE_SSL=disable`。
+
+本轮改了什么：
+
+- **Postgres 连接**：Vercel 上强制 `:6543` 事务池 + 已核验的池主机名，`ssl: "verify-full"`。
+  之前是 `ssl: "require"`——postgres.js 3.4.9 在该模式下 `rejectUnauthorized = false`，
+  等于加密但不验证证书，中间人可冒充库。回归见 `tests/postgres-tls-config.test.ts`。
+- **发码限流**：手机号「每日 5 次」额度只在分钟桶与 IP 桶都放行后才自增。
+  修复前，攻击者用同一号码在一分钟内狂点就能把受害者当天的 OTP 配额耗光。
+- **客户端 IP 信任**：只在 `VERCEL=1` 时信任 `x-forwarded-for` 最后一跳，`x-real-ip` 一律不认，
+  其余环境落固定兜底桶——避免伪造头轮换出无限桶。
+- **告警出口**：`ALERT_WEBHOOK` 现在必须是不带用户名/口令的 HTTPS URL，否则视为未配置，
+  `/api/health` 返回 503 挡住发券批次。review 告警在 Cron 侧并行发送、失败保持 `pending` 可重试，
+  历史四字段 review 行会被就地补齐 `attemptId/baselineCouponIds/rewardContext` 再发。
+- **RES 请求超时**：`ResApiClient` 接受路由级 `AbortSignal`，与 `maxDuration` 对齐
+  （complete 24s / status 20s / cron 40s），不再出现路由已返回、RES 调用还在跑的悬挂写。
+- **JSON 入参**：四个变更路由对畸形 JSON 统一返回 400 `INVALID_REQUEST`，不再落成 503。
+- **邀请链接彻底下线**：删除 `src/lib/member-link/{crypto,schema}.ts` 与其测试；
+  `/api/session` 保留 410 存根（老链接仍会被点开），脚本改名
+  `scripts/create-member-link.mjs` → `scripts/print-hbti-urls.mjs`（只印 `/` 与 `/demo`）。
+  测试里 `HBTI_LINK_SECRET`、`HBTI_MEMBER_HASH_SECRET` 的桩已清干净。
+
+下一步（尚未做，需要人):
+
+1. **Vercel 生产环境变量仍有三个已退休的键**：`HBTI_LINK_SECRET`、`HBTI_LINK_TTL_SECONDS`、
+   `HBTI_MEMBER_HASH_SECRET`。代码已完全不读它们；确认无其他消费者后由人删除
+   （`npx vercel env rm <NAME> production`）。本轮没有动生产配置。
+2. **`ALERT_WEBHOOK` 生产未配置**：不配就 `/api/health` 503，等于挡住发券。上线前必须配一个
+   真实可达的 HTTPS 目的地，并发一条不含 PII 的 canary 验证。
+3. 部署仍是显式动作：`hbti-web` 走 `npx vercel --prod`（`deploy.sh` 只部署 bakery-ops/res_api）。
+
+---
+
+## Codex 已复核 Kimi、Claude 架构图和 Lark 实际工时表（2026-08-03，未提交）
+
+用户澄清：需要的不是“加班表”，也不是预排班 Excel，而是 Lark 上的月度**实际工时**在线表；
+每天填写、每天读取，记录某员工在哪天实际上班及实际工作时长。用户已确认这是实际工时来源，
+并提供了后厨与前场两本 Lark Sheets。
+
+本轮只读复核了 Kimi §10、Claude《HOT CRUSH 星型模型目标结构图》、四个数据库消费者、
+现有 RES 账单探针、生产预估单模板/生成代码、员工/`staff`/财务人工成本结构及导入链路。
+两本 Lark 表均通过 bot 只读访问，没有写入：按月分 sheet，第 5 行字段为 No./Name/Position、
+1–31 日、Total Actual Hours、Required Hours、Variance、Leave/Exception Notes；每日单元格同时存在
+数字、空白、0 和 OFF/假期等文本。两表都没有稳定 Employee ID 和 Store Code；前场样例中的
+Required Hours 还出现与表头公式口径不一致的手填数，因此合计列只能作为校验，不能直接当事实。
+
+在 `docs/star-schema-plan.md` 末尾新增“## 十一、Codex 对 Kimi 版本的逐条复核与落地建议”
+（§11.1–11.8，共 184 行），并在 §11.8 逐项复核 Claude 架构图。
+Claude、此前 Codex、Kimi 的原有 689 行没有改动；追加前文件 SHA-256 为
+`2578d6f544bc6073f9f8b0b9547800bf4b6c63ed19e95051a5bf8a3f1552e45e`，追加后重新计算
+前 689 行 hash 相同。所有新增意见均以加粗 `（Codex 意见：…）` 或
+`（Codex 意见—主题：…）` 标注。
+
+本轮收敛的关键结论：
+
+- 推荐“单库 + public 域前缀 + 分域单写 + 精简核心 v2 + mart 后置”，不直接执行 Claude/Kimi 原迁移表。
+- Lark 实际工时落 `hr_timesheet_sync_batch` + `hr_timesheet_entry`，引用稳定
+  `hr_employment_id`；当前唯一粒度为雇佣关系×门店×日期×工作区域/来源流，避免同一员工
+  同日在前场、后厨两本表出现时相互覆盖；`staff` 仅用于同步/批准操作人。未来若有预排班，再独立建
+  `ops_shift_plan/_assignment`，实际工时、计划排班、OT、工资与财务人工成本不混用。
+- 生产预估单的计划量与“实际出货”是不同字段；confirmed/published 只表示获批计划。
+  只有实际出货明确填写才产生 `ops_production_output/_line`，且实际出货仍不自动等同实际烘烤。
+- Kimi 的 26,683 行不是稳定账单，而是 `businessDate+openedTime` 时间桶；样本实际含
+  26,741 单、57 个桶多单。目标仍为 order + order_item + payment + refund，先验证 report 211。
+- `finance_labor_detail` 只有人工成本金额，没有员工或工时；Kimi 的“月工时互校”不成立。
+- `cost_card_product_link` 已存在，不能重建同名表；“成本只能连 2.6%”也已过时。
+- 最小运行权限建议拆为 migrator、RES、Bakery Ops、HBTI、Finance、readonly 六个表级身份。
+- Claude 架构图可保留为分析层初稿，但“运营核心不重构、第二家店才加 store_key、固定 4 维
+  9 事实、只画销售/会员两颗星”不适合作为企业终态；v3 应先画来源批次、身份映射、规范化核心、
+  生产/工时闭环和权限边界，再把各主题 mart 作为下游投影。
+
+本轮没有修改应用代码、没有执行数据库 DDL/DML、没有部署，也没有提交。当前工作区仍有
+HBTI 的其他未提交改动，`docs/star-schema-plan.md` 仍是未跟踪文件；不要运行 `deploy.sh`。
+下一步应先由用户审阅 §11。实施前仍需补稳定 Employee ID（或经人工确认的身份映射）、确认
+每日数字工时是否已经扣除表头所写的 1 小时休息，以及确认预估单“实际出货”日常何时填写；
+随后另写 v3 物理模型和迁移清单，不能把本轮文档批注视为已部署。
+
+---
+
+## Kimi 对星型方案的评审已追加（2026-08-03，Kimi，文档批注，未提交）
+
+用户要求在 `docs/star-schema-plan.md` 的 Codex 批注之后追加 Kimi 的建议，出发点是
+「数据量小、允许大改，目标模型要符合业务」。已新增文档末尾「## 十、Kimi 的建议」一节
+（§10.1–10.6）。写之前独立复查了四个数据库使用方（res_api / bakery-ops / hbti-web /
+财务站，财务站在 iCloud 路径 `…/雅楠需求/门店财务AI分析系统`，只读），并参考了
+`~/Desktop/04-数据库理想终态蓝图-大重构版.md`（0727 实测修订版）。
+
+核心结论：Claude 方案作为止血清单 8/10、作为目标模型 3/10；两份文档共同的最大盲区是
+**排产计划与实际生产零落库**（`plan-generator.ts` 纯函数无 INSERT，sell-through 分母不存在）。
+主要新主张：① 销售事实按账单级建模（`scrape-order-analysis.mjs` 已实测可抓 26,683 行/30 天，
+从未入库），订单行级列为待验证；② 角色拆 3 个就够（站 0727 方案，不同意 Codex 的 per-app
+角色）；③ 批 A 止血单独放行，不等业务模型审批；④ 迁移治理用 0727 方案的 advisory lock
+20 行解法，而非「从 102 起」；⑤ 目标三层模型（pos_ingest_batch 来源层 → 含
+`ops_production_plan/_actual` 的规范化核心层 → 数量不预设的 mart_ 视图层）；⑥ 利用
+「数据少可重抓回填」红利，核心事实重建回填优于兼容视图体操。
+
+新发现的事实性更正（批注里已写）：HBTI 是 12 列不是 8 列、13 题原始答案完全不落库、
+礼品库存纯计数器无流水；dining 日数据是 30 天总比摊到每天的伪造精度；单品折扣抓了没存、
+退款只进 CSV；SCM/MKT 域表已死（真实流程在 WMS/金山文档）。
+
+**用户已拍板（同日，已写进 §10.3/10.4/10.6-1）**：生产数据来源 = 用户每日上传生产预估单
+Excel，上传即产生 `excel_upload` 来源的 `ops_production_plan` 版本，**confirmed 版本即实际
+生产记录，不另建 actual 表**；终态等预测模型准了之后改由 `ops_forecast_run` 自动生成
+（`source='forecast_auto'`，上传降级为人工修正入口），所以 source/status 两列必须第一天就在。
+另新增需求：**班表也由用户每日上传 Excel**，落 `hr_shift_schedule`（店×日×员工×班次，
+关联 `staff`，带 batch_id），用于人效分析并与 `finance_labor_detail` 月工时互相校验。
+待实施时确认：两份 Excel 的模板列、同日重复上传的覆盖语义（建议同日常态覆盖、跨天只读）。
+⚠ §10.6 决策点 2–5（账单级抓取入每晚链路、store_id 现在建、财务月结 closed、三方案归一）
+仍待用户拍板。
+
+本次只改了 `docs/star-schema-plan.md`（未跟踪文件）和本文件，未提交、未动代码、未碰数据库。
+下一步：用户审阅三方意见并拍板 §10.6 剩余决策点后，建议合并出一份 v3 目标模型文档，
+三份旧方案归档；执行前仍需先做 0727 方案 4.1 的迁移治理六条（至今未执行）。
+
+---
+
+## Claude 星型方案逐项批注（2026-08-03，Codex，只读审计后文档批注）
+
+用户要求在 Claude 的原方案上逐条加入 Codex 建议。已保留
+`docs/star-schema-plan.md` 的 Claude 原文，并新增 **110 处**加粗的
+`（Codex 的建议：…）` / 逐项批注，覆盖：总体判断、四个数据库消费者、七条兼容契约、
+Phase 0 的每个迁移、4 个维度、9 个事实/指标对象、消费者切换、“不做”边界和 D1–D5 时间线。
+
+批注的总判断：本文适合作为止血修复和迁移风险附录，不适合作为允许大改后的全业务目标模型；
+保留一个 PostgreSQL 和分析层星型思路，但必须先建立门店、企业商品/SKU、来源身份、采集批次及
+规范化业务核心层。原定迁移 102/105、Phase 1–3 和 D1–D5 均标为暂停或重写。
+
+本次没有修改应用代码、没有执行数据库 DDL/DML、没有部署。`docs/star-schema-plan.md` 原本及现在
+均为未跟踪文件；本节 HANDOFF 修改也未提交，因为用户只要求文档批注、没有要求提交。
+当前 HBTI 代码和 `hbti-web/src/lib/alert.ts` 的既有未提交改动不属于本次工作，未改动或还原。
+在这些改动隔离或提交前，**不要运行 `deploy.sh`**。下一步应由用户先审阅批注；若认可，再另写
+v3 目标业务模型和新版架构图，不要直接执行原方案迁移。
+
+---
+
+## 迁移 101：给 hbti_gift_stock 补 RLS（2026-08-03，已在生产执行）
+
+077 建 `hbti_gift_stock` 时漏了财务站迁移 059 立的不变量——**共用库 public 下每张普通表
+都要启用 RLS**。是财务站的 `db-integration --all` 门禁（`tables_without_rls`）先发现的。
+
+已执行 `bakery-ops/src/modules/data/migrations/101_hbti_gift_stock_rls.sql`：
+public 下现在 0 张表未启用 RLS；库存表照常可读（9 行 / 初始 1376 件 / 已发 1 件）。
+
+安全性依据：同为本项目所建的 `hbti_auth_token`、`hbti_rate_limit` 本来就是 `rls=true`
+且零策略、一直正常；各项目都以 `postgres` 连库，该角色 `rolbypassrls=true`；
+`anon`/`authenticated` 在这张表上本来就没有任何授权。RLS 在这里是「关掉默认敞开」的兜底。
+
+> ⚠️ **两条共用库的规矩，下次建表前先看：**
+> 1. **新建表必须 `ENABLE ROW LEVEL SECURITY`**，否则又要靠对方的门禁来发现。
+> 2. **号段：财务站 001-099、bakery-ops 100-199、res_api 200-299**
+>    （`100_beverage_caliber.sql` 里定的）。077/078 当时越进了财务站号段，已应用不追改；
+>    本次回到 101。新建迁移前先 `SELECT max(version) FROM schema_migrations` 确认。
+
+
+## HBTI 发券 503 定因并修复：RES 令牌是**空闲超时**（2026-08-02/03，已上线）
+
+08-01、08-02 两次发券中断，`/api/health` 503。此前仓库里到处写着「令牌约 24 小时自然失效」，
+据此把轮换从 12 小时加密到 6 小时 —— **这个前提是错的，加密轮换只是碰巧塞了个新令牌进去。**
+
+**做了两轮实验（脚本已用完删除，日志留在服务器 `logs/ttl-cohort.log`、`logs/ttl-crossed.log`）：**
+
+实验一：同时借 6 个令牌，5 个各自闲置到不同时长才查一次，1 个每 15 分钟调用。
+
+| 空闲 1h | 空闲 2h | 空闲 4h | 空闲 6h | 空闲 8h | 每 15 分钟调用 |
+|---|---|---|---|---|---|
+| OK | OK | **401** | **401** | **401** | 8 小时全程 OK |
+
+实验一有个混淆：活跃的那个恰好是**最后**借的，所以「活跃存活」也能解释成
+「最新的没被并发会话上限挤掉」。于是做实验二交叉对照，把两个变量拆开（+4.5h 判读）：
+
+| | ACTIVE（每 15 分钟调用） | IDLE（完全不碰） |
+|---|---|---|
+| **OLD**（先借） | OK | **401（复查确认）** |
+| **NEW**（后借） | OK | **401（复查确认）** |
+
+**最旧的令牌只要在用就活着，最新的闲着也死** → 排除「新登录顶掉旧令牌」和「按创建顺序驱逐」。
+
+**结论：RES 会话是空闲超时，不是固定寿命。致死窗口 2~4 小时。**
+这解释了为什么两次故障距轮换的间隔对不上任何周期（2h32m 和 7h19m）：
+它取决于最后一次 RES 调用的时间，也就是取决于流量。HBTI 流量低，顾客之间隔几小时没人答题，
+令牌就闲死了。
+
+**修复：保温，而不是加频轮换。**
+`/api/health` 会用生产令牌打一次 RES，所以定时 curl 它就等于替令牌续命 —— 不用部署、
+本机不用持有凭证。新增 `ops/hbti-token/keepalive.sh`，cron `7,37 * * * *`（每 30 分钟，
+对 2 小时下限有 4 倍余量；用 7/37 分错开整点轮换）。轮换 `0 3,9,15,21` 保留作兜底。
+
+已验收：cron 自己跑过的班次（01:37 / 02:07 / 02:37 UTC）全部 HTTP 200 `{"db":"ok","res":"ok"}`；
+失败路径本地实测 exit 1 + 建哨兵、恢复后清哨兵；告警去重实测「连续 3 次失败只发 1 条，
+恢复后再失败才再发」。`install-cron.sh` 改成每条目各自守卫（原来单一守卫会因轮换已存在而
+整块跳过，保温永远装不上），在「轮换已装、保温未装」的生产实况下实测幂等。
+
+> ⚠️ **告警实际上没有出口。** `ALERT_WEBHOOK` 在服务器 `.env` 里**没配**，轮换和保温都一样：
+> 失败只会留下 `logs/LAST_FAILURE` / `logs/KEEPALIVE_LAST_BAD` 哨兵文件，**没有人会被通知**。
+> 想要通知就往 `/opt/hotcrush/hbti-token/.env` 填一个 webhook 地址（代码路径已实测可用）。
+> 在那之前，这套东西的兜底仍然是「用户报障」。
+
+顺带修正了几处已被实验证伪的注释：`ops/hbti-token/rotate.mjs`、
+`hbti-web/scripts/refresh-res-token.mjs`、`run.sh`、`cron.example`，以及服务器 crontab 里
+那句「跑在 intraday-refresh 之前的话令牌可能被新会话顶掉」。留着会让下一个人得到两套互相矛盾的
+根因，进而可能把保温当成多余的东西删掉。
+
+**根治仍然是向 RES 申请受限服务凭证** —— 保温只是让借来的会话不闲死，凭证本身的性质没变。
+
+
 ## HBTI 页面改版（2026-07-31，已部署 Vercel）
 
 「你是哪种咖啡人」→「货架上的 16 种人」全站文案替换，照抄 hbti-copy-redesign.md：
@@ -132,7 +344,9 @@
 > 真要退回 Mongo，得先把连接串（还在 `hbti-web/.env.local`）重新加回 Vercel。
 
 > ✅ **已解决（2026-07-31 15:5x）：`RES_VULCAN_TOKEN` 过期已换新，`/api/health` 从 503 回到 200。**
-> 旧令牌是 2026-07-30 16:23 抓的后台会话，约 24 小时后自然失效，对 BO 接口返回 401。
+> 旧令牌是 2026-07-30 16:23 抓的后台会话，对 BO 接口返回 401。
+> （当时写的是「约 24 小时后自然失效」——**08-02 实验已证伪**：它是空闲 2~4 小时超时，
+> 不是固定寿命。详见本文件顶部那条。）
 > 影响面确认过：顾客登录/OTP 走 H5 每请求现取的访客令牌，**不依赖这个后台令牌**，所以登录和答题一直是好的；
 > 断的只是提交之后的发券，以及做券模板只读探测的 `/api/health`。
 >
@@ -143,7 +357,8 @@
 > 只有 `vulcan-token` 来自会话。已改写并落进仓库：**`hbti-web/scripts/refresh-res-token.mjs`**
 > （只校验租户边界 `corporation-id` + `shop-id`，真正把关交给「用运行时头查券模板」的只读验证，支持 `--dry-run`）。
 >
-> 以后换令牌就三步：
+> 手动换令牌三步（**现在通常用不到**：服务器 keepalive.sh 每 30 分钟保温、
+> run.sh 每 6 小时兜底轮换。这三步留给两者都失灵时的应急）：
 > ```bash
 > node ~/hot/res_api/login.js
 > cd ~/hot/hbti-web && node --env-file=.env.local scripts/refresh-res-token.mjs
@@ -152,7 +367,10 @@
 > ⚠ 第三步**必须用 `redeploy`**，不要在 hbti-web 目录跑 `vercel --prod`——那会从本地工作树重新打包，
 > 在迁移 063 执行之前会把 Postgres 版推上生产、整站挂掉。`redeploy` 只复用源码重新注入环境变量。
 >
-> **根治方案仍是向 RES 申请受限服务凭证**，别再依赖每天要人工续一次、且没有任何告警的后台会话。
+> **根治方案仍是向 RES 申请受限服务凭证。**
+> （原话是「别再依赖每天要人工续一次、且没有任何告警的后台会话」——前半句已过时：
+> 现在服务器每 30 分钟保温、每 6 小时兜底轮换，不需要人工续。后半句仍然成立：
+> `ALERT_WEBHOOK` 没配，失败只留哨兵文件，没有主动通知。）
 
 > **2026-07-31 by Claude Code —— 本地视觉预览用的假环境文件正在生效，注意别被它坑到。**
 > 新增 `hbti-web/.env.development.local`（gitignored，全部假值）。Next 的加载优先级是

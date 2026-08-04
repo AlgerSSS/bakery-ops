@@ -68,6 +68,25 @@ describe("ResApiClient", () => {
     ).toThrow("verified RES API origin");
   });
 
+  it("propagates the route deadline into RES requests", async () => {
+    const deadline = new AbortController();
+    const abortReason = new Error("route deadline reached");
+    const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
+      const signal = init?.signal;
+      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(signal).not.toBe(deadline.signal);
+      expect(signal?.aborted).toBe(false);
+      deadline.abort(abortReason);
+      expect(signal?.aborted).toBe(true);
+      throw signal?.reason;
+    });
+    const client = new ResApiClient(config, fetcher, deadline.signal);
+
+    await expect(
+      client.resolveEnabledCouponTemplateByName("Pistachio Green Jewel"),
+    ).rejects.toBe(abortReason);
+  });
+
   it("uses the official split-phone member lookup without leaking phone into results", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

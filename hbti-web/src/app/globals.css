@@ -16,6 +16,26 @@
   font-display: swap;
 }
 
+/* 同一个文件,第二次声明 —— 但这次如实写 font-weight: 400。
+
+   为什么需要:上面那条把它声明成 400 700,浏览器以为字族已自带粗体,于是
+   font-weight:700 拿到的还是同一张 Light 字形表,标题永远粗不起来 —— 这正是
+   老板说「字体还是不行」的原因(CDN 文件名叫 DemiAlt,内部族名却是 Light Alt)。
+   如实声明只有 400 之后,浏览器才会对 700 做合成加粗。
+
+   合成加粗是妥协,不是正解:真正的解是拿到 Neutra Text 的授权粗体字重文件。
+   但实测这个几何无衬线在标题尺寸下合成得很干净(笔画没有涂糊),重量明显
+   贴近 logo。只给大标题用(见 --font-display 的使用处),小字号仍走上面那条
+   不合成的声明,避免糊。 */
+@font-face {
+  font-family: "Neutra Display";
+  src: url("https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com/designer/Font/NeutraTextDemiAlt.woff2")
+    format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   --hc-peach: #f3d0b8;
   --hc-paper: #fff7ea;
@@ -43,9 +63,25 @@
     0 13px 0 #35100d,
     0 24px 36px rgba(52, 12, 9, 0.24);
   --ease-storefront: cubic-bezier(0.22, 0.76, 0.24, 1);
-  --font-brand: "Neutra Text", "Avenir Next", "Helvetica Neue", sans-serif;
-  --font-copy: "Neutra Text", "OPPO Sans", "PingFang SC", "Microsoft YaHei",
-    sans-serif;
+  /* 分工遵循设计规格(docs/superpowers/specs/2026-07-30-hbti-web-design.md:114):
+     标题用 Neutra(与 logo 搭配的官方展示字体),正文用 OPPO Sans。
+
+     两件实测得出、与文件名不符的事实:
+     1) CDN 文件叫 NeutraTextDemiAlt.woff2,但浏览器报告的内部族名是
+        「Neutra Text Light Alt」—— 站点一直在渲染 Light,这才是它看起来
+        远比 logo 轻的原因。CDN 上没有更重的字重(Bold/Book/Demi 等 8 个
+        命名实测全 404),@font-face 却声明 400-700,所以写 700 也不会变粗。
+     2) Neutra 不含汉字。此前 --font-brand 没有中文回退,中文标题落到系统
+        默认(macOS 上是 PingFang SC,安卓/Windows 各不相同),品牌观感不一致;
+        补上 OPPO Sans 与规格「中文以 OPPOSans 为安全回退」一致。 */
+  --font-brand:
+    "Neutra Text", "Avenir Next", "Helvetica Neue", "OPPO Sans", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --font-copy: "OPPO Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+  /* 只给大标题用。走 "Neutra Display" 那条如实声明,写 700 才会合成加粗。 */
+  --font-display:
+    "Neutra Display", "Neutra Text", "Avenir Next", "Helvetica Neue",
+    "OPPO Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
 * {

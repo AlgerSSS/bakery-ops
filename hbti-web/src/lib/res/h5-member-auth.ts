@@ -85,6 +85,13 @@ export interface ResH5SendVerifyCodeInput {
   phone: ResH5PhoneIdentity;
 }
 
+/** RES 对发码请求的回执，已脱敏，可以直接落日志。 */
+export interface ResH5SendVerifyCodeReceipt {
+  code: string;
+  message?: string;
+  bodyKeys: string[];
+}
+
 export interface ResH5VerifyLoginInput
   extends ResH5SendVerifyCodeInput {
   code: string;
@@ -124,6 +131,7 @@ interface ResH5AuthDiagnosticDetails {
   message?: string;
   providerCode?: string;
   httpStatus?: number;
+  timedOut?: boolean;
   topLevelKeys?: string[];
   dataKeys?: string[];
   dataValueTypes?: Record<string, SafeValueType>;
@@ -133,6 +141,7 @@ export class ResH5AuthDiagnosticError extends Error {
   readonly stage: ResH5AuthDiagnosticStage;
   readonly providerCode?: string;
   readonly httpStatus?: number;
+  readonly timedOut: boolean;
   readonly topLevelKeys: string[];
   readonly dataKeys: string[];
   readonly dataValueTypes: Record<string, SafeValueType>;
@@ -145,6 +154,7 @@ export class ResH5AuthDiagnosticError extends Error {
     this.stage = details.stage;
     this.providerCode = details.providerCode;
     this.httpStatus = details.httpStatus;
+    this.timedOut = details.timedOut === true;
     this.topLevelKeys = details.topLevelKeys ?? [];
     this.dataKeys = details.dataKeys ?? [];
     this.dataValueTypes = details.dataValueTypes ?? {};
@@ -169,10 +179,22 @@ export class ResH5VerificationCodeError extends Error {
 
 type FetchLike = typeof fetch;
 
+/** 单次 RES 调用的上限。整体上限由调用方通过 deadlineSignal 决定。 */
+const PER_CALL_TIMEOUT_MS = 12_000;
+
 export class ResH5MemberAuthClient {
+  /**
+   * @param deadlineSignal 整个请求共享的截止时限，与每次调用各自的 12 秒超时取先到者。
+   *
+   * 没有它的时候发码要串行走三次 RES 调用、每次各自 12 秒——最坏 36 秒，而 Vercel
+   * 函数 30 秒就被砍、浏览器 15 秒就放弃了。于是出现最坏的一种失败：顾客看到
+   * 「网络错误」，短信其实正在路上，然后他们去点重发，而重发是 RES 会静默丢掉的。
+   * 共享时限把总耗时钉死在一个比浏览器超时更早的数上，服务端总有机会把真实结果说完。
+   */
   constructor(
     private readonly config: ResH5MemberAuthConfig,
     private readonly fetcher: FetchLike = fetch,
+    private readonly deadlineSignal?: AbortSignal,
   ) {
     if (config.baseUrl !== RES_H5_BASE_URL) {
       throw new Error(
@@ -231,9 +253,16 @@ export class ResH5MemberAuthClient {
     return response.data;
   }
 
+  /**
+   * 返回 RES 的回执，供调用方落日志。
+   *
+   * 之前这里是 Promise<void>：RES 说了什么全被丢掉，只留下「没抛错」这一个比特。
+   * 于是当 RES 回 "000"（接单了）但短信从没送达时，我们在日志里只看得到一个
+   * 光秃秃的 200，无从判断是它没发还是发了没到。
+   */
   async sendVerifyCode(
     input: ResH5SendVerifyCodeInput,
-  ): Promise<void> {
+  ): Promise<ResH5SendVerifyCodeReceipt> {
     const phone = parsePhone(input.phone);
     const payload = await this.post(
       "/api/user-auth/sendVerifyCode",
@@ -248,6 +277,12 @@ export class ResH5MemberAuthClient {
       "send_code_response",
     );
     assertSuccess(response, payload, "send_code_response");
+    const body = isRecord(payload.body) ? payload.body : undefined;
+    return {
+      code: response.code,
+      message: readSafeProviderMessage(body?.msg ?? body?.message),
+      bodyKeys: readSafeKeys(body),
+    };
   }
 
   async verifyLoginAndEnsureMember(
@@ -441,6 +476,12 @@ export class ResH5MemberAuthClient {
     stage: ResH5AuthDiagnosticStage,
   ): Promise<ResH5HttpPayload> {
     assertHeaderValue(deviceId, "device ID");
+    const requestSignal = this.deadlineSignal
+      ? AbortSignal.any([
+          AbortSignal.timeout(PER_CALL_TIMEOUT_MS),
+          this.deadlineSignal,
+        ])
+      : AbortSignal.timeout(PER_CALL_TIMEOUT_MS);
     let response: Response;
     try {
       response = await this.fetcher(
@@ -465,13 +506,14 @@ export class ResH5MemberAuthClient {
             "ctx-params": "/login?type=phone",
           },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(12_000),
+          signal: requestSignal,
         },
       );
     } catch {
       throw new ResH5AuthDiagnosticError({
         stage,
         message: "RES H5 request failed.",
+        timedOut: requestSignal.aborted,
       });
     }
     if (!response.ok) {
@@ -491,6 +533,7 @@ export class ResH5MemberAuthClient {
         stage,
         message: "RES H5 request failed.",
         httpStatus: response.status,
+        timedOut: requestSignal.aborted,
       });
     }
   }
@@ -586,6 +629,18 @@ function readSafeProviderCode(value: unknown): string | undefined {
     (value === "000" || /^CRM-\d{2}-\d{4}$/.test(value))
     ? value
     : undefined;
+}
+
+/**
+ * RES 的 msg 是自由文本，可能把手机号回显进来。落日志前先掐掉长数字串再截断——
+ * 目的是看懂「RES 到底说了什么」，不是把顾客的号码抄进日志。
+ */
+function readSafeProviderMessage(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const scrubbed = value.replace(/\d{4,}/g, "***").trim();
+  return scrubbed.length === 0 ? undefined : scrubbed.slice(0, 200);
 }
 
 function readSafeKeys(

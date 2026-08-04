@@ -22,6 +22,7 @@ import {
   ageChoices,
   colorChoices,
   genderChoices,
+  isGiftTemplateName,
   type AgeChoice,
   type ColorChoice,
   type GenderChoice,
@@ -53,6 +54,8 @@ type SubmissionState =
   | "idle"
   | "submitting"
   | "issued"
+  // 答完了但周边已发完。是终态，不是错误——人格照常出，只是没有券。
+  | "unrewarded"
   | "processing"
   | "review"
   | "demo"
@@ -70,7 +73,7 @@ interface HbtiDraft {
 }
 
 interface CompletionResponse {
-  status?: "issued" | "processing" | "review";
+  status?: "issued" | "unrewarded" | "processing" | "review";
   code?: HbtiCode;
   color?: ColorChoice;
   memberWalletUrl?: string;
@@ -111,7 +114,9 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [submission, setSubmission] =
     useState<SubmissionState>("idle");
-  const [rewardName, setRewardName] = useState(copy.rewardName);
+  // 存的是 RES 的原始券模板名，不是显示名。翻译推迟到渲染时做——
+  // 存翻译结果的话，顾客在结果页切语言，卡片上的礼物名会冻在上一个语言。
+  const [rewardTemplateName, setRewardTemplateName] = useState<string>();
   const [memberWalletUrl, setMemberWalletUrl] = useState<string>();
   const [confirmedCode, setConfirmedCode] = useState<HbtiCode>();
   const [confirmedColor, setConfirmedColor] = useState<ColorChoice>();
@@ -262,13 +267,14 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
       setConfirmedColor(payload.color);
     }
     if (payload.reward?.couponTemplateName) {
-      setRewardName(payload.reward.couponTemplateName);
+      setRewardTemplateName(payload.reward.couponTemplateName);
     }
     if (isSafeWalletUrl(payload.memberWalletUrl)) {
       setMemberWalletUrl(payload.memberWalletUrl);
     }
     if (
       payload.status === "issued" ||
+      payload.status === "unrewarded" ||
       payload.status === "processing" ||
       payload.status === "review"
     ) {
@@ -434,11 +440,11 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
     setDraftKey(undefined);
     setDraftLoaded(false);
     setSubmission("idle");
-    setRewardName(copy.rewardName);
+    setRewardTemplateName(undefined);
     setMemberWalletUrl(undefined);
     setConfirmedCode(undefined);
     setConfirmedColor(undefined);
-  }, [copy.rewardName]);
+  }, []);
 
   useEffect(() => {
     if (submission !== "processing") {
@@ -519,7 +525,7 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
                   ? results[confirmedCode][locale].name
                   : result?.name
               }
-              rewardName={rewardName}
+              rewardTemplateName={rewardTemplateName}
               memberWalletUrl={memberWalletUrl}
               color={confirmedColor ?? color}
               onRetry={pollCompletionStatus}
@@ -581,11 +587,18 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
             />
           )}
         </div>
-        {!demoMode && authState !== "signedOut" && (
-          <a className={styles.memberReturn} href={MEMBER_WALLET_URL}>
-            {copy.returnToMembership}
-          </a>
-        )}
+        {/* 钱包出口只在开场页与结果页出现。
+            原先它对所有非登出态渲染,于是答题页底部同时有「下一题」「返回」
+            「返回会员账户」三个动作抢注意力,还第二次重复了圆圈箭头图案;
+            它那 44px+ 的页脚也是 320x740 上第 13 题溢出的一部分成因。
+            已发券的完成态本身带有自己的钱包 CTA,不需要这个。 */}
+        {!demoMode &&
+          authState !== "signedOut" &&
+          (stage === "intro" || stage === "result") && (
+            <a className={styles.memberReturn} href={MEMBER_WALLET_URL}>
+              {copy.returnToMembership}
+            </a>
+          )}
       </div>
     </main>
   );
@@ -688,8 +701,13 @@ function QuestionStep({
 }) {
   return (
     <section className={styles.questionPanel}>
-      <Progress current={index + 1} total={questions.length} label={copy.questionProgress(index + 1, questions.length)} />
-      <p className={styles.eyebrow}>{copy.chooseOne}</p>
+      <Progress
+        current={index + 1}
+        total={questions.length}
+        label={copy.questionProgress(index + 1, questions.length)}
+        flavor={copy.questionProgressFlavor(index + 1, questions.length)}
+      />
+      <p className={styles.eyebrow}>{copy.chooseOne[question.id]}</p>
       <h1
         id={`question-${question.id}`}
         ref={headingRef}
@@ -721,7 +739,9 @@ function QuestionStep({
                 <span className={styles.answerEmoji} aria-hidden="true">
                   {option.emoji}
                 </span>
-                <span>{option.label[locale]}</span>
+                <span className={styles.answerLabel}>
+                  {option.label[locale]}
+                </span>
                 <span className={styles.answerCheck} aria-hidden="true">
                   ✓
                 </span>
@@ -754,10 +774,14 @@ function Progress({
   current,
   total,
   label,
+  flavor,
 }: {
   current: number;
   total: number;
+  /** 字面表述,给屏幕阅读器 */
   label: string;
+  /** 烘焙口径,只给眼睛看 */
+  flavor: string;
 }) {
   // 连续进度条：13 题时分段小药丸会换行成三排，很难看。
   // 用一条填充式进度条，宽度按 current/total 走；role/aria-* 原样保留。
@@ -778,7 +802,9 @@ function Progress({
           aria-hidden="true"
         />
       </div>
-      <p>{label}</p>
+      {/* 可见的烘焙口径计数是装饰:进度已由上面的 progressbar 用字面文案播报,
+          这里再念一遍「第 9 炉」只会让人听着猜自己答到第几题。 */}
+      <p aria-hidden="true">{flavor}</p>
     </div>
   );
 }
@@ -813,8 +839,14 @@ function ResultStep({
       >
         <div className={styles.ticketNotchLeft} aria-hidden="true" />
         <div className={styles.ticketNotchRight} aria-hidden="true" />
+        {/* 票头左侧从「HBTI / HSDA」改成「配方编号 HSDA」:同一串字母,
+            读成配方号而不是测评代码。零额外高度。
+            没有做「火候」「出炉时间」—— 结果数据里只有 code / name / traits /
+            description / signatureOrder,那两项没有对应事实,编出来就是造假。 */}
         <header className={styles.ticketHeader}>
-          <span>HBTI / {code}</span>
+          <span>
+            {copy.recipeNoLabel} {code}
+          </span>
           <span>HOT CRUSH</span>
         </header>
         <div
@@ -826,6 +858,10 @@ function ResultStep({
           ))}
         </div>
         <h2>{result.name}</h2>
+        {/* 「配料」小标题:同样四个特征,加了标签就从标签堆读成配方单。
+            试过放同一行首位以省高度,反而更差 —— 英文/马来文的标签会挤掉
+            横向空间,标签行从 1 行变 2 行,整页 867/889 比独立一行的 853 还高。 */}
+        <p className={styles.traitsLabel}>{copy.traitsLabel}</p>
         <div className={styles.traitLine}>
           {result.traits.map((trait) => (
             <span key={trait}>{trait}</span>
@@ -1144,7 +1180,7 @@ function CompletionState({
   state,
   resultCode,
   resultName,
-  rewardName,
+  rewardTemplateName,
   memberWalletUrl,
   color,
   onRetry,
@@ -1154,7 +1190,8 @@ function CompletionState({
   state: Exclude<SubmissionState, "idle" | "error">;
   resultCode?: HbtiCode;
   resultName?: string;
-  rewardName: string;
+  /** RES 的原始券模板名；显示名在这里现算，见下方 giftDisplayName。 */
+  rewardTemplateName?: string;
   memberWalletUrl?: string;
   color?: ColorChoice;
   onRetry: () => void;
@@ -1173,6 +1210,14 @@ function CompletionState({
   const isIssued = state === "issued";
   const isProcessing = state === "processing";
   const isDemo = state === "demo";
+  const isSoldOut = state === "unrewarded";
+  // 券模板名是后台的内部字符串（"HBTI Gift · Rose Fridge Magnet"），不能直接给顾客看。
+  // 认不出来时退回兜底文案，而不是把原字符串漏出去——万一后台改名，顾客看到的是
+  // 一句得体的话，不是一行内部标识。
+  const giftDisplayName =
+    rewardTemplateName && isGiftTemplateName(rewardTemplateName)
+      ? copy.giftNames[rewardTemplateName]
+      : copy.rewardName;
   return (
     <section className={styles.completionPanel} aria-live="polite">
       <div
@@ -1187,34 +1232,52 @@ function CompletionState({
           ? copy.demoCompleteEyebrow
           : isIssued
             ? copy.successEyebrow
-            : copy.resultEyebrow}
+            : isSoldOut
+              ? copy.giftSoldOutEyebrow
+              : copy.resultEyebrow}
       </p>
       <h1 ref={headingRef} tabIndex={-1}>
         {isDemo
           ? copy.demoCompleteTitle
           : isIssued
             ? copy.successTitle
-            : isProcessing
-              ? copy.processingTitle
-              : copy.reviewTitle}
+            : isSoldOut
+              ? copy.giftSoldOutTitle
+              : isProcessing
+                ? copy.processingTitle
+                : copy.reviewTitle}
       </h1>
       <p className={styles.completionBody}>
         {isDemo
           ? copy.demoCompleteBody
           : isIssued
             ? copy.successBody
-            : isProcessing
-              ? copy.processingBody
-              : copy.reviewBody}
+            : isSoldOut
+              ? copy.giftSoldOutBody
+              : isProcessing
+                ? copy.processingBody
+                : copy.reviewBody}
       </p>
       <div
         className={styles.rewardCard}
         data-surface="reward-receipt"
         data-color={color ?? "neutral"}
       >
-        <span>{isDemo ? copy.demoRewardLabel : copy.rewardLabel}</span>
-        <strong>{rewardName || copy.rewardName}</strong>
-        <p>{isDemo ? copy.demoRewardNote : copy.rewardNote}</p>
+        <span>
+          {isDemo
+            ? copy.demoRewardLabel
+            : isSoldOut
+              ? copy.giftSoldOutLabel
+              : copy.rewardLabel}
+        </span>
+        <strong>{isSoldOut ? copy.giftSoldOutName : giftDisplayName}</strong>
+        <p>
+          {isDemo
+            ? copy.demoRewardNote
+            : isSoldOut
+              ? copy.giftSoldOutNote
+              : copy.rewardNote}
+        </p>
       </div>
       {resultCode && resultName && (
         <div

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { hasAlertDestination } from "@/lib/alert";
+import { readCaptchaConfig } from "@/lib/auth/captcha-config";
 
 import { createResApiClientFromEnv } from "@/lib/res/client";
 import { readHbtiServerConfig } from "@/lib/server-config";
@@ -35,9 +36,10 @@ export async function GET(): Promise<NextResponse> {
   // allSettled 而非 all:两项都要跑完。用 all 的话先失败的那个会掩盖另一个,
   // 于是线上只剩一行「503 (no message)」,分不清是数据库还是 RES ——
   // 这正是 2026-08-01/02 两次发券中断查了很久才定位的原因。
-  const [db, resAccess] = await Promise.allSettled([
+  const [db, resAccess, signIn] = await Promise.allSettled([
     checkCompletionStoreFromEnv(),
     checkResAccess(res, config.couponTemplateName),
+    checkSignInReadiness(),
   ]);
   if (db.status === "rejected") {
     console.error("[health] completion store unreachable", db.reason);
@@ -45,19 +47,41 @@ export async function GET(): Promise<NextResponse> {
   if (resAccess.status === "rejected") {
     console.error("[health] RES access failed", resAccess.reason);
   }
+  if (signIn.status === "rejected") {
+    console.error("[health] sign-in surface unavailable", signIn.reason);
+  }
   const checks = {
     alert: hasAlertDestination() ? "ok" : "fail",
     db: db.status === "fulfilled" ? "ok" : "fail",
     res: resAccess.status === "fulfilled" ? "ok" : "fail",
+    signIn: signIn.status === "fulfilled" ? "ok" : "fail",
   } as const;
   const ok =
-    checks.alert === "ok" && checks.db === "ok" && checks.res === "ok";
+    checks.alert === "ok" &&
+    checks.db === "ok" &&
+    checks.res === "ok" &&
+    checks.signIn === "ok";
   // 只报哪一路挂了,不回显异常内容 —— 这个端点无鉴权,错误信息里可能带
   // 上游 URL 或凭证片段。细节留在服务端日志。
   return json(
     { status: ok ? "ok" : "degraded", service: "hbti-web", checks },
     ok ? 200 : 503,
   );
+}
+
+/**
+ * 顾客旅程的第一步能不能走。
+ *
+ * 上面那个 `res` 探的是**后台**（bo.sea.restosuite.ai，券模板），而登录走的是
+ * **H5**（f4klzbmr9n2d.m.sea.restosuite.ai）—— 两个不同的系统。2026-08-04 RES 在
+ * 租户级打开了腾讯云验证码，登录当场全挂，而 health 一路绿灯，因为它压根没探那一面。
+ * 这一项就是补这个盲区：H5 探不通、或者验证码换成了我们驱动不了的供应商，都算 fail。
+ */
+async function checkSignInReadiness(): Promise<void> {
+  const config = await readCaptchaConfig();
+  if (config.provider === "unsupported") {
+    throw new Error("RES captcha provider is not supported by this client.");
+  }
 }
 
 async function checkResAccess(

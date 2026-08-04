@@ -20,6 +20,7 @@ function renderSignIn() {
   render(
     <MemberSignIn
       copy={copy}
+      locale="en"
       headingRef={headingRef}
       onAuthenticated={onAuthenticated}
     />,
@@ -33,6 +34,22 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     json: async () => body,
   } as Response;
+}
+
+/**
+ * 组件挂载时会先问一次 `/api/auth/captcha`（RES 是否要求图形验证码）。
+ * 这些用例关心的是发码与验证调用，所以把探测就地应答掉、不转发给内层 mock ——
+ * 否则它会吃掉 `mockResolvedValueOnce` 队列的第一项，也会污染调用计数。
+ */
+function stubFetch<T>(inner: T): T {
+  const wrapped = (input: unknown, init?: unknown) => {
+    if (String(input).includes("/api/auth/captcha")) {
+      return Promise.resolve(jsonResponse({ enable: false, provider: null }));
+    }
+    return (inner as (a: unknown, b?: unknown) => unknown)(input, init);
+  };
+  vi.stubGlobal("fetch", wrapped);
+  return inner;
 }
 
 /** 输入一个合法的马来西亚号码并发送。 */
@@ -65,7 +82,7 @@ describe("MemberSignIn 的重发闸门", () => {
         resendMayNotArrive: false,
       }),
     );
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
     renderSignIn();
 
@@ -91,7 +108,7 @@ describe("MemberSignIn 的重发闸门", () => {
         resendMayNotArrive: false,
       }),
     );
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
     renderSignIn();
 
@@ -105,8 +122,7 @@ describe("MemberSignIn 的重发闸门", () => {
   });
 
   it("服务端说这个号今天发过了，就如实告诉顾客", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn().mockResolvedValue(
         jsonResponse({
           challengeToken: "challenge-1",
@@ -126,8 +142,7 @@ describe("MemberSignIn 的重发闸门", () => {
   });
 
   it("超时说的是「可能已发出」，而不是让顾客再试一次", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi
         .fn()
         .mockRejectedValue(
@@ -158,7 +173,7 @@ describe("MemberSignIn 的重发闸门", () => {
         }),
       )
       .mockRejectedValueOnce(new DOMException("timed out", "TimeoutError"));
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
     renderSignIn();
 
@@ -182,7 +197,7 @@ describe("MemberSignIn 的重发闸门", () => {
         }),
       )
       .mockResolvedValueOnce(jsonResponse({ error: "VERIFICATION_FAILED" }, 503));
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
     renderSignIn();
 
@@ -196,8 +211,7 @@ describe("MemberSignIn 的重发闸门", () => {
   });
 
   it("真的断网了才说网络问题", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
     );
     const user = userEvent.setup();

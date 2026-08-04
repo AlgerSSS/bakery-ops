@@ -26,6 +26,13 @@ const captchaEnvelopeSchema = apiEnvelopeSchema.extend({
         .union([z.string(), z.number()])
         .nullable()
         .optional(),
+      // 腾讯云是 RES 当前给本租户配的验证码供应商。appId 是公开的客户端标识
+      // （RES 自己的 H5 就把它明文放在前端），可以安全地下发给浏览器。
+      tencentCloud: z
+        .object({ captchaAppId: z.union([z.string(), z.number()]) })
+        .passthrough()
+        .nullable()
+        .optional(),
     })
     .passthrough(),
 });
@@ -80,9 +87,22 @@ export interface ResH5PhoneIdentity {
   countryCode: string;
 }
 
+/**
+ * 顾客解出的验证码凭证，原样透传给 RES。
+ *
+ * 字段名是个坑：腾讯 SDK 的成功回调给的是 `{ticket, randstr}`，而 RES 要的是
+ * `{token, randstr}` —— `ticket` 必须改名成 `token`，写错不会报错，只会一直
+ * 「missing required param: captcha」。RES 自己的 H5 也是这么转的。
+ */
+export interface ResH5CaptchaSolution {
+  token: string;
+  randstr: string;
+}
+
 export interface ResH5SendVerifyCodeInput {
   session: ResH5GuestSession;
   phone: ResH5PhoneIdentity;
+  captcha?: ResH5CaptchaSolution;
 }
 
 /** RES 对发码请求的回执，已脱敏，可以直接落日志。 */
@@ -266,7 +286,13 @@ export class ResH5MemberAuthClient {
     const phone = parsePhone(input.phone);
     const payload = await this.post(
       "/api/user-auth/sendVerifyCode",
-      { contactType: "PHONE", phone },
+      {
+        contactType: "PHONE",
+        phone,
+        // 只在真的有解时带上这个键。RES 对「有 captcha 键但内容为空」和「没有这个键」
+        // 的处理不一样，前者会走进校验分支报一个更含糊的错。
+        ...(input.captcha ? { captcha: parseCaptcha(input.captcha) } : {}),
+      },
       input.session.token,
       input.session.deviceId,
       "send_code_transport",
@@ -724,6 +750,25 @@ function parsePhone(
     .safeParse(value);
   if (!result.success) {
     throw new Error("Invalid RES H5 phone identity.");
+  }
+  return result.data;
+}
+
+/**
+ * 验证码凭证同样要在出网前校验形状。腾讯的 ticket 在 SDK 降级时会是
+ * `trerror_<code>_<appid>_<ts>` 这种占位串——那不是我们该伪造的东西，但它确实可能
+ * 从真实 SDK 回调里来，所以这里只校验「非空且长度合理」，把判定留给 RES。
+ */
+function parseCaptcha(value: ResH5CaptchaSolution): ResH5CaptchaSolution {
+  const result = z
+    .object({
+      token: z.string().min(1).max(1024),
+      randstr: z.string().min(1).max(256),
+    })
+    .strict()
+    .safeParse(value);
+  if (!result.success) {
+    throw new Error("Invalid RES H5 captcha solution.");
   }
   return result.data;
 }

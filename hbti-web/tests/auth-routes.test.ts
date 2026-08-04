@@ -30,6 +30,8 @@ const mocks = vi.hoisted(() => {
     createRateLimiter: vi.fn(),
     readServerConfig: vi.fn(),
     readAuthConfig: vi.fn(),
+    readCaptchaConfig: vi.fn(),
+    forgetCaptchaConfig: vi.fn(),
   };
 });
 
@@ -50,6 +52,11 @@ vi.mock("@/lib/rate-limit/auth-rate-limit", () => ({
 vi.mock("@/lib/server-config", () => ({
   readHbtiServerConfig: mocks.readServerConfig,
   readHbtiAuthConfig: mocks.readAuthConfig,
+}));
+
+vi.mock("@/lib/auth/captcha-config", () => ({
+  readCaptchaConfig: mocks.readCaptchaConfig,
+  forgetCaptchaConfig: mocks.forgetCaptchaConfig,
 }));
 
 import { POST as logout } from "@/app/api/auth/logout/route";
@@ -98,6 +105,7 @@ beforeEach(() => {
     token: "guest-token",
   });
   mocks.res.getCaptchaConfig.mockResolvedValue({ enable: false });
+  mocks.readCaptchaConfig.mockResolvedValue({ enable: false, provider: null });
   mocks.res.sendVerifyCode.mockResolvedValue({
     code: "000",
     bodyKeys: ["code", "data"],
@@ -203,28 +211,89 @@ describe("POST /api/auth/otp/request", () => {
     expect(response.headers.get("access-control-allow-origin")).toBeNull();
   });
 
-  it("fails closed before sending when RES requires a captcha", async () => {
-    mocks.res.getCaptchaConfig.mockResolvedValue({
+  // 2026-08-04：RES 在租户级打开了腾讯云验证码，`sendVerifyCode` 从此服务端强制
+  // 要求 captcha（不带就是 UNI-00-0103）。以下三条钉住这条路径的全部分支。
+  it("要求验证码时如实回 400 并附带配置，而不是含糊的 503", async () => {
+    mocks.readCaptchaConfig.mockResolvedValue({
       enable: true,
-      captchaType: "tencent_cloud",
+      provider: "tencent-cloud",
+      appId: "189993702",
     });
 
     const response = await requestOtp(
       mutationRequest("/api/auth/otp/request", {
-        phone: {
-          countryCode: "60",
-          isoCode: "MY",
-          phone: "123456789",
-        },
+        phone: { countryCode: "60", isoCode: "MY", phone: "123456789" },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "CAPTCHA_REQUIRED",
+      captcha: {
+        enable: true,
+        provider: "tencent-cloud",
+        appId: "189993702",
+      },
+    });
+    expect(mocks.store.createChallenge).not.toHaveBeenCalled();
+    expect(mocks.res.sendVerifyCode).not.toHaveBeenCalled();
+    // 缺验证码的请求根本到不了 RES，不该消耗顾客当天的发码额度。
+    expect(mocks.rateLimiter.consumeOtpRequest).not.toHaveBeenCalled();
+  });
+
+  it("带上顾客解出的验证码时原样透传给 RES", async () => {
+    mocks.readCaptchaConfig.mockResolvedValue({
+      enable: true,
+      provider: "tencent-cloud",
+      appId: "189993702",
+    });
+
+    const response = await requestOtp(
+      mutationRequest("/api/auth/otp/request", {
+        phone: { countryCode: "60", isoCode: "MY", phone: "123456789" },
+        captcha: { token: "tkt-abc", randstr: "@rnd" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.res.sendVerifyCode).toHaveBeenCalledWith(
+      expect.objectContaining({
+        captcha: { token: "tkt-abc", randstr: "@rnd" },
+      }),
+    );
+  });
+
+  it("RES 换成我们驱动不了的验证码时 fail closed", async () => {
+    mocks.readCaptchaConfig.mockResolvedValue({
+      enable: true,
+      provider: "unsupported",
+    });
+
+    const response = await requestOtp(
+      mutationRequest("/api/auth/otp/request", {
+        phone: { countryCode: "60", isoCode: "MY", phone: "123456789" },
+        captcha: { token: "tkt-abc", randstr: "@rnd" },
       }),
     );
 
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
-      error: "CAPTCHA_REQUIRED_UNSUPPORTED",
+      error: "CAPTCHA_UNSUPPORTED",
     });
-    expect(mocks.store.createChallenge).not.toHaveBeenCalled();
     expect(mocks.res.sendVerifyCode).not.toHaveBeenCalled();
+  });
+
+  it("发码失败时作废验证码配置缓存，让下一次请求重新问 RES", async () => {
+    mocks.res.sendVerifyCode.mockRejectedValue(new Error("captcha missing"));
+
+    const response = await requestOtp(
+      mutationRequest("/api/auth/otp/request", {
+        phone: { countryCode: "60", isoCode: "MY", phone: "123456789" },
+      }),
+    );
+
+    expect(response.status).toBeGreaterThanOrEqual(500);
+    expect(mocks.forgetCaptchaConfig).toHaveBeenCalledTimes(1);
   });
 
   it("同号码当天第二次发码时如实告知新短信可能收不到", async () => {

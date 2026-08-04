@@ -510,6 +510,7 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
           ) : authState === "signedOut" ? (
             <MemberSignIn
               copy={copy}
+              locale={locale}
               headingRef={headingRef}
               onAuthenticated={(authenticatedMember) => {
                 setMember(authenticatedMember);

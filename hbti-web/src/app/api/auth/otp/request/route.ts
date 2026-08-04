@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  forgetCaptchaConfig,
+  readCaptchaConfig,
+} from "@/lib/auth/captcha-config";
 import { getJsonMutationRejection, noStoreJson } from "@/lib/auth/http";
 import { createAuthStoreFromEnv } from "@/lib/auth/pg-auth-store";
 import { normalizeAuthPhone } from "@/lib/auth/phone";
@@ -31,6 +35,13 @@ const RES_DEADLINE_MS = 18_000;
 
 const requestSchema = z.strictObject({
   phone: z.unknown(),
+  // 顾客解出的图形验证码。RES 关掉验证码时这一项不该出现，所以是可选而不是可空。
+  captcha: z
+    .strictObject({
+      token: z.string().min(1).max(1024),
+      randstr: z.string().min(1).max(256),
+    })
+    .optional(),
 });
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -53,6 +64,25 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     const input = requestSchema.parse(rawBody);
     const phone = normalizeAuthPhone(input.phone);
+
+    // 验证码要求在**限流之前**判定：缺验证码的请求根本到不了 RES，不该消耗顾客
+    // 当天的发码额度。用缓存的配置判断，常见路径零 RES 调用。
+    const captchaConfig = await readCaptchaConfig();
+    if (captchaConfig.provider === "unsupported") {
+      // RES 换了我们驱动不了的供应商。fail closed —— 让顾客看到明确的不可用，
+      // 好过发出一个必定在 RES 那里失败的请求。
+      return noStoreJson(
+        { error: "CAPTCHA_UNSUPPORTED" },
+        { status: 503 },
+      );
+    }
+    if (captchaConfig.enable && !input.captcha) {
+      return noStoreJson(
+        { error: "CAPTCHA_REQUIRED", captcha: captchaConfig },
+        { status: 400 },
+      );
+    }
+
     const authConfig = readHbtiAuthConfig();
     const rateLimiter = await createAuthRateLimiterFromEnv(
       authConfig.authSecret,
@@ -82,23 +112,28 @@ export async function POST(request: Request): Promise<NextResponse> {
       ),
     ]);
     const guestSession = await res.createGuestSession(randomUUID());
-    const captcha = await res.getCaptchaConfig(guestSession);
-    if (captcha.enable) {
-      return noStoreJson(
-        { error: "CAPTCHA_REQUIRED_UNSUPPORTED" },
-        { status: 503 },
-      );
-    }
+    // 这里**不再**重复问一次 captcha/config：上面已经用缓存判过，再问一次就是
+    // 每次发码多一趟 RES 往返。代价是缓存窗口内 RES 拨动开关会漏判——那种情况下
+    // sendVerifyCode 会失败，catch 里顺手把缓存作废，下一次请求就能拿到真相。
 
     const challenge = await store.createChallenge({
       guestToken: guestSession.token,
       deviceId: guestSession.deviceId,
       identity: phone.identity,
     });
-    const receipt = await res.sendVerifyCode({
-      session: guestSession,
-      phone: phone.resPhone,
-    });
+    let receipt;
+    try {
+      receipt = await res.sendVerifyCode({
+        session: guestSession,
+        phone: phone.resPhone,
+        captcha: input.captcha,
+      });
+    } catch (error) {
+      // 发码失败最可能的新原因就是「缓存里的验证码配置过时了」。作废缓存，让下一次
+      // 请求重新问 RES —— 否则开关被拨动后我们要一直错到缓存自然过期。
+      forgetCaptchaConfig();
+      throw error;
+    }
 
     // 唯一一处能看见 RES 究竟说了什么的地方。receipt 已在客户端脱敏（长数字串被掐掉），
     // 这里再不落日志，下次「回了 000 但短信没到」就还是只能看到一个光秃秃的 200。

@@ -58,6 +58,16 @@ async function mockPrivateNetwork(
   let completionCalls = 0;
   let completionStatusCalls = 0;
 
+  // 登录表单挂载时会先问 RES 要不要图形验证码。这些用例跑的是「不需要」那条分支：
+  // 需要验证码时顾客得真的解一次，而解验证码不是自动化该做的事。
+  await page.route("**/api/auth/captcha", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ enable: false, provider: null }),
+    });
+  });
+
   await page.route("**/api/auth/session", async (route) => {
     expect(route.request().method()).toBe("GET");
     await route.fulfill({

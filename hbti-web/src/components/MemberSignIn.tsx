@@ -12,6 +12,13 @@ import {
   normalizeNationalNumber,
   supportedCountries,
 } from "@/lib/auth/countries";
+import type { PublicCaptchaConfig } from "@/lib/auth/captcha-config";
+import {
+  type CaptchaSolution,
+  preloadCaptcha,
+  solveCaptcha,
+} from "@/lib/auth/tencent-captcha";
+import type { Locale } from "@/content/types";
 import type { UiCopy } from "@/content/ui";
 
 import styles from "./hbti.module.css";
@@ -45,9 +52,22 @@ interface AuthenticatedMember {
 
 interface MemberSignInProps {
   copy: UiCopy;
+  locale: Locale;
   headingRef: RefObject<HTMLHeadingElement | null>;
   onAuthenticated: (member: AuthenticatedMember) => void;
 }
+
+/**
+ * 腾讯验证码弹层的语言码。
+ *
+ * 马来文按 `en` 处理：腾讯的语言表里没有 ms，RES 自己 H5 的映射同样没有、
+ * 落到它的 `|| "en"` 兜底。硬塞一个不支持的码只会让弹层显示成默认中文。
+ */
+const CAPTCHA_LANGUAGE: Record<Locale, string> = {
+  en: "en",
+  "zh-CN": "zh-cn",
+  "ms-MY": "en",
+};
 
 interface OtpReply {
   challengeToken?: string;
@@ -70,6 +90,7 @@ function isTimeout(caught: unknown): boolean {
 
 export function MemberSignIn({
   copy,
+  locale,
   headingRef,
   onAuthenticated,
 }: MemberSignInProps) {
@@ -86,7 +107,34 @@ export function MemberSignIn({
   // 否则顾客可以立刻再发一次，而那一次 RES 多半不会送达。只有真的换了号才重置。
   const [cooldownPhone, setCooldownPhone] = useState<string>();
   const [sendCaveat, setSendCaveat] = useState<"mayNotArrive" | "maybeSent">();
+  const [captchaConfig, setCaptchaConfig] = useState<PublicCaptchaConfig>();
   const codeRef = useRef<HTMLInputElement>(null);
+
+  // 挂载时就问清楚要不要过图形验证码，并把 SDK 预热。等到顾客点「发送」再拉脚本，
+  // 那几百毫秒的空白里他们通常已经又点了一次。
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const response = await fetch("/api/auth/captcha", {
+          cache: "no-store",
+          signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+        });
+        const payload = (await response.json()) as PublicCaptchaConfig;
+        if (!alive) return;
+        setCaptchaConfig(payload);
+        if (payload.enable && payload.provider === "tencent-cloud") {
+          preloadCaptcha();
+        }
+      } catch {
+        // 探测失败不在这里报错：真正要紧的判定在服务端，发码时会如实拒绝。
+        // 这里静默留空，避免页面一打开就先弹一条顾客无法处理的错误。
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (resendSeconds <= 0) {
@@ -106,6 +154,30 @@ export function MemberSignIn({
       return;
     }
 
+    // 图形验证码要在进入 busy 之前解完：弹层是模态的，顾客可能想了半分钟，
+    // 这段时间按钮不该一直转圈，更不该占着 sending 状态挡住「取消」。
+    let captcha: CaptchaSolution | undefined;
+    if (captchaConfig?.enable) {
+      if (captchaConfig.provider !== "tencent-cloud" || !captchaConfig.appId) {
+        setError(copy.captchaRequired);
+        return;
+      }
+      const outcome = await solveCaptcha(
+        captchaConfig.appId,
+        CAPTCHA_LANGUAGE[locale],
+      );
+      if (outcome.status === "dismissed") {
+        // 顾客自己关掉的，不是故障。给一句能行动的提示，不做成红色报错。
+        setError(copy.captchaDismissed);
+        return;
+      }
+      if (outcome.status === "unavailable") {
+        setError(copy.captchaRequired);
+        return;
+      }
+      captcha = outcome.solution;
+    }
+
     setBusy("sending");
     setError(undefined);
     setConfirmation(undefined);
@@ -122,6 +194,7 @@ export function MemberSignIn({
             isoCode: country.isoCode,
             phone: nationalPhone,
           },
+          ...(captcha ? { captcha } : {}),
         }),
         cache: "no-store",
         signal: AbortSignal.timeout(SEND_TIMEOUT_MS),

@@ -6,6 +6,7 @@ const routeMocks = vi.hoisted(() => ({
   createResApiClientFromEnv: vi.fn(),
   readHbtiServerConfig: vi.fn(),
   resolveEnabledCouponTemplateByName: vi.fn(),
+  readCaptchaConfig: vi.fn(),
 }));
 
 vi.mock("@/lib/alert", () => ({
@@ -22,6 +23,10 @@ vi.mock("@/lib/res/client", () => ({
 
 vi.mock("@/lib/server-config", () => ({
   readHbtiServerConfig: routeMocks.readHbtiServerConfig,
+}));
+
+vi.mock("@/lib/auth/captcha-config", () => ({
+  readCaptchaConfig: routeMocks.readCaptchaConfig,
 }));
 
 describe("health route", () => {
@@ -42,6 +47,11 @@ describe("health route", () => {
     routeMocks.resolveEnabledCouponTemplateByName.mockResolvedValue({
       id: "tpl-1",
     });
+    routeMocks.readCaptchaConfig.mockResolvedValue({
+      enable: true,
+      provider: "tencent-cloud",
+      appId: "189993702",
+    });
     consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -59,7 +69,7 @@ describe("health route", () => {
     await expect(response.json()).resolves.toEqual({
       status: "ok",
       service: "hbti-web",
-      checks: { alert: "ok", db: "ok", res: "ok" },
+      checks: { alert: "ok", db: "ok", res: "ok", signIn: "ok" },
     });
   });
 
@@ -72,7 +82,7 @@ describe("health route", () => {
     await expect(response.json()).resolves.toEqual({
       status: "degraded",
       service: "hbti-web",
-      checks: { alert: "fail", db: "ok", res: "ok" },
+      checks: { alert: "fail", db: "ok", res: "ok", signIn: "ok" },
     });
   });
 
@@ -89,7 +99,7 @@ describe("health route", () => {
     await expect(response.json()).resolves.toEqual({
       status: "degraded",
       service: "hbti-web",
-      checks: { alert: "ok", db: "ok", res: "fail" },
+      checks: { alert: "ok", db: "ok", res: "fail", signIn: "ok" },
     });
     // allSettled 的价值:RES 先炸也不能让 db 检查被跳过,
     // 否则「db 正常」这个结论就是没根据的。
@@ -107,7 +117,7 @@ describe("health route", () => {
     await expect(response.json()).resolves.toEqual({
       status: "degraded",
       service: "hbti-web",
-      checks: { alert: "ok", db: "fail", res: "ok" },
+      checks: { alert: "ok", db: "fail", res: "ok", signIn: "ok" },
     });
     expect(routeMocks.resolveEnabledCouponTemplateByName).toHaveBeenCalledTimes(
       1,
@@ -128,8 +138,32 @@ describe("health route", () => {
     await expect(response.json()).resolves.toEqual({
       status: "degraded",
       service: "hbti-web",
-      checks: { alert: "ok", db: "fail", res: "fail" },
+      checks: { alert: "ok", db: "fail", res: "fail", signIn: "ok" },
     });
+  });
+
+  // 2026-08-04 的真实故障：RES 在租户级打开了腾讯云验证码，登录当场全挂，
+  // 而 health 一路绿灯 —— 上面那个 `res` 探的是**后台**券模板，登录走的是**H5**，
+  // 两个不同的系统。这一条是那次盲区的回归闸。
+  it("names the sign-in surface when RES switches to a captcha we cannot drive", async () => {
+    routeMocks.readCaptchaConfig.mockResolvedValue({
+      enable: true,
+      provider: "unsupported",
+    });
+    const GET = await load();
+    const response = await GET();
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      status: "degraded",
+      service: "hbti-web",
+      checks: { alert: "ok", db: "ok", res: "ok", signIn: "fail" },
+    });
+    // 登录面挂掉不该掩盖其余检查——它们仍要跑完并如实报告。
+    expect(routeMocks.checkCompletionStoreFromEnv).toHaveBeenCalledTimes(1);
+    expect(routeMocks.resolveEnabledCouponTemplateByName).toHaveBeenCalledTimes(
+      1,
+    );
   });
 
   it("separates missing configuration from dependency failure", async () => {

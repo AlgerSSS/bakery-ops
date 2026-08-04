@@ -18,6 +18,22 @@ function jsonResponse(body: unknown, status = 200): Response {
   } as Response;
 }
 
+/**
+ * 组件挂载时会先问一次 `/api/auth/captcha`（RES 是否要求图形验证码）。
+ * 这些用例关心的是发码与验证调用，所以把探测就地应答掉、不转发给内层 mock ——
+ * 否则它会吃掉 `mockResolvedValueOnce` 队列的第一项，也会污染调用计数。
+ */
+function stubFetch<T>(inner: T): T {
+  const wrapped = (input: unknown, init?: unknown) => {
+    if (String(input).includes("/api/auth/captcha")) {
+      return Promise.resolve(jsonResponse({ enable: false, provider: null }));
+    }
+    return (inner as (a: unknown, b?: unknown) => unknown)(input, init);
+  };
+  vi.stubGlobal("fetch", wrapped);
+  return inner;
+}
+
 describe("customer HBTI journey", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -31,8 +47,7 @@ describe("customer HBTI journey", () => {
   });
 
   it("switches the public phone sign-in between English and Chinese", async () => {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi.fn().mockResolvedValue(jsonResponse({ authenticated: false })),
     );
     const user = userEvent.setup();
@@ -72,7 +87,7 @@ describe("customer HBTI journey", () => {
           draftKey: "member-draft-key-123456",
         }),
       );
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
 
     render(<HbtiExperience />);
@@ -138,7 +153,7 @@ describe("customer HBTI journey", () => {
           draftKey: "member-draft-key-123456",
         }),
       );
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
 
     render(<HbtiExperience />);
@@ -201,7 +216,7 @@ describe("customer HBTI journey", () => {
           draftKey: "second-member-draft-key",
         }),
       );
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
 
     render(<HbtiExperience />);
@@ -262,7 +277,7 @@ describe("customer HBTI journey", () => {
           reward: { couponTemplateName: "Pistachio Green Jewel" },
         }),
       );
-    vi.stubGlobal("fetch", fetchMock);
+    stubFetch(fetchMock);
     const user = userEvent.setup();
 
     render(<HbtiExperience />);
@@ -371,8 +386,7 @@ describe("周边发完之后", () => {
   });
 
   function mockJourney(completion: unknown) {
-    vi.stubGlobal(
-      "fetch",
+    stubFetch(
       vi
         .fn()
         .mockResolvedValueOnce(

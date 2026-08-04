@@ -6,17 +6,24 @@ import type { NextConfig } from "next";
 // directive that must never reach the shipped policy.
 const isDevServer = process.env.NODE_ENV !== "production";
 
+// 腾讯云验证码的加载面。2026-08-04 RES 在租户级打开了图形验证码，`sendVerifyCode`
+// 从此服务端强制要求 captcha 参数，登录必须在浏览器里跑腾讯的 SDK 才能拿到解。
+// 放行范围刻意收到 `*.captcha.qcloud.com` 这一个域：SDK 从 ca.turing 拉，
+// 校验与切图走同域下的其他主机，弹层是同域 iframe。
+const TENCENT_CAPTCHA_ORIGIN = "https://*.captcha.qcloud.com";
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
-  `script-src 'self' 'unsafe-inline'${isDevServer ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' ${TENCENT_CAPTCHA_ORIGIN}${isDevServer ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   "font-src 'self' https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com data:",
-  "img-src 'self' data: blob:",
-  "connect-src 'self'",
+  `img-src 'self' data: blob: ${TENCENT_CAPTCHA_ORIGIN}`,
+  `connect-src 'self' ${TENCENT_CAPTCHA_ORIGIN}`,
+  `frame-src ${TENCENT_CAPTCHA_ORIGIN}`,
   "upgrade-insecure-requests",
 ].join("; ");
 

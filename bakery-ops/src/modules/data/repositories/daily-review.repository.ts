@@ -48,10 +48,25 @@ export async function adoptDailyReview(date: string): Promise<void> {
 }
 
 // ========== Daily Revenue ==========
-export async function upsertDailyRevenue(date: string, revenue: number, transactionCount?: number, avgTransactionValue?: number): Promise<void> {
+/**
+ * 店长在复盘页手填的营业额，写进 daily_review 而不是 daily_revenue（迁移 104）。
+ *
+ * 此前这里是 `INSERT INTO daily_revenue ... ON CONFLICT (date) DO UPDATE
+ * SET revenue = EXCLUDED.revenue` —— 无条件覆盖 res_api 每晚抓来的 POS 实测值，
+ * 而当晚 23:00 的同步又反向把店长填的抹掉。两个数互相消灭，谁也不知道自己填的活了多久。
+ *
+ * 它们本来就是两件事：POS 实测是机器抓的事实，店长填的是人的判断（手工单、跑单、
+ * 当天特殊情况）。并排存着互相对照才有意义，对照视图见 v_revenue_manager_vs_pos。
+ */
+export async function saveManagerRevenue(date: string, revenue: number, transactionCount?: number, avgTransactionValue?: number): Promise<void> {
   await execute(
-    `INSERT INTO daily_revenue (date, revenue, transaction_count, avg_transaction_value) VALUES (?, ?, ?, ?)
-     ON CONFLICT (date) DO UPDATE SET revenue = EXCLUDED.revenue, transaction_count = COALESCE(EXCLUDED.transaction_count, daily_revenue.transaction_count), avg_transaction_value = COALESCE(EXCLUDED.avg_transaction_value, daily_revenue.avg_transaction_value)`,
+    `INSERT INTO daily_review (date, review_json, suggestions_json, manager_revenue, manager_transaction_count, manager_avg_transaction, manager_revenue_at)
+     VALUES (?, '{}'::jsonb, '[]'::jsonb, ?, ?, ?, now())
+     ON CONFLICT (date) DO UPDATE SET
+       manager_revenue = EXCLUDED.manager_revenue,
+       manager_transaction_count = COALESCE(EXCLUDED.manager_transaction_count, daily_review.manager_transaction_count),
+       manager_avg_transaction = COALESCE(EXCLUDED.manager_avg_transaction, daily_review.manager_avg_transaction),
+       manager_revenue_at = now()`,
     [date, revenue, transactionCount ?? null, avgTransactionValue ?? null]
   );
 }

@@ -17,7 +17,7 @@ vi.mock("@/app/(forecast)/actions", () => ({
   saveOutOfStockRecords: vi.fn(),
   deleteOutOfStockByDate: vi.fn(),
   adoptDailyReview: vi.fn(),
-  upsertDailyRevenue: vi.fn(),
+  saveManagerRevenue: vi.fn(),
   addContextEvent: vi.fn(),
 }));
 

@@ -180,13 +180,15 @@ test('零流水日在 daily_revenue 留一行显式的 0：0 是实测事实，0
 
   const row = r.revenueRowFor(EXPECTED);
   assert.ok(row, `零流水日必须写 daily_revenue：${r.out}`);
-  assert.equal(row[1], 0, 'revenue = 0（当天真的没有流水）');
-  assert.equal(row[2], 0, 'transaction_count = 0');
-  assert.equal(row[3], null, '客单价 = 0/0 未定义，必须 NULL 而不是 0');
-  assert.equal(row[4], 0, 'gross_sales = 0');
-  assert.equal(row[6], null, '折扣率 = 0/0 未定义，必须 NULL');
-  assert.equal(row[7], null, '会员占比 = 0/0 未定义，必须 NULL');
-  assert.equal(row[8], false, '零流水日不是降级近似值，不能走 COALESCE 保护（否则晚到的真值永远盖不回来）');
+  // 迁移 102 起 store 是第 2 个参数（唯一键成了 (date, store)），后面的位次整体后移一位。
+  assert.equal(row[1], '吉隆坡Pavilion门店', 'store 必须写进去，否则新唯一键匹配不上');
+  assert.equal(row[2], 0, 'revenue = 0（当天真的没有流水）');
+  assert.equal(row[3], 0, 'transaction_count = 0');
+  assert.equal(row[4], null, '客单价 = 0/0 未定义，必须 NULL 而不是 0');
+  assert.equal(row[5], 0, 'gross_sales = 0');
+  assert.equal(row[7], null, '折扣率 = 0/0 未定义，必须 NULL');
+  assert.equal(row[8], null, '会员占比 = 0/0 未定义，必须 NULL');
+  assert.equal(row[9], false, '零流水日不是降级近似值，不能走 COALESCE 保护（否则晚到的真值永远盖不回来）');
 });
 
 test('判不出是不是零流水日：其他天照写，当天不写，该步 PARTIAL 且整体 exit 1', () => {
@@ -238,8 +240,9 @@ test('漏点 1：CSV 缺当天时必须真的用 daily.json 当降级源（try/c
   assert.match(r.out, /resolved from hourlyByDate fallback/);
   const row = r.revenueRowFor(EXPECTED);
   assert.ok(row, `必须用小时聚合补出当天的 daily_revenue：${r.out}`);
-  assert.equal(row[1], 200, '两条 hourlyByDate（各 100）聚合出 200');
-  assert.equal(row[8], true, '降级出来的当天记录必须打 degraded 标记（走 COALESCE 保护）');
+  assert.equal(row[1], '吉隆坡Pavilion门店', 'store 必须写进去');
+  assert.equal(row[2], 200, '两条 hourlyByDate（各 100）聚合出 200');
+  assert.equal(row[9], true, '降级出来的当天记录必须打 degraded 标记（走 COALESCE 保护）');
 });
 
 test('漏点 2：itemsByDateHour 失败时，item_hourly_sales 一行不删不写，其余步骤照常', () => {

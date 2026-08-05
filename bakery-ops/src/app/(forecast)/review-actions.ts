@@ -12,7 +12,7 @@ import {
   deleteHoliday,
   getDailySalesTotal,
   getDailyRevenues,
-  upsertDailyRevenue,
+  saveManagerRevenue,
   getProductSalesTrend,
 } from "@/modules/data/repositories/forecast.repository";
 
@@ -28,6 +28,6 @@ export {
   deleteHoliday,
   getDailySalesTotal,
   getDailyRevenues,
-  upsertDailyRevenue,
+  saveManagerRevenue,
   getProductSalesTrend,
 };

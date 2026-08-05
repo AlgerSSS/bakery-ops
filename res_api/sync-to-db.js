@@ -13,6 +13,10 @@ import { classifyBusinessDate, dailyWitnesses, PartialStepError } from './lib/ze
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => { const [k, v] = a.replace(/^--/, '').split('='); return [k, v]; }));
 
+// 与 sync-member.mjs:24 同一个来源，两边写的是同一张 pos_member / daily_revenue 的 store 列。
+// 迁移 102 起 daily_revenue 也带门店，唯一键是 (date, store)。
+const STORE_NAME = process.env.MEMBER_STORE || '吉隆坡Pavilion门店';
+
 const DB_URL = args['database-url'] || process.env.DATABASE_URL;
 if (!DB_URL) { console.error('[sync-to-db] ERROR: DATABASE_URL env var is required'); process.exit(1); }
 const sql = postgres(DB_URL, { max: 5, idle_timeout: 20 });
@@ -151,9 +155,11 @@ async function syncDailyRevenue() {
     // 第 N 晚降级给 D 日写了近似值，第 N+1 晚 CSV 已有 D 日精确值但当晚又降级 -> 仍被 COALESCE 挡住。
     const degraded = fallbackUsed && record.date === EXPECTED_DATE;
     await sql`
-      INSERT INTO daily_revenue (date, revenue, transaction_count, avg_transaction_value, gross_sales, total_discount, discount_rate, member_sales_ratio)
-      VALUES (${record.date}, ${record.revenue}, ${record.transaction_count}, ${record.avg_transaction_value}, ${record.gross_sales}, ${record.total_discount}, ${record.discount_rate}, ${record.member_sales_ratio})
-      ON CONFLICT ON CONSTRAINT uk_daily_revenue_date DO UPDATE SET
+      INSERT INTO daily_revenue (date, store, revenue, transaction_count, avg_transaction_value, gross_sales, total_discount, discount_rate, member_sales_ratio)
+      VALUES (${record.date}, ${STORE_NAME}, ${record.revenue}, ${record.transaction_count}, ${record.avg_transaction_value}, ${record.gross_sales}, ${record.total_discount}, ${record.discount_rate}, ${record.member_sales_ratio})
+      -- 迁移 102 起按 (date, store) 唯一。旧的 uk_daily_revenue_date 仍在，
+      -- 但只有这一条能承第二家店；103 会把旧的删掉。
+      ON CONFLICT ON CONSTRAINT uk_daily_revenue_date_store DO UPDATE SET
         revenue = CASE WHEN ${degraded} THEN COALESCE(daily_revenue.revenue, EXCLUDED.revenue) ELSE EXCLUDED.revenue END,
         transaction_count = CASE WHEN ${degraded} THEN COALESCE(daily_revenue.transaction_count, EXCLUDED.transaction_count) ELSE EXCLUDED.transaction_count END,
         avg_transaction_value = CASE WHEN ${degraded} THEN COALESCE(daily_revenue.avg_transaction_value, EXCLUDED.avg_transaction_value) ELSE EXCLUDED.avg_transaction_value END,

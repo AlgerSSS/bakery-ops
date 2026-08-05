@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useForecastContext } from "@/ui/components/providers/forecast-provider";
 import {
-  adoptDailyReview, upsertDailyRevenue, addContextEvent, getDailyRevenues, getProducts,
+  adoptDailyReview, saveManagerRevenue, addContextEvent, getDailyRevenues, getProducts,
 } from "@/app/(forecast)/actions";
 import type { OutOfStockRecord, DailyReviewResult } from "@/modules/domain/forecast/types";
 import dayjs from "dayjs";
@@ -75,8 +75,9 @@ export function useReview() {
          这里原本会 deleteOutOfStockByDate 整天清空再写人工记录——自动检测 2026-07 上线后，
          店长补记一条就会抹掉当天全部自动结果。人工通道自 2026-04-12 起无人使用，已整块下线。 */
 
+      // 104 起写 daily_review 的 manager_* 列，不再覆盖 daily_revenue 的 POS 实测值。
       if (actualRevenue > 0) {
-        await upsertDailyRevenue(reviewDate, actualRevenue, txCount || undefined, avgTxValue || undefined);
+        await saveManagerRevenue(reviewDate, actualRevenue, txCount || undefined, avgTxValue || undefined);
       }
 
       // Save weather as context_event

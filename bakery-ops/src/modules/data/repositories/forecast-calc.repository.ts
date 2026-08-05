@@ -184,6 +184,18 @@ export async function deleteFixedShipmentSchedule(productName: string): Promise<
 export async function getDailySalesTotal(date: string): Promise<number> {
   const revenueRows = await query<{ revenue: number }>("SELECT revenue FROM daily_revenue WHERE date = ?", [date]);
   if (revenueRows.length > 0) return Math.round(revenueRows[0].revenue);
+
+  // 没有 POS 实测值时退回店长手填（104 起手填落在 daily_review.manager_revenue）。
+  // 这一层正是手填通道的用武之地：res_api 当晚抓取整体失败时，daily_revenue 与
+  // item_hourly_sales（daily_sales_record 是它的派生视图）会同时为空，
+  // 下面那条「单品数量 × 单价」的兜底也拿不到行、返回 0，
+  // 于是「昨日销售额」显示成 0 —— 而店长明明填过这个数。
+  const managerRows = await query<{ revenue: number }>(
+    "SELECT manager_revenue::float8 AS revenue FROM daily_review WHERE date = ? AND manager_revenue IS NOT NULL",
+    [date]
+  );
+  if (managerRows.length > 0) return Math.round(managerRows[0].revenue);
+
   const rows = await query<{ product_name: string; qty: number }>(
     `SELECT standard_name as product_name, SUM(quantity) as qty FROM daily_sales_record WHERE date = ? GROUP BY standard_name`,
     [date]

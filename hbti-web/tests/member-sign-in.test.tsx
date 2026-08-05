@@ -244,6 +244,73 @@ describe("MemberSignIn 的重发闸门", () => {
     expect(screen.queryByText(copy.authNetworkError)).not.toBeInTheDocument();
   });
 
+  // RES 对同号当天的重发回 "000" 却不真的送达（当日首次 11/13 到达、重复 0/6）。
+  // 每次发码都新建一个 guest session，验证码绑在那个 session 上——只留新令牌的话，
+  // 顾客手里那条**真收到**的码就永远验不过，而「等不及点重发」是最本能的动作。
+  it("重发之后，先前那条真收到的验证码仍然能用", async () => {
+    const fetchMock = vi
+      .fn()
+      // retryAfterSeconds 给 1，让冷却一秒后自然到期，不必操纵时钟
+      .mockResolvedValueOnce(
+        jsonResponse({
+          challengeToken: "challenge-1",
+          maskedPhone: "+60 12*****89",
+          retryAfterSeconds: 1,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          challengeToken: "challenge-2",
+          maskedPhone: "+60 12*****89",
+          retryAfterSeconds: 1,
+          resendMayNotArrive: true,
+        }),
+      )
+      // 新令牌说码不对——顾客手里的是第一条的码
+      .mockResolvedValueOnce(jsonResponse({ error: "INVALID_CODE" }, 400))
+      // 回退到旧令牌：通过
+      .mockResolvedValueOnce(
+        jsonResponse({
+          authenticated: true,
+          maskedPhone: "+60 12*****89",
+          draftKey: "draft-1",
+        }),
+      );
+    stubFetch(fetchMock);
+    const user = userEvent.setup();
+    const { onAuthenticated } = renderSignIn();
+
+    await sendCodeFor(user, "123456789");
+    await screen.findByLabelText(copy.codeLabel);
+
+    // 冷却到期后点页面上的「重发」——这条路径不清空上一份令牌
+    const resend = await screen.findByRole(
+      "button",
+      { name: copy.resendCode },
+      { timeout: 3000 },
+    );
+    await user.click(resend);
+
+    await user.type(await screen.findByLabelText(copy.codeLabel), "123456");
+    await user.click(screen.getByRole("button", { name: copy.verifyCode }));
+
+    await waitFor(() => expect(onAuthenticated).toHaveBeenCalledTimes(1));
+
+    const verifyTokens = fetchMock.mock.calls
+      .map(([, init]) => {
+        try {
+          return JSON.parse(String((init as RequestInit)?.body ?? "{}"));
+        } catch {
+          return {};
+        }
+      })
+      .filter((b) => typeof b.code === "string")
+      .map((b) => b.challengeToken);
+    // 先试新令牌，失败后回退到旧的——顺序本身就是这条修复的全部内容。
+    expect(verifyTokens).toEqual(["challenge-2", "challenge-1"]);
+    expect(screen.queryByText(copy.invalidCode)).not.toBeInTheDocument();
+  });
+
   it("真的断网了才说网络问题", async () => {
     stubFetch(
       vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),

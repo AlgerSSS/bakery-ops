@@ -108,6 +108,9 @@ export function MemberSignIn({
   const [cooldownPhone, setCooldownPhone] = useState<string>();
   const [sendCaveat, setSendCaveat] = useState<"mayNotArrive" | "maybeSent">();
   const [captchaConfig, setCaptchaConfig] = useState<PublicCaptchaConfig>();
+  // 上一次发码拿到的令牌。见 requestCode 里的说明：重发不该作废顾客手里的码。
+  const [previousChallengeToken, setPreviousChallengeToken] =
+    useState<string>();
   const codeRef = useRef<HTMLInputElement>(null);
 
   // 挂载时就问清楚要不要过图形验证码，并把 SDK 预热。等到顾客点「发送」再拉脚本，
@@ -209,6 +212,12 @@ export function MemberSignIn({
         return;
       }
 
+      // 留住上一份令牌。每次发码都会新建一个 guest session，验证码绑在那个 session
+      // 上；而 RES 对同号当天的重发**回 000 却不真的送达**（仓库实测：当日首次 11/13
+      // 到达、重复 0/6）。只留新令牌的话，顾客手里那条**真收到**的码绑的是已经被丢弃
+      // 的 session，输进去必然「验证码错误」，当天再无解——而「等不及就点重发」正是
+      // 顾客最本能的动作。两份都留着，验证时依次试，哪条短信真到了都能用。
+      setPreviousChallengeToken(challengeToken);
       setChallengeToken(payload.challengeToken);
       setMaskedPhone(payload.maskedPhone ?? maskPhone(nationalPhone, country));
       setResendSeconds(
@@ -237,6 +246,22 @@ export function MemberSignIn({
     }
   }
 
+  async function postVerification(token: string, confirmConflict: boolean) {
+    const response = await fetch("/api/auth/otp/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        challengeToken: token,
+        code,
+        acceptMembership: true,
+        ...(confirmConflict ? { confirmConflict: true } : {}),
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
+    });
+    return { response, payload: await readOtpReply(response) };
+  }
+
   async function verifyCode(confirmConflict = false) {
     if (!challengeToken) {
       return;
@@ -250,19 +275,31 @@ export function MemberSignIn({
     setError(undefined);
 
     try {
-      const response = await fetch("/api/auth/otp/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          challengeToken,
-          code,
-          acceptMembership: true,
-          ...(confirmConflict ? { confirmConflict: true } : {}),
-        }),
-        cache: "no-store",
-        signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
-      });
-      const payload = await readOtpReply(response);
+      let { response, payload } = await postVerification(
+        challengeToken,
+        confirmConflict,
+      );
+
+      // 新令牌说码不对，而我们手上还留着上一次发码的令牌——那多半就是顾客真收到
+      // 的那条码所属的挑战（RES 对重发回 000 却不送达）。再试一次那份，别让一次
+      // 「等不及点了重发」把整天的机会赔掉。只在「码不对」这一种错误上回退：
+      // 过期、超次数、账户冲突都另有含义，重试只会把它们变模糊。
+      if (
+        !response.ok &&
+        WRONG_CODE_ERRORS.has(String(payload.error)) &&
+        previousChallengeToken
+      ) {
+        const fallback = await postVerification(
+          previousChallengeToken,
+          confirmConflict,
+        );
+        if (fallback.response.ok || fallback.payload.error !== payload.error) {
+          ({ response, payload } = fallback);
+          // 旧的那份被证明才是活的，从此以它为准。
+          setChallengeToken(previousChallengeToken);
+          setPreviousChallengeToken(undefined);
+        }
+      }
 
       if (
         response.ok &&
@@ -297,6 +334,9 @@ export function MemberSignIn({
 
   function changePhone() {
     setChallengeToken(undefined);
+    // 上一份挑战属于上一个号码，留着只会在验证时白试一次，还可能把「码不对」
+    // 的原因说成别的。
+    setPreviousChallengeToken(undefined);
     setMaskedPhone("");
     setCode("");
     setError(undefined);
@@ -593,6 +633,13 @@ async function readOtpReply(response: Response): Promise<OtpReply> {
     return {};
   }
 }
+
+/** 只有这几种错误意味着「码本身不对」，才值得拿上一份挑战再试一次。 */
+const WRONG_CODE_ERRORS = new Set([
+  "INVALID_CODE",
+  "OTP_INVALID",
+  "INVALID_VERIFICATION_CODE",
+]);
 
 function errorMessage(error: string | undefined, copy: UiCopy): string {
   switch (error) {

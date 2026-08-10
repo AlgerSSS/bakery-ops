@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
 from unittest import mock
@@ -124,6 +125,122 @@ def _apply(port: int, applied_by: str) -> apply.ApplyResult:
         applied_by=applied_by,
         local_scratch=True,
     )
+
+
+def _assert_concurrent_apply(port: int) -> apply.ApplyResult:
+    role_admin = _connect(port)
+    role_admin.autocommit = True
+    role_admin_cursor = role_admin.cursor()
+    role_admin_cursor.execute("ALTER ROLE postgres SET transaction_timeout = '250ms'")
+    timeout_injected = True
+    blocker = _connect(port)
+    blocker.autocommit = True
+    blocker_cursor = blocker.cursor()
+    lock_held = False
+    executor = ThreadPoolExecutor(max_workers=2)
+    futures = []
+    try:
+        blocker_cursor.execute(
+            "SELECT pg_catalog.pg_advisory_lock("
+            "pg_catalog.hashtextextended(%s, 0))",
+            (apply.SESSION_LOCK_KEY,),
+        )
+        lock_held = True
+        futures = [
+            executor.submit(_apply, port, "pg17-concurrent-a"),
+            executor.submit(_apply, port, "pg17-concurrent-b"),
+        ]
+
+        monitor = _connect(port)
+        monitor.autocommit = True
+        monitor_cursor = monitor.cursor()
+        try:
+            deadline = time.monotonic() + 30
+            while True:
+                monitor_cursor.execute(
+                    """
+                    SELECT pg_catalog.count(DISTINCT lock.pid)
+                      FROM pg_catalog.pg_locks AS lock
+                      JOIN pg_catalog.pg_stat_activity AS activity
+                        ON activity.pid = lock.pid
+                     WHERE lock.locktype = 'advisory'
+                       AND lock.database = (
+                             SELECT oid
+                               FROM pg_catalog.pg_database
+                              WHERE datname = pg_catalog.current_database()
+                           )
+                       AND NOT lock.granted
+                       AND activity.application_name = 'hotcrush-r6-phase1-runner'
+                    """
+                )
+                if monitor_cursor.fetchone() == (2,):
+                    time.sleep(0.5)
+                    if any(future.done() for future in futures):
+                        raise AssertionError(
+                            "an inherited transaction_timeout interrupted a waiting runner"
+                        )
+                    break
+                if any(future.done() for future in futures):
+                    raise AssertionError("runner completed before the forced lock contention")
+                if time.monotonic() >= deadline:
+                    raise AssertionError("both concurrent runners did not reach the session lock")
+                time.sleep(0.05)
+        finally:
+            monitor_cursor.close()
+            monitor.close()
+
+        blocker_cursor.execute(
+            "SELECT pg_catalog.pg_advisory_unlock("
+            "pg_catalog.hashtextextended(%s, 0))",
+            (apply.SESSION_LOCK_KEY,),
+        )
+        assert blocker_cursor.fetchone() == (True,)
+        lock_held = False
+
+        results = [future.result(timeout=60) for future in futures]
+        assert sorted(result.status for result in results) == ["APPLIED", "NOOP"]
+        assert len({result.payload_sha256 for result in results}) == 1
+        assert len({result.catalog_fingerprint for result in results}) == 1
+
+        role_admin_cursor.execute("ALTER ROLE postgres RESET transaction_timeout")
+        timeout_injected = False
+
+        verification = _connect(port)
+        try:
+            cursor = verification.cursor()
+            cursor.execute("SELECT pg_catalog.count(*) FROM public.app_schema_migration")
+            assert cursor.fetchone() == (1,)
+            cursor.execute(
+                """
+                SELECT pg_catalog.count(*)
+                  FROM pg_catalog.pg_locks
+                 WHERE locktype = 'advisory'
+                   AND database = (
+                         SELECT oid
+                           FROM pg_catalog.pg_database
+                          WHERE datname = pg_catalog.current_database()
+                       )
+                """
+            )
+            assert cursor.fetchone() == (0,)
+        finally:
+            verification.rollback()
+            verification.close()
+        return next(result for result in results if result.status == "APPLIED")
+    finally:
+        if lock_held:
+            blocker_cursor.execute(
+                "SELECT pg_catalog.pg_advisory_unlock("
+                "pg_catalog.hashtextextended(%s, 0))",
+                (apply.SESSION_LOCK_KEY,),
+            )
+        blocker_cursor.close()
+        blocker.close()
+        executor.shutdown(wait=True, cancel_futures=True)
+        if timeout_injected:
+            role_admin_cursor.execute("ALTER ROLE postgres RESET transaction_timeout")
+        role_admin_cursor.close()
+        role_admin.close()
 
 
 def _assert_sqlstate(cursor, sql: str, expected: str, params: tuple[object, ...] = ()) -> None:
@@ -420,7 +537,7 @@ def main() -> int:
     routing = {key: os.environ.pop(key) for key in apply.ROUTING_ENVIRONMENT_KEYS if key in os.environ}
     try:
         with scratch_cluster("a") as port_a, scratch_cluster("b") as port_b:
-            first_a = _apply(port_a, "pg17-acceptance-a")
+            first_a = _assert_concurrent_apply(port_a)
             assert first_a.status == "APPLIED"
             assert _apply(port_a, "pg17-acceptance-a-rerun").status == "NOOP"
             _assert_check_exclusion_fk_and_rls(port_a)
@@ -442,6 +559,7 @@ def main() -> int:
                         "phase1_sha256": first_a.payload_sha256,
                         "catalog_fingerprint": first_a.catalog_fingerprint,
                         "clusters": 2,
+                        "concurrent_statuses": ["APPLIED", "NOOP"],
                         "rerun_status": "NOOP",
                     },
                     sort_keys=True,

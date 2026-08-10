@@ -57,6 +57,7 @@ TRANSACTION_CONTROL_RE = re.compile(
 )
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 PRE_LEDGER_LAST_STAGE = "041_validate_foreign_keys.sql"
+SESSION_LOCK_KEY = "hotcrush-core-v1-r6-phase1"
 
 
 class ApplySafetyError(RuntimeError):
@@ -543,6 +544,13 @@ def _write_ledger(cursor: Any, bundle: VerifiedBundle, applied_by: str) -> None:
         raise ApplySafetyError("ledger_write_failed", "Migration ledger write did not round-trip")
 
 
+def _best_effort_rollback(connection: Any) -> None:
+    try:
+        connection.rollback()
+    except Exception:
+        pass
+
+
 def apply_phase1(
     *,
     dsn: str,
@@ -562,10 +570,20 @@ def apply_phase1(
         connection = connect(**target.connect_kwargs())
     except Exception:
         raise ApplySafetyError("database_connect_failed", "Database connection failed") from None
-    connection.autocommit = False
-    cursor = connection.cursor()
+    cursor = None
     commit_started = False
     try:
+        connection.autocommit = True
+        cursor = connection.cursor()
+        cursor.execute("SET transaction_timeout = 0")
+        cursor.execute("SET lock_timeout = 0")
+        cursor.execute("SET statement_timeout = 0")
+        cursor.execute(
+            "SELECT pg_catalog.pg_advisory_lock("
+            "pg_catalog.hashtextextended(%s, 0))",
+            (SESSION_LOCK_KEY,),
+        )
+        connection.autocommit = False
         cursor.execute("BEGIN ISOLATION LEVEL SERIALIZABLE")
         cursor.execute("SET LOCAL lock_timeout = '5s'")
         cursor.execute("SET LOCAL statement_timeout = '15min'")
@@ -574,10 +592,6 @@ def apply_phase1(
         cursor.execute("SET LOCAL TIME ZONE 'UTC'")
         cursor.execute("SET LOCAL DateStyle = 'ISO, YMD'")
         cursor.execute("SET LOCAL quote_all_identifiers = off")
-        cursor.execute(
-            "SELECT pg_catalog.pg_advisory_xact_lock("
-            "pg_catalog.hashtextextended('hotcrush-core-v1-r6-phase1', 0))"
-        )
         _validate_runtime(cursor, target)
         ledger_state = _classify_ledger(cursor, bundle)
         if ledger_state == "NOOP":
@@ -585,7 +599,7 @@ def apply_phase1(
                 fingerprint = verify_catalog_contract(cursor, bundle.catalog_contract)
             except CatalogContractError:
                 raise ApplySafetyError("catalog_mismatch", "Database catalog differs from the sealed contract") from None
-            connection.rollback()
+            _best_effort_rollback(connection)
             return ApplyResult("NOOP", bundle.payload_sha256, fingerprint)
 
         boundary = next(
@@ -613,15 +627,21 @@ def apply_phase1(
         return ApplyResult("APPLIED", bundle.payload_sha256, fingerprint)
     except ApplySafetyError:
         if not commit_started:
-            connection.rollback()
+            _best_effort_rollback(connection)
         raise
     except BaseException:
         if not commit_started:
-            connection.rollback()
+            _best_effort_rollback(connection)
         raise ApplySafetyError("apply_failed", "Phase 1 transaction failed") from None
     finally:
-        cursor.close()
-        connection.close()
+        try:
+            if cursor is not None:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+        finally:
+            connection.close()
 
 
 def _argument_parser() -> argparse.ArgumentParser:

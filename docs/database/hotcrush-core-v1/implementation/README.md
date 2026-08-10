@@ -88,12 +88,22 @@ Before connecting, the runner:
 5. rejects the production source project and every target except the approved
    green project or an explicit numeric-loopback scratch database.
 
-The fresh path runs all stages in one SERIALIZABLE transaction under one
-advisory lock. It executes through FK validation (`041`), verifies that the
-ledger is still postgres-owned and not yet FORCE RLS, inserts the immutable
-ledger row with `execution_ms=NULL`, then executes security/comments/catalog
-acceptance (`080/090/099`), performs the detached exact catalog comparison and
-commits. A failure before commit rolls back all Phase 1 objects and the ledger.
+Before opening the SERIALIZABLE business transaction, the runner acquires a
+session advisory lock and holds it until the database connection closes. A
+concurrent runner therefore starts its database snapshot only after the first
+runner commits, and observes the committed ledger instead of acting on a stale
+snapshot. Lock acquisition explicitly neutralizes inherited transaction, lock
+and statement timeouts so correctness is not converted into a third, ambiguous
+timeout result. A runner can therefore wait indefinitely behind a live lock
+holder; an operator may cancel the waiting session, and closing either
+connection releases its session lock. The fresh path then runs all stages in
+one SERIALIZABLE transaction. It executes through FK validation (`041`),
+verifies that the ledger is still postgres-owned and not yet FORCE RLS, inserts
+the immutable ledger row with `execution_ms=NULL`, then executes
+security/comments/catalog acceptance (`080/090/099`), performs the detached
+exact catalog comparison and commits. A failure before commit rolls back all
+Phase 1 objects and the ledger. Closing the connection releases the session
+lock on every success or failure path.
 
 The rerun path accepts only one exact baseline ledger row with the same filename
 and checksum. It executes no DDL, re-runs the complete catalog comparison and
@@ -107,7 +117,7 @@ Static suite:
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-Current result: **38/38 pass**.
+Current result: **43/43 pass**.
 
 Artifact regeneration and byte verification:
 
@@ -123,11 +133,14 @@ python3 tests/run_phase1_pg17_acceptance.py
 ```
 
 The harness creates two independent `postgres:17.6-alpine` clusters, applies
-the same sealed bytes, reruns both as `NOOP`, compares canonical catalogs byte
-for byte, and verifies transaction rollback, ledger idempotency, CHECK
-enforcement, EXCLUDE adjacency/overlap/predicate behavior, composite FK
-`MATCH SIMPLE`/orphan/deferred/delete behavior, ACL denial and default-deny RLS.
-The final result was `PASS` with the catalog fingerprint shown above.
+the same sealed bytes, forces two runners to wait concurrently on the same
+fresh database, and requires exactly one `APPLIED` plus one `NOOP`, one ledger
+row and zero runner errors. It then reruns both clusters as `NOOP`, compares
+canonical catalogs byte for byte, and verifies transaction rollback, ledger
+idempotency, CHECK enforcement, EXCLUDE adjacency/overlap/predicate behavior,
+composite FK `MATCH SIMPLE`/orphan/deferred/delete behavior, ACL denial and
+default-deny RLS. The final result was `PASS` with the catalog fingerprint
+shown above.
 
 ## Explicitly not approved or claimed
 

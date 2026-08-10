@@ -70,17 +70,29 @@ class FakeCursor:
         guard_row: tuple[object, ...] = ("r", "postgres", False, False),
         guard_count: tuple[int] = (0,),
         fail_stage: str | None = None,
+        fail_close: bool = False,
+        fail_session_lock: bool = False,
     ) -> None:
         self.ledger_exists = ledger_exists
         self.ledger_rows = ledger_rows or []
         self.guard_row = guard_row
         self.guard_count = guard_count
         self.fail_stage = fail_stage
+        self.fail_close = fail_close
+        self.fail_session_lock = fail_session_lock
+        self.closed = 0
         self.executions: list[tuple[str, object]] = []
+        self.autocommit_at_execution: list[bool] = []
+        self.connection: FakeConnection | None = None
         self._result: object = None
 
     def execute(self, sql: str, params: object = None) -> None:
         self.executions.append((sql, params))
+        self.autocommit_at_execution.append(
+            self.connection.autocommit if self.connection is not None else False
+        )
+        if self.fail_session_lock and "pg_catalog.pg_advisory_lock(" in sql:
+            raise RuntimeError("session lock failed")
         if self.fail_stage and sql.startswith(f"-- HOT CRUSH Core V1 R6 / {self.fail_stage}"):
             raise RuntimeError("secret database failure")
         if "server_version_num" in sql and "rolbypassrls" in sql:
@@ -107,13 +119,23 @@ class FakeCursor:
         return self._result if isinstance(self._result, list) else []
 
     def close(self) -> None:
-        return None
+        self.closed += 1
+        if self.fail_close:
+            raise RuntimeError("cursor close failed")
 
 
 class FakeConnection:
-    def __init__(self, cursor: FakeCursor, *, fail_commit: bool = False) -> None:
+    def __init__(
+        self,
+        cursor: FakeCursor,
+        *,
+        fail_commit: bool = False,
+        fail_rollback: bool = False,
+    ) -> None:
         self._cursor = cursor
+        cursor.connection = self
         self.fail_commit = fail_commit
+        self.fail_rollback = fail_rollback
         self.autocommit = True
         self.commits = 0
         self.rollbacks = 0
@@ -126,6 +148,37 @@ class FakeConnection:
         self.commits += 1
         if self.fail_commit:
             raise RuntimeError("connection lost during commit")
+
+    def rollback(self) -> None:
+        self.rollbacks += 1
+        if self.fail_rollback:
+            raise RuntimeError("connection lost during rollback")
+
+    def close(self) -> None:
+        self.closed += 1
+
+
+class SetupFailureConnection:
+    def __init__(self, fail_at: str) -> None:
+        self.fail_at = fail_at
+        self._autocommit = False
+        self.rollbacks = 0
+        self.closed = 0
+
+    @property
+    def autocommit(self) -> bool:
+        return self._autocommit
+
+    @autocommit.setter
+    def autocommit(self, value: bool) -> None:
+        if self.fail_at == "autocommit" and value:
+            raise RuntimeError("autocommit setup failed")
+        self._autocommit = value
+
+    def cursor(self):
+        if self.fail_at == "cursor":
+            raise RuntimeError("cursor setup failed")
+        raise AssertionError("unexpected cursor request")
 
     def rollback(self) -> None:
         self.rollbacks += 1
@@ -319,6 +372,115 @@ class Phase1TransactionStateMachineTests(unittest.TestCase):
             )
         return result, verifier_mock
 
+    def test_session_lock_precedes_the_serializable_business_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle, contract = build_bundle(Path(tmp))
+            cursor = FakeCursor()
+            connection = FakeConnection(cursor)
+
+            result, _ = self._apply(bundle, contract, connection)
+
+            self.assertEqual(result.status, "APPLIED")
+            sql = [statement for statement, _ in cursor.executions]
+            lock_position = next(
+                index
+                for index, statement in enumerate(sql)
+                if "pg_catalog.pg_advisory_lock(" in statement
+            )
+            lock_positions = [
+                index
+                for index, statement in enumerate(sql)
+                if "pg_catalog.pg_advisory_lock(" in statement
+            ]
+            transaction_timeout_position = sql.index("SET transaction_timeout = 0")
+            lock_timeout_position = sql.index("SET lock_timeout = 0")
+            statement_timeout_position = sql.index("SET statement_timeout = 0")
+            begin_position = sql.index("BEGIN ISOLATION LEVEL SERIALIZABLE")
+            self.assertEqual(len(lock_positions), 1)
+            self.assertLess(transaction_timeout_position, lock_timeout_position)
+            self.assertLess(lock_timeout_position, statement_timeout_position)
+            self.assertLess(statement_timeout_position, lock_position)
+            self.assertLess(lock_position, begin_position)
+            self.assertTrue(cursor.autocommit_at_execution[transaction_timeout_position])
+            self.assertTrue(cursor.autocommit_at_execution[lock_timeout_position])
+            self.assertTrue(cursor.autocommit_at_execution[statement_timeout_position])
+            self.assertTrue(cursor.autocommit_at_execution[lock_position])
+            self.assertFalse(cursor.autocommit_at_execution[begin_position])
+            self.assertEqual(sql.count("BEGIN ISOLATION LEVEL SERIALIZABLE"), 1)
+            self.assertFalse(any("pg_advisory_xact_lock" in statement for statement in sql))
+            self.assertFalse(any("pg_advisory_unlock" in statement for statement in sql))
+            self.assertEqual(connection.closed, 1)
+
+    def test_connection_close_releases_the_session_lock_even_if_cursor_close_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle, contract = build_bundle(Path(tmp))
+            cursor = FakeCursor(fail_close=True)
+            connection = FakeConnection(cursor)
+
+            result, _ = self._apply(bundle, contract, connection)
+
+            self.assertEqual(result.status, "APPLIED")
+            self.assertEqual(cursor.closed, 1)
+            self.assertEqual(connection.closed, 1)
+
+    def test_connection_closes_when_prelock_setup_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle, contract = build_bundle(Path(tmp))
+            for failure in ("autocommit", "cursor"):
+                with self.subTest(failure=failure):
+                    connection = SetupFailureConnection(failure)
+                    with self.assertRaises(apply.ApplySafetyError) as caught:
+                        self._apply(bundle, contract, connection)  # type: ignore[arg-type]
+                    self.assertEqual(caught.exception.code, "apply_failed")
+                    self.assertEqual(connection.rollbacks, 1)
+                    self.assertEqual(connection.closed, 1)
+
+    def test_connection_closes_when_session_lock_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle, contract = build_bundle(Path(tmp))
+            connection = FakeConnection(FakeCursor(fail_session_lock=True))
+
+            with self.assertRaises(apply.ApplySafetyError) as caught:
+                self._apply(bundle, contract, connection)
+
+            self.assertEqual(caught.exception.code, "apply_failed")
+            self.assertEqual(connection.rollbacks, 1)
+            self.assertEqual(connection.closed, 1)
+
+    def test_rollback_failure_does_not_mask_the_safe_outcome(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle, contract = build_bundle(Path(tmp))
+
+            failed = FakeConnection(
+                FakeCursor(fail_stage="080 final default-deny RLS and object privileges"),
+                fail_rollback=True,
+            )
+            with self.assertRaises(apply.ApplySafetyError) as caught:
+                self._apply(bundle, contract, failed)
+            self.assertEqual(caught.exception.code, "apply_failed")
+            self.assertEqual(failed.rollbacks, 1)
+            self.assertEqual(failed.closed, 1)
+
+            noop = FakeConnection(
+                FakeCursor(
+                    ledger_exists=True,
+                    ledger_rows=[
+                        (
+                            "R6_PHASE1_BASELINE",
+                            "phase1.sql",
+                            json.loads((bundle / "phase1-ddl-manifest.json").read_text())[
+                                "payload"
+                            ]["sha256"],
+                        )
+                    ],
+                ),
+                fail_rollback=True,
+            )
+            result, _ = self._apply(bundle, contract, noop)
+            self.assertEqual(result.status, "NOOP")
+            self.assertEqual(noop.rollbacks, 1)
+            self.assertEqual(noop.closed, 1)
+
     def test_fresh_apply_executes_each_stage_and_writes_ledger_before_security(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             bundle, contract = build_bundle(Path(tmp))
@@ -356,6 +518,7 @@ class Phase1TransactionStateMachineTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, "apply_failed")
             self.assertEqual(connection.commits, 0)
             self.assertEqual(connection.rollbacks, 1)
+            self.assertEqual(connection.closed, 1)
 
         with tempfile.TemporaryDirectory() as tmp:
             bundle, contract = build_bundle(Path(tmp))
@@ -367,6 +530,7 @@ class Phase1TransactionStateMachineTests(unittest.TestCase):
             self.assertNotIn("SECRET_EXPECTED", str(caught.exception))
             self.assertNotIn("SECRET_ACTUAL", str(caught.exception))
             self.assertEqual(connection.rollbacks, 1)
+            self.assertEqual(connection.closed, 1)
 
     def test_same_checksum_is_noop_and_ledger_drift_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -382,6 +546,7 @@ class Phase1TransactionStateMachineTests(unittest.TestCase):
             self.assertEqual(result.status, "NOOP")
             self.assertEqual(connection.commits, 0)
             self.assertEqual(connection.rollbacks, 1)
+            self.assertEqual(connection.closed, 1)
             self.assertFalse(any(sql.startswith("-- HOT CRUSH") for sql, _ in cursor.executions))
             verifier.assert_called_once_with(cursor, CATALOG_SENTINEL)
 
@@ -397,6 +562,7 @@ class Phase1TransactionStateMachineTests(unittest.TestCase):
                         self._apply(bundle, contract, drift_connection)
                     self.assertEqual(caught.exception.code, code)
                     self.assertEqual(drift_connection.rollbacks, 1)
+                    self.assertEqual(drift_connection.closed, 1)
 
     def test_guard_failure_and_commit_uncertainty_have_distinct_outcomes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -407,6 +573,7 @@ class Phase1TransactionStateMachineTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, "ledger_guard_failed")
             self.assertEqual(guard_connection.rollbacks, 1)
             self.assertEqual(guard_connection.commits, 0)
+            self.assertEqual(guard_connection.closed, 1)
 
             commit_connection = FakeConnection(FakeCursor(), fail_commit=True)
             with self.assertRaises(apply.ApplySafetyError) as caught:
@@ -414,6 +581,7 @@ class Phase1TransactionStateMachineTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, "commit_outcome_unknown")
             self.assertEqual(commit_connection.commits, 1)
             self.assertEqual(commit_connection.rollbacks, 0)
+            self.assertEqual(commit_connection.closed, 1)
 
 
 if __name__ == "__main__":

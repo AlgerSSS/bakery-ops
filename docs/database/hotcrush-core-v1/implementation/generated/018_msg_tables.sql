@@ -1,0 +1,120 @@
+-- HOT CRUSH Core V1 R6 / msg physical tables
+-- Generated deterministically. Do not hand-edit.
+-- The psycopg2 apply runner owns the sole transaction, lock and SET LOCAL state.
+
+CREATE TABLE public."msg_conversation" (
+  "conversation_id" pg_catalog.uuid DEFAULT pg_catalog.gen_random_uuid() NOT NULL,
+  "channel_code" pg_catalog.text NOT NULL,
+  "external_conversation_id" pg_catalog.text,
+  "application_id" pg_catalog.uuid,
+  "person_id" pg_catalog.uuid,
+  "member_id" pg_catalog.uuid,
+  "app_user_id" pg_catalog.uuid,
+  "status" pg_catalog.text DEFAULT 'OPEN' NOT NULL,
+  "opened_at" pg_catalog.timestamptz NOT NULL,
+  "closed_at" pg_catalog.timestamptz,
+  "created_at" pg_catalog.timestamptz DEFAULT pg_catalog.now() NOT NULL,
+  "updated_at" pg_catalog.timestamptz DEFAULT pg_catalog.now() NOT NULL,
+  CONSTRAINT "pk_msg_conversation__conversation_id" PRIMARY KEY ("conversation_id"),
+  CONSTRAINT "uq_msg_conversation__channel_code__external_conversation_id" UNIQUE NULLS DISTINCT ("channel_code", "external_conversation_id"),
+  CONSTRAINT "ck_msg_conversation__table__01" CHECK ("closed_at" IS NULL OR "closed_at" >= "opened_at"),
+  CONSTRAINT "ck_msg_conversation__table__02" CHECK (pg_catalog.num_nonnulls ( "application_id" , "person_id" , "member_id" , "app_user_id" ) >= 1),
+  CONSTRAINT "ck_msg_conversation__channel_code__01" CHECK ("channel_code" IN ( 'WHATSAPP' , 'WEB_CHAT' , 'LARK' , 'OTHER' )),
+  CONSTRAINT "ck_msg_conversation__status__01" CHECK ("status" IN ( 'OPEN' , 'WAITING_USER' , 'WAITING_AGENT' , 'CLOSED' , 'OPTED_OUT' , 'BLOCKED' ))
+);
+
+CREATE TABLE public."msg_conversation_state" (
+  "conversation_state_id" pg_catalog.uuid DEFAULT pg_catalog.gen_random_uuid() NOT NULL,
+  "conversation_id" pg_catalog.uuid NOT NULL,
+  "workflow_code" pg_catalog.text NOT NULL,
+  "workflow_version" pg_catalog.text NOT NULL,
+  "state_code" pg_catalog.text NOT NULL,
+  "collected_data" pg_catalog.jsonb DEFAULT '{}'::pg_catalog.jsonb NOT NULL,
+  "pending_action" pg_catalog.jsonb,
+  "expires_at" pg_catalog.timestamptz,
+  "status" pg_catalog.text DEFAULT 'ACTIVE' NOT NULL,
+  "created_at" pg_catalog.timestamptz DEFAULT pg_catalog.now() NOT NULL,
+  "updated_at" pg_catalog.timestamptz DEFAULT pg_catalog.now() NOT NULL,
+  CONSTRAINT "pk_msg_conversation_state__conversation_state_id" PRIMARY KEY ("conversation_state_id"),
+  CONSTRAINT "uq_msg_conversation_state__conversation_id__workflow_code" UNIQUE ("conversation_id", "workflow_code"),
+  CONSTRAINT "ck_msg_conversation_state__workflow_code__01" CHECK ("workflow_code" ~ '^[A-Z][A-Z0-9_]{1,63}$'),
+  CONSTRAINT "ck_msg_conversation_state__status__01" CHECK ("status" IN ( 'ACTIVE' , 'COMPLETED' , 'EXPIRED' , 'CANCELLED' , 'ERROR' ))
+);
+
+CREATE TABLE public."msg_delivery_attempt" (
+  "delivery_attempt_id" pg_catalog.uuid DEFAULT pg_catalog.gen_random_uuid() NOT NULL,
+  "outbound_message_id" pg_catalog.uuid NOT NULL,
+  "attempt_no" pg_catalog.int4 NOT NULL,
+  "started_at" pg_catalog.timestamptz NOT NULL,
+  "finished_at" pg_catalog.timestamptz,
+  "result" pg_catalog.text NOT NULL,
+  "external_message_id" pg_catalog.text,
+  "http_status" pg_catalog.int4,
+  "error_code" pg_catalog.text,
+  "error_detail" pg_catalog.text,
+  "created_at" pg_catalog.timestamptz DEFAULT pg_catalog.now() NOT NULL,
+  CONSTRAINT "pk_msg_delivery_attempt__delivery_attempt_id" PRIMARY KEY ("delivery_attempt_id"),
+  CONSTRAINT "uq_msg_delivery_attempt__outbound_message_id__attempt_no" UNIQUE ("outbound_message_id", "attempt_no"),
+  CONSTRAINT "ck_msg_delivery_attempt__table__01" CHECK ("finished_at" IS NULL OR "finished_at" >= "started_at"),
+  CONSTRAINT "ck_msg_delivery_attempt__attempt_no__01" CHECK ("attempt_no" > 0),
+  CONSTRAINT "ck_msg_delivery_attempt__result__01" CHECK ("result" IN ( 'SENT' , 'RETRYABLE_FAILURE' , 'PERMANENT_FAILURE' , 'UNKNOWN' ))
+);
+
+CREATE TABLE public."msg_message" (
+  "message_id" pg_catalog.uuid DEFAULT pg_catalog.gen_random_uuid() NOT NULL,
+  "conversation_id" pg_catalog.uuid NOT NULL,
+  "outbound_message_id" pg_catalog.uuid,
+  "external_message_id" pg_catalog.text,
+  "direction" pg_catalog.text NOT NULL,
+  "sender_type" pg_catalog.text NOT NULL,
+  "content_type" pg_catalog.text NOT NULL,
+  "content_text" pg_catalog.text,
+  "content_ref" pg_catalog.text,
+  "occurred_at" pg_catalog.timestamptz NOT NULL,
+  "acceptance_status" pg_catalog.text NOT NULL,
+  "metadata" pg_catalog.jsonb DEFAULT '{}'::pg_catalog.jsonb NOT NULL,
+  "created_at" pg_catalog.timestamptz DEFAULT pg_catalog.now() NOT NULL,
+  CONSTRAINT "pk_msg_message__message_id" PRIMARY KEY ("message_id"),
+  CONSTRAINT "uq_msg_message__conversation_id__external_message_id" UNIQUE NULLS DISTINCT ("conversation_id", "external_message_id"),
+  CONSTRAINT "uq_msg_message__outbound_message_id" UNIQUE NULLS DISTINCT ("outbound_message_id"),
+  CONSTRAINT "ck_msg_message__direction__01" CHECK ("direction" IN ( 'INBOUND' , 'OUTBOUND' , 'SYSTEM' )),
+  CONSTRAINT "ck_msg_message__sender_type__01" CHECK ("sender_type" IN ( 'PERSON' , 'MEMBER' , 'APP_USER' , 'SERVICE' , 'CHANNEL' )),
+  CONSTRAINT "ck_msg_message__content_type__01" CHECK ("content_type" IN ( 'TEXT' , 'IMAGE' , 'FILE' , 'AUDIO' , 'TEMPLATE' , 'EVENT' )),
+  CONSTRAINT "ck_msg_message__acceptance_status__01" CHECK ("acceptance_status" IN ( 'RECEIVED' , 'QUEUED' , 'SENT' , 'FAILED' , 'REJECTED' ))
+);
+
+CREATE TABLE public."msg_outbound_message" (
+  "outbound_message_id" pg_catalog.uuid DEFAULT pg_catalog.gen_random_uuid() NOT NULL,
+  "conversation_id" pg_catalog.uuid,
+  "job_run_id" pg_catalog.uuid,
+  "review_action_id" pg_catalog.uuid,
+  "ai_call_id" pg_catalog.uuid,
+  "appointment_id" pg_catalog.uuid,
+  "campaign_member_id" pg_catalog.uuid,
+  "queued_by_user_id" pg_catalog.uuid,
+  "channel_code" pg_catalog.text NOT NULL,
+  "recipient_ref" pg_catalog.text NOT NULL,
+  "push_kind" pg_catalog.text,
+  "business_date" pg_catalog.date,
+  "template_code" pg_catalog.text,
+  "template_version" pg_catalog.int4,
+  "payload" pg_catalog.jsonb DEFAULT '{}'::pg_catalog.jsonb NOT NULL,
+  "idempotency_key" pg_catalog.text NOT NULL,
+  "earliest_send_at" pg_catalog.timestamptz NOT NULL,
+  "expires_at" pg_catalog.timestamptz,
+  "priority" pg_catalog.int2 DEFAULT 100 NOT NULL,
+  "status" pg_catalog.text DEFAULT 'QUEUED' NOT NULL,
+  "created_at" pg_catalog.timestamptz DEFAULT pg_catalog.now() NOT NULL,
+  "updated_at" pg_catalog.timestamptz DEFAULT pg_catalog.now() NOT NULL,
+  CONSTRAINT "pk_msg_outbound_message__outbound_message_id" PRIMARY KEY ("outbound_message_id"),
+  CONSTRAINT "uq_msg_outbound_message__idempotency_key" UNIQUE ("idempotency_key"),
+  CONSTRAINT "uq_msg_outbound_message__push_kind__recipient_ref__b_70f2b27212" UNIQUE NULLS DISTINCT ("push_kind", "recipient_ref", "business_date"),
+  CONSTRAINT "ck_msg_outbound_message__table__01" CHECK ("expires_at" IS NULL OR "expires_at" > "earliest_send_at"),
+  CONSTRAINT "ck_msg_outbound_message__table__02" CHECK (( "push_kind" IS NULL ) = ( "business_date" IS NULL )),
+  CONSTRAINT "ck_msg_outbound_message__table__03" CHECK (( "template_code" IS NULL ) = ( "template_version" IS NULL )),
+  CONSTRAINT "ck_msg_outbound_message__table__04" CHECK (pg_catalog.num_nonnulls ( "conversation_id" , "job_run_id" , "review_action_id" , "ai_call_id" , "appointment_id" , "campaign_member_id" , "queued_by_user_id" ) >= 1),
+  CONSTRAINT "ck_msg_outbound_message__channel_code__01" CHECK ("channel_code" IN ( 'WHATSAPP' , 'LARK' , 'EMAIL' , 'OTHER' )),
+  CONSTRAINT "ck_msg_outbound_message__push_kind__01" CHECK ("push_kind" IS NULL OR "push_kind" ~ '^[A-Z][A-Z0-9_]{1,63}$'),
+  CONSTRAINT "ck_msg_outbound_message__template_version__01" CHECK ("template_version" IS NULL OR "template_version" > 0),
+  CONSTRAINT "ck_msg_outbound_message__status__01" CHECK ("status" IN ( 'QUEUED' , 'PROCESSING' , 'SENT' , 'FAILED' , 'CANCELLED' , 'EXPIRED' ))
+);

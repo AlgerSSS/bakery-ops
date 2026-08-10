@@ -1,0 +1,155 @@
+﻿r5_object,r6_disposition,r6_target,phase1_physical,full_catalog_physical_contract,extension_or_condition,reason,claude_fable_5,final_override
+app_schema_migration,PHASE1_PLATFORM_SIDECAR,app_schema_migration,YES,YES,,按代码仓库分别记录已执行的迁移，消除多个项目共用单一数字版本造成的冲突。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+app_source_system,PHASE1_CORE_BUSINESS,app_source_system,YES,YES,,登记 RES、Lark、财务模板、人工后台等数据来源及其责任边界。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+app_unit,PHASE1_CORE_BUSINESS,app_unit,YES,YES,,登记产品、原料、配方、采购和库存共同使用的计量单位；单位代码只表达计量含义，不夹带某个供应商包装规格。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+app_job_run,PHASE1_PLATFORM_SIDECAR,app_job_run,YES,YES,,统一记录抓取、预测、成本计算和同步任务每次运行的输入窗口、结果和错误。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+app_audit_event,PHASE1_PLATFORM_SIDECAR,app_audit_event,YES,YES,,只追加记录登录、权限、人工改数、审批和敏感读取等受控操作。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+app_user,PHASE1_PLATFORM_SIDECAR,app_user,YES,YES,,统一财务、BakeryOps及未来后台的登录账号；不等同于员工自然人。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+app_role,PHASE1_PLATFORM_SIDECAR,app_role,YES,YES,,定义可分配给账号的角色集合。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+app_permission,EXTENSION_LATER,app_permission,NO,YES,FINE_GRAINED_ACCESS: 细粒度权限,定义最小可授权动作，例如读取成本、发布班表或管理账号。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+app_user_role,PHASE1_PLATFORM_SIDECAR,app_user_role,YES,YES,,记录账号在有效期内拥有的角色。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+app_role_permission,EXTENSION_LATER,app_role_permission,NO,YES,FINE_GRAINED_ACCESS: 细粒度权限,按生效区间把原子权限组合进角色，并保留撤销历史。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+app_user_location_scope,PHASE1_PLATFORM_SIDECAR,app_user_location_scope,YES,YES,,限制一项账号角色分配可以读取或操作哪些门店、厨房或仓库，避免多角色账号的地点范围互相串用。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+app_session,PHASE1_PLATFORM_SIDECAR,app_session,YES,YES,,保存经过哈希的登录会话及其过期和撤销状态。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+app_one_time_token,PHASE1_PLATFORM_SIDECAR,app_one_time_token,YES,YES,,为 HBTI、重置密码或一次性公开流程保存哈希令牌和消费状态。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+app_rate_limit_event,PHASE1_PLATFORM_SIDECAR,app_rate_limit_event,YES,YES,,记录受保护接口的限流计数，替代 HBTI 专用的孤立限流表。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+ops_location,PHASE1_CORE_BUSINESS,ops_location,YES,YES,,统一表示门店、中央厨房、仓库、办公室或兼具多种能力的地点。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+ops_location_source_identity,PHASE1_CORE_BUSINESS,ops_location_source_identity,YES,YES,,把 RES、Lark、财务模板等外部地点编号映射到统一 location_id，并保留有效期。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+ops_product,PHASE1_CORE_BUSINESS,ops_product,YES,YES,,维护 HOT CRUSH 可销售、可生产产品的稳定身份，不等同于某门店 POS listing。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+ops_product_alias,PHASE1_CORE_BUSINESS,ops_product_alias,YES,YES,,保存人工输入、Excel和历史系统中的产品别称，并明确归一到 product_id。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+hr_person,PHASE1_CORE_BUSINESS,hr_person,YES,YES,,为候选人和员工提供不随雇佣关系变化的稳定 person_id。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+hr_person_contact,PHASE1_CORE_BUSINESS,hr_person_contact,YES,YES,,把电话和邮箱等联系方式从一般人员主档隔离，便于最小权限和历史管理。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+hr_employment,PHASE1_CORE_BUSINESS,hr_employment,YES,YES,,把自然人与一次具体雇佣关系分开，支持离职后再次入职和跨地点调动。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+hr_employment_source_identity,PHASE1_CORE_BUSINESS,hr_employment_source_identity,YES,YES,,把 Lark、工资表和历史员工表中的员工编号映射到 employment_id。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+hr_employment_mapping_review,PHASE1_CORE_BUSINESS,hr_employment_mapping_review,YES,YES,,保存 Lark、工资表和历史员工来源无法自动确认到 employment_id 时的候选、证据和人工结论。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+scm_material,PHASE1_CORE_BUSINESS,scm_material,YES,YES,,统一表示原料、包材和半成品，不让供应链依赖财务成本卡内部编号。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+scm_material_alias,PHASE1_CORE_BUSINESS,scm_material_alias,YES,YES,,保存供应商、财务模板和历史配方里的原料不同写法。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+scm_material_source_identity,PHASE1_CORE_BUSINESS,scm_material_source_identity,YES,YES,,把成本卡迁移编号、WMS编号等外部物料身份映射到 material_id。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+pos_ingest_batch,PHASE1_CORE_BUSINESS,pos_ingest_batch,YES,YES,,记录每次 RES/POS 抓取的数据集、窗口、游标、校验值和完整性。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+pos_product_listing,PHASE1_CORE_BUSINESS,pos_product_listing,YES,YES,,保存某来源组织/门店菜单中的商品身份和当前目录属性，不直接等同于企业 product_id。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+pos_product_mapping,PHASE1_CORE_BUSINESS,pos_product_mapping,YES,YES,,版本化保存 listing 与 product_id 的确认关系，使历史销售按当时映射重现。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+pos_product_mapping_review,PHASE1_CORE_BUSINESS,pos_product_mapping_review,YES,YES,,保存无法自动唯一映射的 listing 候选和处理结论。；人工决定、批准、状态转换或业务副作用本身就是事实，不能从最终结果倒推。,CORE_KEEP,NONE
+pos_sales_day,PHASE1_CORE_BUSINESS,pos_sales_day,YES,YES,,保存某地点某营业日某批次的销售、折扣、订单和来源平均客单观察。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+pos_sales_hour,PHASE1_CORE_BUSINESS,pos_sales_hour,YES,YES,,保存门店每个营业小时的销售和订单汇总。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+pos_item_sales_hour,PHASE1_CORE_BUSINESS,pos_item_sales_hour,YES,YES,,保存 listing 在每个营业小时的销量和销售额；即使尚未映射 product_id 也能完整入库。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+pos_daily_breakdown,PHASE1_CORE_BUSINESS,pos_daily_breakdown,YES,YES,,保存支付方式、就餐方式或渠道等日销售拆分，避免把不同维度做成固定宽列。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+pos_item_waste,PHASE1_CORE_BUSINESS,pos_item_waste,YES,YES,,保存来源报废记录及标准原因，不把试吃等营销用途默认算作损失。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+ops_stockout_event,PHASE1_CORE_BUSINESS,ops_stockout_event,YES,YES,,记录人工确认或算法识别的断货时段、证据及估算损失。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+pos_order,PHASE1_CORE_BUSINESS,pos_order,YES,YES,,只保存来源订单的稳定身份，不把尚未证明存在的订单头金额、状态或时间硬塞进同一行。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+pos_order_item,PHASE1_CORE_BUSINESS,pos_order_item,YES,YES,,按一次来源批次保存订单内同一 listing 的合计数量与净额；这是当前可稳定重跑的最小商品粒度。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+pos_payment,DEFER_SOURCE,pos_payment,NO,YES,SOURCE_CONDITIONAL,保存订单的一次支付或支付状态变化。；外部来源身份、粒度、权限和重跑契约尚未验证，当前只保留目标契约，不建正式表。,DEFER_SOURCE,NONE
+pos_refund,DEFER_SOURCE,pos_refund,NO,YES,SOURCE_CONDITIONAL,保存订单或订单行级退款，不用负销售行替代退款事实。；外部来源身份、粒度、权限和重跑契约尚未验证，当前只保留目标契约，不建正式表。,DEFER_SOURCE,NONE
+pos_member,PHASE1_CORE_BUSINESS,pos_member,YES,YES,,只保存会员非敏感稳定身份和企业治理状态；每天变化的等级、积分、累计值和余额进入会员状态快照，联系方式另表隔离。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+pos_member_contact,PHASE1_CORE_BUSINESS,pos_member_contact,YES,YES,,隔离存放业务明确批准保留的会员手机号，并支持换号历史。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+pos_member_card,PHASE1_CORE_BUSINESS,pos_member_card,YES,YES,,把一名会员的多张卡拆为独立身份，避免把卡余额永远聚合进会员主档。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+pos_member_balance_snapshot,PHASE1_CORE_BUSINESS,pos_member_balance_snapshot,YES,YES,,保存来源在某日直接观察到、无法从不完整流水可靠反推的会员等级、积分、累计值和会员名下全部卡余额。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+pos_member_card_transaction,PHASE1_CORE_BUSINESS,pos_member_card_transaction,YES,YES,,保存充值、消费核销、退款和余额调整的不可变事件。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+pos_member_daily_metric,PHASE1_CORE_BUSINESS,pos_member_daily_metric,YES,YES,,保存会员人数、消费、充值、核销、调整和期末余额等来源日报原值；比率和可重算净额只在视图派生。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+ops_calendar_event,PHASE1_CORE_BUSINESS,ops_calendar_event,YES,YES,,保存已解析的节假日、学校假期和其他可验证日历事件。；人工决定、批准、状态转换或业务副作用本身就是事实，不能从最终结果倒推。,CORE_KEEP,NONE
+ops_operational_event,PHASE1_CORE_BUSINESS,ops_operational_event,YES,YES,,记录停电、设备故障、人流异常、促销或其他当日突发情况及人工证据。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+ops_operational_event_product,PHASE1_CORE_BUSINESS,ops_operational_event_product,YES,YES,,明确运营事件影响哪些产品以及影响方向和数量。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+ops_forecast_run,PHASE1_CORE_BUSINESS,ops_forecast_run,YES,YES,,冻结一次预测使用的目标日期、算法、输入清单和结果状态。；虽然数值可计算，但该版本曾被提出、批准或用于触发行动，历史决定本身不可从当前输入反推。,CORE_KEEP,NONE
+ops_forecast_line,PHASE1_CORE_BUSINESS,ops_forecast_line,YES,YES,,保存一次预测对每个产品的数量区间和解释。；虽然数值可计算，但该版本曾被提出、批准或用于触发行动，历史决定本身不可从当前输入反推。,CORE_KEEP,NONE
+ops_production_plan_version,PHASE1_CORE_BUSINESS,ops_production_plan_version,YES,YES,,直接保留某地点某营业日每次预测建议、人工调整、审批、发布或取消，不再为同一自然键另建空壳主单。；虽然数值可计算，但该版本曾被提出、批准或用于触发行动，历史决定本身不可从当前输入反推。,CORE_KEEP,NONE
+ops_production_plan_line,PHASE1_CORE_BUSINESS,ops_production_plan_line,YES,YES,,保存某版本每个产品的计划数量和人工判断来源。；虽然数值可计算，但该版本曾被提出、批准或用于触发行动，历史决定本身不可从当前输入反推。,CORE_KEEP,NONE
+ops_production_plan_slot,EXTENSION_LATER,ops_production_plan_slot,NO,YES,PRODUCTION_EXECUTION: 生产执行与配送,把产品总计划拆到具体生产时段，解决总量正确但时段断货的问题。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_workload_run,EXTENSION_LATER,ops_workload_run,NO,YES,SHIFT_AND_WORKFORCE: 班表、工作量与工位,把已发布生产计划和预测销售转换为岗位/工位所需分钟，作为班表显式上游。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_workload_line,EXTENSION_LATER,ops_workload_line,NO,YES,SHIFT_AND_WORKFORCE: 班表、工作量与工位,保存某工作量运行对岗位、工位及可选产品的需求分钟和数量依据。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_production_run,EXTENSION_LATER,ops_production_run,NO,YES,PRODUCTION_EXECUTION: 生产执行与配送,记录一次真实生产执行，不用计划数量冒充实际产出。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_production_run_line,EXTENSION_LATER,ops_production_run_line,NO,YES,PRODUCTION_EXECUTION: 生产执行与配送,保存实际生产的合格、报废和返工数量，并可追溯到计划行。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_dispatch,EXTENSION_LATER,ops_dispatch,NO,YES,PRODUCTION_EXECUTION: 生产执行与配送,记录成品从中央厨房或门店发往另一地点的一次配送。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_dispatch_line,EXTENSION_LATER,ops_dispatch_line,NO,YES,PRODUCTION_EXECUTION: 生产执行与配送,保存配送中每个产品的发出、接收、拒收和差异数量。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_daily_review,PHASE1_CORE_BUSINESS,ops_daily_review,YES,YES,,保存某地点营业日的结构化复盘版本，区分人工事实、AI总结和采纳状态。；人工决定、批准、状态转换或业务副作用本身就是事实，不能从最终结果倒推。,CORE_KEEP,NONE
+ops_review_action,PHASE1_CORE_BUSINESS,ops_review_action,YES,YES,,把复盘建议变成有负责人、期限和完成状态的动作。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+ops_business_rule,PHASE1_CORE_BUSINESS,ops_business_rule,YES,YES,,版本化保存企业级、地点级、产品级或地点产品级的排产阈值、产品策略、招聘可预约窗口和断货排除等低频配置。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+hr_job_requisition,PHASE1_CORE_BUSINESS,hr_job_requisition,YES,YES,,记录某地点、岗位所需人数、期限和批准状态，作为候选申请的业务来源。；人工决定、批准、状态转换或业务副作用本身就是事实，不能从最终结果倒推。,CORE_KEEP,NONE
+hr_application,PHASE1_CORE_BUSINESS,hr_application,YES,YES,,记录自然人对一个招聘需求的一次申请身份和来源；阶段变化只追加到 hr_application_stage_event。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+hr_application_stage_event,PHASE1_CORE_BUSINESS,hr_application_stage_event,YES,YES,,只追加保存候选申请每次进入新阶段的时间、原因、来源和操作者，使漏斗和停留时长可以重建。；人工决定、批准、状态转换或业务副作用本身就是事实，不能从最终结果倒推。,CORE_KEEP,NONE
+hr_appointment,PHASE1_CORE_BUSINESS,hr_appointment,YES,YES,,记录候选人面试、试工或文件办理的一次预约及其实际执行结果；试工不再另建一对一结果表。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+hr_assessment,PHASE1_CORE_BUSINESS,hr_assessment,YES,YES,,保存一次结构化评估的建议、红线结论、评估者和模板版本；总分由明细视图派生。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+hr_assessment_score,PHASE1_CORE_BUSINESS,hr_assessment_score,YES,YES,,逐项保存评分、权重、红线和证据，避免只有总分无法解释。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+hr_offer,PHASE1_CORE_BUSINESS,hr_offer,YES,YES,,版本化保存候选人的岗位、地点、薪酬摘要、有效期和接受状态。；人工决定、批准、状态转换或业务副作用本身就是事实，不能从最终结果倒推。,CORE_KEEP,NONE
+hr_onboarding_task,EXTENSION_LATER,hr_onboarding_task,NO,YES,TRAINING_AND_ONBOARDING: 培训与入职,逐项跟踪合同、证件、系统账号、培训和门店准备等入职事项。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+hr_employee_event,PHASE1_CORE_BUSINESS,hr_employee_event,YES,YES,,记录转正、调动、停职、奖惩、离职等不可变人事事件。；人工决定、批准、状态转换或业务副作用本身就是事实，不能从最终结果倒推。,CORE_KEEP,NONE
+hr_screening_rule,PHASE1_CORE_BUSINESS,hr_screening_rule,YES,YES,,保存经人工批准、带证据和适用范围的招聘筛选规则。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+hr_training_course,EXTENSION_LATER,hr_training_course,NO,YES,TRAINING_AND_ONBOARDING: 培训与入职,维护课程稳定身份，内容和考核规则放在版本表。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+hr_training_course_version,EXTENSION_LATER,hr_training_course_version,NO,YES,TRAINING_AND_ONBOARDING: 培训与入职,冻结课程内容、及格线、有效期和考核规则版本。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+hr_training_assignment,EXTENSION_LATER,hr_training_assignment,NO,YES,TRAINING_AND_ONBOARDING: 培训与入职,记录员工被要求完成的具体课程版本、期限和原因。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+hr_training_result,EXTENSION_LATER,hr_training_result,NO,YES,TRAINING_AND_ONBOARDING: 培训与入职,保存一次课程学习或考试的分数、结果和资格有效期。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_role,PHASE1_CORE_BUSINESS,ops_role,YES,YES,,维护排班、招聘和培训共同使用的标准岗位身份。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+ops_station,EXTENSION_LATER,ops_station,NO,YES,SHIFT_AND_WORKFORCE: 班表、工作量与工位,维护地点内可排班的工位或工作区域。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_role_training_requirement,EXTENSION_LATER,ops_role_training_requirement,NO,YES,TRAINING_AND_ONBOARDING: 培训与入职,定义岗位需要哪些课程、是否强制和有效期规则。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_shift_plan_version,EXTENSION_LATER,ops_shift_plan_version,NO,YES,SHIFT_AND_WORKFORCE: 班表、工作量与工位,直接保留某地点某营业日班表每次草稿、资格校验、批准、发布或取消，不再另建空壳班表主单。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_shift_requirement,EXTENSION_LATER,ops_shift_requirement,NO,YES,SHIFT_AND_WORKFORCE: 班表、工作量与工位,明确每个时段需要的岗位、工位、人数和关键岗位属性。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ops_shift_assignment,EXTENSION_LATER,ops_shift_assignment,NO,YES,SHIFT_AND_WORKFORCE: 班表、工作量与工位,把合资格员工明确指派到班表时段、岗位和工位。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+hr_timesheet_sync_batch,DEFER_SOURCE,hr_timesheet_sync_batch,NO,YES,SOURCE_CONDITIONAL,记录一次 Lark 或其他工时来源同步的窗口、解析版本和完整性。；外部来源身份、粒度、权限和重跑契约尚未验证，当前只保留目标契约，不建正式表。,DEFER_SOURCE,NONE
+hr_timesheet_entry,DEFER_SOURCE,hr_timesheet_entry,NO,YES,SOURCE_CONDITIONAL,保存员工在地点、日期和工作区域的实际净工时原值与来源，不把班表当实际工时。；外部来源身份、粒度、权限和重跑契约尚未验证，当前只保留目标契约，不建正式表。,DEFER_SOURCE,NONE
+scm_material_unit_conversion,PHASE1_CORE_BUSINESS,scm_material_unit_conversion,YES,YES,,版本化维护某种原料或包材在采购包装、配方用量和库存基础单位之间的可审核换算。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+scm_supplier,PHASE1_CORE_BUSINESS,scm_supplier,YES,YES,,维护供应商稳定身份、采购币种、付款条件和状态。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+scm_supplier_item,PHASE1_CORE_BUSINESS,scm_supplier_item,YES,YES,,以版本行维护供应商 SKU、对应统一物料、包装换算、MOQ和商业条件；规格变化新增版本，不再拆一张一对一映射表。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+scm_supplier_item_mapping_review,EXTENSION_LATER,scm_supplier_item_mapping_review,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,处理供应商 SKU 无法唯一映射到 material_id 的候选和证据。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_inventory_count,EXTENSION_LATER,scm_inventory_count,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,记录某地点某时点的一次完整或抽样盘点及批准状态。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_inventory_count_line,EXTENSION_LATER,scm_inventory_count_line,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,保存盘点时每种原料的实盘数量、批次和效期。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_inventory_movement,EXTENSION_LATER,scm_inventory_movement,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,记录收货、领用、生产消耗、调整、报废或地点转移的一次库存事件。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_inventory_movement_line,EXTENSION_LATER,scm_inventory_movement_line,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,保存库存事件中每种原料、批号和数量。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_material_requirement_run,EXTENSION_LATER,scm_material_requirement_run,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,把已发布生产计划按生效配方展开成原料需求，并冻结输入版本。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_material_requirement_component,EXTENSION_LATER,scm_material_requirement_component,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,逐项保留需求运行中每个计划产品行展开出的一个原料贡献或一个明确质量阻断；原料总需求只从这些最细行汇总。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_replenishment_run,EXTENSION_LATER,scm_replenishment_run,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,把原料需求、可用库存、在途、安全量、MOQ和提前期转换为建议订货。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_replenishment_line,EXTENSION_LATER,scm_replenishment_line,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,保存原料建议量、批准量、库存构成、MOQ取整和调整原因。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_purchase_order_revision,EXTENSION_LATER,scm_purchase_order_revision,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,直接保留某采购单号每次草稿、审批、发送、供应商确认或取消，不再另建空壳采购主单。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_purchase_order_line,EXTENSION_LATER,scm_purchase_order_line,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,保存采购版本中已确认的供应商商品版本、订购包装数量、单位价格和来源补货行。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_goods_receipt,EXTENSION_LATER,scm_goods_receipt,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,记录针对供应商确认采购版本的一次实际到货、验收和入库。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_goods_receipt_line,EXTENSION_LATER,scm_goods_receipt_line,NO,YES,PROCUREMENT_AND_INVENTORY: 采购、库存、订货与收货,保存每个采购行的实收、拒收、批号、效期和实际价格。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+scm_supplier_price_observation,PHASE1_CORE_BUSINESS,scm_supplier_price_observation,YES,YES,,沉淀报价、PO或收货形成的原始和归一化采购价，供成本卡选择生效价格。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+cost_card_recipe_version,PHASE1_CORE_BUSINESS,cost_card_recipe_version,YES,YES,,一行冻结一个配方代码版本的名称、产出对象、批产量、生效区间、售价参考和发布状态；不再为只有版本表引用的配方另建主档。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+cost_card_recipe_component,PHASE1_CORE_BUSINESS,cost_card_recipe_component,YES,YES,,逐项保存配方版本的统一原料用量、损耗和净得率。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+cost_card_material_price,PHASE1_CORE_BUSINESS,cost_card_material_price,YES,YES,,从供应商价格观察或人工批准值中选择某地点、原料的有效成本价格。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+finance_import_batch,PHASE1_CORE_BUSINESS,finance_import_batch,YES,YES,,记录财务模板、银行文件或人工数据每次导入的文件、期间、校验值和批准状态。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+finance_sales_daily,PHASE1_CORE_BUSINESS,finance_sales_daily,YES,YES,,保存财务模板口径的门店日销售，保持与 POS 事实独立用于核对。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+finance_item_sales_monthly,PHASE1_CORE_BUSINESS,finance_item_sales_monthly,YES,YES,,保存财务模板中月度单品数量和金额，作为 POS 聚合的独立核对来源。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+finance_monthly_cost_line,PHASE1_CORE_BUSINESS,finance_monthly_cost_line,YES,YES,,用统一粒度保存材料、人工、仓运和期间费用，同时保留类别和组织来源。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+finance_cashflow_line,PHASE1_CORE_BUSINESS,finance_cashflow_line,YES,YES,,保存门店月度现金流项目和金额，不与收入或利润混用。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+finance_order_logistics_line,PHASE1_CORE_BUSINESS,finance_order_logistics_line,YES,YES,,保留财务模板中包含订货、付款、发货、到港、交付和入库日期的历史物流行。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+finance_inventory_snapshot_line,PHASE1_CORE_BUSINESS,finance_inventory_snapshot_line,YES,YES,,保存财务模板月末现存、在途、用量、规格和采购类型。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+finance_inventory_flow_line,PHASE1_CORE_BUSINESS,finance_inventory_flow_line,YES,YES,,保存财务模板按仓别的期初、入库、领用和期末数量。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+finance_supplier_purchase_monthly,PHASE1_CORE_BUSINESS,finance_supplier_purchase_monthly,YES,YES,,保存财务模板按月、供应商、物料和规格聚合的采购数量、单价和金额。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+finance_target,PHASE1_CORE_BUSINESS,finance_target,YES,YES,,保存地点、月份和指标的目标值及版本。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+finance_monthly_metric,PHASE1_CORE_BUSINESS,finance_monthly_metric,YES,YES,,保存财务模板提供的营业利润、净利润、摊销费、储值净额等标准月指标。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+finance_period_category_map,PHASE1_CORE_BUSINESS,finance_period_category_map,YES,YES,,版本化维护财务来源类别到销售、管理、财务、研发等期间费用口径的映射。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+mkt_campaign_version,PHASE1_CORE_BUSINESS,mkt_campaign_version,YES,YES,,一行冻结一个活动代码版本的名称、类型、时间窗、适用地点、参与规则、问卷算法和奖励政策；不再为只有版本表引用的活动另建主档。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+mkt_campaign_member,PHASE1_CORE_BUSINESS,mkt_campaign_member,YES,YES,,记录会员在某活动版本中的资格、邀请、开始、完成和取消历史，不再把活动状态覆盖在 pos_member 当前快照上。；人工决定、批准、状态转换或业务副作用本身就是事实，不能从最终结果倒推。,CORE_KEEP,NONE
+mkt_survey_question,PHASE1_CORE_BUSINESS,mkt_survey_question,YES,YES,,版本化保存活动问卷题目、类型、顺序和必答规则。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+mkt_survey_question_option,PHASE1_CORE_BUSINESS,mkt_survey_question_option,YES,YES,,保存选择题选项代码、文本、顺序和可选分析标签。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+mkt_survey_response,PHASE1_CORE_BUSINESS,mkt_survey_response,YES,YES,,保存会员对某活动版本的一次完整、部分或仅有历史结果锚点的问卷尝试。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+mkt_survey_answer,PHASE1_CORE_BUSINESS,mkt_survey_answer,YES,YES,,逐个原子值保存选项、评分、布尔或文本答案；多选题每个被选选项各占一行，不把多个外键塞进数组。；这是来源原值或最小业务事件，是多种派生分析的不可替代输入。,CORE_KEEP,NONE
+mkt_survey_result,PHASE1_CORE_BUSINESS,mkt_survey_result,YES,YES,,保存一次问卷作答锚点经具体算法版本计算或由历史来源迁入的 HBTI 类型及其他测评结果；历史结果可能缺少原答案，不能冒充可复算。；虽然数值可计算，但该版本曾被提出、批准或用于触发行动，历史决定本身不可从当前输入反推。,CORE_KEEP,NONE
+mkt_reward,PHASE1_CORE_BUSINESS,mkt_reward,YES,YES,,维护礼品、优惠券或权益的稳定身份。；稳定身份、有效期映射、单位换算或已发布定义无法从交易结果可靠反推。,CORE_KEEP,NONE
+mkt_reward_stock,PHASE1_CORE_BUSINESS,mkt_reward_stock,YES,YES,,保存活动版本、地点和奖励的可用、预留和已发数量。；人工决定、批准、状态转换或业务副作用本身就是事实，不能从最终结果倒推。,CORE_KEEP,NONE
+mkt_reward_claim,PHASE1_CORE_BUSINESS,mkt_reward_claim,YES,YES,,记录会员选择、预留、发放、到期或取消一份奖励的完整状态。；人工决定、批准、状态转换或业务副作用本身就是事实，不能从最终结果倒推。,CORE_KEEP,NONE
+msg_conversation,PHASE1_PLATFORM_SIDECAR,msg_conversation,YES,YES,,统一表示内部助手、候选人 WhatsApp 或会员活动的一段会话，并用类型化外键连接业务对象。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+msg_message,PHASE1_PLATFORM_SIDECAR,msg_message,YES,YES,,只追加保存会话中的入站、出站和系统消息及经过审核的正文。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+msg_conversation_state,PHASE1_PLATFORM_SIDECAR,msg_conversation_state,YES,YES,,保存招聘或助手多轮流程的当前节点、已收集参数和到期时间；完成后仍保留最终状态摘要。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+msg_outbound_message,PHASE1_PLATFORM_SIDECAR,msg_outbound_message,YES,YES,,保存待发送消息、业务推送自然键、最早发送时间、幂等键和队列状态；投递次数、最后错误和成功去重结论从投递事实派生。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+msg_delivery_attempt,PHASE1_PLATFORM_SIDECAR,msg_delivery_attempt,YES,YES,,只追加记录外发消息每次调用渠道、结果、外部消息ID和脱敏错误。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+msg_delivery_event,EXTENSION_LATER,msg_delivery_event,NO,YES,CHANNEL_RECEIPTS: 消息渠道回执,只追加保存渠道回执中的 SENT、DELIVERED、READ、FAILED 等状态变化，避免覆盖消息历史状态。；只有对应模块启用并出现真实写入者、业务副作用或处理历史时才物理实施，首期不建。,EXTENSION_LATER,NONE
+ai_prompt_segment,PHASE1_PLATFORM_SIDECAR,ai_prompt_segment,YES,YES,,一行冻结一个可复用 Prompt 片段版本的内容、变量结构和校验值；不在每个模板关联中重复复制内容。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+ai_prompt_template,PHASE1_PLATFORM_SIDECAR,ai_prompt_template,YES,YES,,一行冻结一个 AI 场景模板版本的模型、参数、输出 schema 和安全策略；不再为稳定模板头另拆版本表。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+ai_prompt_template_segment,PHASE1_PLATFORM_SIDECAR,ai_prompt_template_segment,YES,YES,,按顺序连接模板版本和已冻结片段版本，只保存组合关系及消息角色。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+ai_call,PHASE1_PLATFORM_SIDECAR,ai_call,YES,YES,,记录一次模型调用的模板版本、调用方、输入引用、输出、token、成本、延迟和验证结果。；身份权限、幂等、安全、任务恢复、审计或投递恢复需要持久技术状态；它不是业务分析表。,CORE_KEEP,NONE
+ops_calendar_import_batch,MERGE_INTO,app_job_run,NO_SEPARATE_TABLE,NO,,与 app_job_run 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,CORE_MERGE_INTO:app_job_run,NONE
+ops_production_plan,MERGE_INTO,ops_production_plan_version,NO_SEPARATE_TABLE,NO,,与 ops_production_plan_version 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,CORE_KEEP,FINAL_OVERRIDE:CORE_MERGE_INTO:ops_production_plan_version
+cost_card_recipe,MERGE_INTO,cost_card_recipe_version,NO_SEPARATE_TABLE,NO,,与 cost_card_recipe_version 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,CORE_KEEP,FINAL_OVERRIDE:CORE_MERGE_INTO:cost_card_recipe_version
+ops_plan_adjustment,MERGE_INTO,ops_production_plan_line,NO_SEPARATE_TABLE,NO,,与 ops_production_plan_line 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,CORE_MERGE_INTO:ops_production_plan_version,FINAL_OVERRIDE:CORE_MERGE_INTO:ops_production_plan_line
+hr_trial,MERGE_INTO,hr_appointment,NO_SEPARATE_TABLE,NO,,与 hr_appointment 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,CORE_MERGE_INTO:hr_appointment,NONE
+scm_supplier_item_material_mapping,MERGE_INTO,scm_supplier_item,NO_SEPARATE_TABLE,NO,,与 scm_supplier_item 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,CORE_MERGE_INTO:scm_supplier_item,NONE
+ai_prompt_template_version,MERGE_INTO,ai_prompt_template,NO_SEPARATE_TABLE,NO,,与 ai_prompt_template 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,CORE_MERGE_INTO:ai_prompt_template,NONE
+mkt_campaign,MERGE_INTO,mkt_campaign_version,NO_SEPARATE_TABLE,NO,,与 mkt_campaign_version 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,CORE_KEEP,FINAL_OVERRIDE:CORE_MERGE_INTO:mkt_campaign_version
+ops_shift_plan,MERGE_INTO,ops_shift_plan_version,NO_SEPARATE_TABLE,NO,,与 ops_shift_plan_version 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,EXTENSION_LATER,FINAL_OVERRIDE:CORE_MERGE_INTO:ops_shift_plan_version
+msg_push_deduplication,MERGE_INTO,msg_outbound_message,NO_SEPARATE_TABLE,NO,,与 msg_outbound_message 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,CORE_KEEP,FINAL_OVERRIDE:CORE_MERGE_INTO:msg_outbound_message
+scm_purchase_order,MERGE_INTO,scm_purchase_order_revision,NO_SEPARATE_TABLE,NO,,与 scm_purchase_order_revision 属于同一身份、运行或版本事实；独立表会造成一对一同步漂移。,EXTENSION_LATER,FINAL_OVERRIDE:CORE_MERGE_INTO:scm_purchase_order_revision
+ops_demand_factor_observation,DERIVE_VIEW,v_ops_holiday_factor,NO,NO,,可由更基础、版本化输入确定性重算，改由 v_ops_holiday_factor 输出。,DERIVE_VIEW,NONE
+scm_material_requirement_line,DERIVE_VIEW,v_scm_material_requirement_line,NO,NO,,可由更基础、版本化输入确定性重算，改由 v_scm_material_requirement_line 输出。,EXTENSION_LATER,FINAL_OVERRIDE:DERIVE_VIEW:v_scm_material_requirement_line
+cost_card_product_cost_snapshot,DERIVE_VIEW,v_cost_card_product_cost_snapshot,NO,NO,,可由更基础、版本化输入确定性重算，改由 v_cost_card_product_cost_snapshot 输出。,DERIVE_VIEW,NONE
+cost_card_product_cost_component,DERIVE_VIEW,v_cost_card_product_cost_component,NO,NO,,可由更基础、版本化输入确定性重算，改由 v_cost_card_product_cost_component 输出。,DERIVE_VIEW,NONE
+app_data_quality_issue,REMOVE,app_job_run,NO,NO,,跨域 entity_type/entity_id 工单会制造无外键的多态副本；质量状态由各域核对视图统一派生，若未来确需人工工单，应由独立工单系统引用 rule_code 与证据链接，不反向成为事实来源。 app_job_run 仅记录必要刷新任务，不保存成本结果。,REMOVE,NONE
+cost_card_cost_run,REMOVE,app_job_run,NO,NO,,成本完全由版本化配方、采用价与单位换算确定；刷新运行统一记录到 app_job_run。 app_job_run 仅记录必要刷新任务，不保存成本结果。,REMOVE,NONE

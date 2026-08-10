@@ -1,0 +1,349 @@
+"""Disposition of every current production table and view under Scheme C."""
+
+from __future__ import annotations
+
+from collections import Counter
+from dataclasses import asdict, dataclass
+import hashlib
+import json
+
+
+@dataclass(frozen=True)
+class Mapping:
+    current_object: str
+    object_type: str
+    disposition: str
+    target_objects: tuple[str, ...]
+    migration_rule: str
+    compatibility_rule: str
+    risk: str
+
+
+def M(name, object_type, disposition, targets, migration_rule, compatibility_rule, risk="MEDIUM"):
+    return Mapping(name, object_type, disposition, tuple(targets), migration_rule, compatibility_rule, risk)
+
+
+@dataclass(frozen=True)
+class RewardTemplateRoute:
+    """One exact source reward template route; names are not fuzzy identity keys."""
+
+    source_system: str
+    source_object: str
+    source_template: str
+    target_reward_stable_anchor: str
+    reward_type: str
+    evidence_path_lines: tuple[str, ...]
+
+
+REWARD_TEMPLATE_ALLOWLIST = (
+    RewardTemplateRoute(
+        "LEGACY_SUPABASE_PUBLIC", "public.hbti_gift_stock.template_name",
+        "HBTI Gift · White Pencil", "reward_code:HBTI_GIFT_WHITE_PENCIL", "PHYSICAL_GIFT",
+        ("bakery-ops/src/modules/data/migrations/077_hbti_gift_stock.sql:34", "hbti-web/src/content/ui.ts:152"),
+    ),
+    RewardTemplateRoute(
+        "LEGACY_SUPABASE_PUBLIC", "public.hbti_gift_stock.template_name",
+        "HBTI Gift · Red Pencil", "reward_code:HBTI_GIFT_RED_PENCIL", "PHYSICAL_GIFT",
+        ("bakery-ops/src/modules/data/migrations/077_hbti_gift_stock.sql:35", "hbti-web/src/content/ui.ts:153"),
+    ),
+    RewardTemplateRoute(
+        "LEGACY_SUPABASE_PUBLIC", "public.hbti_gift_stock.template_name",
+        "HBTI Gift · Black Pencil", "reward_code:HBTI_GIFT_BLACK_PENCIL", "PHYSICAL_GIFT",
+        ("bakery-ops/src/modules/data/migrations/077_hbti_gift_stock.sql:36", "hbti-web/src/content/ui.ts:154"),
+    ),
+    RewardTemplateRoute(
+        "LEGACY_SUPABASE_PUBLIC", "public.hbti_gift_stock.template_name",
+        "HBTI Gift · Heart Scent Card", "reward_code:HBTI_GIFT_HEART_SCENT_CARD", "PHYSICAL_GIFT",
+        ("bakery-ops/src/modules/data/migrations/077_hbti_gift_stock.sql:37", "hbti-web/src/content/ui.ts:155"),
+    ),
+    RewardTemplateRoute(
+        "LEGACY_SUPABASE_PUBLIC", "public.hbti_gift_stock.template_name",
+        "HBTI Gift · Rose Scent Card", "reward_code:HBTI_GIFT_ROSE_SCENT_CARD", "PHYSICAL_GIFT",
+        ("bakery-ops/src/modules/data/migrations/077_hbti_gift_stock.sql:38", "hbti-web/src/content/ui.ts:156"),
+    ),
+    RewardTemplateRoute(
+        "LEGACY_SUPABASE_PUBLIC", "public.hbti_gift_stock.template_name",
+        "HBTI Gift · Butterfly Scent Card", "reward_code:HBTI_GIFT_BUTTERFLY_SCENT_CARD", "PHYSICAL_GIFT",
+        ("bakery-ops/src/modules/data/migrations/077_hbti_gift_stock.sql:39", "hbti-web/src/content/ui.ts:157"),
+    ),
+    RewardTemplateRoute(
+        "LEGACY_SUPABASE_PUBLIC", "public.hbti_gift_stock.template_name",
+        "HBTI Gift · Rose Fridge Magnet", "reward_code:HBTI_GIFT_ROSE_FRIDGE_MAGNET", "PHYSICAL_GIFT",
+        ("bakery-ops/src/modules/data/migrations/077_hbti_gift_stock.sql:40", "hbti-web/src/content/ui.ts:158"),
+    ),
+    RewardTemplateRoute(
+        "LEGACY_SUPABASE_PUBLIC", "public.hbti_gift_stock.template_name",
+        "HBTI Gift · KL Fridge Magnet", "reward_code:HBTI_GIFT_KL_FRIDGE_MAGNET", "PHYSICAL_GIFT",
+        ("bakery-ops/src/modules/data/migrations/077_hbti_gift_stock.sql:41", "hbti-web/src/content/ui.ts:159"),
+    ),
+    RewardTemplateRoute(
+        "LEGACY_SUPABASE_PUBLIC", "public.hbti_gift_stock.template_name",
+        "HBTI Gift · Bow Fridge Magnet", "reward_code:HBTI_GIFT_BOW_FRIDGE_MAGNET", "PHYSICAL_GIFT",
+        ("bakery-ops/src/modules/data/migrations/077_hbti_gift_stock.sql:42", "hbti-web/src/content/ui.ts:160"),
+    ),
+    RewardTemplateRoute(
+        "RES", "RES.coupon_template.name",
+        "Pistachio Green Jewel", "reward_code:RES_COUPON_PISTACHIO_GREEN_JEWEL", "COUPON",
+        ("hbti-web/.env.example:26", "hbti-web/src/content/ui.ts:370"),
+    ),
+)
+
+
+def _canonical_sha256(value: object) -> str:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+REWARD_TEMPLATE_ALLOWLIST_PAYLOAD = tuple(asdict(route) for route in REWARD_TEMPLATE_ALLOWLIST)
+REWARD_TEMPLATE_ALLOWLIST_SHA256 = _canonical_sha256(REWARD_TEMPLATE_ALLOWLIST_PAYLOAD)
+REWARD_TEMPLATE_ALLOWLIST_EXPECTED_SHA256 = "a63668421add727e53ce259e63cc25c283e7de922e5e3db02fe210654f23b19e"
+
+COST_ITEM_SOURCE_AUDIT = {
+    "provenance": "P0c Sol read-only source audit supplied by the coordinator; this generator did not reconnect to production",
+    "source_object": "public.cost_card_item",
+    "row_count": 471,
+    "route_counts": {"PRODUCT": 99, "INGREDIENT": 190, "SEMI_FINISHED": 171, "PACKAGING": 11},
+    "product_identity_routes": {
+        "MERGE_VIA_LINK_POS_LISTING_OLD_PRODUCT_ITEM_KEY": 32,
+        "CREATE_SOURCE_KEYED_LEGACY_PRODUCT": 67,
+    },
+    "material_routes": {"INGREDIENT": 190, "SEMI_FINISHED": 171, "PACKAGING": 11},
+    "base_unit_source_counts": {"g": 372, "ea": 94, "个": 5},
+    "base_unit_approved_map": {"g": "G", "ea": "EACH", "个": "EACH"},
+    "status_source_counts": {"active": 471},
+    "source_ref_source_counts": {"mysql": 451, "manual": 14, "NULL": 6, "other": 0},
+    "unknown_item_type_policy": "BLOCK",
+    "unknown_base_unit_policy": "BLOCK",
+    "name_identity_policy": "DISPLAY_OR_ALIAS_EVIDENCE_ONLY_NEVER_MERGE",
+    "source_ref_policy": "INDEPENDENT_EVIDENCE_ONLY_NULL_STAYS_NULL",
+}
+
+COST_ITEM_SOURCE_REF_PROBE = {
+    "transaction_mode": "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY",
+    "source_project_ref": "ecsgqcmwtjmcpzqytdqw",
+    "database": "postgres",
+    "server_version_num": "170006",
+    "transaction_timestamp_utc": "2026-08-10 11:41:20.585094+00",
+    "transaction_timestamp_myt": "2026-08-10 19:41:20.585094+08",
+    "txid_current_if_assigned": None,
+    "query": "SELECT source_ref, count(*)::bigint::text AS row_count FROM public.cost_card_item GROUP BY source_ref ORDER BY source_ref NULLS FIRST",
+    "result_group_count": 466,
+    "canonicalization": "JSON.stringify array in field order {source_ref,row_count}",
+    "canonical_json_sha256": "cf1b064dbc21eb3b7552684a19f4afa68362d5f2b01e16335d0938e479585721",
+    "classified_counts": {"total": 471, "null": 6, "mysql": 451, "manual": 14, "other": 0},
+    "superseded_incorrect_oral_counts": "465/5/6",
+}
+
+COST_RECIPE_OUTPUT_AUDIT = {
+    "source_object": "public.cost_card_recipe",
+    "version_count": 289,
+    "family_count": 270,
+    "product_output": {"version_count": 104, "family_count": 99},
+    "semi_finished_output": {"version_count": 185, "family_count": 171},
+}
+
+HBTI_RESULT_ONLY_ANCHOR_CONTRACT = {
+    "uuid5_root": "7ab6debe-4d90-50e2-ab29-9873d96e848d",
+    "prefix": "migration-only:",
+    "typed_jcs_components": (
+        "mkt_survey_response", "source_system", "public.pos_member", "store",
+        "member_id", "campaign_version", "RESULT_ONLY",
+    ),
+    "attempt_no": None,
+    "response_status": "SUBMITTED",
+    "validation_result": "SOURCE_ANSWERS_UNAVAILABLE",
+    "source_observation": False,
+    "result_only_count": 6,
+    "full_fact_count": 1,
+}
+
+REWARD_SOURCE_AUDIT = {
+    "provenance": "P0c Sol read-only source audit supplied by the coordinator; this generator did not reconnect to production",
+    "reward_identity_count": 10,
+    "stock_row_count": 9,
+    "allocated_quantity": 1376,
+    "reserved_quantity": 0,
+    "redeemed_quantity": 2,
+    "damaged_quantity": 0,
+    "claim_count": 4,
+    "stock_claim_count": 1,
+    "stockless_external_fulfillment_count": 3,
+    "source_fulfillment_id_count": 4,
+    "source_fulfillment_id_unique_count": 4,
+    "confirmed_at_present_count": 4,
+    "heart_stock_claim_count": 1,
+    "pistachio_stockless_claim_count": 3,
+    "butterfly_redeemed_quantity": 1,
+    "butterfly_claim_count": 0,
+    "butterfly_reconciliation_status": "DRIFT",
+}
+
+
+def validate_source_fidelity_contracts() -> dict[str, int | str]:
+    """Fail closed on the frozen P0c routing and aggregate evidence."""
+
+    routes = COST_ITEM_SOURCE_AUDIT["route_counts"]
+    products = COST_ITEM_SOURCE_AUDIT["product_identity_routes"]
+    materials = COST_ITEM_SOURCE_AUDIT["material_routes"]
+    units = COST_ITEM_SOURCE_AUDIT["base_unit_source_counts"]
+    if sum(routes.values()) != 471:
+        raise AssertionError("cost item routes must cover 471/471 rows")
+    if routes["PRODUCT"] != 99 or sum(products.values()) != 99 or products != {
+        "MERGE_VIA_LINK_POS_LISTING_OLD_PRODUCT_ITEM_KEY": 32,
+        "CREATE_SOURCE_KEYED_LEGACY_PRODUCT": 67,
+    }:
+        raise AssertionError("cost product route must be exactly 99=32+67")
+    if sum(materials.values()) != 372 or materials != {
+        "INGREDIENT": 190, "SEMI_FINISHED": 171, "PACKAGING": 11,
+    }:
+        raise AssertionError("cost material route must be exactly 372=190+171+11")
+    if sum(units.values()) != 471 or units != {"g": 372, "ea": 94, "个": 5}:
+        raise AssertionError("cost unit evidence must cover 471/471 rows")
+    if COST_ITEM_SOURCE_AUDIT["source_ref_source_counts"] != {
+        "mysql": 451, "manual": 14, "NULL": 6, "other": 0,
+    }:
+        raise AssertionError("cost source_ref classification must remain 451/14/6/0")
+    if COST_ITEM_SOURCE_REF_PROBE["canonical_json_sha256"] != "cf1b064dbc21eb3b7552684a19f4afa68362d5f2b01e16335d0938e479585721":
+        raise AssertionError("cost source_ref read-only probe hash drifted")
+    recipe = COST_RECIPE_OUTPUT_AUDIT
+    if recipe["version_count"] != 289 or recipe["family_count"] != 270:
+        raise AssertionError("recipe totals must remain 289 versions / 270 families")
+    if recipe["product_output"] != {"version_count": 104, "family_count": 99}:
+        raise AssertionError("product recipe output split must remain 104 / 99")
+    if recipe["semi_finished_output"] != {"version_count": 185, "family_count": 171}:
+        raise AssertionError("semi-finished recipe output split must remain 185 / 171")
+    if len(REWARD_TEMPLATE_ALLOWLIST) != 10:
+        raise AssertionError("reward template allowlist must contain exactly 10 routes")
+    if REWARD_TEMPLATE_ALLOWLIST_SHA256 != REWARD_TEMPLATE_ALLOWLIST_EXPECTED_SHA256:
+        raise AssertionError("reward template allowlist changed without an explicit reviewed fixture hash update")
+    if len({route.source_template for route in REWARD_TEMPLATE_ALLOWLIST}) != 10:
+        raise AssertionError("reward template allowlist contains duplicate source templates")
+    if len({route.target_reward_stable_anchor for route in REWARD_TEMPLATE_ALLOWLIST}) != 10:
+        raise AssertionError("reward routes must resolve to exactly 10 reward identities")
+    if Counter(route.reward_type for route in REWARD_TEMPLATE_ALLOWLIST) != {
+        "PHYSICAL_GIFT": 9, "COUPON": 1,
+    }:
+        raise AssertionError("reward type allowlist must be 9 physical gifts + 1 coupon")
+    if REWARD_SOURCE_AUDIT["allocated_quantity"] != 1376:
+        raise AssertionError("legacy reward allocation must remain 1376")
+    if REWARD_SOURCE_AUDIT["redeemed_quantity"] != 2:
+        raise AssertionError("legacy stock issued count must remain 2")
+    if REWARD_SOURCE_AUDIT["claim_count"] != 4:
+        raise AssertionError("legacy reward receipt count must remain 4")
+    return {
+        "cost_item_row_count": 471,
+        "cost_product_route_count": 99,
+        "cost_material_route_count": 372,
+        "reward_template_route_count": 10,
+        "reward_template_allowlist_sha256": REWARD_TEMPLATE_ALLOWLIST_SHA256,
+        "hbti_result_only_anchor_count": 6,
+    }
+
+
+TABLE_MAPPINGS = [
+    M("ai_call_log", "table", "SPLIT_REDACT", ("ai_call",), "迁移模型、token、耗时和状态；完整prompt/response先离线PII与秘密扫描，只将批准的脱敏内容写入新库，原文加密归档后按保留期删除。", "BakeryOps先双写新ai_call；历史回放工具改读受限归档。", "HIGH"),
+    M("ai_daily_correction", "table", "MERGE", ("ops_production_plan_line", "ai_call"), "有对应计划版本和产品身份的采纳记录迁入新计划版本行的调整原因、上版计划行、AI调用和确认账号字段；无法定位版本的记录只归档为历史证据。", "旧功能关闭前提供只读兼容视图，禁止继续维护独立调整表或独立生效系数。"),
+    M("app_audit_log", "table", "MIGRATE", ("app_audit_event",), "动作、对象、before/after、请求和时间脱敏迁移；缺少actor映射时使用SERVICE/历史主体说明，不猜账号。旧 object_id 只有通过 UUID 校验才进入 object_id；非 UUID 原文放入受限迁移证据或归档，绝不伪造跨表关系。", "财务网站切换到受控审计函数；object_type/object_id 只作审计定位，不作业务连接；旧表冻结只读。", "HIGH"),
+    M("app_role", "table", "MIGRATE", ("app_role",), "按role_code迁移并与新权限字典重新审核。", "财务网站鉴权先兼容旧role_code，再切新RBAC。"),
+    M("app_session", "table", "REISSUE_NOT_MIGRATE", ("app_session",), "不迁移活动会话令牌；切换时统一失效并要求重新登录。", "切换窗口提前通知，旧会话表短期只用于撤销核查。", "HIGH"),
+    M("app_user", "table", "MIGRATE", ("app_user", "app_user_role"), "账号状态和密码哈希经算法兼容检查后迁移；role_code转换为角色关系；无法验证哈希则强制改密。", "登录接口支持一次性强制改密，不复制明文或临时密码。", "HIGH"),
+    M("app_user_role_pre083", "table", "ARCHIVE_DROP", (), "校验与现行角色分配一致后导出校验哈希并归档，不进入新库。", "无运行时兼容；确认无调用后删除。", "LOW"),
+    M("app_user_store_scope", "table", "MIGRATE_REKEY", ("app_user_role", "app_user_location_scope"), "先把 user_id 解析为账号，并为迁移时确认的具体角色建立 app_user_role；再将 finance_store 名称通过地点来源证据解析为 location_id，把 assigned_at 作为地点授权 valid_from、assigned_by 解析为 granted_by_user_id。无法唯一确认角色、地点或授权人的记录进入 BLOCKER，不按名称猜填，也不得把一个地点范围默认扩散到该账号的所有角色。", "财务网站切换后按 user_role_id + location_id 校验范围；旧接口只在已确认的一对一适配层中接受 user_id/store。", "HIGH"),
+    M("applications", "table", "MIGRATE_REKEY", ("hr_person", "hr_application", "hr_employment_source_identity"), "先按受控身份规则建立person_id，再按岗位需求和来源申请ID迁移；employee_id关联需与employment去重。", "BakeryOps招聘API在双读期返回旧字段适配层。", "HIGH"),
+    M("appointments", "table", "MIGRATE", ("hr_appointment",), "application和location身份确认后迁移预约类型、时段、状态和确认主体。", "招聘FSM切换到新appointment_id。"),
+    M("business_rule", "table", "CLASSIFY_VERSION", ("ops_business_rule", "v_ops_holiday_factor"), "先按语义分类：阈值、排除清单、包装倍数等批准政策转为有schema_version和生效期的ops_business_rule；声称来自历史销量的月/星期/事件系数只有在原始日历事件、销量样本和窗口都可重建时才由视图重新计算。无法证明的系数仅作为DRAFT遗留建议，不落成实测事实。", "设置页创建规则新版本；预测只读取ACTIVE规则和可重算的质量合格因子，禁止直接读取遗留JSON。", "HIGH"),
+    M("candidate_conversations", "table", "SPLIT", ("msg_conversation", "msg_conversation_state", "hr_application"), "手机号先映射到受限person contact；FSM状态迁入conversation_state；无法对上申请的会话隔离审核。", "招聘消息流程双写会话和状态，旧表只读。", "HIGH"),
+    M("chat_history", "table", "RETENTION_FILTER", ("msg_conversation", "msg_message"), "仅迁移仍在保留期且可映射会话的最近上下文；旧裁剪语义明确标注，不宣称完整聊天历史。", "编排器切换到msg_message最近窗口查询。"),
+    M("context_event", "table", "CLASSIFY_SPLIT", ("ops_calendar_event", "ops_operational_event"), "按来源证据将节假日类和门店突发类分开；无法分类或缺地点的记录进入质量队列。", "预测只读批准日历或确认运营事件，不再读取混合表。", "HIGH"),
+    M("cost_card_item", "table", "TYPE_SPLIT", ("ops_product", "ops_product_alias", "scm_material", "scm_material_source_identity"), "471条来源成本项目必须逐行且只走一条路：99个product=32个经cost_card_product_link.pos_item_id→POS listing→旧product.item_key独立身份链合并（不改canonical code/name/timestamp，只添alias证据）+67个按source id新建product_code=LEGACY-COST-ITEM-<id>且category_code=LEGACY_COST_CARD_UNCLASSIFIED；372个nonproduct=190 ingredient+171 semi_finished+11 packaging，全部按source id进入scm_material并建立来源身份。名称只作显示/alias证据，绝不合并；item_type只接受product/semi_finished/ingredient/packaging；base_unit实值g372/ea94/个5精确映G/EACH/EACH；active471精确映ACTIVE；source_ref只作独立证据且NULL保持NULL，经2026-08-10只读聚合核实mysql451/manual14/NULL6/other0（旧口述465/5/6错误）。门禁：471=99+372、99=32+67、372=190+171+11，每行唯一route且不得重复消费。", "财务成本卡UI重构为产品与原料两套主数据；旧item id通过迁移清单映到product/material，372条物料另有来源身份；任何未知类型、单位或多路命中都阻断。", "CRITICAL"),
+    M("cost_card_item_name_lock", "table", "RETIRE", (), "不迁移锁行；新库使用规范化唯一索引和事务级advisory lock。", "财务写入改造后删除旧锁表。", "LOW"),
+    M("cost_card_item_price", "table", "MIGRATE_REKEY", ("scm_supplier_price_observation", "cost_card_material_price"), "逐字段保留旧价格ID、原料、供应商、原始金额、币种、计价数量、计价单位、生效区间、来源、创建人和核验信息。先映射material_id、supplier_item_id、受控单位与换算证据；只有具备供应商商品证据的行才创建supplier_price_observation，无供应商行只形成price_source=MIGRATED_MANUAL的启动采用价。normalized_price_myr/normalized_unit不复制为事实，只用于重算核对；单位或汇率不明时不得进入正式成本。未来实际收货价追加新观察和新采用价区间，不覆盖启动价。", "成本API先读确定性当前价视图并影子核对；显示MIGRATED_MANUAL/ESTIMATED质量，实际收货价批准后创建新区间。", "CRITICAL"),
+    M("cost_card_product_link", "table", "REMODEL", ("pos_product_mapping", "pos_product_mapping_review", "cost_card_recipe_version"), "先把37个裸POS item引用展开为63个实际listing，再逐listing确认统一product；其中36个裸引用对应61个listing可由证据确认，item 67对应2个listing存在冲突，必须各建CONFLICT/OPEN的pos_product_mapping_review，不能取第一个。确定product后才建立pos_product_mapping；配方产出必须指向相同product。", "旧链接字段由兼容视图派生，写入端改用产品身份和配方版本；未决review不得进入成本或销售联动。", "CRITICAL"),
+    M("cost_card_product_link_pre080", "table", "ARCHIVE_DROP", (), "与现行映射和审计记录比对后加密归档，不迁入新库。", "无运行时兼容。", "LOW"),
+    M("cost_card_recipe", "table", "VERSION_IN_PLACE", ("cost_card_recipe_version",), "289条来源配方版本按item_id归为270个家族：product输出104 versions/99 families，semi_finished输出185 versions/171 families。source recipe id只通过登记source_system_id与name=public.cost_card_recipe:<id>确定性生成recipe_version_id并保存在迁移清单，绝不能冒充recipe_code。recipe_code固定为LEGACY-COST-ITEM-<item_id>；item_id恰好解析一个output_product_id或output_material_id。非空effective_from按吉隆坡00:00解释，唯一DRAFT NULL保持NULL；来源含结束日的effective_to统一加1日形成半开区间。", "财务成本API按recipe_version_id写读，旧recipe字段由兼容视图提供；104/99+185/171=289/270与版本边界必须逐行核对。", "CRITICAL"),
+    M("cost_card_recipe_item", "table", "MIGRATE_REKEY", ("cost_card_recipe_component",), "source recipe item id以登记source_system_id与name=public.cost_card_recipe_item:<id>确定性生成component_id并保存在迁移清单；recipe_id只能经source recipe清单定位version，component_item_id只能经cost item source id解析material，单位g统一解析为G。1527个组件必须全部定位，孤儿=0、环=0；缺映射或循环进入BLOCKER，不猜填。", "成本计算影子运行逐产品核对组件数、单位成本与门禁1527定位/0孤儿/0环。", "CRITICAL"),
+    M("daily_breakdown", "table", "MIGRATE", ("pos_daily_breakdown", "v_pos_daily_breakdown_current"), "date→business_date，dim_type/dim_value→受控 dimension_type/dimension_value，net_sales 原值迁移；dining 行 bill_count→quantity 且 quantity_unit='ORDER'，payment 行原 NULL 保持 NULL；ratio 不落物理列，由 current 视图按同地点/日期/维度/币种的 net_sales 分母派生。补 location_id 与 DAILY_BREAKDOWN 历史批次；无法定位批次时生成一次性迁移批次并保留证据。", "res_api改写新表；财务查询使用治理 current 视图，任何比例必须同时显示分子和分母。", "HIGH"),
+    M("daily_push_log", "table", "MERGE_QUEUE_NATURAL_KEY", ("msg_outbound_message",), "kind、recipient、date迁入外发消息的 push_kind、recipient_ref、business_date；旧成功时间与可定位发送尝试核对，不能伪造投递事件。", "调度任务按业务自然键恢复或创建同一外发消息，不再维护第二张去重确认表。"),
+    M("daily_revenue", "table", "SPLIT_BY_WRITER", ("pos_sales_day", "finance_sales_daily"), "res_api/POS来源行迁入pos_sales_day；财务模板或人工来源迁入finance_sales_daily；无法确认写者的行进入审核，绝不按值猜。", "两个写者分别切换；旧daily_revenue只读兼容视图不能接受ON CONFLICT写入。", "CRITICAL"),
+    M("daily_review", "table", "MIGRATE", ("ops_daily_review", "ops_review_action"), "manager_revenue、manager_transaction_count、manager_avg_transaction、manager_revenue_at逐列无损迁移；review_json和建议按版本化schema迁移，采纳建议能定位动作的拆为review_action。", "BakeryOps复盘流程改为草稿保存、提交冻结和新版本更正；旧数值字段继续由结构化列提供。", "HIGH"),
+    M("employee_events", "table", "MIGRATE_REKEY", ("hr_employee_event",), "employee_id先对齐employment_id，再迁移事件类型、生效日和受限说明。", "员工管理改用employment_id。"),
+    M("employees", "table", "SPLIT_IDENTITY", ("hr_person", "hr_person_contact", "hr_application", "hr_application_stage_event", "hr_employment", "hr_employee_event", "hr_employment_source_identity", "hr_employment_mapping_review"), "逐人去重后拆自然人、加密联系方式、候选申请阶段、雇佣关系和不可变人事事件；技能、语言、教育、经历和简历仅作为受限MIGRATED_PROFILE_SNAPSHOT证据承接，不伪造成稳定主档字段。与staff重叠者必须按来源ID、联系方式哈希、入职日和地点证据人工/规则确认，不能按姓名自动对齐；冲突进入专用审核表。", "BakeryOps员工接口提供旧形状适配，写入改用person/application/employment事务；受限简历字段遵守批准保留期。", "CRITICAL"),
+    M("fact_hbti_response", "table", "NORMALIZE", ("mkt_campaign_version", "mkt_campaign_member", "mkt_survey_question", "mkt_survey_response", "mkt_survey_answer", "mkt_survey_result"), "来源审计为1条完整作答和6条result-only历史。只有fact_hbti_response.answers里的真实答案可逐题展开和生成input_sha256，真实visit_time/category才分别形成Q5/Q6答案并同步进入result_dimensions；6条result-only保持0 answers、attempt_no=NULL、NULL hash、response.status=SUBMITTED、quality_status=INCOMPLETE_INPUT、algorithm_version=LEGACY_UNPERSISTED，并以SOURCE_ANSWERS_UNAVAILABLE说明验证缺口。其source_response_id是登记legacy source_system下migration-only:+UUIDv5(root 7ab6debe-4d90-50e2-ab29-9873d96e848d, typed-JCS [mkt_survey_response,source_system,public.pos_member,store,member_id,campaign_version,RESULT_ONLY])迁移锚点，迁移清单保存公式/hash/非源观察标志，不得冒充attempt。gender/age活跃迁移为0；未知活动开始时间只允许ARCHIVED且starts_at=NULL。", "HBTI先双写作答与结果，逐次核对1 full + 6 result-only、0个伪造答案、6个非来源migration anchor、result_code和真实答案input_sha256。", "HIGH"),
+    M("fact_shift", "table", "REMODEL", ("app_job_run", "ops_shift_plan_version", "ops_role", "ops_station", "ops_shift_requirement", "ops_shift_assignment", "hr_employment_mapping_review"), "将Excel行识别为计划班表而非实际工时；source_file/imported_at进入app_job_run并由source_job_run_id连接班表版本，location_id+business_date形成版本族。staff_name先映射employment_id，post/station拆标准岗位和工位；on/off按地点时区组成绝对时间，duration_h只在与跨度一致时转换为计划净分钟/休息分钟。OFF行不伪造零时长指派；当前空表若切换前出现OFF等新语义必须重新批准迁移合同。", "排班导入器改写版本化班表，不创建空壳主单；人效实际只读timesheet。", "CRITICAL"),
+    M("finance_cashflow", "table", "MIGRATE", ("finance_import_batch", "finance_cashflow_line"), "按原文件/月份重建批次并迁移项目金额；验证期初+流入-流出=期末。", "财务页面切新表并保留旧字段适配。"),
+    M("finance_expense", "table", "MERGE_TYPED", ("finance_import_batch", "finance_monthly_cost_line"), "按原导入文件重建source_layer=MANAGEMENT_REPORT或POSTED_LEDGER批次；转为cost_domain=OPERATING_EXPENSE，保存major/sub/source，并明确accounting_treatment=RECOGNIZED_EXPENSE或迁移待核对。", "财务损益查询只读v_finance_import_batch_current选中的获准批次和认可会计处理。"),
+    M("finance_expense_raw", "table", "MERGE_TYPED", ("finance_import_batch", "finance_monthly_cost_line"), "以source_layer=OPERATIONAL_TEMPLATE、recognition_status=SOURCE_ONLY重建独立批次；保留支付渠道source_label并标accounting_treatment=RAW_SOURCE，不与归口expense相加。只有财务批准的后续版本才能转为认可口径。", "兼容查询必须显式选择raw、management或posted层；默认利润表不得汇总RAW_SOURCE。", "HIGH"),
+    M("finance_item_sales", "table", "MIGRATE_REKEY", ("finance_item_sales_monthly",), "先映射location和product；未映射商品保留source_item_name并标UNMAPPED_PRODUCT。", "财务单品页切换到新表。"),
+    M("finance_labor", "table", "ARCHIVE_COMPAT", ("finance_monthly_cost_line",), "仅在finance_labor_detail缺失月份按LEGACY来源迁移；不得与明细重复加总。", "新财务页面默认不读旧口径，仅历史兜底。", "HIGH"),
+    M("finance_labor_detail", "table", "MERGE_TYPED", ("finance_import_batch", "finance_monthly_cost_line"), "转为cost_domain=LABOR，保留category/subitem/organization。", "财务人工成本页面读新月成本行。"),
+    M("finance_material", "table", "MERGE_TYPED", ("finance_import_batch", "finance_monthly_cost_line"), "转为cost_domain=MATERIAL并保留食材/包材及source。", "财务材料成本页面读新月成本行。"),
+    M("finance_order_base", "table", "MERGE_METRIC", ("finance_monthly_metric",), "迁为ORDER_BASE_AMOUNT标准月指标；保留原批次和人工校正证据。", "摊销公式改读metric_code。"),
+    M("finance_orders", "table", "MIGRATE", ("finance_order_logistics_line",), "id→source_row_ref，order_no/name/spec/category/ptype/volume→source_order_no/source_item_name/source_specification/source_category/source_purchase_type/source_volume，qty/amount 原值迁 quantity/amount，supplier 原文迁 source_supplier_name，并仅在证据唯一时解析 supplier_id；d_order/d_pay/d_ship/d_arrive/d_deliver/d_inbound 分别解析为六个日期，非法非空值阻断该行。store 必须先解析 location_id；供应商/原料只有确认映射后填ID，不伪造SCM采购单。旧 volume 未证明单位，确认前 quality_status 不得 COMPLETE。", "财务物流页切新历史事实；旧列名兼容查询只从明确目标字段投影。"),
+    M("finance_period_map", "table", "VERSION", ("finance_period_category_map",), "为当前规则补valid_from和批准主体；未命中类别进入数据质量队列。", "损益计算只读ACTIVE有效规则。"),
+    M("finance_pl_metrics", "table", "MIGRATE", ("finance_monthly_metric",), "将指标名映射到稳定metric_code；无法唯一分类的指标保留原名并标UNCLASSIFIED。", "财务利润表改读标准月指标。"),
+    M("finance_revenue_daily", "table", "MIGRATE", ("finance_import_batch", "finance_sales_daily"), "date按已确认地点营业时区解析为business_date，store只经地点来源映射解析；revenue→net_sales、gross_sales→gross_sales、total_discount→discount_amount且NULL原样保留。discount_rate不原样迁移，只由同一行discount_amount/NULLIF(gross_sales,0)派生；import_source→批次dataset/source_layer。空表也建立字段级目标契约。", "财务销售模板只写finance_sales_daily；比例只从同批原值派生。", "HIGH"),
+    M("finance_stock", "table", "MIGRATE_REKEY", ("finance_inventory_snapshot_line",), "id→source_row_ref，month→business_month（仅接受可解析月份），store→location_id，name/spec/category/ptype→source_item_name/specification/source_category/purchase_type，in_stock/in_transit/monthly_use→on_hand_quantity/in_transit_quantity/monthly_usage_quantity，unit_volume→source_unit_volume 原值。旧表没有 source_unit，不能猜单位；原料/单位未确认保持质量状态且数量不补0。", "财务库存页切新表；正式单位换算必须等来源单位确认并建立物料单位换算。"),
+    M("finance_stock_flow", "table", "MIGRATE_REKEY", ("finance_inventory_flow_line",), "仓别标准化，原料和单位映射后迁移，验证期初+入库-领用=期末。", "财务进销存查询切新表。"),
+    M("finance_store", "table", "MERGE_IDENTITY", ("ops_location", "ops_location_source_identity"), "与ops_store和POS来源证据共同建立唯一location_id；名称只能当证据。", "财务所有store参数改为location_id；保留显示名。", "CRITICAL"),
+    M("finance_supplier_orders", "table", "MIGRATE_REKEY", ("finance_supplier_purchase_monthly",), "先映射supplier/material和单位；无法映射保留来源名称并标质量问题。", "财务供应商采购页切新表。"),
+    M("finance_targets", "table", "VERSION", ("finance_target",), "每地点、月份和指标转为版本1并记录批准/来源；名称映射为metric_code。", "财务目标页创建新版本而非覆盖。"),
+    M("forecast_snapshot", "table", "REMODEL", ("ops_forecast_run", "ops_forecast_line", "ops_production_plan_version", "ops_production_plan_line"), "区分算法预测与人工/最终计划：能证明预测的迁forecast，已执行预估量迁计划版本；计划稳定身份直接使用 location_id + plan_business_date，补product和运行版本。", "BakeryOps预测和预估接口分开读写，不创建空壳计划主单。", "CRITICAL"),
+    M("hbti_auth_token", "table", "REISSUE_NOT_MIGRATE", ("app_one_time_token",), "token_hash、kind、state、attempts、payload、created_at、expires_at 全部不迁移；切换时旧令牌统一失效，只由新服务为新请求创建 app_one_time_token。不得复制旧哈希、剩余尝试次数或载荷来延长旧授权。", "HBTI链接服务在明确维护窗口切换验证入口；旧表仅短期只读用于撤销核查，过期后按保留策略清理。", "HIGH"),
+    M("hbti_gift_stock", "table", "MIGRATE_REKEY", ("mkt_reward", "mkt_reward_stock", "mkt_reward_claim", "v_mkt_reward_stock_reconciliation"), "只接受已冻结hash的10项精确奖励模板白名单：9个现有库存模板逐项映PHYSICAL_GIFT，Pistachio Green Jewel精确映COUPON，未知模板BLOCK，禁止名称模式推断。9行库存allocated=initial_stock、reserved=0、redeemed=issued_count、damaged=0，allocated合计1376、来源issued合计2。Heart receipt 1精确连接库存；3条Pistachio外部履约只连reward且reward_stock_id=NULL；Butterfly issued=1但0 receipt，核对输出DRIFT且禁止伪造claim。4个RES newCouponId唯一且confirmedAt存在，迁source_fulfillment_id与redeemed_at；reserved_at无来源证据保持NULL。", "HBTI库存扣减改为原子版本锁；库存核对只汇总reward_stock_id非空的claim，stockless外部履约不进入库存核对，REDEEMED只证明发放不证明POS消费。", "CRITICAL"),
+    M("hbti_rate_limit", "table", "EXPIRE_NOT_MIGRATE", ("app_rate_limit_event",), "不迁移已过期限流桶；切换后新请求写通用限流表。", "短期允许旧桶自然过期。", "LOW"),
+    M("holiday", "table", "SPLIT_EVIDENCE", ("app_job_run", "ops_calendar_event", "v_ops_holiday_factor"), "官方日期、名称、管辖区和来源迁日历事件，原抓取批次证据迁通用任务运行；旧倍率不作为事实迁移，只在原始销售样本和窗口可重建时由视图重算，无来源猜测仅保留为DRAFT规则或FALLBACK标记。", "预测改读v_ops_holiday_factor；日历同步统一记录app_job_run。", "HIGH"),
+    M("hourly_sales_summary", "table", "MIGRATE", ("pos_sales_hour", "v_pos_sales_hour_current"), "date+hour 按地点时区与营业日切点解析为 business_date/hour_started_at；bill_count→order_count，num_of_guests→source_guest_count，gross_sales/net_sales/total_discount→gross_sales/net_sales/discount_amount，NULL 原样保留；avg_order_net_sales 不迁物理列，由 net_sales/NULLIF(order_count,0) 派生；synced_at 只作历史 SALES_HOUR 批次完成证据。补 location_id 与批次并核对日合计。", "res_api改写新小时表；分析只读 current 视图，source_guest_count 不得标成进店客流。", "CRITICAL"),
+    M("item_hourly_sales", "table", "MIGRATE_SOURCE_FIRST", ("pos_ingest_batch", "pos_product_listing", "pos_item_sales_hour"), "date+hour按location时区和营业日切点解析为business_date/hour_started_at；qty/net_sales/gross_sales逐值迁入商品小时事实，NULL不补0，synced_at只进入批次完成血缘。有item_key行在来源命名空间解析listing；缺item_key行只有在来源证据唯一时恢复，否则创建隔离的历史未知listing并把item_name保留为source_name_snapshot，绝不按名称静默指向product。", "res_api全量与日中同步都必须写listing_id、location_id和幂等批次。", "CRITICAL"),
+    M("item_last_sale", "table", "RETIRE_DERIVED", ("ops_stockout_event",), "不迁移缓存表；需要的最后销售时刻由pos_item_sales_hour查询，确认断货事件迁入ops_stockout_event。", "断货检测改用索引查询和确认事件。"),
+    M("item_waste", "table", "MIGRATE", ("pos_item_waste", "v_pos_item_waste_current", "v_pos_item_waste_mapped"), "id 仅作迁移来源定位，date→business_date，item_key→listing_id（无法映射则阻断，不按 item_name 猜），item_name 原样迁 source_name_snapshot，waste_reason→reason_raw 并按版本规则生成 reason_code，qty→quantity，amount→source_waste_amount，store→location_id，synced_at→历史 ITEM_WASTE 批次完成证据；币种按已确认的来源数据集合同写入，不能由当前售价推算金额。试吃不默认算损失。", "res_api写新报废表；下游只读 current/mapped 视图并把来源金额与派生成本损失分开展示。", "HIGH"),
+    M("job_openings", "table", "MIGRATE", ("hr_job_requisition",), "将门店、岗位、需求人数和状态迁为正式招聘需求；缺批准信息标历史迁移。", "招聘平台同步以requisition_code为业务键。"),
+    M("offers", "table", "VERSION", ("hr_offer",), "每个申请现有Offer迁版本1；地点/岗位/薪酬受限字段映射并保留状态。", "BakeryOps改写hr_offer；不使用可更新兼容视图做ON CONFLICT。", "HIGH"),
+    M("ops_audit_log", "table", "CLASSIFY_SPLIT", ("app_job_run", "app_audit_event"), "自动skill运行转app_job_run；人工受控动作转app_audit_event；status=running长期未终态记录标质量问题。", "编排器分别写运行和审计。", "HIGH"),
+    M("ops_store", "table", "MERGE_IDENTITY", ("ops_location", "ops_location_source_identity", "ops_business_rule", "app_user", "app_user_role", "app_user_location_scope"), "store_code/name/address/area/timezone/active→location_code/location_name/address_text/area_code/timezone_name/status；pos_store_name 作为 POS 来源地点证据建立 ops_location_source_identity。manager_user_id/head_chef_user_id 先解析 app_user，再建立 STORE_MANAGER/HEAD_CHEF 的 app_user_role 与对应 user_role_id 的地点范围，不把通知负责人冒充雇佣或班次事实。interview_windows/trial_windows 分别迁为地点级 HR_INTERVIEW_WINDOWS/HR_TRIAL_WINDOWS 版本化规则并通过固定 JSON Schema 校验。字段名 lark_base_token 实际是 Lark Bitable app/base 标识而不是登录凭证，迁 LARK 地点来源映射的 source_container_id；lark_table_id 迁同一映射的 source_location_id。真实 app secret/access token 必须在密钥管理中重新配置，绝不入库。", "BakeryOps所有 store_code 外键迁 location_id；招聘时段读地点级规则；Lark客户端从已批准来源映射读取公开 Base/table 对象ID，并从部署密钥读取认证凭证。", "CRITICAL"),
+    M("out_of_stock_record", "table", "MIGRATE", ("ops_stockout_event",), "补location/listing，人工与自动识别方法分开；估损保留算法版本，无法映射产品仍保留listing。", "断货服务改写ops域确认状态；POS同步服务不写该表。"),
+    M("pos_member", "table", "SPLIT_PRIVACY", ("pos_member", "pos_member_contact", "pos_member_card", "pos_member_balance_snapshot", "v_pos_member_state_current", "mkt_campaign_member", "mkt_survey_response", "mkt_survey_result", "mkt_reward_claim"), "会员稳定身份迁 pos_member；手机号应用层加密迁受限表；卡身份拆行。以 last_snapshot_date 建立一次 MEMBER_PROFILE 历史批次，将 has_profile、level_name、growth、point_balance、lifetime_topup_amount/count、lifetime_consume_amount/count 与 balance_total/cash/gift/frozen 一起迁入同日会员状态快照。HBTI历史结果字段只作结果/奖励/验证证据：visit_time/category仅进入mkt_survey_result.result_dimensions的Q5/Q6维度，绝不制造answer；hbti_status的processing/issued/review/unrewarded不直映campaign_member/response status；result-only response固定SUBMITTED，full answers验证后才VALIDATED；完成只由hbti_completed_at+result事实证明。", "res_api只写POS会员域，HBTI只写mkt域；6条result-only使用非来源migration anchor，旧状态只作核对证据，不再双写会员主档。", "CRITICAL"),
+    M("pos_member_card_txn", "table", "MIGRATE_LOSSLESS", ("pos_member_card_transaction",), "按 source_system_id + location_id + txn_id 幂等迁移。逐列保真：txn_id→source_transaction_id，member_id/card_no→source_member_id/source_card_id并在证据唯一时解析稳定FK，txn_type→source_transaction_type_code，txn_type_label→source_transaction_type_label及批次 parser_version 下的标准 transaction_type，money_amount/gift_amount/total_amount/trade_amount 与四个前后余额、point_delta 原值保留，pos_order_no→source_pos_order_no，order_id→source_order_id，source_code→source_code。store/pos_shop_id只用于受控 location 映射；source→批次 dataset/source_system；fetched_at→批次完成血缘，不在每笔事件重复。只有来源系统、地点和来源订单ID唯一解析时才补企业 order_id。", "res_api写新交易表；UNKNOWN 类型进入质量视图，不拒绝原始事实；会员归属统一由 v_pos_order_member_attribution 派生。total_amount、trade_amount 和商品 net_sales 是三种不同口径。", "CRITICAL"),
+    M("pos_member_order_item", "table", "MIGRATE_LATEST_SNAPSHOT", ("pos_order", "pos_order_item", "v_pos_member_order_item"), "先登记 RES 来源系统并把脚本固定 shop ID 唯一映射为 location_id；按营业日建立 coverage_scope=MEMBER_FLAGGED_ONLY 的历史 pos_ingest_batch，把 source order ID 去重为 pos_order，把 item_key 解析为 listing_id 后迁 quantity、net_sales 和 business_date。当前缺少批次历史，只能标记为迁移时最新快照；3 行/2 个未接上 pos_product 的 item_key 进入 PRODUCT_MAPPING_PENDING。现有 member_id 仅作归属核验线索，不复制为目标真值；5 个多会员订单保留 AMBIGUOUS。", "RES 改为整批不可变快照写入；旧表依赖 ON CONFLICT，不能用普通兼容视图承接写入，需维护窗口切换。HBTI/报表只读 v_pos_member_order_item。", "CRITICAL"),
+    M("pos_member_daily", "table", "SPLIT", ("pos_member_daily_metric", "v_pos_member_daily_summary"), "new/consumed/recharged/points_member_count、member/total_consume_amount、topup/redeem/consume_refund/adjust 分项和门店期末余额等来源原值逐列无损迁日指标；card_payment_net、stored_value_face_net、topup_total 与两种比例只在视图按明确分母派生。门店日汇总不得伪造成会员或卡级余额快照。", "会员日报统一读 v_pos_member_daily_summary，并同时展示来源分母比率与 POS 分母比率。", "CRITICAL"),
+    M("pos_product", "table", "MIGRATE_SOURCE", ("pos_product_listing", "pos_product_mapping", "ops_product"), "逐列迁 RES 当前目录：item_key/item_id/org_id/org_type/menu_item_code→source_item_key/source_item_id/source_organization_id/source_organization_type_code/source_menu_item_code；name_en/name_zh 与 category_id/en/zh、spec、sales_price、res_status、first_seen_at/synced_at 分别迁对应 source_*、current_price、source_status_code、first_seen_at/last_seen_at；res_cost_card_id/res_spec_id/has_cost_card/res_total_cost/res_theoretical_cost 无损迁 source_cost_card_id/source_cost_spec_id/source_has_cost_card/source_total_cost/source_theoretical_cost；name_zh_display/category_display 迁显示覆盖字段。现有排产/成本证据确认后才建立 ops_product 与有效 mapping，不能把 listing 或 RES 成本观察当企业成本卡。", "res_api只写 listing 当前目录；产品主数据流程写 mapping；来源成本字段仅用于核对。", "CRITICAL"),
+    M("product", "table", "MIGRATE_MASTER", ("ops_product", "ops_business_rule", "v_pos_item_sales_day", "v_ops_timeslot_sales_baseline"), "id 只作旧来源映射证据；category/name/name_en/pack_multiple 迁企业产品主数据，unit_type batch/individual→planning_rounding_mode，cold_hot→temperature_profile_code。price/display_full_quantity/positioning/sales_ratio/target_tc/audience/break_stock_time/sort_order/time_slots 属地点敏感人工策略，整体迁为 PRODUCT_LOCATION_PLANNING_POLICY 版本的受 schema 约束 rule_value，并关联 scope_product_id；旧表不带地点，只有来源部署/导入合同唯一证明时才填 scope_location_id，不能作为企业全局默认扩散。item_key 只用于确认 POS listing 映射，不写成企业身份。avg_monday_to_thursday/avg_friday/avg_weekend/baseline_total_sales/baseline_day_count 是销售缓存，不迁物理列，由 current POS 销售按批准窗口派生；created_at/updated_at 仅在来源确实代表产品主档时间时保留。", "BakeryOps产品API改用 product_id；地点策略按发生时有效的业务规则版本读取，实际销售比例和基线只读视图，规则参考价不能当成交价。", "CRITICAL"),
+    M("product_alias", "table", "MIGRATE", ("ops_product_alias",), "别名先解析standard_name到product_id；_REMOVED_等作废记录迁为REJECTED/失效历史。", "导入匹配只用CONFIRMED别名。"),
+    M("prompt_segment", "table", "VERSION", ("ai_prompt_segment", "ai_prompt_template_segment"), "segment_key与当前内容迁为 ai_prompt_segment 的版本1并计算哈希；模板关联只保存片段版本外键、顺序和角色，不重复复制文本。", "片段内容变化新增 segment version；模板组合变化新增 template version。", "HIGH"),
+    M("prompt_template", "table", "VERSION", ("ai_prompt_template", "ai_prompt_template_segment"), "template_key、版本号、模型参数、输出schema和安全策略合并为一条不可变模板版本行；片段顺序另存关系表。补齐安全与输出契约后才能ACTIVE。", "AI调用必须记录具体prompt_template_id；创建新版本而不是覆盖旧行。", "HIGH"),
+    M("schema_migrations", "table", "REKEY", ("app_schema_migration",), "按文件证据补repository_code、filename和checksum；25条缺文件/校验的记录逐条核实，冲突版本不得猜归属。", "四个仓库使用(repository_code,migration_version)唯一键。", "CRITICAL"),
+    M("screening_rules", "table", "REVIEW_MIGRATE", ("hr_screening_rule",), "全部规则重新做样本、歧视风险和人工批准审查；未批准迁DRAFT，绝不直接ACTIVE。", "招聘流程只展示ACTIVE风险提示，不自动拒绝。", "HIGH"),
+    M("session_state", "table", "MIGRATE_ACTIVE_ONLY", ("msg_conversation", "msg_conversation_state"), "仅迁仍有效且可定位会话的状态；过期或无会话状态不迁，保留统计摘要。", "编排器切新状态表。"),
+    M("staff", "table", "SPLIT_IDENTITY", ("hr_person", "hr_person_contact", "hr_employment", "hr_employment_source_identity", "hr_employment_mapping_review", "app_user", "app_user_role", "app_user_location_scope"), "与employees逐人对账后建立person/employment；WhatsApp/Lark标识进入带source_system_id的来源身份，只有来源ID、雇佣期间、地点等证据一致后才确认。role/permissions必须经批准RBAC映射为具体user_role，store_ids再绑定该user_role；不复制自由权限。subscriptions作为账号当前消息偏好代码迁入app_user并经注册表校验。重名、再入职或多来源冲突不得按姓名自动合并。", "班表和工时只用employment_id；通知按app_user.notification_subscription_codes，权限按user_role+location_scope；未确认员工映射进入BLOCKER。", "CRITICAL"),
+    M("trials", "table", "MERGE_SPLIT", ("hr_appointment", "hr_assessment", "hr_assessment_score"), "试工预约与实际开始/结束、结果、安全事件合并到appointment；评分总览和评分项拆assessment。缺评分项模板时保留总分并标历史。", "招聘流程用appointment承接试工执行，用assessment承接评价，不再维护重复trial主表。"),
+    M("wa_outbound_queue", "table", "MIGRATE_ACTIVE_ONLY", ("msg_outbound_message",), "仅迁未过期queued记录；手机号转换为受控contact/recipient引用；失败历史不作为待发重试。", "WhatsApp worker切新队列和幂等键。", "HIGH"),
+    M("wa_send_log", "table", "MIGRATE_SUMMARY", ("msg_outbound_message", "msg_delivery_attempt", "msg_delivery_event"), "有业务幂等键的记录先对齐外发消息；发送尝试迁attempt；有渠道事件ID和发生时间的送达/已读/失败状态迁不可变delivery_event。成功业务推送由外发消息自然键和投递事实派生，其余只按天计数归档，不伪造正文或状态时间。", "当前送达状态与推送成功去重结论均由治理视图派生；限额由投递尝试汇总，不保留手机号散列之外的冗余。"),
+]
+
+
+VIEW_MAPPINGS = [
+    M("daily_sales_record", "view", "REBUILD_VIEW", ("v_pos_item_sales_day",), "以新商品小时事实和有效产品映射重建。", "在调用方切换期提供旧列名兼容视图。"),
+    M("product_material_cost", "view", "REBUILD_VIEW", ("v_cost_card_product_cost_quality",), "从产品日成本质量视图派生旧列名，并显式携带quality_status。", "BakeryOps复盘先适配新字段，再移除兼容视图。"),
+    M("timeslot_sales_record", "view", "REBUILD_VIEW", ("v_ops_timeslot_sales_baseline",), "用location/product和批准滚动窗口重建。", "预测调用改用稳定ID。"),
+    M("v_cost_card_current_cost", "view", "REBUILD_VIEW", ("v_cost_card_product_cost_quality",), "从不可变产品成本快照选择目标日成本。", "财务成本页面切新视图。"),
+    M("v_cost_card_data_quality", "view", "REBUILD_VIEW", ("v_cost_card_product_cost_quality", "v_app_data_quality_summary"), "将成本覆盖和问题队列合并展示。", "旧字段兼容后逐步下线。"),
+    M("v_cost_card_price_current_normalized", "view", "REBUILD_VIEW", ("v_cost_card_material_price_current",), "从当前成本采用价重建。", "成本计算切新视图。"),
+    M("v_cost_card_recipe_expanded", "view", "REBUILD_VIEW", ("v_cost_card_recipe_expanded",), "用统一material_id和版本化配方递归展开，并检测循环。", "成本与MRP共用同一展开视图。", "HIGH"),
+    M("v_daily_margin", "view", "REBUILD_VIEW", ("v_cost_card_daily_margin",), "按location/business_date汇总产品毛利并同时展示总覆盖和可信覆盖。", "管理页面必须连同覆盖率显示。"),
+    M("v_forecast_accuracy", "view", "REBUILD_VIEW", ("v_ops_forecast_accuracy",), "用forecast_run/product/location与治理销售事实重建。", "BakeryOps报表切新视图。"),
+    M("v_holiday_factor", "view", "REBUILD_VIEW", ("v_ops_holiday_factor",), "仅选择有来源和质量状态的需求因子，兜底明确标FALLBACK。", "预测引擎读取factor_source。"),
+    M("v_identity_gap", "view", "REBUILD_VIEW", ("v_identity_mapping_gap",), "覆盖地点、商品、人员、原料四类映射缺口及业务影响。", "质量看板切新视图。"),
+    M("v_item_cost_quality", "view", "REBUILD_VIEW", ("v_cost_card_product_cost_quality",), "按location/date/product展示组件和价格覆盖。", "定价和毛利页面切新视图。"),
+    M("v_item_daily_pulse", "view", "REBUILD_VIEW", ("v_ops_item_daily_pulse",), "连接已发布计划、实际生产、配送、销售、报废、断货和质量状态。", "复盘页切新视图。"),
+    M("v_item_sales_keyed", "view", "RETIRE_NAME_RECOVERY", ("v_pos_item_sales_day",), "不再按英文名回补item_key；所有事实必须有listing_id，未映射product保留NULL并入审核。", "调用方改读listing/product映射质量。", "HIGH"),
+    M("v_item_waste_keyed", "view", "REBUILD_VIEW", ("v_pos_item_waste_mapped",), "按发生时点有效listing映射补product_id，不按名称猜。", "复盘和成本损失读取新视图。"),
+    M("v_labor_productivity", "view", "REBUILD_VIEW", ("v_ops_labor_productivity",), "按location/business_date连接实际工时和POS净销售。", "不输出未经批准的产品级人工成本。"),
+    M("v_pos_item_by_name", "view", "RETIRE", (), "名称仅用于候选审核，不再输出名称到唯一item_key的伪权威视图。", "所有调用改用listing_id或确认mapping。", "HIGH"),
+    M("v_product_identity", "view", "REBUILD_VIEW", ("v_product_identity",), "以listing为全集并使用有有效期的确认映射。", "旧列名可短期兼容。"),
+    M("v_revenue_manager_vs_pos", "view", "REBUILD_VIEW", ("v_ops_manager_sales_reconciliation",), "从复盘人工输入和POS事实核对，不让任何一侧覆盖另一侧。", "复盘页切新视图。"),
+    M("v_revenue_reconciliation", "view", "REBUILD_VIEW", ("v_pos_revenue_reconciliation",), "按location/date核对日、小时和商品三种POS粒度。", "抓取监控切新视图。"),
+    M("v_shift_by_post", "view", "REBUILD_VIEW", ("v_ops_shift_by_role",), "按标准role_id汇总计划与实际工时，不再截取自由文本post第一段。", "班表报表切新岗位视图。"),
+]
+
+
+MAPPINGS = TABLE_MAPPINGS + VIEW_MAPPINGS
+MAPPING_BY_NAME = {item.current_object: item for item in MAPPINGS}

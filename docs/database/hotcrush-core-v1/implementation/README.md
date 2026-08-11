@@ -147,7 +147,10 @@ shown above.
 - No SQL in this directory has been executed against the source or green
   Supabase project.
 - No application has switched databases.
-- No view or ETL/backfill is included.
+- No target view or production ETL/backfill is included. The `etl/` directory
+  contains a frozen 76-table/759-field contract and an offline synthetic safety
+  scaffold only; its release state is `PHYSICAL_BACKFILL_NOT_STARTED`, its
+  handler registry is empty, and it cannot accept a database adapter.
 - Historical cost, HBTI and reward source fidelity is not yet proven. Their
   data phase requires an S0-deidentified row-level routing ledger and an actual
   canonical-payload reconciliation.

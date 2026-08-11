@@ -49,6 +49,11 @@ const TRANSACTION_OPTIONS = Object.freeze({
   isolationLevel: "SERIALIZABLE",
   readOnly: true,
 });
+const RAW_SOURCE_CAPTURE_RUNTIME_ADDENDUM = Object.freeze({
+  schema: "hotcrush.r6.raw-source-runtime-addendum.v1",
+  session_settings: Object.freeze({ statement_timeout: "0" }),
+});
+const STATEMENT_TIMEOUT_SQL = "SET LOCAL \"statement_timeout\" = '0'";
 const SESSION_STATEMENTS = Object.freeze([
   Object.freeze(["DateStyle", "ISO, YMD", "SET LOCAL \"DateStyle\" = 'ISO, YMD'"]),
   Object.freeze(["IntervalStyle", "iso_8601", "SET LOCAL \"IntervalStyle\" = 'iso_8601'"]),
@@ -109,6 +114,7 @@ const RUNTIME_SQL = `SELECT
   pg_catalog.current_setting('TimeZone') AS time_zone,
   pg_catalog.current_setting('bytea_output') AS bytea_output,
   pg_catalog.current_setting('extra_float_digits') AS extra_float_digits,
+  pg_catalog.current_setting('statement_timeout') AS statement_timeout,
   pg_catalog.pg_current_wal_lsn()::text AS source_wal_lsn,
   pg_catalog.to_char(
     pg_catalog.transaction_timestamp(),
@@ -336,7 +342,7 @@ export function validateSourceMvccSnapshot(value) {
 
 function validateRuntime(contract, rows) {
   if (!Array.isArray(rows) || rows.length !== 1) throw new TypeError("source_runtime_drift");
-  const values = rawRow(rows[0], 14, "source_runtime_drift");
+  const values = rawRow(rows[0], 15, "source_runtime_drift");
   const [
     serverVersion,
     isolationLevel,
@@ -347,6 +353,7 @@ function validateRuntime(contract, rows) {
     timeZone,
     byteaOutput,
     extraFloatDigits,
+    statementTimeout,
     sourceWalLsn,
     sourceTransactionTimestamp,
     sourceMvccSnapshot,
@@ -359,6 +366,8 @@ function validateRuntime(contract, rows) {
       dateStyle !== expectedSettings.DateStyle || intervalStyle !== expectedSettings.IntervalStyle ||
       timeZone !== expectedSettings.TimeZone || byteaOutput !== expectedSettings.bytea_output ||
       extraFloatDigits !== expectedSettings.extra_float_digits ||
+      statementTimeout !==
+        RAW_SOURCE_CAPTURE_RUNTIME_ADDENDUM.session_settings.statement_timeout ||
       sourceDatabase !== "postgres" || sourceIsInRecovery !== "f" ||
       !/^[0-9A-F]+\/[0-9A-F]+$/.test(sourceWalLsn) ||
       !/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$/.test(
@@ -378,6 +387,10 @@ function validateRuntime(contract, rows) {
       TimeZone: timeZone,
       bytea_output: byteaOutput,
       extra_float_digits: extraFloatDigits,
+    }),
+    runtime_addendum: Object.freeze({
+      schema: RAW_SOURCE_CAPTURE_RUNTIME_ADDENDUM.schema,
+      session_settings: Object.freeze({ statement_timeout: statementTimeout }),
     }),
     source_watermark: Object.freeze({
       source_transaction_timestamp: sourceTransactionTimestamp,
@@ -445,6 +458,9 @@ export async function captureSourceSnapshot({
       captureContract.writes_to_source !== false || captureContract.lock_order.length !== 76) {
     throw new TypeError("source_capture_contract_drift");
   }
+  if (Object.hasOwn(captureContract.session_settings, "statement_timeout")) {
+    throw new TypeError("source_capture_contract_drift");
+  }
   let connector;
   let operationError;
   let result;
@@ -458,6 +474,7 @@ export async function captureSourceSnapshot({
       if (!transaction || typeof transaction.query !== "function" || typeof transaction.stream !== "function") {
         throw new TypeError("invalid_source_transaction");
       }
+      await transaction.query(STATEMENT_TIMEOUT_SQL, []);
       for (const [name, expected, sql] of SESSION_STATEMENTS) {
         if (captureContract.session_settings[name] !== expected) {
           throw new TypeError("source_capture_contract_drift");
@@ -490,6 +507,7 @@ export async function captureSourceSnapshot({
         deferrable: true,
         isolation_level: "SERIALIZABLE",
         read_only: true,
+        runtime_addendum: runtime.runtime_addendum,
         server_version: runtime.server_version,
         session_settings: runtime.session_settings,
         source_database: runtime.source_database,
@@ -517,6 +535,7 @@ export async function captureSourceSnapshot({
       return Object.freeze({
         catalogSha256,
         contractSha256: logicalContractHash,
+        runtimeAddendum: runtime.runtime_addendum,
         sourceDatabase: runtime.source_database,
         sourceIsInRecovery: runtime.source_is_in_recovery,
         mvccSnapshot: runtime.source_mvcc_snapshot,
@@ -707,6 +726,7 @@ export function loadSourceDsnFromMacOSKeychain({ execFileImpl = nodeExecFile } =
 }
 
 export {
+  RAW_SOURCE_CAPTURE_RUNTIME_ADDENDUM,
   SOURCE_CURSOR_BATCH_SIZE,
   SOURCE_CAPTURE_INCIDENT_BOUNDARY,
   SOURCE_DSN_KEYCHAIN,

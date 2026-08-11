@@ -20,6 +20,7 @@ import { canonicalizeJcs, sha256Hex } from "../etl/lib/canonical.mjs";
 import { loadMigrationContract } from "../etl/lib/contract.mjs";
 import { verifyStreamingEncryptedArtifact } from "../etl/lib/envelope-stream.mjs";
 import {
+  RAW_SOURCE_CAPTURE_RUNTIME_ADDENDUM,
   SOURCE_DSN_KEYCHAIN,
   SOURCE_CAPTURE_INCIDENT_BOUNDARY,
   SOURCE_PROJECT_REF,
@@ -53,6 +54,10 @@ const KEYRING = {
   hmacKeyId: "fixture-hmac-v1",
   hmacKey: Buffer.alloc(32, 0x42),
 };
+const EXPECTED_RAW_RUNTIME_ADDENDUM = Object.freeze({
+  schema: "hotcrush.r6.raw-source-runtime-addendum.v1",
+  session_settings: Object.freeze({ statement_timeout: "0" }),
+});
 
 function wire(value) {
   return value === null ? null : Buffer.from(String(value), "utf8");
@@ -178,6 +183,7 @@ function runtimeRow(
   mvccSnapshot = "700:700:",
   databaseName = "postgres",
   inRecovery = false,
+  statementTimeout = "0",
 ) {
   return [[
     wire(version),
@@ -189,6 +195,7 @@ function runtimeRow(
     wire("UTC"),
     wire("hex"),
     wire("3"),
+    wire(statementTimeout),
     wire("0/16B6C50"),
     wire(transactionTimestamp),
     wire(mvccSnapshot),
@@ -213,6 +220,7 @@ function fakeSource(contract, {
   mvccSnapshot = "700:700:",
   databaseName = "postgres",
   inRecovery = false,
+  reportedStatementTimeout = null,
   tableRows = null,
 } = {}) {
   const state = {
@@ -221,6 +229,7 @@ function fakeSource(contract, {
     openCalls: 0,
     queries: [],
     streams: [],
+    statementTimeout: "2min",
     transactionOptions: null,
   };
   const rowsByTable = tableRows ?? new Map([
@@ -238,6 +247,10 @@ function fakeSource(contract, {
   const transaction = {
     async query(sql, parameters = []) {
       state.queries.push({ parameters: structuredClone(parameters), sql });
+      if (sql === "SET LOCAL \"statement_timeout\" = '0'") {
+        state.statementTimeout = "0";
+        return [];
+      }
       if (sql.startsWith("SET LOCAL ") || sql.startsWith("LOCK TABLE ")) return [];
       if (sql.includes("FROM pg_catalog.pg_constraint")) return liveConstraints;
       if (sql.includes("pg_get_viewdef")) return liveViewDefinitions;
@@ -249,6 +262,7 @@ function fakeSource(contract, {
           mvccSnapshot,
           databaseName,
           inRecovery,
+          reportedStatementTimeout ?? state.statementTimeout,
         );
       }
       throw new Error("unexpected_fake_query");
@@ -315,7 +329,7 @@ function assertPublicManifestShape(manifest) {
   const serialized = canonicalizeJcs(manifest).toString("utf8");
   assert.doesNotMatch(
     serialized,
-    /content_sha256|ecsgqcmwtjmcpzqytdqw|postgres(?:ql)?:|password|filename|path|table_sha256|hmac|commitment|mvcc|snapshot/i,
+    /content_sha256|ecsgqcmwtjmcpzqytdqw|postgres(?:ql)?:|password|filename|path|table_sha256|hmac|commitment|mvcc|snapshot|statement_timeout|runtime_addendum/i,
   );
 }
 
@@ -445,9 +459,17 @@ test("raw MVCC snapshot evidence accepts only canonical closed pg_snapshot text"
 
 test("explicit raw capture locks and revalidates the exact source before 76 streaming projections", async () => {
   const contract = await loadMigrationContract();
+  assert.equal(
+    Object.hasOwn(contract.source_capture_contract.session_settings, "statement_timeout"),
+    false,
+  );
+  assert.deepEqual(RAW_SOURCE_CAPTURE_RUNTIME_ADDENDUM, EXPECTED_RAW_RUNTIME_ADDENDUM);
+  assert.equal(Object.isFrozen(RAW_SOURCE_CAPTURE_RUNTIME_ADDENDUM), true);
+  assert.equal(Object.isFrozen(RAW_SOURCE_CAPTURE_RUNTIME_ADDENDUM.session_settings), true);
   const directory = await mkdtemp(path.join(os.tmpdir(), "hc-r6-source-raw-"));
   await mkdir(path.join(directory, ".raw-partial-stale"), { mode: 0o700 });
   const fake = fakeSource(contract);
+  assert.equal(fake.state.statementTimeout, "2min");
 
   const manifest = await exportEncryptedRawSourceCapture({
     contract,
@@ -480,12 +502,15 @@ test("explicit raw capture locks and revalidates the exact source before 76 stre
 
   const settings = fake.state.queries.filter((entry) => entry.sql.startsWith("SET LOCAL "));
   assert.deepEqual(settings.map((entry) => entry.sql), [
+    "SET LOCAL \"statement_timeout\" = '0'",
     "SET LOCAL \"DateStyle\" = 'ISO, YMD'",
     "SET LOCAL \"IntervalStyle\" = 'iso_8601'",
     "SET LOCAL \"TimeZone\" = 'UTC'",
     "SET LOCAL \"bytea_output\" = 'hex'",
     "SET LOCAL \"extra_float_digits\" = '3'",
   ]);
+  assert.equal(fake.state.queries[0].sql, "SET LOCAL \"statement_timeout\" = '0'");
+  assert.equal(fake.state.statementTimeout, "0");
   const lock = fake.state.queries.find((entry) => entry.sql.startsWith("LOCK TABLE "));
   assert.ok(lock);
   assert.match(lock.sql, / IN ACCESS SHARE MODE$/);
@@ -512,6 +537,10 @@ test("explicit raw capture locks and revalidates the exact source before 76 stre
   assert.deepEqual(fake.state.queries[viewDefinitionIndex].parameters, ["public"]);
   assert.match(fake.state.queries[runtimeIndex].sql, /pg_catalog\.current_database\(\)/);
   assert.match(fake.state.queries[runtimeIndex].sql, /pg_catalog\.pg_is_in_recovery\(\)/);
+  assert.match(
+    fake.state.queries[runtimeIndex].sql,
+    /pg_catalog\.current_setting\('statement_timeout'\)/,
+  );
   assert.equal(fake.state.streams.length, 76);
   assert.ok(fake.state.streams.every((entry) => entry.batchSize === 128));
   assert.ok(fake.state.streams.every((entry) => entry.parameters.length === 0));
@@ -588,6 +617,7 @@ test("explicit raw capture locks and revalidates the exact source before 76 stre
   assert.equal(privateManifest.source_mvcc_snapshot, "700:700:");
   assert.equal(privateManifest.source_database, "postgres");
   assert.equal(privateManifest.source_is_in_recovery, false);
+  assert.deepEqual(privateManifest.source_runtime_addendum, EXPECTED_RAW_RUNTIME_ADDENDUM);
   assert.doesNotThrow(() => verifyRawHmacKeyCommitment({
     captureSha256: privateManifest.capture_sha256,
     commitment: privateManifest.hmac_key_commitment,
@@ -727,7 +757,7 @@ test("column, identity, view-definition, and stream drift fail closed before pub
   await rm(cleanupFailureDirectory, { force: true, recursive: true });
 });
 
-test("runtime, database, and recovery drift fail before any table query or unsafe connect", async () => {
+test("runtime addendum, database, and recovery drift fail before any table query or unsafe connect", async () => {
   const contract = await loadMigrationContract();
   const directory = await mkdtemp(path.join(os.tmpdir(), "hc-r6-version-drift-"));
   const fake = fakeSource(contract, { runtimeVersion: "17.5" });
@@ -779,6 +809,7 @@ test("runtime, database, and recovery drift fail before any table query or unsaf
   for (const [label, options] of [
     ["wrong-database", { databaseName: "template1" }],
     ["recovery", { inRecovery: true }],
+    ["statement-timeout", { reportedStatementTimeout: "2min" }],
   ]) {
     const runtimeDirectory = await mkdtemp(path.join(os.tmpdir(), `hc-r6-${label}-`));
     const runtime = fakeSource(contract, options);
@@ -906,7 +937,7 @@ test("source DSN provider is fixed, read-only, no-shell, and redacts Keychain fa
 });
 
 const localFixtureUrl = process.env.HOTCRUSH_R6_PG17_READONLY_FIXTURE_URL;
-test("optional local PG17.6 fixture accepts the exact read-only deferrable transaction", {
+test("optional local PG17.6 fixture clears inherited 2min timeout in the read-only transaction", {
   skip: !localFixtureUrl,
 }, async () => {
   const parsed = new URL(localFixtureUrl);
@@ -920,7 +951,13 @@ test("optional local PG17.6 fixture accepts the exact read-only deferrable trans
     ssl: false,
   });
   try {
+    await sql.unsafe("SET statement_timeout = '2min'");
+    const [[inheritedStatementTimeout]] = await sql.unsafe(
+      "SELECT pg_catalog.current_setting('statement_timeout')",
+    ).raw();
+    assert.equal(inheritedStatementTimeout.toString("utf8"), "2min");
     await sql.begin("ISOLATION LEVEL SERIALIZABLE READ ONLY DEFERRABLE", async (tx) => {
+      await tx.unsafe("SET LOCAL \"statement_timeout\" = '0'");
       await tx.unsafe("SET LOCAL \"DateStyle\" = 'ISO, YMD'");
       await tx.unsafe("SET LOCAL \"IntervalStyle\" = 'iso_8601'");
       await tx.unsafe("SET LOCAL \"TimeZone\" = 'UTC'");
@@ -937,6 +974,7 @@ test("optional local PG17.6 fixture accepts the exact read-only deferrable trans
         pg_catalog.current_setting('TimeZone') AS time_zone,
         pg_catalog.current_setting('bytea_output') AS bytea_output,
         pg_catalog.current_setting('extra_float_digits') AS extra_float_digits,
+        pg_catalog.current_setting('statement_timeout') AS statement_timeout,
         pg_catalog.pg_current_wal_lsn()::text AS source_wal_lsn,
         pg_catalog.to_char(
           pg_catalog.transaction_timestamp(),
@@ -947,17 +985,21 @@ test("optional local PG17.6 fixture accepts the exact read-only deferrable trans
         CASE WHEN pg_catalog.pg_is_in_recovery() THEN 't' ELSE 'f' END
           AS source_is_in_recovery`).raw();
       const values = row.map((value) => value.toString("utf8"));
-      assert.deepEqual(values.slice(0, 9), [
-        "17.6", "serializable", "on", "on", "ISO, YMD", "iso_8601", "UTC", "hex", "3",
+      assert.deepEqual(values.slice(0, 10), [
+        "17.6", "serializable", "on", "on", "ISO, YMD", "iso_8601", "UTC", "hex", "3", "0",
       ]);
-      assert.match(values[9], /^[0-9A-F]+\/[0-9A-F]+$/);
-      assert.match(values[10], /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$/);
-      assert.ok(values[10] > SOURCE_CAPTURE_INCIDENT_BOUNDARY);
-      assert.match(values[11], /^(?:0|[1-9][0-9]*):(?:0|[1-9][0-9]*):(?:[0-9]+(?:,[0-9]+)*)?$/);
-      assert.equal(validateSourceMvccSnapshot(values[11]), values[11]);
-      assert.equal(values[12], "postgres");
-      assert.equal(values[13], "f");
+      assert.match(values[10], /^[0-9A-F]+\/[0-9A-F]+$/);
+      assert.match(values[11], /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$/);
+      assert.ok(values[11] > SOURCE_CAPTURE_INCIDENT_BOUNDARY);
+      assert.match(values[12], /^(?:0|[1-9][0-9]*):(?:0|[1-9][0-9]*):(?:[0-9]+(?:,[0-9]+)*)?$/);
+      assert.equal(validateSourceMvccSnapshot(values[12]), values[12]);
+      assert.equal(values[13], "postgres");
+      assert.equal(values[14], "f");
     });
+    const [[restoredStatementTimeout]] = await sql.unsafe(
+      "SELECT pg_catalog.current_setting('statement_timeout')",
+    ).raw();
+    assert.equal(restoredStatementTimeout.toString("utf8"), "2min");
   } finally {
     await sql.end({ timeout: 5 });
   }

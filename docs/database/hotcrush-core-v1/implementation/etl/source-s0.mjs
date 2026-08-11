@@ -351,6 +351,7 @@ export async function exportEncryptedRawSourceCapture({
       source_database: captured.sourceDatabase,
       source_is_in_recovery: captured.sourceIsInRecovery,
       source_mvcc_snapshot: captured.mvccSnapshot,
+      source_runtime_addendum: captured.runtimeAddendum,
       status: RAW_CAPTURE_STATUS,
       target_load_allowed: false,
       watermark: captured.watermark,

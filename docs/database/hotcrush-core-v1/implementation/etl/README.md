@@ -53,9 +53,10 @@ all 76 base tables, exact projection of 759 columns, fixed session settings,
 schema revalidation after locking, TLS verification and closing the source
 connection before any target connection. The historically named
 `source-s0.mjs` now implements only an encrypted raw-source capture path. It is
-inert unless `--capture-encrypted-raw` is present and it has not been run
-against the source. It contains no production S0 builder/reader, target
-connector, handler or DML path, so this capability does not change
+inert unless `--capture-encrypted-raw` is present. The first remote read-only
+attempt failed safely with no completed capture and no retained partial
+directory. It contains no production S0 builder/reader, target connector,
+handler or DML path, so this capability does not change
 `PHYSICAL_BACKFILL_NOT_STARTED`.
 
 The target catalog must retain fingerprint
@@ -100,7 +101,7 @@ AES-256-GCM stream per table, with an independent random DEK, and verifies a
 file's complete authentication tag before accepting it. Measured live
 size/runtime acceptance and any raw-to-S0 conversion remain outstanding.
 
-## Encrypted raw source capture only (implemented, never run)
+## Encrypted raw source capture only (implemented, no completed capture)
 
 This is deliberately **not** a production S0. Its encrypted frames do not
 compute the domain-separated HMAC source occurrence tokens, duplicate
@@ -145,16 +146,30 @@ TLS trust is pinned to the public Supabase Root 2021 CA (SHA-256 fingerprint
 `80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA`),
 whose validity is checked before opening the single connection.
 
-Inside one `SERIALIZABLE READ ONLY DEFERRABLE` transaction the raw capture applies
-the five frozen session settings, locks all 76 named tables in the contract's
-order, then revalidates the exact 76-table/759-column `relkind=r` surface and
-the exact named/ordered PK and unique constraints plus all 21 denied view
-definitions. It reads view definitions only from `pg_catalog` and never selects
-from a registered view. Each table query lists every contracted column and uses
-a deterministic identity order; raw PostgreSQL wire text is framed and
-encrypted incrementally without a plaintext application file. There is no
-`COPY`, temporary object, source write, function/DDL creation, target connection
-or handler execution.
+The base migration contract and its hash remain unchanged. The raw path carries
+a separate frozen `hotcrush.r6.raw-source-runtime-addendum.v1` containing only
+`statement_timeout: "0"`. The source session was observed to inherit the exact
+value `2min`; the first remote attempt therefore reached table 53,
+`item_hourly_sales`, before PostgreSQL cancelled the query with SQLSTATE `57014`.
+Its first query inside the same `SERIALIZABLE READ ONLY DEFERRABLE` transaction
+is now exactly `SET LOCAL "statement_timeout" = '0'`, before any lock, catalog
+or table query. Runtime validation then requires
+`pg_catalog.current_setting('statement_timeout') = '0'`. The actual validated
+addendum is included in `snapshot_sha256` and retained in the encrypted private
+manifest; it is absent from the public receipt. This disables PostgreSQL's
+inherited per-statement deadline only for that transaction. It does not weaken
+the single-snapshot, read-only, lock or schema gates, and does not guarantee
+completion against connection, operator or server failures.
+
+The transaction also applies the five frozen base session settings, locks all
+76 named tables in the contract's order, then revalidates the exact
+76-table/759-column `relkind=r` surface and the exact named/ordered PK and unique
+constraints plus all 21 denied view definitions. It reads view definitions only
+from `pg_catalog` and never selects from a registered view. Each table query
+lists every contracted column and uses a deterministic identity order; raw
+PostgreSQL wire text is framed and encrypted incrementally without a plaintext
+application file. There is no `COPY`, temporary object, source write,
+function/DDL creation, target connection or handler execution.
 
 The same locked transaction also requires
 `pg_catalog.current_database() = 'postgres'` and

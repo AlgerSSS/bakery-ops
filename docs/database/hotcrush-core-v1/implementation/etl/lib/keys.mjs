@@ -18,15 +18,32 @@ function copyKey(value, name) {
   return Buffer.from(value);
 }
 
+function wipeBuffer(value) {
+  if (!Buffer.isBuffer(value)) return;
+  try {
+    value.fill(0);
+  } catch {
+    // Cleanup is best-effort and must never replace the validation/read error.
+  }
+}
+
 export function validateKeyring(input) {
   if (!input || typeof input !== "object") throw new TypeError("invalid_keyring");
-  const kek = copyKey(input.kek, "kek");
-  const hmacKey = copyKey(input.hmacKey, "hmac_key");
-  if (typeof input.kekId !== "string" || typeof input.hmacKeyId !== "string") {
-    throw new TypeError("invalid_key_id");
+  let kek;
+  let hmacKey;
+  try {
+    kek = copyKey(input.kek, "kek");
+    hmacKey = copyKey(input.hmacKey, "hmac_key");
+    if (typeof input.kekId !== "string" || typeof input.hmacKeyId !== "string") {
+      throw new TypeError("invalid_key_id");
+    }
+    if (timingSafeEqual(kek, hmacKey)) throw new TypeError("key_separation_violation");
+    return Object.freeze({ kekId: input.kekId, kek, hmacKeyId: input.hmacKeyId, hmacKey });
+  } catch (error) {
+    wipeBuffer(kek);
+    wipeBuffer(hmacKey);
+    throw error;
   }
-  if (timingSafeEqual(kek, hmacKey)) throw new TypeError("key_separation_violation");
-  return Object.freeze({ kekId: input.kekId, kek, hmacKeyId: input.hmacKeyId, hmacKey });
 }
 
 function decodeKeychainValue(stdout) {
@@ -36,7 +53,10 @@ function decodeKeychainValue(stdout) {
   }
   const bytes = Buffer.from(value, "base64");
   const canonical = bytes.toString("base64");
-  if (bytes.length !== 32 || canonical !== value) throw new TypeError("keychain_value_invalid");
+  if (bytes.length !== 32 || canonical !== value) {
+    wipeBuffer(bytes);
+    throw new TypeError("keychain_value_invalid");
+  }
   return bytes;
 }
 
@@ -65,19 +85,29 @@ function readKeychainItem(spec, execFileImpl) {
 }
 
 export async function loadMacOSKeychainKeyring({ execFileImpl = nodeExecFile } = {}) {
+  let rawKek;
+  let rawHmacKey;
   try {
-    const [kek, hmacKey] = await Promise.all([
+    const [kekResult, hmacResult] = await Promise.allSettled([
       readKeychainItem(KEYCHAIN.kek, execFileImpl),
       readKeychainItem(KEYCHAIN.hmac, execFileImpl),
     ]);
+    if (kekResult.status === "fulfilled") rawKek = kekResult.value;
+    if (hmacResult.status === "fulfilled") rawHmacKey = hmacResult.value;
+    if (kekResult.status === "rejected" || hmacResult.status === "rejected") {
+      throw new Error("keychain_read_failed");
+    }
     return validateKeyring({
       kekId: KEYCHAIN.kek.id,
-      kek,
+      kek: rawKek,
       hmacKeyId: KEYCHAIN.hmac.id,
-      hmacKey,
+      hmacKey: rawHmacKey,
     });
   } catch {
     throw new Error("keychain_read_failed");
+  } finally {
+    wipeBuffer(rawKek);
+    wipeBuffer(rawHmacKey);
   }
 }
 

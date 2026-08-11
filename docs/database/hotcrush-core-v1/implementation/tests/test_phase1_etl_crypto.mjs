@@ -28,6 +28,21 @@ import {
 const KEK = Buffer.alloc(32, 0x11);
 const HMAC = Buffer.alloc(32, 0x22);
 
+async function observeBufferWipes(run, { throwDuringCleanup = false } = {}) {
+  const originalFill = Buffer.prototype.fill;
+  const wiped = [];
+  Buffer.prototype.fill = function observedFill(...args) {
+    wiped.push(this);
+    if (throwDuringCleanup) throw new Error("fixture_cleanup_failed");
+    return Reflect.apply(originalFill, this, args);
+  };
+  try {
+    return { result: await run(), wiped };
+  } finally {
+    Buffer.prototype.fill = originalFill;
+  }
+}
+
 test("hotcrush typed-JCS v1 is stable, type preserving, and rejects lossy inputs", () => {
   assert.equal(
     canonicalizeJcs({ z: 1, a: "x" }).toString(),
@@ -116,22 +131,94 @@ test("AES-256-GCM envelope authenticates payload and independently wrapped DEK",
   );
 });
 
+test("validateKeyring wipes its private copies on separation failure without masking the error", async () => {
+  const equalKek = Buffer.from(KEK);
+  const equalHmac = Buffer.from(KEK);
+  const observed = await observeBufferWipes(() => {
+    assert.throws(
+      () => validateKeyring({
+        kekId: "fixture-kek-v1",
+        kek: equalKek,
+        hmacKeyId: "fixture-hmac-v1",
+        hmacKey: equalHmac,
+      }),
+      /key_separation_violation/,
+    );
+  });
+  assert.equal(observed.wiped.length, 2);
+  assert.ok(observed.wiped.every((buffer) => buffer.equals(Buffer.alloc(32))));
+  assert.ok(observed.wiped.every((buffer) => buffer !== equalKek && buffer !== equalHmac));
+  assert.deepEqual(equalKek, KEK);
+  assert.deepEqual(equalHmac, KEK);
+
+  await observeBufferWipes(() => {
+    assert.throws(
+      () => validateKeyring({
+        kekId: "fixture-kek-v1",
+        kek: equalKek,
+        hmacKeyId: "fixture-hmac-v1",
+        hmacKey: equalHmac,
+      }),
+      /key_separation_violation/,
+    );
+  }, { throwDuringCleanup: true });
+});
+
 test("Keychain provider is read-only, no-shell, fixed-argument, and redacts failures", async () => {
   assert.throws(() => {
     KEYCHAIN.kek.service = "attacker-controlled";
   }, TypeError);
   const calls = [];
+  const encodedKeys = [Buffer.alloc(32, 0x31), Buffer.alloc(32, 0x32)]
+    .map((buffer) => `${buffer.toString("base64")}\n`);
   const fakeExecFile = (file, args, options, callback) => {
     calls.push({ file, args, options });
-    callback(null, `${Buffer.alloc(32, calls.length).toString("base64")}\n`, "");
+    callback(null, encodedKeys[calls.length - 1], "");
   };
-  const keyring = await loadMacOSKeychainKeyring({ execFileImpl: fakeExecFile });
+  const observedSuccess = await observeBufferWipes(() =>
+    loadMacOSKeychainKeyring({ execFileImpl: fakeExecFile })
+  );
+  const keyring = observedSuccess.result;
   assert.equal(calls.length, 2);
   assert.ok(calls.every((call) => call.file === "/usr/bin/security"));
   assert.ok(calls.every((call) => call.options.shell === false));
   assert.ok(calls.every((call) => call.args[0] === "find-generic-password"));
   assert.equal(keyring.kek.length, 32);
   assert.equal(keyring.hmacKey.length, 32);
+  assert.deepEqual(keyring.kek, Buffer.alloc(32, 0x31));
+  assert.deepEqual(keyring.hmacKey, Buffer.alloc(32, 0x32));
+  assert.equal(observedSuccess.wiped.length, 2);
+  assert.ok(observedSuccess.wiped.every((buffer) => buffer.equals(Buffer.alloc(32))));
+  assert.ok(observedSuccess.wiped.every((buffer) => buffer !== keyring.kek && buffer !== keyring.hmacKey));
+
+  let partialCalls = 0;
+  const observedPartialFailure = await observeBufferWipes(async () => {
+    await assert.rejects(
+      loadMacOSKeychainKeyring({
+        execFileImpl: (_file, _args, _options, callback) => {
+          partialCalls += 1;
+          if (partialCalls === 1) callback(null, encodedKeys[0], "");
+          else callback(new Error("secret=DO_NOT_LEAK"), "", "secret=DO_NOT_LEAK");
+        },
+      }),
+      (error) => error.message === "keychain_read_failed",
+    );
+  });
+  assert.equal(partialCalls, 2);
+  assert.equal(observedPartialFailure.wiped.length, 1);
+  assert.ok(observedPartialFailure.wiped[0].equals(Buffer.alloc(32)));
+
+  const sameEncodedKey = `${Buffer.alloc(32, 0x41).toString("base64")}\n`;
+  const observedValidationFailure = await observeBufferWipes(async () => {
+    await assert.rejects(
+      loadMacOSKeychainKeyring({
+        execFileImpl: (_file, _args, _options, callback) => callback(null, sameEncodedKey, ""),
+      }),
+      (error) => error.message === "keychain_read_failed",
+    );
+  });
+  assert.equal(observedValidationFailure.wiped.length, 4);
+  assert.ok(observedValidationFailure.wiped.every((buffer) => buffer.equals(Buffer.alloc(32))));
 
   await assert.rejects(
     loadMacOSKeychainKeyring({
@@ -140,6 +227,21 @@ test("Keychain provider is read-only, no-shell, fixed-argument, and redacts fail
     }),
     (error) => error.message === "keychain_read_failed",
   );
+
+  let cleanupFailureCalls = 0;
+  await observeBufferWipes(async () => {
+    await assert.rejects(
+      loadMacOSKeychainKeyring({
+        execFileImpl: (_file, _args, _options, callback) => {
+          cleanupFailureCalls += 1;
+          if (cleanupFailureCalls === 1) callback(null, encodedKeys[0], "");
+          else callback(new Error("original_keychain_failure"), "", "");
+        },
+      }),
+      (error) => error.message === "keychain_read_failed",
+    );
+  }, { throwDuringCleanup: true });
+  assert.equal(cleanupFailureCalls, 2);
 });
 
 test("encrypted artifact writer publishes only ciphertext at mode 0600", async () => {

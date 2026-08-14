@@ -23,10 +23,19 @@ function jsonResponse(body: unknown, status = 200): Response {
  * 这些用例关心的是发码与验证调用，所以把探测就地应答掉、不转发给内层 mock ——
  * 否则它会吃掉 `mockResolvedValueOnce` 队列的第一项，也会污染调用计数。
  */
-function stubFetch<T>(inner: T): T {
+function stubFetch<T>(
+  inner: T,
+  completionStatus: Response = jsonResponse(
+    { status: "not_found", retryable: true },
+    404,
+  ),
+): T {
   const wrapped = (input: unknown, init?: unknown) => {
     if (String(input).includes("/api/auth/captcha")) {
       return Promise.resolve(jsonResponse({ enable: false, provider: null }));
+    }
+    if (String(input).includes("/api/complete/status")) {
+      return Promise.resolve(completionStatus);
     }
     return (inner as (a: unknown, b?: unknown) => unknown)(input, init);
   };
@@ -257,6 +266,99 @@ describe("customer HBTI journey", () => {
     ).not.toBeInTheDocument();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/auth/logout");
     expect((fetchMock.mock.calls[1][1] as RequestInit).body).toBe("{}");
+  });
+
+  it("restores an already-issued result immediately after member authentication", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        authenticated: true,
+        maskedPhone: "+61 43•••••92",
+        draftKey: "completed-member-draft-key",
+      }),
+    );
+    stubFetch(
+      fetchMock,
+      jsonResponse({
+        status: "issued",
+        code: "HSDA",
+        color: "pistachio",
+        reward: { couponTemplateName: "HBTI Gift · Heart Scent Card" },
+        memberWalletUrl:
+          "https://f4klzbmr9n2d.m.sea.restosuite.ai/couponIndex",
+      }),
+    );
+
+    render(<HbtiExperience />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Your gift is in your member wallet.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("HSDA")).toBeInTheDocument();
+    expect(screen.getByText("The Pistachio Tart")).toBeInTheDocument();
+    expect(screen.getByText("Heart Scent Card")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Claim my bread/ }),
+    ).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/auth/session");
+  });
+
+  it("restores an already-issued result immediately after OTP verification", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ authenticated: false }))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          challengeToken: "r".repeat(43),
+          maskedPhone: "+61 43•••••92",
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          authenticated: true,
+          maskedPhone: "+61 43•••••92",
+          draftKey: "completed-member-draft-key",
+        }),
+      );
+    stubFetch(
+      fetchMock,
+      jsonResponse({
+        status: "issued",
+        code: "HSDA",
+        color: "pistachio",
+        reward: { couponTemplateName: "HBTI Gift · Heart Scent Card" },
+        memberWalletUrl:
+          "https://f4klzbmr9n2d.m.sea.restosuite.ai/couponIndex",
+      }),
+    );
+    const user = userEvent.setup();
+
+    render(<HbtiExperience />);
+    await user.selectOptions(
+      await screen.findByLabelText("Country or region"),
+      "AU",
+    );
+    await user.type(screen.getByLabelText("Member phone number"), "431029692");
+    await user.click(
+      screen.getByRole("button", { name: "Send verification code" }),
+    );
+    await user.type(await screen.findByLabelText("Six-digit code"), "123456");
+    await user.click(
+      screen.getByRole("button", { name: "Verify and begin" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Your gift is in your member wallet.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("HSDA")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Claim my bread/ }),
+    ).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("uses the server-authoritative result and colour after completion", async () => {

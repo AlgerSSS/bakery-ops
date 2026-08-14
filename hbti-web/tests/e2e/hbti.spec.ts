@@ -268,6 +268,49 @@ test("defaults to English and fits every supported mobile width", async ({
   expect(network.completionCalls()).toBe(0);
 });
 
+test("restores an existing member result before offering the quiz", async ({
+  page,
+}) => {
+  const network = await mockPrivateNetwork(page, {
+    completionStatusReplies: [
+      {
+        status: 200,
+        body: {
+          status: "issued",
+          code: "HSDA",
+          color: "pistachio",
+          reward: {
+            couponTemplateName: "HBTI Gift · Heart Scent Card",
+          },
+          memberWalletUrl:
+            "https://f4klzbmr9n2d.m.sea.restosuite.ai/couponIndex",
+        },
+      },
+    ],
+  });
+
+  await page.goto("/");
+
+  await expect(
+    page.getByRole("heading", {
+      name: "Your gift is in your member wallet.",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("HSDA")).toBeVisible();
+  await expect(page.getByText("The Pistachio Tart")).toBeVisible();
+  await expect(page.getByText("Heart Scent Card")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Claim my bread/ }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: /View it in my member wallet/ }),
+  ).toHaveCount(1);
+  expect(network.completionStatusCalls()).toBe(1);
+  expect(network.completionCalls()).toBe(0);
+  await assertNoHorizontalOverflow(page);
+  expect(network.externalRequests).toEqual([]);
+});
+
 test("uses the HOT CRUSH storefront tokens, trilingual slogan, and full-colour arrow", async ({
   page,
 }) => {
@@ -734,6 +777,10 @@ test("keeps polling a processing reward until RES confirms it", async ({
     ],
     completionStatusReplies: [
       {
+        status: 404,
+        body: { status: "not_found", retryable: true },
+      },
+      {
         status: 200,
         body: {
           status: "processing",
@@ -776,7 +823,9 @@ test("keeps polling a processing reward until RES confirms it", async ({
     }),
   ).toBeVisible({ timeout: 9_000 });
   expect(network.completionCalls()).toBe(1);
-  expect(network.completionStatusCalls()).toBe(2);
+  // One read happens immediately after authentication, then two polls move
+  // the newly submitted reward from processing to issued.
+  expect(network.completionStatusCalls()).toBe(3);
   expect(network.externalRequests).toEqual([]);
 });
 

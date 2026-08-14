@@ -123,6 +123,84 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const advanceTimerRef = useRef<number | null>(null);
 
+  const acceptCompletion = useCallback((payload: CompletionResponse) => {
+    if (isHbtiCode(payload.code)) {
+      setConfirmedCode(payload.code);
+    }
+    if (isColorChoice(payload.color)) {
+      setConfirmedColor(payload.color);
+    }
+    if (payload.reward?.couponTemplateName) {
+      setRewardTemplateName(payload.reward.couponTemplateName);
+    }
+    if (isSafeWalletUrl(payload.memberWalletUrl)) {
+      setMemberWalletUrl(payload.memberWalletUrl);
+    }
+    if (
+      payload.status === "issued" ||
+      payload.status === "unrewarded" ||
+      payload.status === "processing" ||
+      payload.status === "review"
+    ) {
+      setSubmission(payload.status);
+      return true;
+    }
+    return false;
+  }, []);
+
+  const clearCompletion = useCallback(() => {
+    setSubmission("idle");
+    setRewardTemplateName(undefined);
+    setMemberWalletUrl(undefined);
+    setConfirmedCode(undefined);
+    setConfirmedColor(undefined);
+  }, []);
+
+  const restoreAuthenticatedMember = useCallback(
+    async (authenticatedMember: AuthenticatedMember) => {
+      clearCompletion();
+      setMember(authenticatedMember);
+      // Keep the account-check screen visible until the authoritative
+      // completion read finishes. Otherwise an already-finished member sees
+      // the quiz for a moment and can start creating a conflicting local result.
+      setAuthState("checking");
+
+      try {
+        const response = await fetch("/api/complete/status", {
+          method: "GET",
+          cache: "no-store",
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        });
+        if (response.status === 401) {
+          setMember(undefined);
+          setAuthState("signedOut");
+          return;
+        }
+        if (response.status === 404) {
+          setAuthState("signedIn");
+          return;
+        }
+        if (!response.ok) {
+          setAuthState("error");
+          return;
+        }
+        if (
+          !acceptCompletion((await response.json()) as CompletionResponse)
+        ) {
+          setAuthState("error");
+          return;
+        }
+        setAuthState("signedIn");
+      } catch {
+        // Fail closed: if we cannot tell whether this member already has a
+        // terminal result, do not let them retake and discover the conflict
+        // only after submitting for a gift.
+        setAuthState("error");
+      }
+    },
+    [acceptCompletion, clearCompletion],
+  );
+
   const checkSession = useCallback(async () => {
     setAuthState("checking");
 
@@ -147,11 +225,10 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
         typeof payload.maskedPhone === "string" &&
         typeof payload.draftKey === "string"
       ) {
-        setMember({
+        await restoreAuthenticatedMember({
           maskedPhone: payload.maskedPhone,
           draftKey: payload.draftKey,
         });
-        setAuthState("signedIn");
         return;
       }
       setMember(undefined);
@@ -159,7 +236,7 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
     } catch {
       setAuthState("error");
     }
-  }, []);
+  }, [restoreAuthenticatedMember]);
 
   useEffect(() => {
     if (demoMode) {
@@ -195,10 +272,6 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
       setColor(draft?.color);
       setGender(draft?.gender);
       setAge(draft?.age);
-      setSubmission("idle");
-      setConfirmedCode(undefined);
-      setConfirmedColor(undefined);
-      setMemberWalletUrl(undefined);
       setDraftLoaded(Boolean(nextDraftKey));
     }, 0);
     return () => window.clearTimeout(timer);
@@ -258,31 +331,6 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
     [answers],
   );
   const result = score ? results[score.code][locale] : null;
-
-  const acceptCompletion = useCallback((payload: CompletionResponse) => {
-    if (isHbtiCode(payload.code)) {
-      setConfirmedCode(payload.code);
-    }
-    if (isColorChoice(payload.color)) {
-      setConfirmedColor(payload.color);
-    }
-    if (payload.reward?.couponTemplateName) {
-      setRewardTemplateName(payload.reward.couponTemplateName);
-    }
-    if (isSafeWalletUrl(payload.memberWalletUrl)) {
-      setMemberWalletUrl(payload.memberWalletUrl);
-    }
-    if (
-      payload.status === "issued" ||
-      payload.status === "unrewarded" ||
-      payload.status === "processing" ||
-      payload.status === "review"
-    ) {
-      setSubmission(payload.status);
-      return true;
-    }
-    return false;
-  }, []);
 
   function chooseAnswer(
     question: HbtiQuestion,
@@ -513,8 +561,7 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
               locale={locale}
               headingRef={headingRef}
               onAuthenticated={(authenticatedMember) => {
-                setMember(authenticatedMember);
-                setAuthState("signedIn");
+                void restoreAuthenticatedMember(authenticatedMember);
               }}
             />
           ) : submission !== "idle" && submission !== "error" ? (
@@ -595,6 +642,7 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
             已发券的完成态本身带有自己的钱包 CTA,不需要这个。 */}
         {!demoMode &&
           authState !== "signedOut" &&
+          submission === "idle" &&
           (stage === "intro" || stage === "result") && (
             <a className={styles.memberReturn} href={MEMBER_WALLET_URL}>
               {copy.returnToMembership}

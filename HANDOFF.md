@@ -6,6 +6,26 @@
 
 ---
 
+## 生日域名提交被 INVALID_ORIGIN 拦截的修复（2026-08-15，DSH，已修复上线）
+
+用户走真实流程到确认页点「留好我的生日礼」报「没留上，稍后再试一次」。复现：
+birthday.hotcrush.net 上的 profile/reserve 提交返回 403 INVALID_ORIGIN——Origin 校验
+只认 `HBTI_LINK_BASE_URL`（hbti-test.hotcrush.net），生日域名的同源提交被当跨站拒绝
+（数据库无落单，失败发生在 Origin 关之前）。
+
+修复（`749e156`，`2fcb22a` 合入）：`getJsonMutationRejection` 的允许名单改为
+`HBTI_LINK_BASE_URL` + `HBTI_EXTRA_ORIGINS`（逗号分隔）的并集，并收紧语义为
+「请求主机 ∈ 名单 且 Origin 头 === 请求主机」。Vercel 生产已配
+`HBTI_EXTRA_ORIGINS=https://birthday.hotcrush.net`（本地 .env.local 同步）。
+
+验证：生日域名提交由 403 变 400（过 Origin 关、到日期校验）；hbti-test 行为不变；
+陌生 Origin 仍 403。新部署 `hotcrush-hbti-fmwd9xk5x-algersss-projects.vercel.app`
+（两域名已指到它）。门禁全绿（332 过 39 跳过）。
+⚠️ 给后人的话：**同一应用多加一个自有域名时，除了 DNS/别名，还要把这个域名加进
+HBTI_EXTRA_ORIGINS**，否则所有 POST 全 403。
+
+---
+
 ## 生日礼双选项 + 折叠日历 + 服务器 Lark 通知 relay（2026-08-15，DSH，已合入并部署）
 
 用户三项要求全部落地：
@@ -1817,6 +1837,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-15 | DSH | **修复生日域名提交 403 INVALID_ORIGIN（已上线）**：Origin 白名单从单一 HBTI_LINK_BASE_URL 改为与 HBTI_EXTRA_ORIGINS 的并集（语义收紧为「主机 ∈ 名单 且 Origin===主机」）；Vercel 配 HBTI_EXTRA_ORIGINS=https://birthday.hotcrush.net；验证生日域名提交 403→400、hbti-test 不变、陌生 Origin 仍 403；新部署 hotcrush-hbti-fmwd9xk5x-algersss-projects.vercel.app。教训：应用加自有域名必须同步加白名单。 |
 | 2026-08-15 | DSH | **生日礼双选项 + 折叠日历 + 服务器通知 relay（已部署）**：权益模型改选项列表，450 积分兑换对积分 ≥450 会员开放（免费巴斯克仍每年一份），view 返回 options、reserve 带 giftType；预约屏日期选择折叠为最近 7 天胶囊 + 展开。门店通知按用户要求搬上 tokyo-01：scripts/birthday-notify.mjs 每 15 分钟轮询 pending 行 → Lark 群「HOT CRUSH 生日礼预约」（机器人自建群，chat oc_9d0e91b9f8206ef474ed213f150ddb72）→ sent，失败 3 次置 failed（迁移 111 加 notify_attempts 已执行）；/etc/cron.d/hotcrush-birthday + 服务器 env（不入 git）。门禁 tsc/eslint/vitest 330 过 39 跳过/build 全绿；Vercel 新部署 hotcrush-hbti-hw85hmtso-algersss-projects.vercel.app（两域名已指到，注意 --prod 部署后 birthday 域名需手动 alias）；Playwright 实测双选项与折叠日历；本地+服务器 Lark 测试消息各一发。仍未做真实预约写入。 |
 | 2026-08-15 | DSH | **生日贺卡动态化全量上线（已执行）**：迁移 110 经查已在生产库生效（两表 0 行、列/索引与迁移一致）；Vercel 生产新增 BIRTHDAY_LINK_SECRET 与 BIRTHDAY_CAMPAIGN_YEAR=2026；`vercel build --prod` + `deploy --prebuilt --prod` 部署 `hotcrush-hbti-h752wzi63-algersss-projects.vercel.app` 并别名 hbti-test.hotcrush.net；`birthday.hotcrush.net` 从静态项目 hotcrush-birthday-card 切到新部署（DNS/证书未动，静态部署保留回滚）。端到端验收：health 四检全绿、view 接口 401/410 边界正确、为会员 2063178969381101576 生成签名链接后 view 200（真实年度回顾 + 免费巴斯克权益 + 取货窗口）、两域名 200、no-store 生效、TLS 通过。未做真实预约写入；BIRTHDAY_NOTIFY_WEBHOOK 待门店提供 Lark 机器人地址。 |
 | 2026-08-15 | DSH | **生日贺卡动态化完成并合入 main（已推送）**：`dsh/birthday-dynamic` 分支 3 个提交 `04b4c6e` --no-ff 合入，生日卡从静态烘焙改为按会员动态生成。新增 /birthday 多屏 H5（封面/信/年度回顾/权益/资料/预约/确认）与 4 个 /api/birthday 接口；签名专属链接（HMAC、30 天过期、免登录进卡，短信验证兜底且不再为非会员静默开户）；预约落库与 Lark 门店通知；迁移 `110_birthday_card.sql`（mkt_birthday_profile / mkt_birthday_reservation，未执行）；proxy.ts 按域名分发、/birthday 强制 no-store。门禁 tsc/eslint/vitest 318 过 39 跳过（生日专项 39 例）/next build 全绿，凭据扫描干净；分支已删、worktree 已移除，origin/main 已同步。上线待办：迁移 110、Vercel 环境变量、vercel 部署、域名切换、链接生成（详见正文新节）。 |

@@ -20,9 +20,15 @@ Claude 评审归档；HANDOFF 多段。全部脏文件提交前过凭据扫描�
 **分支治理**：删 11 个本地分支（9 个已并入 main；`claude/exciting-torvalds-498847` 与
 `claude/nostalgic-wiles-f7cb6a` 的修复经逐文件 diff=0 验证已被 main 吸收）；
 `codex/r6-green-implementation` 以 --no-ff 合入 main（HANDOFF 冲突按两边全保留解决）
-并删除。main 随后推送 origin（含 birthday-web 归档，用户批准方案 B）。删 4 个已合并
-远程分支。AGENTS.md 0.2 新增分支生命周期规则：合并即删、开工 rebase、收工两态、
+并删除。AGENTS.md 0.2 新增分支生命周期规则：合并即删、开工 rebase、收工两态、
 常态检出 main。
+
+⚠️ **推送未完成（待用户在自己终端执行）**：本地 main 领先 origin/main 28 个提交。
+github.com:443 白天多次超时（晚间恢复但很慢）；git 凭据在 macOS 钥匙串，非交互会话
+取不到（后台 push 报 "could not read Username"，前台 security 命令挂起等 GUI 授权）。
+请在本机终端执行：
+1. `cd ~/hot && git push origin main`（约 196 MB 新增对象、含大图/HTML，慢网下耐心等）
+2. `git push origin --delete claude/hbti-launch-hardening claude/rename-ops-tables codex/schema-consolidation refactor/architecture-review`（删 4 个已合并远程分支）
 
 **deploy.sh 合并**：实测 Contabo（62.72.46.80）SSH 超时仍失联，tokyo-01 上
 hotcrush-core / hotcrush-res-api / hotcrush-alert-relay 三服务 active。deploy-tokyo.sh
@@ -31,7 +37,9 @@ hotcrush-core / hotcrush-res-api / hotcrush-alert-relay 三服务 active。deplo
 
 ⚠️ 下次 deploy 注意：main 现在包含 bakery-ops 意图路由/forecast 改动（a88b8df），
 相关单测已过但全量门禁未跑——deploy.sh 默认含门禁，别用 --skip-gate。
-终态：本地仅 main 一个分支，远程仅 origin/main；工作树干净。
+终态：本地主工作树检出 main 且干净；另有 DSH 会话的活跃分支 `dsh/birthday-dynamic`
+在其独立 worktree 检出（生日页动态化在途，勿动）；远程待上面两条命令执行后应仅剩
+origin/main。
 
 ---
 

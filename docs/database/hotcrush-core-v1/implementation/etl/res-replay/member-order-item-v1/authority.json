@@ -1,0 +1,88 @@
+{
+  "schema": "hotcrush.res.report211.member-order-item.replay-authority.v1",
+  "stable_line_identity": {
+    "status": "APPROVED_FULL_HISTORY_PROBE",
+    "fields": [
+      "D_shopId",
+      "D_orderId",
+      "D_itemId",
+      "D_reversal_order"
+    ],
+    "assertion_fields": [
+      "D_businessDate",
+      "D_currency",
+      "D_isMemberConsume"
+    ],
+    "d_item_id_alone_approved": false,
+    "reversal_order_codes": {
+      "0": "Normal Order",
+      "1": "Full Refund/Cancellation",
+      "2": "Partial Refund/Cancellation",
+      "3": "Original for Cancellation"
+    }
+  },
+  "probe": {
+    "range": [
+      "2026-01-01",
+      "2026-08-08"
+    ],
+    "scope": {
+      "currency": "MYR",
+      "member_only": true,
+      "shop_id": "406994127"
+    },
+    "response_rows": 46662,
+    "reported_total": 46662,
+    "distinct_d_item_ids": 46142,
+    "distinct_composite_line_keys": 46662,
+    "distinct_composite_conflicts": 0,
+    "composite_null_rows": 0,
+    "exact_duplicate_rows": 0,
+    "full_history_probe_page_size": 50000,
+    "replay_daily_page_size": 2000,
+    "daily_max_rows": 947,
+    "daily_total_mismatches": 0,
+    "aggregate_groups": 44484,
+    "aggregate_source_row_count_distribution": {
+      "1": 42660,
+      "2": 1573,
+      "3": 179,
+      "4": 60,
+      "5": 5,
+      "6": 5,
+      "12": 2
+    },
+    "quantity_groups": {
+      "positive": 43997,
+      "negative": 485,
+      "zero": 2
+    },
+    "positive_only_totals": {
+      "net_qty": "55974",
+      "net_sales": "438756.90"
+    },
+    "all_quantity_totals": {
+      "net_qty": "55331",
+      "net_sales": "433247.43"
+    },
+    "legacy_omission_delta": {
+      "net_qty": "-643",
+      "net_sales": "-5509.47"
+    },
+    "missing_current_product_listing": {
+      "source_item_keys": 2,
+      "raw_rows": 3
+    },
+    "deep_pagination_rejection_evidence": {
+      "response_rows": 4457,
+      "exact_duplicate_rows": 1088
+    },
+    "canonical_row_digest_sha256": "2dcffa1fad936678d3ddc460d1d7289c23615d5cc2b4c39c8229ad961f0a20b0"
+  },
+  "execution": {
+    "status": "NOT_APPROVED_NOT_EXECUTED",
+    "default_mode": "INERT",
+    "live_read_only_replay_approved": false,
+    "database_writes_allowed": false
+  }
+}

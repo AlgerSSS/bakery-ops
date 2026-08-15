@@ -1,0 +1,2519 @@
+{
+  "action_registry": [
+    {
+      "action_code": "R6A1_FX_RATE_OBSERVATION_WRITE",
+      "business_rowcount_by_outcome": {
+        "INSERTED": 1,
+        "NOOP_CANONICAL": 0
+      },
+      "maintenance_only": false,
+      "object_type": "finance_fx_rate_observation",
+      "online_writer_identity": "public.r6a1_write_fx_rate_observation_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.int4,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.numeric,pg_catalog.text,pg_catalog.text,pg_catalog.timestamptz,pg_catalog.timestamptz,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)",
+      "outcomes": [
+        "INSERTED",
+        "NOOP_CANONICAL"
+      ],
+      "replay_audit_rowcount": 0,
+      "replay_business_rowcount": 0
+    },
+    {
+      "action_code": "R6A1_MATERIAL_PRICE_OBSERVATION_INSERT",
+      "business_rowcount_by_outcome": {
+        "INSERTED": 1
+      },
+      "maintenance_only": false,
+      "object_type": "scm_material_price_observation",
+      "online_writer_identity": "public.r6a1_insert_material_price_observation_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.timestamptz,pg_catalog.numeric,pg_catalog.numeric,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.jsonb)",
+      "outcomes": [
+        "INSERTED"
+      ],
+      "replay_audit_rowcount": 0,
+      "replay_business_rowcount": 0
+    },
+    {
+      "action_code": "R6A1_MATERIAL_PRICE_OBSERVATION_VERIFY",
+      "business_rowcount_by_outcome": {
+        "VERIFIED": 1
+      },
+      "maintenance_only": false,
+      "object_type": "scm_material_price_observation",
+      "online_writer_identity": "public.r6a1_verify_material_price_observation_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.timestamptz,pg_catalog.uuid,pg_catalog.text,pg_catalog.jsonb)",
+      "outcomes": [
+        "VERIFIED"
+      ],
+      "replay_audit_rowcount": 0,
+      "replay_business_rowcount": 0
+    },
+    {
+      "action_code": "R6A1_MATERIAL_COST_SELECTION_WRITE",
+      "business_rowcount_by_outcome": {
+        "CLOSED": 1,
+        "DRAFT_INSERTED": 1,
+        "DRAFT_UPDATED": 1,
+        "VERIFIED": 1
+      },
+      "maintenance_only": false,
+      "object_type": "cost_card_material_cost_selection",
+      "online_writer_identity": "public.r6a1_write_material_cost_selection_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.timestamptz,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.timestamptz,pg_catalog.timestamptz,pg_catalog.text,pg_catalog.jsonb)",
+      "outcomes": [
+        "DRAFT_INSERTED",
+        "DRAFT_UPDATED",
+        "VERIFIED",
+        "CLOSED"
+      ],
+      "replay_audit_rowcount": 0,
+      "replay_business_rowcount": 0
+    },
+    {
+      "action_code": "R6A1_MATERIAL_PRICE_OBSERVATION_RESTORE",
+      "business_rowcount_by_outcome": {
+        "RESTORED_INSERTED": 1
+      },
+      "maintenance_only": true,
+      "object_type": "scm_material_price_observation",
+      "online_writer_identity": null,
+      "outcomes": [
+        "RESTORED_INSERTED"
+      ],
+      "replay_audit_rowcount": 0,
+      "replay_business_rowcount": 0
+    }
+  ],
+  "activation_status": "NOT_ACTIVATED",
+  "artifact_kind": "R6A1_TRIGGER_CONTRACT",
+  "audit_json_contract": {
+    "after": {
+      "contract_version": 2,
+      "exact_keys": [
+        "schema",
+        "contract_version",
+        "operation_id",
+        "first_request_id",
+        "action_code",
+        "object_type",
+        "object_id",
+        "outcome",
+        "occurred_at",
+        "input_fingerprint_sha256",
+        "immutable_core_fingerprint_sha256",
+        "effect_fingerprint_sha256",
+        "lineage",
+        "redacted_response",
+        "redacted_provenance"
+      ],
+      "lineage_exact_keys": [
+        "previous_chain_receipt_id",
+        "previous_object_receipt_id",
+        "previous_max_interpretation_contract_version",
+        "predecessor_effect_fingerprint_sha256"
+      ],
+      "schema": "hotcrush.r6a1.primary-audit-after.v2"
+    },
+    "before": {
+      "contract_version": 2,
+      "exact_keys": [
+        "schema",
+        "contract_version",
+        "operation_id",
+        "first_request_id",
+        "stable_principal",
+        "target",
+        "input_fingerprint_sha256",
+        "before_effect_fingerprint_sha256",
+        "redacted_input"
+      ],
+      "schema": "hotcrush.r6a1.primary-audit-before.v2",
+      "stable_principal_exact_keys": [
+        "actor_type",
+        "actor_user_id",
+        "job_run_id"
+      ],
+      "target_exact_keys": [
+        "object_type",
+        "requested_object_id"
+      ]
+    },
+    "forbidden_receipt_values": [
+      "full_business_row",
+      "raw_source_payload_ref",
+      "raw_verification_evidence",
+      "raw_source_unit_text"
+    ],
+    "ordinary_audit_branch": {
+      "exact_five_actions_forbidden_results": [
+        "DENIED",
+        "FAILED"
+      ],
+      "global_guard_required": false,
+      "operation_id": null,
+      "update_delete": "UNCONDITIONALLY_REJECTED"
+    },
+    "projections_by_action": {
+      "R6A1_FX_RATE_OBSERVATION_WRITE": {
+        "redacted_input_keys": [
+          "source_job_run_id",
+          "interpretation_contract_version",
+          "source_system_id",
+          "source_record_id_sha256",
+          "from_currency_code",
+          "to_currency_code",
+          "rate",
+          "rate_type",
+          "rate_basis",
+          "quoted_at",
+          "provider_published_at",
+          "source_payload_sha256",
+          "source_payload_ref_sha256",
+          "quality_status",
+          "verified_by_user_id"
+        ],
+        "redacted_provenance_keys": [
+          "authority_code",
+          "source_job_run_id",
+          "interpretation_contract_version",
+          "previous_chain_receipt_id",
+          "previous_max_interpretation_contract_version",
+          "business_predecessor_fx_rate_observation_id",
+          "source_payload_sha256",
+          "source_payload_ref_sha256",
+          "canonical_output_fingerprint_sha256"
+        ]
+      },
+      "R6A1_MATERIAL_COST_SELECTION_WRITE": {
+        "redacted_input_keys": [
+          "material_cost_selection_id",
+          "expected_updated_at",
+          "actor_user_id",
+          "material_id",
+          "material_price_observation_id",
+          "target_currency_assignment_id",
+          "currency_policy_id",
+          "fx_rate_observation_id",
+          "effective_from",
+          "effective_to",
+          "quality_status",
+          "evidence_sha256"
+        ],
+        "redacted_provenance_keys": [
+          "previous_object_receipt_id",
+          "selection_cutoff",
+          "price_admission_receipt_id",
+          "price_receipt_prefix_tip_id",
+          "assignment_id",
+          "policy_id",
+          "fx_branch",
+          "fx_admission_receipt_id",
+          "fx_receipt_prefix_tip_id",
+          "fx_candidate_set_fingerprint_sha256"
+        ]
+      },
+      "R6A1_MATERIAL_PRICE_OBSERVATION_INSERT": {
+        "redacted_input_keys": [
+          "actor_user_id",
+          "actor_job_run_id",
+          "material_id",
+          "supplier_item_id",
+          "source_system_id",
+          "source_record_id_sha256",
+          "source_payload_sha256",
+          "observation_type",
+          "observed_at",
+          "raw_price_amount",
+          "raw_price_quantity",
+          "raw_price_unit_text_sha256",
+          "raw_price_unit_id",
+          "material_unit_conversion_id",
+          "transaction_currency_code",
+          "zero_price_reason_code",
+          "verification_evidence_sha256"
+        ],
+        "redacted_provenance_keys": [
+          "actor_path",
+          "source_system_id",
+          "source_payload_sha256",
+          "previous_chain_receipt_id",
+          "previous_object_receipt_id"
+        ]
+      },
+      "R6A1_MATERIAL_PRICE_OBSERVATION_RESTORE": {
+        "redacted_input_keys": [
+          "material_price_observation_id",
+          "material_id",
+          "supplier_item_id",
+          "source_system_id",
+          "source_record_id_sha256",
+          "source_payload_sha256",
+          "supersedes_material_price_observation_id",
+          "observation_type",
+          "observed_at",
+          "transaction_currency_code",
+          "quality_status",
+          "source_job_run_id",
+          "interpretation_contract_version",
+          "input_manifest_sha256",
+          "s0_artifact_sha256",
+          "row_fingerprint_sha256",
+          "verification_evidence_sha256"
+        ],
+        "redacted_provenance_keys": [
+          "source_job_run_id",
+          "interpretation_contract_version",
+          "input_manifest_sha256",
+          "s0_artifact_sha256",
+          "previous_chain_receipt_id",
+          "previous_max_interpretation_contract_version",
+          "predecessor_price_observation_id",
+          "predecessor_effect_fingerprint_sha256",
+          "verification_authority"
+        ]
+      },
+      "R6A1_MATERIAL_PRICE_OBSERVATION_VERIFY": {
+        "redacted_input_keys": [
+          "material_price_observation_id",
+          "expected_updated_at",
+          "verified_by_user_id",
+          "zero_price_reason_code",
+          "verification_evidence_sha256"
+        ],
+        "redacted_provenance_keys": [
+          "previous_object_receipt_id",
+          "before_quality_status",
+          "after_quality_status",
+          "verified_by_user_id",
+          "verified_at",
+          "verification_evidence_sha256"
+        ]
+      }
+    },
+    "redacted_response_rule": "AFTER.redacted_response equals the stored writer-response jsonb value and function return",
+    "reserved_receipt": {
+      "business_dml_order": "INSERT_RECEIPT_BEFORE_BUSINESS_DML_IN_SAME_TRANSACTION",
+      "object_fields": "NONNULL_AND_ACTION_EXACT",
+      "operation_id": "NONNULL_NON_NIL_UUID",
+      "result": "SUCCESS"
+    },
+    "response": {
+      "exact_keys": [
+        "schema",
+        "action_code",
+        "operation_id",
+        "audit_event_id",
+        "object_type",
+        "object_id",
+        "outcome",
+        "effect_fingerprint_sha256",
+        "occurred_at"
+      ],
+      "schema": "hotcrush.r6a1.writer-response.v1"
+    }
+  },
+  "behavior_acceptance": [
+    "five actions replay exact input and reject different input",
+    "five actions commit-unknown same-operation retry performs zero audit and zero business DML",
+    "W1 INSERTED, NOOP_CANONICAL, version-tail, quality-canonical, human and automated paths",
+    "W3 human-only, source-job argument absent, and five approved zero reasons",
+    "W4 same-currency, cross-currency, max-quote tie rejection, no forbidden tie-break, terminal cutoff and admission",
+    "receipt logical clock rollback preserves strict predecessor edge",
+    "later FX root cannot retroactively change an existing VERIFIED selection",
+    "independent W3 price root does not create an invented latest-price ranking",
+    "historical selection restore is rejected",
+    "RESTORE automated history, chain and detached-artifact mismatch cases",
+    "procurement extension evidence gate",
+    "ordinary audit insert without global guard succeeds; reserved insert without guard fails",
+    "eight shared-parent semantic/nonsemantic, READ COMMITTED concurrent fresh snapshot, and RR/SERIALIZABLE no-guard cases",
+    "session lock stack, cleanup, commit-unknown and indeterminate outcomes",
+    "exact15 constraint list and no SET CONSTRAINTS ALL",
+    "seven truncate blockers",
+    "18 relation locks, 16 conservation roots and 55 outbound MATCH SIMPLE FKs",
+    "partial-null MATCH SIMPLE skips whole FK and full nonnull orphan fails",
+    "detached conservation detects NOOP-tail physical deletion",
+    "old aliases, nonowner privileges, counts, comments and model/catalog hashes"
+  ],
+  "catalog_acceptance": {
+    "activation_status": "NOT_ACTIVATED",
+    "aliases_rejected": [
+      "public.r6a1_dispatch_*",
+      "public.r6a1_ct_*_iud",
+      "public.r6a1_ct_*_u",
+      "alternative trigger spellings",
+      "long finance/scm writer aliases"
+    ],
+    "baseline_helper_count": 1,
+    "baseline_helper_identity": "public.app_normalize_alias_v1(pg_catalog.text)",
+    "business_constraint_counts": {
+      "c": 404,
+      "f": 332,
+      "p": 105,
+      "u": 113,
+      "x": 21
+    },
+    "business_constraint_total": 975,
+    "catalog_status": "NOT_COMPILED",
+    "constraint_trigger_count": 15,
+    "constraint_trigger_mapping": "EXACT_1_TO_1_WITH_PG_CONSTRAINT_CONTYPE_T",
+    "managed_constraint_total": 990,
+    "managed_routine_total": 28,
+    "model_comment_inventory": {
+      "column": 1470,
+      "constraint": 975,
+      "foreign_key_support_index": 266,
+      "table": 105,
+      "total": 2816
+    },
+    "new_routine_count": 27,
+    "new_routine_execute_grant_count": 0,
+    "physical_capture_requirement": "TWO_INDEPENDENT_POSTGRESQL_17_6_CANDIDATES_EXACT_BYTES",
+    "physical_comment_requirements": {
+      "baseline_helper": "CAPTURE_CURRENT_STATE",
+      "constraint_trigger": 15,
+      "new_routine": 27,
+      "trigger": 22
+    },
+    "postgresql_contract": "17.6",
+    "resolved_model_sha256": "72c68f5961cbf2c6456cf61d39d3b3e8188f458de90c88ef7c1afaac4be80a7f",
+    "target_pg_catalog_sha256": null,
+    "trigger_count": 22,
+    "trigger_enabled": "ALWAYS",
+    "trigger_type_mask_histogram": {
+      "17": 8,
+      "29": 7,
+      "34": 7
+    }
+  },
+  "catalog_status": "NOT_COMPILED",
+  "conservation_contract": {
+    "database_only_limitation": "A superuser can disable triggers and physically delete a terminal receipt; DB-only graph validation cannot prove deletion absence",
+    "detached_artifact": {
+      "confidentiality": [
+        "PRIVATE",
+        "SIGNED",
+        "ENCRYPTED"
+      ],
+      "exact_contents": [
+        "per-root relation row_count and typed-framed PK-sorted canonical-set root",
+        "graph root, tip and edge conservation including W1 NOOP-only tails",
+        "operation, object and source receipt lineage",
+        "55 outbound active FK orphan counts and typed orphan-set roots",
+        "raw NOOP source-ref detached bindings",
+        "manifest, signature and hash"
+      ],
+      "required": true
+    },
+    "foreign_key_scope": {
+      "active_outbound_count": 55,
+      "external_parent_relations": [
+        "hr_person",
+        "scm_supplier"
+      ],
+      "match_type": "MATCH SIMPLE",
+      "partial_null_rule": "IF_ANY_CHILD_COMPONENT_NULL_SKIP_WHOLE_FK",
+      "query_texts_and_typed_roots_pinned": true
+    },
+    "lock_mode": "SHARE",
+    "lookup_only_relations": [
+      "hr_person",
+      "scm_supplier"
+    ],
+    "root_relations": [
+      "app_audit_event",
+      "app_currency",
+      "app_job_run",
+      "app_source_system",
+      "app_unit",
+      "app_user",
+      "cost_card_material_cost_selection",
+      "finance_accounting_entity",
+      "finance_currency_assignment",
+      "finance_currency_policy",
+      "finance_fx_rate_observation",
+      "ops_location",
+      "scm_material",
+      "scm_material_price_observation",
+      "scm_material_unit_conversion",
+      "scm_supplier_item"
+    ],
+    "share_lock_order": [
+      "app_audit_event",
+      "app_currency",
+      "app_job_run",
+      "app_source_system",
+      "app_unit",
+      "app_user",
+      "cost_card_material_cost_selection",
+      "finance_accounting_entity",
+      "finance_currency_assignment",
+      "finance_currency_policy",
+      "finance_fx_rate_observation",
+      "hr_person",
+      "ops_location",
+      "scm_material",
+      "scm_material_price_observation",
+      "scm_material_unit_conversion",
+      "scm_supplier",
+      "scm_supplier_item"
+    ]
+  },
+  "decision_status": "APPROVED_CANDIDATE_AFTER_MODEL_RESEAL",
+  "dispatcher_contracts": {
+    "audit": {
+      "insert_nonreserved": "operation_id NULL; existing generic CHECK/FK only; no R6 global guard",
+      "insert_reserved": "SUCCESS, non-NIL operation, global guard, strict receipt/effect graph",
+      "reserved_denied_failed": "REJECT",
+      "update_delete": "REJECT"
+    },
+    "common": [
+      "six core DELETE operations reject",
+      "finance_fx_rate_observation UPDATE rejects as immutable",
+      "app_audit_event UPDATE and DELETE reject",
+      "scm_material_price_observation permits only exact W3 mutable set",
+      "cost_card_material_cost_selection permits only exact W4 transition set",
+      "owner maintenance uses the same fresh connector and global protocol"
+    ],
+    "read_closures": {
+      "cost_card_material_cost_selection": [
+        "app_audit_event",
+        "app_currency",
+        "app_job_run",
+        "app_source_system",
+        "app_unit",
+        "app_user",
+        "cost_card_material_cost_selection",
+        "finance_accounting_entity",
+        "finance_currency_assignment",
+        "finance_currency_policy",
+        "finance_fx_rate_observation",
+        "ops_location",
+        "scm_material",
+        "scm_material_price_observation",
+        "scm_material_unit_conversion",
+        "scm_supplier_item",
+        "hr_person lookup",
+        "scm_supplier lookup"
+      ],
+      "finance_accounting_entity": [
+        "app_user",
+        "finance_accounting_entity parent",
+        "finance_accounting_entity children",
+        "finance_accounting_entity cycle",
+        "finance_currency_assignment",
+        "finance_currency_policy",
+        "cost_card_material_cost_selection"
+      ],
+      "finance_currency_assignment": [
+        "ops_location",
+        "finance_accounting_entity",
+        "app_currency",
+        "app_user",
+        "finance_currency_assignment siblings",
+        "finance_currency_policy",
+        "cost_card_material_cost_selection"
+      ],
+      "finance_currency_policy": [
+        "app_currency",
+        "app_source_system",
+        "app_user",
+        "finance_currency_assignment",
+        "finance_currency_policy siblings",
+        "scm_material_price_observation",
+        "finance_fx_rate_observation",
+        "cost_card_material_cost_selection"
+      ],
+      "finance_fx_rate_observation": [
+        "app_currency",
+        "app_source_system",
+        "app_job_run",
+        "app_user",
+        "app_audit_event",
+        "finance_fx_rate_observation chain",
+        "finance_currency_policy",
+        "scm_material_price_observation",
+        "cost_card_material_cost_selection"
+      ],
+      "scm_material_price_observation": [
+        "app_currency",
+        "app_source_system",
+        "app_unit",
+        "scm_material",
+        "scm_material_unit_conversion",
+        "scm_supplier_item",
+        "app_user",
+        "app_audit_event",
+        "scm_material_price_observation chain",
+        "finance_currency_assignment",
+        "finance_currency_policy",
+        "finance_fx_rate_observation",
+        "cost_card_material_cost_selection"
+      ]
+    },
+    "shared_parent_algorithm": {
+      "comparison": "COMPARE_EACH_SEMANTIC_COLUMN_WITH_IS_DISTINCT_FROM",
+      "global_guard_semantic_change": "REQUIRE_SERIALIZABLE_AND_RUN_IMPACTED_CLOSURE",
+      "no_semantic_change": "FAST_PASS",
+      "read_committed_no_guard": "CURRENT_DEPENDENCY_LOOKUP_OVER_OLD_UNION_NEW; PASS_IF_NONE_ELSE_P0001",
+      "repeatable_read_or_serializable_no_guard": "FAIL_P0001_WITHOUT_DEPENDENCY_LOOKUP_PROOF"
+    },
+    "shared_parent_updates": [
+      {
+        "dependencies": [
+          "finance_currency_assignment.location_id"
+        ],
+        "recursive": false,
+        "semantic_columns": [
+          "location_id",
+          "status"
+        ],
+        "table": "ops_location"
+      },
+      {
+        "dependencies": [
+          "finance_currency_assignment.currency_code",
+          "finance_currency_policy.source_currency_code",
+          "finance_currency_policy.target_currency_code",
+          "finance_fx_rate_observation.from_currency_code",
+          "finance_fx_rate_observation.to_currency_code",
+          "scm_material_price_observation.transaction_currency_code",
+          "cost_card_material_cost_selection source/target currency"
+        ],
+        "recursive": false,
+        "semantic_columns": [
+          "currency_code",
+          "status",
+          "valid_from",
+          "valid_to"
+        ],
+        "table": "app_currency"
+      },
+      {
+        "dependencies": [
+          "finance_currency_policy.fx_provider_source_system_id",
+          "finance_fx_rate_observation.source_system_id",
+          "scm_material_price_observation.source_system_id",
+          "scm_material_unit_conversion.source_system_id",
+          "app_job_run referenced by FX or reserved receipt"
+        ],
+        "recursive": false,
+        "semantic_columns": [
+          "source_system_id",
+          "source_code",
+          "source_type",
+          "owner_project",
+          "authoritative_scope",
+          "status"
+        ],
+        "table": "app_source_system"
+      },
+      {
+        "dependencies": [
+          "finance_fx_rate_observation.source_job_run_id",
+          "exact-five app_audit_event.job_run_id"
+        ],
+        "recursive": false,
+        "semantic_columns": [
+          "job_run_id",
+          "source_system_id",
+          "job_code",
+          "scheduled_for",
+          "started_at",
+          "finished_at",
+          "status",
+          "input_manifest",
+          "created_at"
+        ],
+        "table": "app_job_run"
+      },
+      {
+        "dependencies": [
+          "scm_material_price_observation.supplier_item_id"
+        ],
+        "recursive": false,
+        "semantic_columns": [
+          "supplier_item_id",
+          "supplier_id",
+          "supersedes_supplier_item_id",
+          "order_unit_id",
+          "material_id",
+          "material_unit_conversion_id",
+          "valid_from",
+          "valid_to",
+          "mapping_status",
+          "evidence",
+          "confirmed_by_user_id",
+          "confirmed_at"
+        ],
+        "table": "scm_supplier_item"
+      },
+      {
+        "dependencies": [
+          "scm_material_price_observation.material_unit_conversion_id",
+          "scm_supplier_item.material_unit_conversion_id"
+        ],
+        "recursive": false,
+        "semantic_columns": [
+          "material_unit_conversion_id",
+          "material_id",
+          "from_unit_id",
+          "to_unit_id",
+          "conversion_factor",
+          "valid_from",
+          "valid_to",
+          "source_system_id",
+          "evidence",
+          "status",
+          "verified_by_user_id",
+          "verified_at"
+        ],
+        "table": "scm_material_unit_conversion"
+      },
+      {
+        "dependencies": [
+          "scm_material_price_observation.material_id",
+          "cost_card_material_cost_selection.material_id",
+          "scm_material_unit_conversion.material_id",
+          "scm_supplier_item.material_id"
+        ],
+        "recursive": false,
+        "semantic_columns": [
+          "material_id",
+          "material_type",
+          "base_unit_id",
+          "status"
+        ],
+        "table": "scm_material"
+      },
+      {
+        "dependencies": [
+          "scm_material.base_unit_id",
+          "scm_material_unit_conversion.from_unit_id",
+          "scm_material_unit_conversion.to_unit_id",
+          "scm_supplier_item.order_unit_id",
+          "scm_material_price_observation.raw_price_unit_id",
+          "app_unit.canonical_unit_id recursive closure"
+        ],
+        "recursive": true,
+        "semantic_columns": [
+          "unit_id",
+          "dimension_code",
+          "canonical_unit_id",
+          "factor_to_canonical",
+          "status"
+        ],
+        "table": "app_unit"
+      }
+    ]
+  },
+  "family_invariants": {
+    "accounting_entity": [
+      "branch parent must be LEGAL_ENTITY and ACTIVE branch parent must be ACTIVE",
+      "no self-parent and no cycle",
+      "id, code, creator and created_at always frozen",
+      "ACTIVE freezes identity/name/kind/parent/jurisdiction/registration/evidence/verifier/time",
+      "ACTIVE only transitions to RETIRED with status and updated_at",
+      "DRAFT transitions only to ACTIVE or REJECTED; RETIRED and REJECTED terminal"
+    ],
+    "currency_assignment": [
+      "scope/role/id XOR and approved parent location/entity/currency eligibility",
+      "approved intervals never overlap",
+      "DRAFT transitions only to APPROVED or REJECTED",
+      "APPROVED core and initial approval evidence/time freeze",
+      "only controlled close and optional retirement without truncating dependent policy/selection"
+    ],
+    "currency_policy": [
+      "same/cross currency field shapes exact and assignment target/range consistent",
+      "approved intervals never overlap",
+      "DRAFT transitions only to APPROVED or REJECTED",
+      "APPROVED core and initial approval evidence/time freeze",
+      "only controlled close/retire and never truncate dependent VERIFIED selection"
+    ],
+    "fx_rate_observation": [
+      "immutable business row",
+      "predecessor same source-system/record, current terminal, no fork and no cycle",
+      "job, authority, interpretation version and receipt provenance exact",
+      "parent-side selection preservation"
+    ],
+    "material_cost_selection": [
+      "explicit price id; no latest-price ranking",
+      "exact DRAFT/VERIFIED/open-close transitions",
+      "composite parent, cutoff, admission, terminal and max-quote tie rules",
+      "VERIFIED core frozen and interval exclusion preserved"
+    ],
+    "material_price_observation": [
+      "immutable core exact; only W3 mutable fields",
+      "restore chain same source/record terminal with no fork/cycle",
+      "composite material/unit/supplier identity",
+      "automated VERIFIED requires RESTORE provenance",
+      "inactive procurement evidence gate",
+      "successor/RESTORE that changes referenced terminal revalidates selection"
+    ]
+  },
+  "hash_contract": {
+    "compact_canonical_serialization": "json.dumps(value,ensure_ascii=False,sort_keys=True,separators=(',',':')).encode('utf-8')",
+    "json_contains_self_digest": false,
+    "manifest_bindings": [
+      "raw_sha256",
+      "size_bytes",
+      "compact_canonical_sha256"
+    ],
+    "sidecar_format": "<lowercase raw sha256>  trigger-contract.json\\n",
+    "source_serialization": "json.dumps(value,ensure_ascii=False,indent=2,sort_keys=True)+'\\n'"
+  },
+  "idempotency_contract": {
+    "fresh_order": [
+      "session guard",
+      "serializable isolation",
+      "defer exact15",
+      "capture v_now",
+      "current caller auth",
+      "normalize and typed-hash input",
+      "lookup action_code and operation_id",
+      "fresh preconditions only if receipt absent"
+    ],
+    "lineage": {
+      "clock_rule": "root occurred_at=v_now; child=max(v_now, predecessor.occurred_at plus 1 microsecond)",
+      "edge_rule": "child occurred_at strictly greater than predecessor",
+      "mutable_object_edges": [
+        "W2 or RESTORE to W3 via previous_object_receipt_id",
+        "W4 draft/verify/close via previous_object_receipt_id"
+      ],
+      "receipt_drift_error": "23514/r6a1_receipt_effect_drift_v1",
+      "source_chain_edges": [
+        "W1 FX via previous_chain_receipt_id",
+        "price RESTORE via previous_chain_receipt_id"
+      ],
+      "validation": "before effect equals predecessor effect; immutable core; allowed transition; no fork/cycle; current row unique tip"
+    },
+    "operation": {
+      "advisory_lock": "NONE",
+      "concurrency_arbiter": "app_audit_event_action_operation_uq",
+      "identity_grain": [
+        "action_code",
+        "operation_id"
+      ],
+      "nil_allowed": false,
+      "on_conflict_swallow": false,
+      "type": "uuid"
+    },
+    "replay": {
+      "fresh_precondition_order": "BEFORE_ALL_FRESH_PRECONDITIONS",
+      "reauthorize_current_caller": true,
+      "required_matches": [
+        "action_code",
+        "operation_id",
+        "stable_principal",
+        "input_fingerprint_sha256",
+        "recorded_object"
+      ],
+      "result": "RETURN_ORIGINAL_STORED_RESPONSE",
+      "validate_lineage_to_current_tip": true,
+      "writes": {
+        "audit": 0,
+        "business": 0
+      }
+    },
+    "request": {
+      "case_sensitive": true,
+      "fingerprint_member": false,
+      "normalization": "NONE",
+      "required": true,
+      "surrounding_u0020_valid": false,
+      "trace_only": true,
+      "utf8_octet_length": {
+        "maximum": 256,
+        "minimum": 1
+      },
+      "validation": "p_request_id = pg_catalog.btrim(p_request_id)"
+    },
+    "same_action_operation_mismatch": "23505/app_audit_event_action_operation_uq"
+  },
+  "inventory": {
+    "assert_all_routine_count": 1,
+    "assert_routine_count": 6,
+    "baseline_helper_identity": "public.app_normalize_alias_v1(pg_catalog.text)",
+    "constraint_trigger_count": 15,
+    "dispatcher_routine_count": 15,
+    "governed_direct_dml_grant_count": 0,
+    "managed_routine_count": 28,
+    "new_routine_count": 27,
+    "runtime_nonowner_execute_grant_count": 0,
+    "trigger_count": 22,
+    "trigger_type_mask_histogram": {
+      "17": 8,
+      "29": 7,
+      "34": 7
+    },
+    "truncate_routine_count": 1,
+    "truncate_trigger_count": 7,
+    "writer_routine_count": 4
+  },
+  "model_binding_status": "MODEL_RESEALED_AND_BOUND",
+  "model_delta": {
+    "affected_table_count": 32,
+    "app_audit_event": {
+      "check_expression": "((operation_id IS NOT NULL) = (result = 'SUCCESS' AND action_code IN ('R6A1_FX_RATE_OBSERVATION_WRITE','R6A1_MATERIAL_PRICE_OBSERVATION_INSERT','R6A1_MATERIAL_PRICE_OBSERVATION_VERIFY','R6A1_MATERIAL_COST_SELECTION_WRITE','R6A1_MATERIAL_PRICE_OBSERVATION_RESTORE'))) AND (operation_id IS NULL OR operation_id <> '00000000-0000-0000-0000-000000000000'::uuid)",
+      "column": {
+        "checks": [],
+        "data_type": "uuid",
+        "default": null,
+        "description": "五个 R6A1 受控成功主动作的幂等操作身份；普通审计事件为空。",
+        "example": "77777777-7777-4777-8777-777777777777",
+        "fk": null,
+        "fk_activation": "WITH_TABLE",
+        "name": "operation_id",
+        "notes": "与 action_code 共同提供一次逻辑命令的并发仲裁；不替代可跨多条日志复用的 request_id。",
+        "nullable": true,
+        "pk": false,
+        "purpose": "支持 commit-unknown 后按同一动作和操作身份安全重放，并拒绝同身份不同输入。",
+        "sensitive": "none",
+        "unique": false,
+        "zh_name": "操作幂等ID"
+      },
+      "field_index_zero_based": 8,
+      "physical_column_ordinal_one_based": 9,
+      "unique_constraint": {
+        "columns": [
+          "action_code",
+          "operation_id"
+        ],
+        "name": "app_audit_event_action_operation_uq",
+        "nulls_distinct": true
+      }
+    },
+    "notes_replacements": {
+      "app_audit_event": "object_type/object_id 是审计元数据，不是业务关系。业务查询必须使用各域真实外键；删除或改名业务对象不会级联修改审计流水。object_type 受域前缀格式约束，object_id 受 UUID 类型约束，仍不能据此声称数据库验证了它指向哪张表。R6A1 的 operation_id 只用于五个受控 SUCCESS 主动作，以 (action_code,operation_id) 提供幂等并发仲裁；request_id 仍是可跨多条事件和写者复用的追踪号，不参与唯一性或输入指纹。普通非 R6A1 审计事件 operation_id 必须为空。五个主动作的 before_data/after_data 仅保存严格脱敏投影和 typed hash，不复制完整业务行或受限证据。",
+      "finance_currency_assignment": "排斥约束为 DEFERRABLE INITIALLY IMMEDIATE。触发器须验证作用域/币种状态，批准后核心字段冻结，仅允许受控关闭或退役，且不得缩短到依赖 policy/selection 之外。GROUP 与 PRESENTATION 均未批准。R6A1 将 approved_at 定义为首次批准时间，批准后不得在退役或关闭时改写；退役操作者与时间只进入审计 receipt。",
+      "finance_currency_policy": "排斥约束为 DEFERRABLE INITIALLY IMMEDIATE。复合外键钉住 assignment 及 target currency。触发器须验证 policy 区间被 assignment 包含、批准状态/目标币种一致、批准后核心字段冻结且缩短不得悬空 selection。DOWN 明确定义为 toward-zero。R6A1 将 approved_at 定义为首次批准时间，批准后不得在退役或关闭时改写；退役操作者与时间只进入审计 receipt。",
+      "scm_material_price_observation": "只有 VERIFIED 且 zero_price_reason_code=CONTRACTUAL_FREE_OF_CHARGE 的零价可供 MATERIAL_COST/PURCHASE_PRICE_ONLY 选择；其它真实零价不表示持续采购成本，SOURCE_PLACEHOLDER 只能 REJECTED。NND 前驱键禁止分叉；触发器验证同 source/record 当前终态、无环、interpretation_contract_version 递增、自动核验 audit provenance、单位/原料复合身份和核心不可变。R6A1 当前在线 insert writer 仅创建 supersedes_material_price_observation_id=NULL 的 UNVERIFIED root；在线 verify writer 仅允许 ACTIVE/HUMAN 执行 UNVERIFIED→VERIFIED。模型允许的 supersession 与 verified_by_user_id=NULL 自动核验历史仅可由签名 S0 maintenance RESTORE 恢复并由 receipt/full verifier 证明。PROCUREMENT_AND_INVENTORY 扩展 FK 激活前，PO_CONFIRMED、RECEIPT_ACTUAL 及其证据 ID 均拒绝。"
+    },
+    "resolved_counts": {
+      "active_foreign_keys": 332,
+      "catalog_total_indexes": 505,
+      "check_constraints": 404,
+      "column_comments": 1470,
+      "columns": 1470,
+      "constraint_comments": 975,
+      "exclusion_constraints": 21,
+      "foreign_key_support_indexes": 266,
+      "index_comments": 266,
+      "primary_keys": 105,
+      "sql_views": 0,
+      "table_comments": 105,
+      "tables": 105,
+      "unique_constraints": 113
+    },
+    "semantic_rebuilds": [
+      "cost_card_material_cost_selection",
+      "pos_order_item",
+      "scm_material_price_observation"
+    ],
+    "surgical_alters": [
+      "app_audit_event",
+      "cost_card_recipe_version",
+      "ops_location"
+    ],
+    "unique_subtypes": {
+      "nulls_distinct": 16,
+      "nulls_not_distinct": 10,
+      "ordinary": 87
+    }
+  },
+  "postgresql_contract": "17.6",
+  "release_blockers": [
+    "CATALOG_CAPTURE_REQUIRED",
+    "ACTIVATION_MIGRATION_REQUIRED",
+    "DEDICATED_CONNECTOR_REQUIRED",
+    "LATEST_SIGNED_S0_CONSERVATION_REQUIRED"
+  ],
+  "resolved_model_sha256": "72c68f5961cbf2c6456cf61d39d3b3e8188f458de90c88ef7c1afaac4be80a7f",
+  "restore_contract": {
+    "action_code": "R6A1_MATERIAL_PRICE_OBSERVATION_RESTORE",
+    "actor": {
+      "actor_type": "DATABASE",
+      "actor_user_id": null,
+      "job_required": true
+    },
+    "batch_request_reuse": true,
+    "cutover": [
+      "target selection table currently empty",
+      "do not restore or forge historical VERIFIED R6A1 selection or approved_at",
+      "old cost-card verified status is not new selection approval",
+      "restore price observed_at but receipt occurs at current cutover logical time",
+      "controlled W4 cutover approves at current server time",
+      "effective_from may be retroactive by authority; approved_at never is"
+    ],
+    "input_schema": "hotcrush.r6a1.material-price-restore-input.v1",
+    "job_contract": {
+      "authority": "SIGNED_S0_RESTORE",
+      "contract": "MATERIAL_PRICE_RESTORE_V1",
+      "input_manifest_hash_omits_own_hash_key": true,
+      "job_code": "R6A1_MATERIAL_PRICE_RESTORE_V1",
+      "required_manifest_keys": [
+        "interpretation_contract_version",
+        "input_manifest_sha256",
+        "s0_artifact_sha256"
+      ],
+      "status": "SUCCEEDED_AND_FINISHED"
+    },
+    "maintenance_execution": "POSTGRES_OWNED_SIGNED_PINNED_MIGRATION_ONLY",
+    "online_routine": null,
+    "outcome": "RESTORED_INSERTED",
+    "predecessor_contract": [
+      "root predecessor null",
+      "successor same source/record and current terminal",
+      "unique child, no cycle, version greater than prefix max",
+      "receipt inserted before business insert and exact replay"
+    ],
+    "procurement_gate": "REJECT_PO_CONFIRMED_RECEIPT_ACTUAL_AND_GOODS_OR_PO_IDS_UNTIL_EXTENSION_RESEAL",
+    "row_identity": "ONE_OPERATION_PER_PRICE_ROW_NON_NIL_TARGET_UUID",
+    "verification_authority": "SIGNED_S0_RESTORE"
+  },
+  "revision_id": "R6A1-FX-SIGNED-POS",
+  "routine_contracts": [
+    {
+      "argument_modes": [
+        "IN"
+      ],
+      "argument_names": [
+        "p_accounting_entity_id"
+      ],
+      "argument_types": [
+        "uuid"
+      ],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_assert_accounting_entity_v1(pg_catalog.uuid)",
+      "kind": "SINGLE_FAMILY_ASSERT",
+      "leakproof": false,
+      "name": "public.r6a1_assert_accounting_entity_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "void",
+      "security": "DEFINER",
+      "signature": "public.r6a1_assert_accounting_entity_v1(p_accounting_entity_id uuid) RETURNS void",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [
+        "IN"
+      ],
+      "argument_names": [
+        "p_currency_assignment_id"
+      ],
+      "argument_types": [
+        "uuid"
+      ],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_assert_currency_assignment_v1(pg_catalog.uuid)",
+      "kind": "SINGLE_FAMILY_ASSERT",
+      "leakproof": false,
+      "name": "public.r6a1_assert_currency_assignment_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "void",
+      "security": "DEFINER",
+      "signature": "public.r6a1_assert_currency_assignment_v1(p_currency_assignment_id uuid) RETURNS void",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [
+        "IN"
+      ],
+      "argument_names": [
+        "p_currency_policy_id"
+      ],
+      "argument_types": [
+        "uuid"
+      ],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_assert_currency_policy_v1(pg_catalog.uuid)",
+      "kind": "SINGLE_FAMILY_ASSERT",
+      "leakproof": false,
+      "name": "public.r6a1_assert_currency_policy_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "void",
+      "security": "DEFINER",
+      "signature": "public.r6a1_assert_currency_policy_v1(p_currency_policy_id uuid) RETURNS void",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [
+        "IN"
+      ],
+      "argument_names": [
+        "p_fx_rate_observation_id"
+      ],
+      "argument_types": [
+        "uuid"
+      ],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_assert_fx_rate_observation_v1(pg_catalog.uuid)",
+      "kind": "SINGLE_FAMILY_ASSERT",
+      "leakproof": false,
+      "name": "public.r6a1_assert_fx_rate_observation_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "void",
+      "security": "DEFINER",
+      "signature": "public.r6a1_assert_fx_rate_observation_v1(p_fx_rate_observation_id uuid) RETURNS void",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [
+        "IN"
+      ],
+      "argument_names": [
+        "p_material_price_observation_id"
+      ],
+      "argument_types": [
+        "uuid"
+      ],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_assert_material_price_observation_v1(pg_catalog.uuid)",
+      "kind": "SINGLE_FAMILY_ASSERT",
+      "leakproof": false,
+      "name": "public.r6a1_assert_material_price_observation_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "void",
+      "security": "DEFINER",
+      "signature": "public.r6a1_assert_material_price_observation_v1(p_material_price_observation_id uuid) RETURNS void",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [
+        "IN"
+      ],
+      "argument_names": [
+        "p_material_cost_selection_id"
+      ],
+      "argument_types": [
+        "uuid"
+      ],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_assert_material_cost_selection_v1(pg_catalog.uuid)",
+      "kind": "SINGLE_FAMILY_ASSERT",
+      "leakproof": false,
+      "name": "public.r6a1_assert_material_cost_selection_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "void",
+      "security": "DEFINER",
+      "signature": "public.r6a1_assert_material_cost_selection_v1(p_material_cost_selection_id uuid) RETURNS void",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_assert_all_invariants_v1()",
+      "kind": "FULL_ASSERT",
+      "leakproof": false,
+      "name": "public.r6a1_assert_all_invariants_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "void",
+      "security": "DEFINER",
+      "signature": "public.r6a1_assert_all_invariants_v1() RETURNS void",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_finance_accounting_entity_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_finance_accounting_entity_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_finance_accounting_entity_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_finance_currency_assignment_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_finance_currency_assignment_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_finance_currency_assignment_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_finance_currency_policy_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_finance_currency_policy_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_finance_currency_policy_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_finance_fx_rate_observation_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_finance_fx_rate_observation_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_finance_fx_rate_observation_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_scm_material_price_observation_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_scm_material_price_observation_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_scm_material_price_observation_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_cost_card_material_cost_selection_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_cost_card_material_cost_selection_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_cost_card_material_cost_selection_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_ops_location_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_ops_location_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_ops_location_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_app_currency_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_app_currency_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_app_currency_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_app_source_system_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_app_source_system_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_app_source_system_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_app_job_run_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_app_job_run_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_app_job_run_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_scm_supplier_item_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_scm_supplier_item_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_scm_supplier_item_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_scm_material_unit_conversion_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_scm_material_unit_conversion_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_scm_material_unit_conversion_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_scm_material_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_scm_material_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_scm_material_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_app_unit_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_app_unit_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_app_unit_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_ct_app_audit_event_v1()",
+      "kind": "TRIGGER_DISPATCHER",
+      "leakproof": false,
+      "name": "public.r6a1_ct_app_audit_event_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "DEFINER",
+      "signature": "public.r6a1_ct_app_audit_event_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [],
+      "argument_names": [],
+      "argument_types": [],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_block_governed_truncate_v1()",
+      "kind": "TRUNCATE_BLOCKER",
+      "leakproof": false,
+      "name": "public.r6a1_block_governed_truncate_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "trigger",
+      "security": "INVOKER",
+      "signature": "public.r6a1_block_governed_truncate_v1() RETURNS trigger",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN"
+      ],
+      "argument_names": [
+        "p_request_id",
+        "p_operation_id",
+        "p_source_job_run_id",
+        "p_interpretation_contract_version",
+        "p_source_system_id",
+        "p_source_record_id",
+        "p_from_currency_code",
+        "p_to_currency_code",
+        "p_rate",
+        "p_rate_type",
+        "p_rate_basis",
+        "p_quoted_at",
+        "p_provider_published_at",
+        "p_source_payload_sha256",
+        "p_source_payload_ref",
+        "p_quality_status",
+        "p_verified_by_user_id"
+      ],
+      "argument_types": [
+        "text",
+        "uuid",
+        "uuid",
+        "integer",
+        "uuid",
+        "text",
+        "text",
+        "text",
+        "numeric",
+        "text",
+        "text",
+        "timestamptz",
+        "timestamptz",
+        "text",
+        "text",
+        "text",
+        "uuid"
+      ],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_write_fx_rate_observation_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.int4,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.numeric,pg_catalog.text,pg_catalog.text,pg_catalog.timestamptz,pg_catalog.timestamptz,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)",
+      "kind": "CONTROLLED_WRITER",
+      "leakproof": false,
+      "name": "public.r6a1_write_fx_rate_observation_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "jsonb",
+      "security": "DEFINER",
+      "signature": "public.r6a1_write_fx_rate_observation_v1(p_request_id text,p_operation_id uuid,p_source_job_run_id uuid,p_interpretation_contract_version integer,p_source_system_id uuid,p_source_record_id text,p_from_currency_code text,p_to_currency_code text,p_rate numeric,p_rate_type text,p_rate_basis text,p_quoted_at timestamptz,p_provider_published_at timestamptz,p_source_payload_sha256 text,p_source_payload_ref text,p_quality_status text,p_verified_by_user_id uuid) RETURNS jsonb",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN"
+      ],
+      "argument_names": [
+        "p_request_id",
+        "p_operation_id",
+        "p_actor_user_id",
+        "p_actor_job_run_id",
+        "p_material_id",
+        "p_supplier_item_id",
+        "p_source_system_id",
+        "p_source_record_id",
+        "p_source_payload_sha256",
+        "p_observation_type",
+        "p_observed_at",
+        "p_raw_price_amount",
+        "p_raw_price_quantity",
+        "p_raw_price_unit_text",
+        "p_raw_price_unit_id",
+        "p_material_unit_conversion_id",
+        "p_transaction_currency_code",
+        "p_zero_price_reason_code",
+        "p_verification_evidence"
+      ],
+      "argument_types": [
+        "text",
+        "uuid",
+        "uuid",
+        "uuid",
+        "uuid",
+        "uuid",
+        "uuid",
+        "text",
+        "text",
+        "text",
+        "timestamptz",
+        "numeric",
+        "numeric",
+        "text",
+        "uuid",
+        "uuid",
+        "text",
+        "text",
+        "jsonb"
+      ],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_insert_material_price_observation_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.timestamptz,pg_catalog.numeric,pg_catalog.numeric,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.jsonb)",
+      "kind": "CONTROLLED_WRITER",
+      "leakproof": false,
+      "name": "public.r6a1_insert_material_price_observation_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "jsonb",
+      "security": "DEFINER",
+      "signature": "public.r6a1_insert_material_price_observation_v1(p_request_id text,p_operation_id uuid,p_actor_user_id uuid,p_actor_job_run_id uuid,p_material_id uuid,p_supplier_item_id uuid,p_source_system_id uuid,p_source_record_id text,p_source_payload_sha256 text,p_observation_type text,p_observed_at timestamptz,p_raw_price_amount numeric,p_raw_price_quantity numeric,p_raw_price_unit_text text,p_raw_price_unit_id uuid,p_material_unit_conversion_id uuid,p_transaction_currency_code text,p_zero_price_reason_code text,p_verification_evidence jsonb) RETURNS jsonb",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN"
+      ],
+      "argument_names": [
+        "p_request_id",
+        "p_operation_id",
+        "p_material_price_observation_id",
+        "p_expected_updated_at",
+        "p_verified_by_user_id",
+        "p_zero_price_reason_code",
+        "p_verification_evidence"
+      ],
+      "argument_types": [
+        "text",
+        "uuid",
+        "uuid",
+        "timestamptz",
+        "uuid",
+        "text",
+        "jsonb"
+      ],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_verify_material_price_observation_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.timestamptz,pg_catalog.uuid,pg_catalog.text,pg_catalog.jsonb)",
+      "kind": "CONTROLLED_WRITER",
+      "leakproof": false,
+      "name": "public.r6a1_verify_material_price_observation_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "jsonb",
+      "security": "DEFINER",
+      "signature": "public.r6a1_verify_material_price_observation_v1(p_request_id text,p_operation_id uuid,p_material_price_observation_id uuid,p_expected_updated_at timestamptz,p_verified_by_user_id uuid,p_zero_price_reason_code text,p_verification_evidence jsonb) RETURNS jsonb",
+      "strict": false,
+      "volatility": "VOLATILE"
+    },
+    {
+      "argument_modes": [
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN",
+        "IN"
+      ],
+      "argument_names": [
+        "p_request_id",
+        "p_operation_id",
+        "p_actor_user_id",
+        "p_material_cost_selection_id",
+        "p_expected_updated_at",
+        "p_material_id",
+        "p_material_price_observation_id",
+        "p_target_currency_assignment_id",
+        "p_currency_policy_id",
+        "p_fx_rate_observation_id",
+        "p_effective_from",
+        "p_effective_to",
+        "p_quality_status",
+        "p_evidence"
+      ],
+      "argument_types": [
+        "text",
+        "uuid",
+        "uuid",
+        "uuid",
+        "timestamptz",
+        "uuid",
+        "uuid",
+        "uuid",
+        "uuid",
+        "uuid",
+        "timestamptz",
+        "timestamptz",
+        "text",
+        "jsonb"
+      ],
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "configuration": [
+        "search_path=pg_catalog, pg_temp",
+        "row_security=off",
+        "TimeZone=UTC"
+      ],
+      "default_argument_count": 0,
+      "executable_body_status": "NOT_COMPILED",
+      "execute_grantees": [],
+      "identity": "public.r6a1_write_material_cost_selection_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.timestamptz,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.timestamptz,pg_catalog.timestamptz,pg_catalog.text,pg_catalog.jsonb)",
+      "kind": "CONTROLLED_WRITER",
+      "leakproof": false,
+      "name": "public.r6a1_write_material_cost_selection_v1",
+      "owner": "postgres",
+      "parallel": "UNSAFE",
+      "returns": "jsonb",
+      "security": "DEFINER",
+      "signature": "public.r6a1_write_material_cost_selection_v1(p_request_id text,p_operation_id uuid,p_actor_user_id uuid,p_material_cost_selection_id uuid,p_expected_updated_at timestamptz,p_material_id uuid,p_material_price_observation_id uuid,p_target_currency_assignment_id uuid,p_currency_policy_id uuid,p_fx_rate_observation_id uuid,p_effective_from timestamptz,p_effective_to timestamptz,p_quality_status text,p_evidence jsonb) RETURNS jsonb",
+      "strict": false,
+      "volatility": "VOLATILE"
+    }
+  ],
+  "schema_version": 2,
+  "transaction_contract": {
+    "after_transaction": {
+      "commit_cleanup_unknown": "COMMIT_SUCCEEDED_CLEANUP_UNKNOWN",
+      "commit_unknown_absent_receipt_before_reacquire": "INDETERMINATE",
+      "connection_action": "ALWAYS_DESTROY_NEVER_POOL",
+      "unlock": "autocommit pg_advisory_unlock exact key must return true",
+      "unlock_anomaly": "FORCE_CLOSE_AND_NEVER_POOL",
+      "verify": "pg_locks exact key has no granted row in any mode"
+    },
+    "begin": {
+      "isolation": "SERIALIZABLE",
+      "no_sql_between_begin_and_writer": true,
+      "only_after_session_lock": true
+    },
+    "connection": {
+      "fresh": true,
+      "ordinary_rpc_supported": false,
+      "physical": true,
+      "pooled": false,
+      "pooler_supported": false
+    },
+    "constraint_mode": {
+      "final": "IMMEDIATE",
+      "initial": "DEFERRED",
+      "names": [
+        "public.ct_r6a1_finance_accounting_entity_v1",
+        "public.ct_r6a1_finance_currency_assignment_v1",
+        "public.ct_r6a1_finance_currency_policy_v1",
+        "public.ct_r6a1_finance_fx_rate_observation_v1",
+        "public.ct_r6a1_scm_material_price_observation_v1",
+        "public.ct_r6a1_cost_card_material_cost_selection_v1",
+        "public.ct_r6a1_ops_location_v1",
+        "public.ct_r6a1_app_currency_v1",
+        "public.ct_r6a1_app_source_system_v1",
+        "public.ct_r6a1_app_job_run_v1",
+        "public.ct_r6a1_scm_supplier_item_v1",
+        "public.ct_r6a1_scm_material_unit_conversion_v1",
+        "public.ct_r6a1_scm_material_v1",
+        "public.ct_r6a1_app_unit_v1",
+        "public.ct_r6a1_app_audit_event_v1"
+      ],
+      "set_constraints_all_forbidden": true
+    },
+    "fresh_branch_locks": [
+      "FX chain or target FOR UPDATE",
+      "target price or selection FOR UPDATE",
+      "referenced parents FOR SHARE in fixed order"
+    ],
+    "guard": {
+      "acquire_outside_transaction": true,
+      "key": {
+        "int32_key_1": 628788722,
+        "int32_key_2": 2009509832,
+        "label": "hotcrush-core-v1-r6a1-fx-cost-invariants",
+        "sha256": "257a8df277c6afc8942fcf8132c7b349a73b5db2e67440a74381d1fb9d7f38be"
+      },
+      "preacquire_check": "current pid has no granted advisory row in any mode for exact key",
+      "try_lock": "pg_catalog.pg_try_advisory_lock(628788722,2009509832)",
+      "try_lock_false": "destroy connection and retry fresh",
+      "writer_first_query": "verify current database/current pid pg_locks classid=628788722,objid=2009509832,objsubid=2,ExclusiveLock,granted"
+    },
+    "retry": {
+      "engine_sqlstates": [
+        "40001",
+        "40P01"
+      ],
+      "maximum_fresh_connection_attempts": 5,
+      "same_retry_identity": [
+        "action_code",
+        "operation_id",
+        "input_fingerprint_sha256"
+      ],
+      "strategy": "fresh connection with jitter after reacquiring global key"
+    },
+    "v_now": "one pg_catalog.clock_timestamp() after exact15 deferred and before auth/reads"
+  },
+  "trigger_contracts": [
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": null,
+      "deferrable": false,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "TRUNCATE"
+      ],
+      "function_identity": "public.r6a1_block_governed_truncate_v1()",
+      "initially_deferred": false,
+      "is_constraint": false,
+      "level": "STATEMENT",
+      "name": "bt_r6a1_block_truncate_app_audit_event_v1",
+      "schema": "public",
+      "table": "app_audit_event",
+      "timing": "BEFORE",
+      "type_mask": 34
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_app_audit_event_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "function_identity": "public.r6a1_ct_app_audit_event_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_app_audit_event_v1",
+      "schema": "public",
+      "table": "app_audit_event",
+      "timing": "AFTER",
+      "type_mask": 29
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_app_currency_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "UPDATE"
+      ],
+      "function_identity": "public.r6a1_ct_app_currency_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_app_currency_v1",
+      "schema": "public",
+      "table": "app_currency",
+      "timing": "AFTER",
+      "type_mask": 17
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_app_job_run_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "UPDATE"
+      ],
+      "function_identity": "public.r6a1_ct_app_job_run_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_app_job_run_v1",
+      "schema": "public",
+      "table": "app_job_run",
+      "timing": "AFTER",
+      "type_mask": 17
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_app_source_system_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "UPDATE"
+      ],
+      "function_identity": "public.r6a1_ct_app_source_system_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_app_source_system_v1",
+      "schema": "public",
+      "table": "app_source_system",
+      "timing": "AFTER",
+      "type_mask": 17
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_app_unit_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "UPDATE"
+      ],
+      "function_identity": "public.r6a1_ct_app_unit_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_app_unit_v1",
+      "schema": "public",
+      "table": "app_unit",
+      "timing": "AFTER",
+      "type_mask": 17
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": null,
+      "deferrable": false,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "TRUNCATE"
+      ],
+      "function_identity": "public.r6a1_block_governed_truncate_v1()",
+      "initially_deferred": false,
+      "is_constraint": false,
+      "level": "STATEMENT",
+      "name": "bt_r6a1_block_truncate_cost_card_material_cost_selection_v1",
+      "schema": "public",
+      "table": "cost_card_material_cost_selection",
+      "timing": "BEFORE",
+      "type_mask": 34
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_cost_card_material_cost_selection_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "function_identity": "public.r6a1_ct_cost_card_material_cost_selection_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_cost_card_material_cost_selection_v1",
+      "schema": "public",
+      "table": "cost_card_material_cost_selection",
+      "timing": "AFTER",
+      "type_mask": 29
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": null,
+      "deferrable": false,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "TRUNCATE"
+      ],
+      "function_identity": "public.r6a1_block_governed_truncate_v1()",
+      "initially_deferred": false,
+      "is_constraint": false,
+      "level": "STATEMENT",
+      "name": "bt_r6a1_block_truncate_finance_accounting_entity_v1",
+      "schema": "public",
+      "table": "finance_accounting_entity",
+      "timing": "BEFORE",
+      "type_mask": 34
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_finance_accounting_entity_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "function_identity": "public.r6a1_ct_finance_accounting_entity_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_finance_accounting_entity_v1",
+      "schema": "public",
+      "table": "finance_accounting_entity",
+      "timing": "AFTER",
+      "type_mask": 29
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": null,
+      "deferrable": false,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "TRUNCATE"
+      ],
+      "function_identity": "public.r6a1_block_governed_truncate_v1()",
+      "initially_deferred": false,
+      "is_constraint": false,
+      "level": "STATEMENT",
+      "name": "bt_r6a1_block_truncate_finance_currency_assignment_v1",
+      "schema": "public",
+      "table": "finance_currency_assignment",
+      "timing": "BEFORE",
+      "type_mask": 34
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_finance_currency_assignment_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "function_identity": "public.r6a1_ct_finance_currency_assignment_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_finance_currency_assignment_v1",
+      "schema": "public",
+      "table": "finance_currency_assignment",
+      "timing": "AFTER",
+      "type_mask": 29
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": null,
+      "deferrable": false,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "TRUNCATE"
+      ],
+      "function_identity": "public.r6a1_block_governed_truncate_v1()",
+      "initially_deferred": false,
+      "is_constraint": false,
+      "level": "STATEMENT",
+      "name": "bt_r6a1_block_truncate_finance_currency_policy_v1",
+      "schema": "public",
+      "table": "finance_currency_policy",
+      "timing": "BEFORE",
+      "type_mask": 34
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_finance_currency_policy_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "function_identity": "public.r6a1_ct_finance_currency_policy_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_finance_currency_policy_v1",
+      "schema": "public",
+      "table": "finance_currency_policy",
+      "timing": "AFTER",
+      "type_mask": 29
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": null,
+      "deferrable": false,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "TRUNCATE"
+      ],
+      "function_identity": "public.r6a1_block_governed_truncate_v1()",
+      "initially_deferred": false,
+      "is_constraint": false,
+      "level": "STATEMENT",
+      "name": "bt_r6a1_block_truncate_finance_fx_rate_observation_v1",
+      "schema": "public",
+      "table": "finance_fx_rate_observation",
+      "timing": "BEFORE",
+      "type_mask": 34
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_finance_fx_rate_observation_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "function_identity": "public.r6a1_ct_finance_fx_rate_observation_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_finance_fx_rate_observation_v1",
+      "schema": "public",
+      "table": "finance_fx_rate_observation",
+      "timing": "AFTER",
+      "type_mask": 29
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_ops_location_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "UPDATE"
+      ],
+      "function_identity": "public.r6a1_ct_ops_location_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_ops_location_v1",
+      "schema": "public",
+      "table": "ops_location",
+      "timing": "AFTER",
+      "type_mask": 17
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_scm_material_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "UPDATE"
+      ],
+      "function_identity": "public.r6a1_ct_scm_material_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_scm_material_v1",
+      "schema": "public",
+      "table": "scm_material",
+      "timing": "AFTER",
+      "type_mask": 17
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": null,
+      "deferrable": false,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "TRUNCATE"
+      ],
+      "function_identity": "public.r6a1_block_governed_truncate_v1()",
+      "initially_deferred": false,
+      "is_constraint": false,
+      "level": "STATEMENT",
+      "name": "bt_r6a1_block_truncate_scm_material_price_observation_v1",
+      "schema": "public",
+      "table": "scm_material_price_observation",
+      "timing": "BEFORE",
+      "type_mask": 34
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_scm_material_price_observation_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ],
+      "function_identity": "public.r6a1_ct_scm_material_price_observation_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_scm_material_price_observation_v1",
+      "schema": "public",
+      "table": "scm_material_price_observation",
+      "timing": "AFTER",
+      "type_mask": 29
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_scm_material_unit_conversion_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "UPDATE"
+      ],
+      "function_identity": "public.r6a1_ct_scm_material_unit_conversion_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_scm_material_unit_conversion_v1",
+      "schema": "public",
+      "table": "scm_material_unit_conversion",
+      "timing": "AFTER",
+      "type_mask": 17
+    },
+    {
+      "comment_requirement": "NONEMPTY_PHYSICAL_COMMENT_REQUIRED",
+      "constraint_name": "ct_r6a1_scm_supplier_item_v1",
+      "deferrable": true,
+      "definition_status": "NOT_COMPILED",
+      "enabled": "ALWAYS",
+      "events": [
+        "UPDATE"
+      ],
+      "function_identity": "public.r6a1_ct_scm_supplier_item_v1()",
+      "initially_deferred": false,
+      "is_constraint": true,
+      "level": "ROW",
+      "name": "ct_r6a1_scm_supplier_item_v1",
+      "schema": "public",
+      "table": "scm_supplier_item",
+      "timing": "AFTER",
+      "type_mask": 17
+    }
+  ],
+  "typed_hash_contract": {
+    "algorithm": "SHA256",
+    "domain": "hotcrush.r6a1.typed-frame.v1",
+    "excluded_fields": [
+      "request_id",
+      "retry_time",
+      "ip_address",
+      "user_agent",
+      "server_generated_id",
+      "server_generated_time",
+      "response_only_fields"
+    ],
+    "field_frame": [
+      "uint32_be(name_utf8_octet_length)",
+      "name_utf8",
+      "uint8(type_tag)",
+      "uint8(null_tag)",
+      "if nonnull uint64_be(value_length) and typed_bytes"
+    ],
+    "field_order": "FIXED_PER_ACTION",
+    "included_fields": [
+      "action_code",
+      "contract_version",
+      "operation_id",
+      "stable_principal",
+      "all effect arguments",
+      "expected timestamp",
+      "full restricted evidence bytes",
+      "restore bindings"
+    ],
+    "jsonb_text_authority": false,
+    "postgresql_binary_contract": "17.6",
+    "root_frame": [
+      "domain_utf8",
+      "uint32_be(field_count)",
+      "field_frames"
+    ],
+    "typed_encodings": {
+      "boolean": "one byte",
+      "inet": "inet_send",
+      "int2": "int2send",
+      "int4": "int4send",
+      "int8": "int8send",
+      "jsonb": "jsonb_send",
+      "numeric": "cast to frozen typmod then numeric_send",
+      "text": "exact UTF8",
+      "timestamptz": "timestamptz_send",
+      "uuid": "uuid_send"
+    }
+  },
+  "writer_contracts": {
+    "W1": {
+      "action_code": "R6A1_FX_RATE_OBSERVATION_WRITE",
+      "canonical_output_fields": [
+        "from_currency_code",
+        "to_currency_code",
+        "rate::numeric(38,18)",
+        "rate_type",
+        "rate_basis",
+        "quoted_at",
+        "provider_published_at",
+        "quality_status"
+      ],
+      "chain_identity": [
+        "source_system_id",
+        "exact source_record_id"
+      ],
+      "fresh_version_rule": "strictly greater than every business-chain source-job version and every prior successful W1 receipt including NOOP tail",
+      "function_identity": "public.r6a1_write_fx_rate_observation_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.int4,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.numeric,pg_catalog.text,pg_catalog.text,pg_catalog.timestamptz,pg_catalog.timestamptz,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.uuid)",
+      "object_type": "finance_fx_rate_observation",
+      "outcomes": [
+        "INSERTED",
+        "NOOP_CANONICAL"
+      ],
+      "semantics": [
+        "all quality states require nonnull SUCCEEDED finished source job with matching source system and exact job/manifest contract/version authority",
+        "OBSERVED or REJECTED requires null verifier and SERVICE job authority OBSERVATION_INGEST",
+        "VERIFIED null verifier requires SERVICE job authority AUTHORITATIVE_AUTOMATED_VERIFICATION",
+        "VERIFIED nonnull verifier requires ACTIVE HUMAN user plus source job and HUMAN_REVIEW_SOURCE",
+        "same terminal canonical tuple writes no business row but advances receipt/version tail",
+        "different tuple inserts immutable successor with same chain terminal predecessor and no fork/cycle",
+        "every new root/successor/NOOP re-evaluates existing VERIFIED selections at approved_at and rejects retroactive candidate/terminal/provenance/tie change"
+      ],
+      "signature": "public.r6a1_write_fx_rate_observation_v1(p_request_id text,p_operation_id uuid,p_source_job_run_id uuid,p_interpretation_contract_version integer,p_source_system_id uuid,p_source_record_id text,p_from_currency_code text,p_to_currency_code text,p_rate numeric,p_rate_type text,p_rate_basis text,p_quoted_at timestamptz,p_provider_published_at timestamptz,p_source_payload_sha256 text,p_source_payload_ref text,p_quality_status text,p_verified_by_user_id uuid) RETURNS jsonb"
+    },
+    "W2": {
+      "action_code": "R6A1_MATERIAL_PRICE_OBSERVATION_INSERT",
+      "function_identity": "public.r6a1_insert_material_price_observation_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.text,pg_catalog.timestamptz,pg_catalog.numeric,pg_catalog.numeric,pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.text,pg_catalog.text,pg_catalog.jsonb)",
+      "object_type": "scm_material_price_observation",
+      "outcomes": [
+        "INSERTED"
+      ],
+      "semantics": [
+        "exactly one actor user/job; user ACTIVE HUMAN or job SUCCEEDED finished with exact job code and matching source system",
+        "UNVERIFIED only; verification fields null; supersedes null; goods/PO ids null",
+        "observation type only QUOTE, MANUAL_MARKET_CHECK or LEGACY_MIGRATION",
+        "hard reject PO_CONFIRMED, RECEIPT_ACTUAL or nonnull procurement evidence IDs",
+        "root only, unique root key, no upsert, correction or supersession"
+      ],
+      "signature": "public.r6a1_insert_material_price_observation_v1(p_request_id text,p_operation_id uuid,p_actor_user_id uuid,p_actor_job_run_id uuid,p_material_id uuid,p_supplier_item_id uuid,p_source_system_id uuid,p_source_record_id text,p_source_payload_sha256 text,p_observation_type text,p_observed_at timestamptz,p_raw_price_amount numeric,p_raw_price_quantity numeric,p_raw_price_unit_text text,p_raw_price_unit_id uuid,p_material_unit_conversion_id uuid,p_transaction_currency_code text,p_zero_price_reason_code text,p_verification_evidence jsonb) RETURNS jsonb"
+    },
+    "W3": {
+      "action_code": "R6A1_MATERIAL_PRICE_OBSERVATION_VERIFY",
+      "function_identity": "public.r6a1_verify_material_price_observation_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.timestamptz,pg_catalog.uuid,pg_catalog.text,pg_catalog.jsonb)",
+      "object_type": "scm_material_price_observation",
+      "outcomes": [
+        "VERIFIED"
+      ],
+      "semantics": [
+        "online human-only verified_by ACTIVE HUMAN with exact activation JWT subject binding; no source-job argument",
+        "only UNVERIFIED to VERIFIED with exact expected OLD.updated_at",
+        "mutable fields only zero_price_reason_code, quality_status, verification_evidence, verified_by_user_id, verified_at, updated_at",
+        "positive price requires old and parameter zero reason null",
+        "zero price may set one of CONTRACTUAL_FREE_OF_CHARGE, PROMOTIONAL_FREE_OF_CHARGE, FREE_SAMPLE, BUNDLED_NO_SEPARATE_PRICE, FULL_REBATE_OR_CREDIT, NEW",
+        "existing approved zero reason must be passed unchanged; SOURCE_PLACEHOLDER cannot verify",
+        "selection accepts zero only CONTRACTUAL_FREE_OF_CHARGE",
+        "independent price root verification never invents latest-price ranking"
+      ],
+      "signature": "public.r6a1_verify_material_price_observation_v1(p_request_id text,p_operation_id uuid,p_material_price_observation_id uuid,p_expected_updated_at timestamptz,p_verified_by_user_id uuid,p_zero_price_reason_code text,p_verification_evidence jsonb) RETURNS jsonb"
+    },
+    "W4": {
+      "action_code": "R6A1_MATERIAL_COST_SELECTION_WRITE",
+      "function_identity": "public.r6a1_write_material_cost_selection_v1(pg_catalog.text,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.timestamptz,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.uuid,pg_catalog.timestamptz,pg_catalog.timestamptz,pg_catalog.text,pg_catalog.jsonb)",
+      "object_type": "cost_card_material_cost_selection",
+      "outcomes": [
+        "DRAFT_INSERTED",
+        "DRAFT_UPDATED",
+        "VERIFIED",
+        "CLOSED"
+      ],
+      "semantics": [
+        "null id inserts DRAFT only; nonnull id updates only with exact expected timestamp; no upsert",
+        "DRAFT to DRAFT or VERIFIED; open VERIFIED only closes effective_to and updated_at; only DRAFT core mutable",
+        "DRAFT to VERIFIED sets approved user and v_now and never backdates",
+        "selection cutoff is guarded v_now and never raised to logical receipt time; clock before required evidence tip fails",
+        "price VERIFIED, admitted by cutoff, terminal-as-of and positive or contractual-free zero",
+        "exact one verified unit route and exact supplier/assignment/policy eligibility as of cutoff",
+        "cross-currency uses VERIFIED direct candidates and ranks only maximum quoted_at; tie at max rejects without alternate tie-break",
+        "same currency requires null FX and policy selectors, conceptual multiplier one and no candidate search",
+        "selected price and FX admission receipts must be at or before approved_at"
+      ],
+      "signature": "public.r6a1_write_material_cost_selection_v1(p_request_id text,p_operation_id uuid,p_actor_user_id uuid,p_material_cost_selection_id uuid,p_expected_updated_at timestamptz,p_material_id uuid,p_material_price_observation_id uuid,p_target_currency_assignment_id uuid,p_currency_policy_id uuid,p_fx_rate_observation_id uuid,p_effective_from timestamptz,p_effective_to timestamptz,p_quality_status text,p_evidence jsonb) RETURNS jsonb"
+    }
+  }
+}

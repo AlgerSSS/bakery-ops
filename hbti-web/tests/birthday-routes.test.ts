@@ -93,7 +93,12 @@ beforeEach(() => {
     if (text.includes("GROUP BY 1")) {
       return Promise.resolve([{ month: "2026-08", net_sales: "345.6", visits: 5 }]);
     }
-    // 注意顺序：pos_member_order_item 包含 pos_member 子串，统计查询必须先于它匹配。
+    // 注意顺序：pos_member_order_item 包含 pos_member 子串，
+    // 年度消费（SUM(net_sales)）必须先于它匹配，否则会被当成会员基础信息行。
+    if (text.includes("SUM(net_sales)")) {
+      // 年度消费 345.6 → Lv2 心动会员
+      return Promise.resolve([{ spend: "345.6" }]);
+    }
     if (text.includes("FROM public.pos_member")) return Promise.resolve([BASICS_ROW]);
     return Promise.resolve([]);
   };
@@ -114,14 +119,16 @@ describe("GET /api/birthday/view", () => {
     expect(body.member.levelName).toBe("VIP1");
     expect(body.member.pointBalance).toBe(120);
     expect(body.maskedPhone).toBe("**** 6789");
+    // 年度消费 345.6 → Lv2 心动会员 → 只有免费巴斯克（积分再多也不给兑换）
     expect(body.options.map((o: { giftType: string }) => o.giftType)).toEqual([
       "free_basque",
-      "points_450",
     ]);
     expect(body.options[0].available).toBe(true);
-    // 余额 120 < 450：积分选项展示但不可选
-    expect(body.options[1].available).toBe(false);
-    expect(body.options[1].deniedReason).toBe("INSUFFICIENT_POINTS");
+    expect(body.member.level.key).toBe("L2");
+    expect(body.member.level.nameZh).toBe("Lv2 心动会员");
+    expect(body.member.level.annualSpend).toBe(345.6);
+    expect(body.member.level.next?.key).toBe("L3");
+    expect(body.member.level.next?.gap).toBeCloseTo(404.4, 1);
     expect(body.stats.totalQty).toBe(12);
     expect(body.stats.favorite.nameZh).toBe("趁热心动蛋挞");
     expect(body.reservations).toEqual([]);
@@ -195,9 +202,13 @@ describe("POST /api/birthday/reserve", () => {
     expect(body.notified).toBe("pending");
   });
 
-  it("积分够 450 时可选积分兑换", async () => {
+  it("L3 积分够 450 时可选积分兑换", async () => {
     const base = sqlState.handler;
     sqlState.handler = (text) => {
+      if (text.includes("SUM(net_sales)")) {
+        // 年度消费 800 → Lv3 热爱会员
+        return Promise.resolve([{ spend: "800" }]);
+      }
       if (text.includes("FROM public.pos_member")) {
         return Promise.resolve([{ ...BASICS_ROW, point_balance: 500 }]);
       }
@@ -220,13 +231,36 @@ describe("POST /api/birthday/reserve", () => {
     expect(body.notified).toBe("pending");
   });
 
-  it("积分不足选积分兑换 → 403", async () => {
+  it("L3 积分不足选积分兑换 → 403", async () => {
+    const base = sqlState.handler;
+    sqlState.handler = (text) => {
+      if (text.includes("SUM(net_sales)")) {
+        return Promise.resolve([{ spend: "800" }]);
+      }
+      return base!(text);
+    };
     const res = await reservePOST(postJson("/api/birthday/reserve", {
       linkToken: linkFor(MEMBER), forWhom: "self", giftType: "points_450",
       pickupDate: validPickupDate(), slot: "noon",
     }));
     expect(res.status).toBe(403);
     expect((await res.json()).error).toBe("INSUFFICIENT_POINTS");
+  });
+
+  it("L2 积分再多也不能选积分兑换 → 409 BENEFIT_NOT_AVAILABLE", async () => {
+    const base = sqlState.handler;
+    sqlState.handler = (text) => {
+      if (text.includes("FROM public.pos_member")) {
+        return Promise.resolve([{ ...BASICS_ROW, point_balance: 5000 }]);
+      }
+      return base!(text);
+    };
+    const res = await reservePOST(postJson("/api/birthday/reserve", {
+      linkToken: linkFor(MEMBER), forWhom: "self", giftType: "points_450",
+      pickupDate: validPickupDate(), slot: "noon",
+    }));
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toBe("BENEFIT_NOT_AVAILABLE");
   });
 
   it("取货日期超出窗口 → 400", async () => {

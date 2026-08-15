@@ -3,11 +3,11 @@ import { z } from "zod";
 
 import { getJsonMutationRejection, noStoreJson } from "@/lib/auth/http";
 import { getDb } from "@/lib/db/postgres";
-import { readBirthdayConfig } from "@/lib/birthday/config";
+import { deriveLevelKey, readBirthdayConfig } from "@/lib/birthday/config";
 import { decideReservation, pickupWindow } from "@/lib/birthday/eligibility";
 import { notifyStore } from "@/lib/birthday/notify";
 import { resolveBirthdayAuth } from "@/lib/birthday/resolve-auth";
-import { readMemberBasics } from "@/lib/birthday/stats";
+import { readAnnualSpend, readMemberBasics } from "@/lib/birthday/stats";
 import {
   createReservation,
   listReservations,
@@ -70,15 +70,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const sql = getDb();
-    const [basics, existing, profile] = await Promise.all([
+    const [basics, existing, profile, annualSpend] = await Promise.all([
       readMemberBasics(sql, auth.memberId),
       listReservations(sql, auth.memberId, config.campaignYear),
       readProfile(sql, auth.memberId),
+      readAnnualSpend(sql, auth.memberId, config.campaignYear),
     ]);
+    // 等级按年累计实付消费实时计算（用户 2026-08-15 定版），与 view 接口同口径。
+    const levelKey = deriveLevelKey(annualSpend);
 
     const decision = decideReservation(
       {
-        levelName: basics?.levelName ?? null,
+        levelName: levelKey,
         pointBalance: basics?.pointBalance ?? null,
       },
       existing.map((r) => ({ giftType: r.giftType, status: r.status })),
@@ -99,7 +102,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       pickupDate: input.pickupDate,
       slot: input.slot,
       memberNote: input.memberNote ?? null,
-      levelSnapshot: basics?.levelName ?? null,
+      levelSnapshot: levelKey,
       pointsSnapshot: basics?.pointBalance ?? null,
     });
     if (!created.ok) {

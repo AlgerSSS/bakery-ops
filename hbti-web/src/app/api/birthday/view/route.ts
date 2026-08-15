@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 
 import { noStoreJson } from "@/lib/auth/http";
 import { getDb } from "@/lib/db/postgres";
-import { readBirthdayConfig } from "@/lib/birthday/config";
+import {
+  deriveLevelKey,
+  memberLevelInfo,
+  readBirthdayConfig,
+} from "@/lib/birthday/config";
 import { resolveBirthdayAuth } from "@/lib/birthday/resolve-auth";
 import { listBirthdayOptions, pickupWindow } from "@/lib/birthday/eligibility";
 import { readMemberBasics, readYearStats } from "@/lib/birthday/stats";
@@ -39,8 +43,15 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const levelName = basics?.levelName ?? null;
     const pointBalance = basics?.pointBalance ?? null;
+    // 等级按「今年实付消费」实时计算（用户 2026-08-15 定版），RES 等级名只作档案。
+    const levelKey = deriveLevelKey(stats?.totalNetSales);
+    const level = memberLevelInfo(levelKey);
+    const annualSpend = stats?.totalNetSales ?? 0;
+    const nextLevel = levelKey === "L4" ? null : memberLevelInfo(
+      levelKey === "L1" ? "L2" : levelKey === "L2" ? "L3" : "L4",
+    );
     const options = listBirthdayOptions(
-      { levelName, pointBalance },
+      { levelName: levelKey, pointBalance },
       reservations.map((r) => ({ giftType: r.giftType, status: r.status })),
       config,
     );
@@ -58,6 +69,20 @@ export async function GET(request: Request): Promise<NextResponse> {
         levelName,
         pointBalance,
         registeredOn: basics?.registeredOn ?? null,
+        level: {
+          key: level.key,
+          nameZh: level.nameZh,
+          nameEn: level.nameEn,
+          annualSpend,
+          next: nextLevel
+            ? {
+                key: nextLevel.key,
+                nameZh: nextLevel.nameZh,
+                threshold: nextLevel.annualThreshold,
+                gap: Math.max(0, nextLevel.annualThreshold - annualSpend),
+              }
+            : null,
+        },
       },
       stats,
       options,

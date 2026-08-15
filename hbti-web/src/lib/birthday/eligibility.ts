@@ -44,11 +44,10 @@ export type ReserveDenial =
 export const POINTS_EXCHANGE_COST = 450;
 
 /**
- * 会员当前可选的生日礼选项。等级权益之外，积分兑换对任何会员开放
- * （2026-08-15 产品决定：会员卡上展示了积分，就应当有花法）：
- *   - free_basque：等级权益是免费巴斯克时才有（每会员每年一份）；
- *   - points_450：余额 ≥ 450 且进行中的积分预约未超上限即可选。
- * 两者的 allowGift 都跟随等级权益规则（VIP1/L1/L2 限自己，L4 可送亲友）。
+ * 会员当前可选的生日礼选项。选项完全由等级权益决定（2026-08-15 用户定版）：
+ *   - L1/L2：只有免费巴斯克（每会员每年一份）；
+ *   - L3/L4：只有 450 积分兑换（L3 限自己，L4 可送亲友）。
+ * 等级来自 deriveLevelKey(年累计消费)，见 config.ts；积分在门店 POS 结算。
  */
 export interface BirthdayOption {
   giftType: "free_basque" | "points_450";
@@ -85,27 +84,27 @@ export function listBirthdayOptions(
     });
   }
 
-  const balance = member.pointBalance;
-  const activePoints = existing.filter(
-    (r) => r.giftType === "points_450" && r.status === "reserved",
-  ).length;
-  let pointsDenied: ReserveDenial | undefined;
-  if (balance === null || balance < POINTS_EXCHANGE_COST) {
-    pointsDenied = "INSUFFICIENT_POINTS";
-  } else if (activePoints >= config.maxActivePointsReservations) {
-    pointsDenied = "TOO_MANY_ACTIVE_RESERVATIONS";
+  if (rule.kind === "points_450") {
+    const balance = member.pointBalance;
+    const activePoints = existing.filter(
+      (r) => r.giftType === "points_450" && r.status === "reserved",
+    ).length;
+    let pointsDenied: ReserveDenial | undefined;
+    if (balance === null || balance < POINTS_EXCHANGE_COST) {
+      pointsDenied = "INSUFFICIENT_POINTS";
+    } else if (activePoints >= config.maxActivePointsReservations) {
+      pointsDenied = "TOO_MANY_ACTIVE_RESERVATIONS";
+    }
+    options.push({
+      giftType: "points_450",
+      label: rule.label,
+      cost: POINTS_EXCHANGE_COST,
+      allowGift: rule.allowGift,
+      yearlyLimit: null,
+      available: pointsDenied === undefined,
+      deniedReason: pointsDenied,
+    });
   }
-  options.push({
-    giftType: "points_450",
-    label: rule.allowGift
-      ? "450 积分兑换生日蛋糕（可送亲友）"
-      : "450 积分兑换生日蛋糕",
-    cost: POINTS_EXCHANGE_COST,
-    allowGift: rule.allowGift,
-    yearlyLimit: null,
-    available: pointsDenied === undefined,
-    deniedReason: pointsDenied,
-  });
 
   return options;
 }

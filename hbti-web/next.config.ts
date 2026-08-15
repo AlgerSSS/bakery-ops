@@ -76,6 +76,16 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // 生日卡全是个性化内容（含会员年度消费与预约），任何缓存层都不能存。
+        source: "/birthday/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "private, no-store, max-age=0",
+          },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },

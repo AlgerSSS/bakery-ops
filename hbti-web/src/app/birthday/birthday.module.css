@@ -536,6 +536,26 @@
   gap: 10px;
 }
 
+/* 折叠日历的展开开关 */
+.calToggle {
+  display: block;
+  margin: 6px 0 2px;
+  padding: 9px 0;
+  width: 100%;
+  font: inherit;
+  font-size: 13.5px;
+  color: rgba(106, 28, 19, 0.78);
+  background: none;
+  border: 0;
+  border-top: 1px dashed var(--line);
+  cursor: pointer;
+  transition: color 0.16s var(--ease);
+}
+
+.calToggle:hover {
+  color: var(--hc-oxblood);
+}
+
 /* 日历：一个月一块；表头一行 + 星期对齐，格子只放数字 */
 .calBlock {
   display: flex;

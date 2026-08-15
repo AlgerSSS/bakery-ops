@@ -114,7 +114,14 @@ describe("GET /api/birthday/view", () => {
     expect(body.member.levelName).toBe("VIP1");
     expect(body.member.pointBalance).toBe(120);
     expect(body.maskedPhone).toBe("**** 6789");
-    expect(body.benefit.kind).toBe("free_basque");
+    expect(body.options.map((o: { giftType: string }) => o.giftType)).toEqual([
+      "free_basque",
+      "points_450",
+    ]);
+    expect(body.options[0].available).toBe(true);
+    // 余额 120 < 450：积分选项展示但不可选
+    expect(body.options[1].available).toBe(false);
+    expect(body.options[1].deniedReason).toBe("INSUFFICIENT_POINTS");
     expect(body.stats.totalQty).toBe(12);
     expect(body.stats.favorite.nameZh).toBe("趁热心动蛋挞");
     expect(body.reservations).toEqual([]);
@@ -176,21 +183,55 @@ describe("POST /api/birthday/reserve", () => {
     }).format(d);
   }
 
-  it("免费巴斯克预约成功并触发通知（未配置则 skipped）", async () => {
+  it("免费巴斯克预约成功，webhook 未配置时通知保持 pending（服务器 relay 收编）", async () => {
     const res = await reservePOST(postJson("/api/birthday/reserve", {
-      linkToken: linkFor(MEMBER), forWhom: "self",
+      linkToken: linkFor(MEMBER), forWhom: "self", giftType: "free_basque",
       pickupDate: validPickupDate(), slot: "noon",
     }));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.reserved).toBe(true);
     expect(body.reservation.reservationId).toBe(42);
-    expect(body.notified).toBe("skipped");
+    expect(body.notified).toBe("pending");
+  });
+
+  it("积分够 450 时可选积分兑换", async () => {
+    const base = sqlState.handler;
+    sqlState.handler = (text) => {
+      if (text.includes("FROM public.pos_member")) {
+        return Promise.resolve([{ ...BASICS_ROW, point_balance: 500 }]);
+      }
+      if (text.includes("INSERT INTO public.mkt_birthday_reservation")) {
+        return Promise.resolve([{
+          reservation_id: 43, gift_type: "points_450", for_whom: "self",
+          recipient_note: null, pickup_date: "2026-08-20", slot: "night",
+          member_note: null, status: "reserved", created_at: "2026-08-15T04:00:00.000Z",
+        }]);
+      }
+      return base!(text);
+    };
+    const res = await reservePOST(postJson("/api/birthday/reserve", {
+      linkToken: linkFor(MEMBER), forWhom: "self", giftType: "points_450",
+      pickupDate: validPickupDate(), slot: "night",
+    }));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.reservation.giftType).toBe("points_450");
+    expect(body.notified).toBe("pending");
+  });
+
+  it("积分不足选积分兑换 → 403", async () => {
+    const res = await reservePOST(postJson("/api/birthday/reserve", {
+      linkToken: linkFor(MEMBER), forWhom: "self", giftType: "points_450",
+      pickupDate: validPickupDate(), slot: "noon",
+    }));
+    expect(res.status).toBe(403);
+    expect((await res.json()).error).toBe("INSUFFICIENT_POINTS");
   });
 
   it("取货日期超出窗口 → 400", async () => {
     const res = await reservePOST(postJson("/api/birthday/reserve", {
-      linkToken: linkFor(MEMBER), forWhom: "self",
+      linkToken: linkFor(MEMBER), forWhom: "self", giftType: "free_basque",
       pickupDate: "2020-01-01", slot: "noon",
     }));
     expect(res.status).toBe(400);
@@ -199,7 +240,8 @@ describe("POST /api/birthday/reserve", () => {
 
   it("VIP1（默认权益）不能送亲友 → 409", async () => {
     const res = await reservePOST(postJson("/api/birthday/reserve", {
-      linkToken: linkFor(MEMBER), forWhom: "gift", recipientNote: "妈妈",
+      linkToken: linkFor(MEMBER), forWhom: "gift", giftType: "free_basque",
+      recipientNote: "妈妈",
       pickupDate: validPickupDate(), slot: "night",
     }));
     expect(res.status).toBe(409);
@@ -219,7 +261,7 @@ describe("POST /api/birthday/reserve", () => {
       return base!(text);
     };
     const res = await reservePOST(postJson("/api/birthday/reserve", {
-      linkToken: linkFor(MEMBER), forWhom: "self",
+      linkToken: linkFor(MEMBER), forWhom: "self", giftType: "free_basque",
       pickupDate: validPickupDate(), slot: "noon",
     }));
     expect(res.status).toBe(409);
@@ -230,7 +272,7 @@ describe("POST /api/birthday/reserve", () => {
     const req = new Request("https://birthday.test/api/birthday/reserve", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ forWhom: "self", pickupDate: validPickupDate(), slot: "noon" }),
+      body: JSON.stringify({ forWhom: "self", giftType: "free_basque", pickupDate: validPickupDate(), slot: "noon" }),
     });
     const res = await reservePOST(req);
     expect(res.status).toBe(403);

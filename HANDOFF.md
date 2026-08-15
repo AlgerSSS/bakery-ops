@@ -6,6 +6,27 @@
 
 ---
 
+## 会员等级按用户定版 + 权益分配收紧（2026-08-15，DSH，已合入并部署）
+
+用户定版会员等级与生日权益，已实现上线：
+
+- **等级升级线（年累计实付消费，实时计算，不再看 RES 等级名 VIP1）**：
+  Lv1 初见会员 First Crush（注册 RM0）→ Lv2 心动会员 Sweet Crush（RM250）→
+  Lv3 热爱会员 Hot Crush（RM750）→ Lv4 挚爱会员 Forever Crush（RM1,500）。
+  消费口径 = pos_member_order_item 的 net_sales 当年累计（与年度回顾同源）。
+- **权益分配**：L1/L2 **只有免费巴斯克**（每年一份）；L3/L4 **才有 450 积分兑换**
+  （L3 限自己、L4 可送亲友）。此前「有积分就能兑换」的临时口径作废。
+- `/api/birthday/view` 返回 `member.level`（key/中英文名/annualSpend/next.gap 升级差），
+  前端封面与权益屏显示等级名与「再花 RMx 升 LvN」提示；reserve 用同口径判定并
+  把派生等级落 `level_snapshot`（Lark 通知里的「等级」也是它）。
+- 线上验证：Nicole 年度消费 RM4290.45 → **Lv4 挚爱会员**，仅 450 积分兑换选项
+  （可送亲友）。注意：她 8-17 的免费巴斯克预约（#1）是按旧口径下的单，保留有效；
+  按新规则 L4 无免费巴斯克，后续到店处理时心里有数。
+- 门禁：tsc/eslint/vitest **333 过 39 跳过**/build 全绿。新部署
+  `hotcrush-hbti-p9oyc6z0z-algersss-projects.vercel.app`（两域名已指到）。
+
+---
+
 ## 生日域名提交被 INVALID_ORIGIN 拦截的修复（2026-08-15，DSH，已修复上线）
 
 用户走真实流程到确认页点「留好我的生日礼」报「没留上，稍后再试一次」。复现：
@@ -1839,6 +1860,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-15 | DSH | **会员等级按用户定版（已部署）**：等级改为按年累计实付消费实时计算（Lv1 初见 RM0 / Lv2 心动 RM250 / Lv3 热爱 RM750 / Lv4 挚爱 RM1500），不再读 RES 等级名；权益收紧为 L1/L2 只有免费巴斯克、L3/L4 才有 450 积分兑换（L3 限自己 L4 可送亲友）；view 返回 member.level 含升级差，reserve 同口径判定；线上验证 Nicole=Lv4 挚爱、仅积分兑换选项。门禁 333 过 39 跳过；新部署 hotcrush-hbti-p9oyc6z0z-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **修复生日域名提交 403 INVALID_ORIGIN（已上线）**：Origin 白名单从单一 HBTI_LINK_BASE_URL 改为与 HBTI_EXTRA_ORIGINS 的并集（语义收紧为「主机 ∈ 名单 且 Origin===主机」）；Vercel 配 HBTI_EXTRA_ORIGINS=https://birthday.hotcrush.net；验证生日域名提交 403→400、hbti-test 不变、陌生 Origin 仍 403；新部署 hotcrush-hbti-fmwd9xk5x-algersss-projects.vercel.app。教训：应用加自有域名必须同步加白名单。 |
 | 2026-08-15 | DSH | **生日礼双选项 + 折叠日历 + 服务器通知 relay（已部署）**：权益模型改选项列表，450 积分兑换对积分 ≥450 会员开放（免费巴斯克仍每年一份），view 返回 options、reserve 带 giftType；预约屏日期选择折叠为最近 7 天胶囊 + 展开。门店通知按用户要求搬上 tokyo-01：scripts/birthday-notify.mjs 每 15 分钟轮询 pending 行 → Lark 群「HOT CRUSH 生日礼预约」（机器人自建群，chat oc_9d0e91b9f8206ef474ed213f150ddb72）→ sent，失败 3 次置 failed（迁移 111 加 notify_attempts 已执行）；/etc/cron.d/hotcrush-birthday + 服务器 env（不入 git）。门禁 tsc/eslint/vitest 330 过 39 跳过/build 全绿；Vercel 新部署 hotcrush-hbti-hw85hmtso-algersss-projects.vercel.app（两域名已指到，注意 --prod 部署后 birthday 域名需手动 alias）；Playwright 实测双选项与折叠日历；本地+服务器 Lark 测试消息各一发。仍未做真实预约写入。 |
 | 2026-08-15 | DSH | **生日贺卡动态化全量上线（已执行）**：迁移 110 经查已在生产库生效（两表 0 行、列/索引与迁移一致）；Vercel 生产新增 BIRTHDAY_LINK_SECRET 与 BIRTHDAY_CAMPAIGN_YEAR=2026；`vercel build --prod` + `deploy --prebuilt --prod` 部署 `hotcrush-hbti-h752wzi63-algersss-projects.vercel.app` 并别名 hbti-test.hotcrush.net；`birthday.hotcrush.net` 从静态项目 hotcrush-birthday-card 切到新部署（DNS/证书未动，静态部署保留回滚）。端到端验收：health 四检全绿、view 接口 401/410 边界正确、为会员 2063178969381101576 生成签名链接后 view 200（真实年度回顾 + 免费巴斯克权益 + 取货窗口）、两域名 200、no-store 生效、TLS 通过。未做真实预约写入；BIRTHDAY_NOTIFY_WEBHOOK 待门店提供 Lark 机器人地址。 |

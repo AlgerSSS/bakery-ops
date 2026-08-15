@@ -6,6 +6,27 @@
 
 ---
 
+## 权益分配二次修订：L1 只有贺卡、L2 只有免费巴斯克、L3/L4 二选一（2026-08-15，DSH，已合入并部署）
+
+用户再次修订生日权益分配，已实现上线：
+
+- **L1 初见**：只有电子贺卡，没有任何蛋糕权益（权益屏显示贺卡说明 + 升级提示，
+  预约屏显示「贺卡已经送到，不用预约」）；
+- **L2 心动**：只有免费巴斯克（每年一份）；
+- **L3 热爱 / L4 挚爱**：**二选一**——免费巴斯克（每年一份）**或** 450 积分兑换
+  （L3 限自己、L4 可送亲友）。两者独立判定：免费巴斯克领过只灰掉免费选项，
+  积分选项不受影响（反之亦然）。
+- 实现：权益模型从「等级→单一规则」改为「等级→可选权益组（数组）」，
+  `resolveBenefits` 返回数组、`listBirthdayOptions` 逐规则展开；
+  `BIRTHDAY_BENEFITS_JSON` 覆盖也改为数组形状（值必须是数组否则配置报错）；
+  未知等级保险丝默认 = 空组（只有贺卡）。
+- 线上验证：Nicole（L4 挚爱）返回双选项——免费巴斯克（已领过 #1，灰显）+
+  450 积分兑换（可送亲友，可选）。
+- 门禁：tsc/eslint/vitest **336 过 39 跳过**/build 全绿。新部署
+  `hotcrush-hbti-ojb3ix3yg-algersss-projects.vercel.app`（两域名已指到）。
+
+---
+
 ## 会员等级按用户定版 + 权益分配收紧（2026-08-15，DSH，已合入并部署）
 
 用户定版会员等级与生日权益，已实现上线：
@@ -1860,6 +1881,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-15 | DSH | **权益分配二次修订（已部署）**：L1 只有贺卡、L2 只有免费巴斯克、L3/L4 免费巴斯克或 450 积分兑换二选一（L3 限自己 L4 可送亲友）；权益模型改「等级→可选权益组数组」，BIRTHDAY_BENEFITS_JSON 覆盖同步改数组；L1 前端显示贺卡说明且无预约表单。门禁 336 过 39 跳过；线上验证 Nicole(L4) 双选项、免费因已领灰显；新部署 hotcrush-hbti-ojb3ix3yg-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **会员等级按用户定版（已部署）**：等级改为按年累计实付消费实时计算（Lv1 初见 RM0 / Lv2 心动 RM250 / Lv3 热爱 RM750 / Lv4 挚爱 RM1500），不再读 RES 等级名；权益收紧为 L1/L2 只有免费巴斯克、L3/L4 才有 450 积分兑换（L3 限自己 L4 可送亲友）；view 返回 member.level 含升级差，reserve 同口径判定；线上验证 Nicole=Lv4 挚爱、仅积分兑换选项。门禁 333 过 39 跳过；新部署 hotcrush-hbti-p9oyc6z0z-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **修复生日域名提交 403 INVALID_ORIGIN（已上线）**：Origin 白名单从单一 HBTI_LINK_BASE_URL 改为与 HBTI_EXTRA_ORIGINS 的并集（语义收紧为「主机 ∈ 名单 且 Origin===主机」）；Vercel 配 HBTI_EXTRA_ORIGINS=https://birthday.hotcrush.net；验证生日域名提交 403→400、hbti-test 不变、陌生 Origin 仍 403；新部署 hotcrush-hbti-fmwd9xk5x-algersss-projects.vercel.app。教训：应用加自有域名必须同步加白名单。 |
 | 2026-08-15 | DSH | **生日礼双选项 + 折叠日历 + 服务器通知 relay（已部署）**：权益模型改选项列表，450 积分兑换对积分 ≥450 会员开放（免费巴斯克仍每年一份），view 返回 options、reserve 带 giftType；预约屏日期选择折叠为最近 7 天胶囊 + 展开。门店通知按用户要求搬上 tokyo-01：scripts/birthday-notify.mjs 每 15 分钟轮询 pending 行 → Lark 群「HOT CRUSH 生日礼预约」（机器人自建群，chat oc_9d0e91b9f8206ef474ed213f150ddb72）→ sent，失败 3 次置 failed（迁移 111 加 notify_attempts 已执行）；/etc/cron.d/hotcrush-birthday + 服务器 env（不入 git）。门禁 tsc/eslint/vitest 330 过 39 跳过/build 全绿；Vercel 新部署 hotcrush-hbti-hw85hmtso-algersss-projects.vercel.app（两域名已指到，注意 --prod 部署后 birthday 域名需手动 alias）；Playwright 实测双选项与折叠日历；本地+服务器 Lark 测试消息各一发。仍未做真实预约写入。 |

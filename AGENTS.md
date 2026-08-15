@@ -25,21 +25,31 @@
 
 一个分支只做一件事；合并前先 `git fetch origin && git rebase origin/main`；合并用 `git merge --no-ff`。
 
+分支生命周期（2026-08-15 起大扫除后确立）：
+
+- **合并即删**：合并回 main 后当场删本地与远程分支。回头看历史靠 `git log`，不靠留着分支。
+- **开工必 rebase**：主题分支从最新 `origin/main` 切出；已落后的分支先 rebase 再动工。
+- **收工只有两种合法状态**：已合并删除，或在 HANDOFF.md 登记的活跃分支。不允许出现无人认领的分支。
+- **本地常态检出是 main**：deploy.sh 从工作树 rsync，检出什么就部署什么。
+
 > ⚠ **三个工具共用一个目录时，分支不提供隔离。** `git checkout` 切的是整个目录，
 > 两个工具同时跑，一个切分支就会把另一个正在编辑的文件换掉。**同一时间只让一个工具动这个目录。**
 
 ### 0.3 部署
 
-`./deploy.sh` 从**本地工作树** rsync 到 Contabo，**不经过 git**（`/opt/hotcrush/*` 下没有 `.git`）。
+`./deploy.sh` 从**本地工作树** rsync 到 **tokyo-01**（Vultr 东京），**不经过 git**（`/opt/hotcrush/*` 下没有 `.git`）。
+
+> 沿革：2026-08-05 之前生产机在 Contabo（已失联下线，不再接收部署）；
+> 当日起生产在 tokyo-01，过渡期脚本 deploy-tokyo.sh 已于 2026-08-15 合并回 deploy.sh。
 
 - 工作区不干净就跑 deploy = 把半成品推上生产。
-- 分支不构成保护：只要 checkout 在本地，deploy 就会带上去。
+- 分支不构成保护：只要 checkout 在本地，deploy 就会带上去。deploy 前确认 `git branch --show-current` 是预期分支。
 - 部署前必过门禁：`tsc --noEmit` + `vitest run` + `next build`（deploy.sh 默认已含，`--skip-gate` 慎用）。
 
 ### 0.4 数据库
 
 只有一个 Supabase 生产库，没有 staging，且**被 4 个代码库 / 3 个部署目标共用**
-（本仓库、`res_api`、Vercel 上的财务网站、Contabo 上的 Python 脚本）。
+（本仓库、`res_api`、Vercel 上的财务网站、tokyo-01 上的 Python 脚本）。
 
 - 只读查询随便跑；**DDL/DML 一律只写成迁移文件，交给人执行**。
 - 改任何表之前先确认这张表还有谁在读写——治理方案与所有权登记见

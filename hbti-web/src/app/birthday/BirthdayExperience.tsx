@@ -1307,9 +1307,11 @@ function CoverScreen({
           {view.member.level.nameZh} · 生日礼遇
         </p>
         <p className={styles.what}>
-          {view.options.some((option) => option.giftType === "free_basque")
-            ? "生日当月，一份巴斯克，我们请。"
-            : "生日当月，450 积分换一份生日蛋糕。"}
+          {view.options.length === 0
+            ? "生日当月，一封贺卡，我们写。"
+            : view.options.some((option) => option.giftType === "points_450")
+              ? "生日当月，巴斯克或 450 积分蛋糕，随你选。"
+              : "生日当月，一份巴斯克，我们请。"}
         </p>
         <button className={styles.btn} type="button" onClick={onOpenLetter}>
           打开你的生日信
@@ -1595,7 +1597,19 @@ function BenefitScreen({
         <p className={styles.tier}>
           {member.level.nameZh} · {view.campaignYear}
         </p>
-        <div
+        {options.length === 0 ? (
+          <>
+            <p className={styles.what}>生日电子贺卡</p>
+            <p className={styles.sub}>
+              Lv1 的生日礼就是这封贺卡——生日当月会自动送给你，不用预约。
+              {member.level.next
+                ? `今年消费满 RM${member.level.next.threshold.toFixed(0)} 升到
+                  ${member.level.next.nameZh}，就有一份免费巴斯克了。`
+                : ""}
+            </p>
+          </>
+        ) : (
+          <div
           className={`${styles.picks} ${styles.picksRow}`}
           role="radiogroup"
           aria-label="选择生日礼"
@@ -1636,7 +1650,8 @@ function BenefitScreen({
             );
           })}
         </div>
-        {points !== null && (
+        )}
+        {points !== null && options.length > 0 && (
           <p className={styles.hintline}>你现在有 {points} 积分。</p>
         )}
         {member.level.next && (
@@ -1880,6 +1895,25 @@ function ReserveScreen({
   }
   const quickDates = inRangeDates.slice(0, 7);
   const hiddenCount = inRangeDates.length - quickDates.length;
+
+  /* L1 只有电子贺卡：没有可预约的蛋糕，直接说明，不给预约表单。 */
+  if (!selectedOption) {
+    return (
+      <section className={`${styles.screen} ${styles.sheet}`}>
+        <ScreenTop hint={STEP_HINT.reserve ?? ""} onBack={onBack} />
+        <h2 ref={headingRef} tabIndex={-1}>
+          贺卡已经送到。
+        </h2>
+        <p className={styles.sub}>
+          Lv1 的生日礼是电子贺卡，生日当月自动送达，不用预约。
+          今年消费满 RM250 升到 Lv2，就有一份免费巴斯克了。
+        </p>
+        <button className={styles.btn} type="button" onClick={onBack}>
+          回到上一步
+        </button>
+      </section>
+    );
+  }
 
   /* 免费巴斯克一年一份：已留过的会员再来，直接看状态，不给第二张表单。 */
   if (claimed) {

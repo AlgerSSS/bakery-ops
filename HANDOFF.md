@@ -6,6 +6,35 @@
 
 ---
 
+## 分支大扫除 + 工作树清零 + deploy.sh 合并东京版（2026-08-15，Kimi，已完成）
+
+用户要求收编全部未提交改动并重排分支；随后确认 main 推送选方案 B（接受 birthday-web
+会员数据进 GitHub 私有仓）、deploy 脚本合并一起做。
+
+**工作树收编（11 个提交，原 codex/r6-green-implementation 上）**：gitignore 增补
+（`__pycache__`/`supabase/.temp`/`output/`——薪资 PDF 含个人数据不入库）；bakery-ops
+意图路由与 forecast 取数（相关单测 23/23 已跑过）；ops 脚本三件套；res_api 会员订单
+商品采集；R6A1 修订包与 ETL 契约；物理存储重审；蓝图图稿；AI 服务商清单；迁移总计划；
+Claude 评审归档；HANDOFF 多段。全部脏文件提交前过凭据扫描，无真实密钥。
+
+**分支治理**：删 11 个本地分支（9 个已并入 main；`claude/exciting-torvalds-498847` 与
+`claude/nostalgic-wiles-f7cb6a` 的修复经逐文件 diff=0 验证已被 main 吸收）；
+`codex/r6-green-implementation` 以 --no-ff 合入 main（HANDOFF 冲突按两边全保留解决）
+并删除。main 随后推送 origin（含 birthday-web 归档，用户批准方案 B）。删 4 个已合并
+远程分支。AGENTS.md 0.2 新增分支生命周期规则：合并即删、开工 rebase、收工两态、
+常态检出 main。
+
+**deploy.sh 合并**：实测 Contabo（62.72.46.80）SSH 超时仍失联，tokyo-01 上
+hotcrush-core / hotcrush-res-api / hotcrush-alert-relay 三服务 active。deploy-tokyo.sh
+内容并入 deploy.sh（唯一入口，头部有沿革注释），deploy-tokyo.sh 删除；AGENTS.md 0.3/0.4
+与 CLAUDE.md 同步更正（Contabo → tokyo-01）。**本轮没有执行部署**。
+
+⚠️ 下次 deploy 注意：main 现在包含 bakery-ops 意图路由/forecast 改动（a88b8df），
+相关单测已过但全量门禁未跑——deploy.sh 默认含门禁，别用 --skip-gate。
+终态：本地仅 main 一个分支，远程仅 origin/main；工作树干净。
+
+---
+
 ## 生日贺卡源码归档入库（2026-08-15，DSH，已合入 main）
 
 生日贺卡 H5 此前由 Claude Code 在 /tmp 临时 scratchpad 开发并直接部署，源码从未入库；

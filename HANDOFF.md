@@ -6,6 +6,27 @@
 
 ---
 
+## 生日贺卡源码归档入库（2026-08-15，DSH，已合入 main）
+
+生日贺卡 H5 此前由 Claude Code 在 /tmp 临时 scratchpad 开发并直接部署，源码从未入库；
+2026-08-15 临时目录被系统清理后，Vercel 部署产物成为唯一副本。本轮从线上
+https://birthday.hotcrush.net/ 抓取回收，经独立分支 `dsh/archive-birthday-web`
+以 --no-ff 合入 main，归档在 `birthday-web/`：
+
+- `birthday-web/index.html`：与当时线上响应字节一致，
+  sha256 5e2bd978e458d1f8996f1d4cd577dfa444a32822407d00e4677bd81134120a55（70525 字节）。
+  已实测部署中只有这一个文件（favicon/图片目录/字体路径均 404，Logo 为内联 SVG+base64）。
+- `birthday-web/fonts/`：页面引用的两个品牌字体（NeutraTextDemiAlt.woff2 / OPPOSans-M-2.woff2），
+  来自与 hbti-web/globals.css 同源的腾讯 COS；线上 HTML 仍引用 CDN，本地副本是容灾归档。
+- `birthday-web/README.md`：来历、Vercel 项目/部署/证书/DNS 信息、重新部署方法、隐患清单。
+
+注意：当前线上版本是为会员 Nicole 静态烘焙的单人页，无后端取数接口，含真实会员消费数据，
+不要再发到第二个公开渠道。今后改生日页一律以 `birthday-web/` 为准，不要再从线上抓取。
+
+归档全程在独立 worktree 完成，主工作树（检出 codex/r6-green-implementation、含各 agent 在途改动）
+未切分支、未被触碰。合并后 main 领先 origin/main 2 个提交（含此前 1 个未推送提交），**尚未 push**，
+由用户决定推送时机。未改部署、DNS、证书、数据库。
+
 ## HBTI 上线加固已合入 main（2026-08-04，Codex，已推送，未部署）
 
 全量门禁在本机通过：`npx tsc --noEmit`、`npx eslint .`（0 error / 0 warning）、
@@ -948,6 +969,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-15 | DSH | **生日贺卡源码归档入库（已合入 main）**：线上 `https://birthday.hotcrush.net/` 曾是唯一幸存副本（原 /tmp scratchpad 源码已被系统清理），已字节一致回收到 `birthday-web/`（index.html sha256 `5e2bd978…34120a55`，70525 字节），另归档两个品牌字体副本与 README（含 Vercel 项目/部署/证书/DNS 与重新部署方法）。经分支 `dsh/archive-birthday-web` --no-ff 合入 main；main 领先 origin/main 2 个提交、尚未 push。线上版本是为会员 Nicole 静态烘焙的单人页、无后端接口；今后改动以 `birthday-web/` 为准。 |
 | 2026-08-04 | Claude Code | **✅ 端到端真实跑通：短信送达 → 验证 → 答题 → 抽礼品 → 发出真券。** 证据：`[otp/request] sent {"resCode":"000","resMessage":"ok","attemptsToday":5}`；随后 `otp/verify` 与 `/api/complete` 各一次；库里 `hbti_status=issued`、人格 `HSDA`、**礼品库存 已发 1 → 2（抽中爱心纸香卡，86 件剩 85）**、0 条 processing/review。**这一跑把此前唯一零里程的那段点亮了**——`acquireProcessing` 幂等锁 → `markPrepared` → `drawGift` 的 `FOR UPDATE` 事务 → RES 真实发券 → 回读对账 → 写 `pos_member`，全部在换过的 `DATABASE_URL`、内联 CA 的真证书校验、事务池 `:6543` 上验证过。**顺带修掉最后一个已知的顾客侧缺陷**：每次发码都新建 guest session、验证码绑在该 session 上，而前端一拿到新令牌就丢掉旧的；RES 对同号当天的重发**回 000 却不真的送达**（仓库实测 19 次请求：当日首次 11/13 到达、重复 0/6），于是「等不及点重发」这个最本能的动作会**把顾客手里真收到的那条码作废**，当天再无解。改成**两份令牌都留着，验证时先试新的、`INVALID_CODE` 时回退旧的**（只在「码不对」这一种错误上回退——过期/超次数/账户冲突另有含义，重试只会把它们变模糊；成功后以活着的那份为准，`changePhone` 会清空）。⚠️ **顾客「请求太频繁」= 我们自己的限流**（5 次/天/号），不是 RES；反复测试才会撞上，真实顾客一人一次。**+61 重复建号已查清**：两行的 `phone_country_code`/`phone_national`/`phone_e164` **完全一致**，不是号码格式问题——是 RES 侧本来就有两个会员记录；全库 4843 个会员里**只有这一个号**有多账号，而「无注册日期的空账号」在各国家码普遍存在（+60 就有 1071 个），**今天这次跑通没有产生第三个账号、正确复用了已有账号**，所以是开发早期的单个历史产物而非系统性缺陷，两个账号积分/余额/消费均为 0、无价值拆分。门禁：tsc / eslint / next build / **vitest 277 通过 39 跳过（316）** / **playwright 42/42** |
 | 2026-08-04 | Claude Code | **验证码上线后仍然发不出短信的完整排查（结论：一直是 CSP 少放行域名，不是别的）。** 症状演进：① 真机解完验证码，RES 回 `CRM-00-1105 captcha rejected! diff`；② 再点，浏览器里毫无反应、**服务端连一条日志都没有**。**定位手法值得复用**：先给错误链路补上 RES 的 `msg` 原文（此前只记 code，而 `CRM-00-1105` 既不在 RES 客户端语言包里也无公开文档，光有码查不动）；再**用一个语法合法但无效的票据打一次**做对照——它回 `decrypt fail`，而真实解题回 `diff`，说明 RES 是**原样回显腾讯 CaptchaCode 的描述**，且真实票据是能被解密的。查腾讯码表：`decrypt fail`=15（票据不合法），**`diff`=21（票据校验异常）**，而腾讯对 21 的说明是「**Ticket 带 `trerror` 前缀 = SDK 连不上自己后端、进入容灾降级**」。⚠️ **根因**：CSP 只放行了 `*.captcha.qcloud.com`，SDK 脚本能加载，但取题目的 `*.captcha.gtimg.com`、风控上报的 `www.turingfraud.net`、以及它要起的 blob Web Worker（`worker-src`）全被挡 → SDK 降级吐 `trerror_` 假票据 → 我们原样转发 → 腾讯判 21。**放行域名不能靠读源码**：SDK 混淆且部分域名运行时拼接，静态搜索必漏 `turingfraud.net`。正确做法是**问浏览器**——在 RES 自己那个能跑通的 H5 上触发一次记录它接触的全部主机，再回本站触发、用 `securitypolicyviolation` 事件核对到零违规。另注意：**弹层不是 iframe**（RES 自家页面也是 `iframe:0`），别拿「有没有 iframe」当成功信号，**零违规**才是。已加两道防御：`trerror_` 票据一律当「验证码不可用」不再转发（发出去必被拒，还白烧顾客当天 5 次发码额度中的一次）；解题等待加有界时限（回调永不触发时，顾客只会看到「点了没反应」，服务端连日志都没有）。**❌ 一条要撤回的推断**：中途我判断是「验证码绑 IP、RES 拿 Vercel 出口 IP 去核验导致不一致」，据此加了转发顾客真实 IP 的 `x-forwarded-for`/`x-real-ip`。腾讯码表证明 `diff`=21 与 IP 无关，**这个推断是错的**。转发 IP 的代码保留（让 RES 风控看到真实顾客而不是数据中心地址，本身是对的），但它从来不是拦住顾客的原因。顺带确认：**浏览器直连 RES 不可行**（CORS 全挡）；RES 挂在 Tencent EdgeOne + APISIX 3.7.0 后面。实测验证：CSP 零违规、弹层容器 `tcaptcha_transform_dy` 已渲染、回调拿到**真实票据**（腾讯对低风险会话会无感知放行；反复触发则升级为真人出题）。门禁：tsc / eslint / next build / vitest 276 通过 39 跳过（315）/ playwright 42/42 |
 | 2026-08-04 | Claude Code | **🔴 登录曾被 RES 单方面打死：租户级打开腾讯云图形验证码，`sendVerifyCode` 变成服务端强制要 `captcha`，HBTI 全站没人能登录。本次实现了验证码，并补上暴露这次故障的 health 盲区。** 发现过程：跑端到端时第一步就 503 `CAPTCHA_REQUIRED_UNSUPPORTED`，换号码复现，一条短信都没发出去。**证据**：在 RES 官方 H5 同源上下文里直接打它自家接口 —— `captcha/config` 回 `{"enable":true,"captchaType":"tencent_cloud","tencentCloud":{"captchaAppId":"189993702"}}`；不带验证码打 `sendVerifyCode` 回 `UNI-00-0103 missing required param: captcha`（**服务端强制，不是前端装饰**）；同样不带验证码打 `verifyCode` 却直接回「验证码错误」——**只有发码这一步强制**，改动范围因此减半。08-02 那天三条 HBTI 记录都走通了 OTP，所以开关是 08-02 12:45 之后被拨的。**契约从 RES 自己的 JS 包里挖出来**（`index-DgMgsMSQ.js`，登录页懒加载分片）：SDK `https://ca.turing.captcha.qcloud.com/TJNCaptcha-global.js`、容器 `tencent-captcha-container`、`new TencentCaptcha(container, appId, cb, {type:"popup", userLanguage})`。⚠️ **字段名是坑**：腾讯回调给 `{ticket, randstr}`，RES 要 `{token, randstr}` —— `ticket` 必须改名成 `token`，写错不报错，只会一直「missing required param」。改动：① 新增 `GET /api/auth/captcha`，前端挂载时问一次并预热 SDK（等点了「发送」再拉脚本，那几百毫秒空白里顾客通常已经又点了一次）；配置带 5 分钟缓存，目的不是省延迟而是让「要不要验证码」能判在**限流之前**——缺验证码的请求到不了 RES，不该烧顾客当天的发码额度。② `sendVerifyCode` 透传 `captcha`；发码失败即作废配置缓存，让下一次重新问 RES。③ **认不出的供应商一律 `unsupported` 并 fail closed**，绝不退化成「不需要验证码」——后者会让前端不加载 SDK，然后发码在 RES 那边失败，顾客看到一个点了没反应的按钮。④ CSP 放行 `https://*.captcha.qcloud.com`（script/img/connect/frame 四项）。⑤ **刻意不实现腾讯的 `trerror_*` 降级令牌**——那是 SDK 自身加载失败时的占位串，由我们主动构造就等于绕过验证码；SDK 起不来就如实报「暂不可用」。⑥ **health 补 `signIn` 一项**：此前 `res` 探的是**后台**（`bo.sea.…`，券模板），登录走的是**H5**（`f4klzbmr9n2d.m.sea.…`），两个不同系统 —— 登录全挂时 health 一路绿灯。现在 H5 探不通、或验证码换成驱动不了的供应商，health 直接 fail。门禁：tsc / eslint / **vitest 272 通过 39 跳过（311）** / next build / **playwright 42/42** 全绿。⚠️ **仍需人验收**：验证码必须由真人解一次才能走通发码，自动化不该也不会去解——上线前请人工走一遍登录。⚠️ 另外发现 **+61 号码会被 RES 建成第二个空会员账号**（`…2873` 无档案无注册日期，而同号的 `…1826` 是 4 月注册的真实会员）；同批 +60 的样本正确复用了原账号，差异疑似在国家码匹配，根因在 RES 侧。两个账号积分余额消费均为 0，本次未造成损失 |

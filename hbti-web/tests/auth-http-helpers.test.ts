@@ -27,6 +27,24 @@ describe("auth request helpers", () => {
     expect(getJsonMutationRejection(request, origin)).toBeNull();
   });
 
+  it("accepts a second own domain listed in HBTI_EXTRA_ORIGINS", () => {
+    vi.stubEnv("HBTI_EXTRA_ORIGINS", "https://birthday.hotcrush.net");
+    const birthdayOrigin = "https://birthday.hotcrush.net";
+    const request = jsonRequest(`${birthdayOrigin}/api/birthday/reserve`);
+
+    expect(getJsonMutationRejection(request, origin)).toBeNull();
+  });
+
+  it("still rejects an origin that matches the request host but is not allow-listed", () => {
+    vi.stubEnv("HBTI_EXTRA_ORIGINS", "https://birthday.hotcrush.net");
+    const stranger = "https://other.hotcrush.net";
+    const rejection = getJsonMutationRejection(
+      jsonRequest(`${stranger}/api/auth/logout`),
+      origin,
+    );
+    expect(rejection?.status).toBe(403);
+  });
+
   it.each([
     {
       headers: { "Content-Type": "text/plain", Origin: origin },

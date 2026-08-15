@@ -1,0 +1,788 @@
+<mxfile host="Electron" modified="2026-08-05T00:00:00.000Z" agent="HOT CRUSH drawio-skill" version="31.1.5" type="device">
+  <diagram id="future-p1-overview" name="01 老板视角总览">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="p1_title" value="HOT CRUSH 未来数据库蓝图&lt;br&gt;&lt;font style='font-size:13px;font-weight:normal'&gt;老板视角：从明日计划、关键岗位、订货，到当日销售与毛利的同一事实链&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=22;fontStyle=1;spacingLeft=18;spacingRight=18;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="320" height="112" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1_capture" value="&lt;b&gt;统一工作入口｜BakeryOps&lt;/b&gt;&lt;br&gt;自动抓：POS、节假日、Lark 工时、采购来源&lt;br&gt;人工确认：计划调整、突发事件、关键岗位、收货例外" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#4A74B5;fontColor=#17324D;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="420" y="40" width="300" height="116" as="geometry"/>
+        </mxCell>
+        <UserObject label="&lt;b&gt;共享身份脊柱&lt;/b&gt;&lt;br&gt;&lt;b&gt;store_id&lt;/b&gt; 门店　&lt;b&gt;product_id&lt;/b&gt; 可售产品&lt;br&gt;&lt;b&gt;employment_id&lt;/b&gt; 雇佣关系　&lt;b&gt;material_id&lt;/b&gt; 原料&lt;br&gt;&lt;font color='#D8E8F7'&gt;跨表只用稳定 ID，不用名称猜关联&lt;/font&gt;" link="data:page/id,future-p5-governance" id="p1_identity">
+          <mxCell style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="780" y="40" width="320" height="128" as="geometry"/>
+        </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;营运闭环&lt;/b&gt;&lt;br&gt;节假日 / 当日突发 → 需求预测&lt;br&gt;→ 预估单版本 / 明日调整&lt;br&gt;→ 分时段计划 → 实际发出 → 销售 / 报废" link="data:page/id,future-p2-operations" id="p1_ops">
+          <mxCell style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="240" y="250" width="290" height="128" as="geometry"/>
+        </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;人事与班表闭环&lt;/b&gt;&lt;br&gt;应聘评分 → 入职 → 培训资格&lt;br&gt;→ 班表需求 / 关键岗位 → 员工指派&lt;br&gt;→ Lark 实际工时 → 人效" link="data:page/id,future-p4-hr" id="p1_hr">
+          <mxCell style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EDFA;strokeColor=#7C5AA6;fontColor=#493263;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="960" y="250" width="290" height="128" as="geometry"/>
+        </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;供应链与成本闭环&lt;/b&gt;&lt;br&gt;已发布计划 × 配方版本 → 原料需求&lt;br&gt;→ 库存 / 在途 → 订货增减 → 收货实价&lt;br&gt;→ 生效成本快照" link="data:page/id,future-p3-scm-cost" id="p1_scm">
+          <mxCell style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF7EE;strokeColor=#3F8F5B;fontColor=#205C39;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="600" y="250" width="290" height="128" as="geometry"/>
+        </mxCell>
+        </UserObject>
+        <mxCell id="p1_facts" value="&lt;b&gt;不可覆盖的实际事实&lt;/b&gt;&lt;br&gt;实际发出 ≠ 实际生产 ≠ POS 售出 ≠ 报废&lt;br&gt;计划班表 ≠ Lark 实际工时&lt;br&gt;历史毛利用当日有效成本，不用今天成本倒算" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E6F7F6;strokeColor=#2E8B88;fontColor=#175E5B;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="600" y="455" width="320" height="134" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1_decision" value="&lt;b&gt;老板每天看到的动作&lt;/b&gt;&lt;br&gt;① 明日产品计划增减　② 未来订货量增减&lt;br&gt;③ 关键岗位缺口　④ 产品占比升降&lt;br&gt;⑤ 当日毛利率 / 缺货 / 报废异常" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="980" y="455" width="320" height="132" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1_rule" value="&lt;b&gt;第一性原理结论&lt;/b&gt;&lt;br&gt;“一次录入”是一个事务写入多张正确粒度的表；&lt;br&gt;不是把预估、采购、班表、销售、工时塞进一张大表。" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C94A4A;fontColor=#7D2525;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="980" y="660" width="320" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="p1_sample" value="&lt;b&gt;验收样本：黑巧 / 草莓塔&lt;/b&gt;&lt;br&gt;两款产品都必须从 product_id 追到：&lt;br&gt;预测 → 计划 → 配方 → 订货 → 售出 → 当日成本 → 毛利；&lt;br&gt;名称不一致时进入映射审核队列，绝不静默猜配。" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#7A8390;fontColor=#3E4650;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="1">
+          <mxGeometry x="600" y="660" width="330" height="128" as="geometry"/>
+        </mxCell>
+        <mxCell id="e0" value="" style="endArrow=none;strokeOpacity=0;html=1;" edge="1" parent="1" source="p1_title" target="p1_capture">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="p1_capture" target="p1_identity">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" value="store_id + product_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.2;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="p1_identity" target="p1_ops">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="844" y="210"/><mxPoint x="385" y="210"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="store_id + employment_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.8;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="p1_identity" target="p1_hr">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1036" y="210"/><mxPoint x="1105" y="210"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="product_id + material_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="p1_identity" target="p1_scm">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="940" y="210"/><mxPoint x="745" y="210"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="已发布计划量" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;strokeColor=#3F8F5B;fontColor=#205C39;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="p1_ops" target="p1_scm">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" value="计划 / 发出 / 销售 / 报废" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.2;entryY=0;" edge="1" parent="1" source="p1_ops" target="p1_facts">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="385" y="420"/><mxPoint x="664" y="420"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="计划班表 / 实际工时" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.8;entryY=0;" edge="1" parent="1" source="p1_hr" target="p1_facts">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1105" y="420"/><mxPoint x="856" y="420"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e8" value="当日有效单位成本" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="p1_scm" target="p1_facts">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e9" value="可靠指标" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="p1_facts" target="p1_decision">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e10" value="动作必须可追溯" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="p1_decision" target="p1_rule">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" value="端到端验收" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="p1_rule" target="p1_sample">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="future-p2-operations" name="02 营运：预估到复盘">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="group_0" value="自动抓取 + 少量人工判断" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;fontColor=#6c8ebf;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="376" y="86" width="988" height="474" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_1" value="预测：每次运行留痕，不覆盖" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#82b366;fontColor=#82b366;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1386" y="136" width="628" height="164" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_2" value="预估单：版本化发布" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d79b00;fontColor=#d79b00;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1716" y="306" width="1278" height="324" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_3" value="执行事实：不能用计划代替实际" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673a6;fontColor=#9673a6;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="2366" y="636" width="628" height="164" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_4" value="自动计算的复盘与动作" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d6b656;fontColor=#d6b656;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="3016" y="6" width="668" height="484" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_title" value="营运闭环&lt;br&gt;&lt;font style='font-size:13px;font-weight:normal'&gt;预估单不是一行可覆盖的数字，而是可追溯的预测、版本、执行和实际事实&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=22;fontStyle=1;spacingLeft=18;spacingRight=18;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="0" y="250" width="320" height="112" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_cal_batch" value="&lt;b&gt;ops_calendar_import_batch&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;官方节假日 / 校历抓取批次&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：一次来源抓取&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：batch_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#4A74B5;fontColor=#17324D;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="34" y="164" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_cal_event" value="&lt;b&gt;ops_calendar_event&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;节假日与经营日事件身份&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：司法辖区 × 日期 × 事件&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：calendar_event_id, date&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#4A74B5;fontColor=#17324D;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="374" y="184" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_factor" value="&lt;b&gt;ops_demand_factor_observation&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;事件发生后的实际需求影响&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 产品/品类 × 事件 × 观察窗&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E6F7F6;strokeColor=#2E8B88;fontColor=#175E5B;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="714" y="54" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_incident" value="&lt;b&gt;ops_operational_event + _product&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;天气、停电、缺货、团单、设备等当日突发&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 时间段 × 事件；可挂产品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id, event_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="364" y="334" width="270" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_form" value="&lt;b&gt;BakeryOps 人工只填&lt;/b&gt;&lt;br&gt;• 明日计划覆盖量 + 原因&lt;br&gt;• 当日突发事件&lt;br&gt;• 实际发出（没有自动源时）&lt;br&gt;&lt;font color='#7D2525'&gt;不填：销售额、产品占比、毛利&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C94A4A;fontColor=#7D2525;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="24" y="314" width="270" height="134" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_sales_history" value="&lt;b&gt;item_hourly_sales / item_waste&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;POS 单品售出与报废实际&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 产品 × 小时/业务日&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E6F7F6;strokeColor=#2E8B88;fontColor=#175E5B;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="374" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_run" value="&lt;b&gt;ops_forecast_run&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;每次算法运行与输入版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 目标日期 × 运行&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：forecast_run_id, store_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="24" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_line" value="&lt;b&gt;ops_forecast_line&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;产品需求预测及上下界&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：预测运行 × 产品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：forecast_run_id, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="354" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_plan" value="&lt;b&gt;ops_production_plan&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;某店某日的稳定计划身份&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 营业日&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：plan_id, store_id, date&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="24" y="184" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_version" value="&lt;b&gt;ops_production_plan_version&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;草稿、提交、批准、发布的不可变版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：计划 × 版本号&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：plan_version_id, version_no&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="354" y="34" width="250" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_plan_line" value="&lt;b&gt;ops_production_plan_line&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;每款产品的计划数量&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：计划版本 × 产品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：plan_version_id, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="674" y="44" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_slot" value="&lt;b&gt;ops_production_plan_slot&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;把产品计划拆到出品时段&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：计划行 × 时间段&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：plan_line_id, slot&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="1004" y="44" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_adjust" value="&lt;b&gt;ops_plan_adjustment&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;明日加减量动作与业务理由&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：计划 × 产品 × 调整动作&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：plan_id, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="24" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_dispatch" value="&lt;b&gt;ops_dispatch&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;某店某日的一次实际发出批次&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 日期 × 发出批次&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：dispatch_id, store_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E6F7F6;strokeColor=#2E8B88;fontColor=#175E5B;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="24" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_dispatch_line" value="&lt;b&gt;ops_dispatch_line&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;实际发给前场的产品数量&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：发出批次 × 产品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：dispatch_id, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E6F7F6;strokeColor=#2E8B88;fontColor=#175E5B;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="354" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_plan_vs" value="&lt;b&gt;v_ops_plan_vs_dispatch&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;发布计划与实际发出的偏差&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 日期 × 产品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id, date, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;dashed=1;dashPattern=6 4;" vertex="1" parent="group_4">
+          <mxGeometry x="24" y="344" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_mix" value="&lt;b&gt;v_ops_product_mix_daily&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;产品销量占比与环比升降&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 日期 × 产品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id, date, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;dashed=1;dashPattern=6 4;" vertex="1" parent="group_4">
+          <mxGeometry x="24" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_accuracy" value="&lt;b&gt;v_ops_forecast_accuracy&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;预测、计划、实际销售的误差&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 日期 × 产品 × 预测版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：forecast_run_id, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;dashed=1;dashPattern=6 4;" vertex="1" parent="group_4">
+          <mxGeometry x="24" y="184" width="250" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2_invariant" value="&lt;b&gt;硬规则&lt;/b&gt;&lt;br&gt;预测 ≠ 已发布计划 ≠ 实际发出 ≠ 实际售出 ≠ 报废&lt;br&gt;空白 ≠ 0；任何更改生成新版本，不覆盖昨天的判断。" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C94A4A;fontColor=#7D2525;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_4">
+          <mxGeometry x="354" y="184" width="290" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="e0" value="" style="endArrow=none;strokeOpacity=0;html=1;" edge="1" parent="1" source="p2_title" target="p2_cal_batch">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="320" y="310"/><mxPoint x="390" y="310"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e1" value="来源与抓取时间" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_cal_batch" target="p2_cal_event">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="660" y="320"/><mxPoint x="740" y="320"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e2" value="观察实际影响" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_sales_history" target="p2_factor">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1000" y="180"/><mxPoint x="1080" y="180"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="事件身份" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_cal_event" target="p2_factor">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="920" y="250"/><mxPoint x="920" y="240"/><mxPoint x="920" y="240"/><mxPoint x="920" y="240"/><mxPoint x="1080" y="240"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="未来日期因素" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_cal_event" target="p2_run">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="830" y="260"/><mxPoint x="830" y="260"/><mxPoint x="830" y="260"/><mxPoint x="830" y="260"/><mxPoint x="1400" y="260"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="历史系数" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_factor" target="p2_run">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1340" y="210"/><mxPoint x="1400" y="210"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e6" value="销量 / 报废历史" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_sales_history" target="p2_run">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" value="已知经营影响" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;" edge="1" parent="1" source="p2_incident" target="p2_run">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e8" value="记录当日事实" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_form" target="p2_incident">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="670" y="480"/><mxPoint x="730" y="480"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e9" value="一对多" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_run" target="p2_line">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1660" y="220"/><mxPoint x="1730" y="220"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e10" value="版本序列" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_plan" target="p2_version">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1870" y="470"/><mxPoint x="1870" y="450"/><mxPoint x="1870" y="450"/><mxPoint x="1870" y="450"/><mxPoint x="2050" y="450"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e11" value="生成草稿" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_line" target="p2_version">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2080" y="250"/><mxPoint x="2190" y="250"/><mxPoint x="2190" y="250"/><mxPoint x="2190" y="250"/><mxPoint x="2190" y="320"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e12" value="加减量 + 原因" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_form" target="p2_adjust">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="670" y="410"/><mxPoint x="1730" y="410"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e13" value="产生新版本" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;strokeColor=#C94A4A;fontColor=#7D2525;strokeWidth=2;" edge="1" parent="1" source="p2_adjust" target="p2_version">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1990" y="390"/><mxPoint x="2050" y="390"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e14" value="发布快照" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_version" target="p2_plan_line">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2320" y="410"/><mxPoint x="2380" y="410"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e15" value="按时段拆分" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_plan_line" target="p2_slot">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2640" y="390"/><mxPoint x="2710" y="390"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e16" value="一对多" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_dispatch" target="p2_dispatch_line">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2640" y="730"/><mxPoint x="2710" y="730"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e17" value="执行对应计划" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;" edge="1" parent="1" source="p2_plan_line" target="p2_dispatch_line">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2660" y="430"/><mxPoint x="2680" y="430"/><mxPoint x="2680" y="430"/><mxPoint x="2680" y="430"/><mxPoint x="2680" y="700"/><mxPoint x="2680" y="700"/><mxPoint x="2680" y="700"/><mxPoint x="2710" y="700"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e18" value="无自动源时确认" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_form" target="p2_dispatch">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="530" y="610"/><mxPoint x="530" y="720"/><mxPoint x="530" y="720"/><mxPoint x="530" y="720"/><mxPoint x="2380" y="720"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e19" value="计划量" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_plan_line" target="p2_plan_vs">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2560" y="350"/><mxPoint x="2560" y="340"/><mxPoint x="2560" y="340"/><mxPoint x="2560" y="340"/><mxPoint x="3170" y="340"/><mxPoint x="3170" y="340"/><mxPoint x="3170" y="340"/><mxPoint x="3170" y="340"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e20" value="实际发出量" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_dispatch_line" target="p2_plan_vs">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3060" y="720"/><mxPoint x="3170" y="720"/><mxPoint x="3170" y="720"/><mxPoint x="3170" y="720"/><mxPoint x="3170" y="480"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e21" value="实际售出" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_sales_history" target="p2_mix">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1000" y="120"/><mxPoint x="3030" y="120"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e22" value="预测量" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_line" target="p2_accuracy">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1990" y="230"/><mxPoint x="3030" y="230"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e23" value="发布计划量" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_plan_line" target="p2_accuracy">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2480" y="320"/><mxPoint x="2480" y="290"/><mxPoint x="2480" y="290"/><mxPoint x="2480" y="290"/><mxPoint x="3030" y="290"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e24" value="实际售出量" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_sales_history" target="p2_accuracy">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e25" value="验证粒度" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_plan_vs" target="p2_invariant">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3390" y="410"/><mxPoint x="3510" y="410"/><mxPoint x="3510" y="410"/><mxPoint x="3510" y="410"/><mxPoint x="3510" y="320"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e26" value="产品结构" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_mix" target="p2_invariant">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3390" y="90"/><mxPoint x="3510" y="90"/><mxPoint x="3510" y="90"/><mxPoint x="3510" y="90"/><mxPoint x="3510" y="180"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e27" value="持续校准" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p2_accuracy" target="p2_invariant">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3290" y="250"/><mxPoint x="3360" y="250"/></Array></mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="future-p3-scm-cost" name="03 供应链：订货到毛利">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="group_0" value="产品需求：只认已发布计划" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;fontColor=#6c8ebf;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="376" y="226" width="1288" height="172" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_1" value="未来原料需求与订货建议" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#82b366;fontColor=#82b366;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1686" y="6" width="1038" height="324" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_2" value="订货修订和到货事实" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d79b00;fontColor=#d79b00;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1366" y="406" width="1358" height="322" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_3" value="成本历史和销售毛利" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673a6;fontColor=#9673a6;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1036" y="916" width="948" height="332" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_4" value="输入边界与业务验收" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d6b656;fontColor=#d6b656;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="2016" y="736" width="348" height="504" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_title" value="供应链 × 成本卡&lt;br&gt;&lt;font style='font-size:13px;font-weight:normal'&gt;已发布产品计划要一路追到原料、订货变更、收货实价、当日成本和毛利&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=22;fontStyle=1;spacingLeft=18;spacingRight=18;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="0" y="250" width="320" height="112" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_plan_line" value="&lt;b&gt;ops_production_plan_line&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;已发布的产品计划数量&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：计划版本 × 产品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：product_id, planned_qty&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="24" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_link" value="&lt;b&gt;cost_card_product_link&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;可售产品到成本卡成品的人工确认桥&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：产品 × 成本卡成品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：product_id, cost_card_item_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="354" y="24" width="250" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_recipe" value="&lt;b&gt;cost_card_recipe_version&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;有生效期的配方版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：成品 × 配方版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：recipe_version_id, effective_from&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="684" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_recipe_item" value="&lt;b&gt;cost_card_recipe_version_item&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;配方中每种原料及净用量&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：配方版本 × 原料&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：recipe_version_id, material_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="1014" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_mr_run" value="&lt;b&gt;scm_material_requirement_run&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;基于计划与配方的需求计算批次&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 目标日期 × 计算运行&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：requirement_run_id, store_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF7EE;strokeColor=#3F8F5B;fontColor=#205C39;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="24" y="174" width="250" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_mr_line" value="&lt;b&gt;scm_material_requirement_line&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;每种原料的毛需求&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：需求运行 × 原料&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：requirement_run_id, material_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF7EE;strokeColor=#3F8F5B;fontColor=#205C39;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="384" y="184" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_inventory" value="&lt;b&gt;scm_inventory_snapshot&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;盘点时点的可用库存&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 原料 × 盘点时点&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id, material_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF7EE;strokeColor=#3F8F5B;fontColor=#205C39;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="384" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_replenish" value="&lt;b&gt;scm_replenishment_run + _line&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;毛需求 − 库存 − 在途 + 安全库存；按包装/MOQ取整&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：补货运行 × 原料&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：replenishment_run_id, material_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF7EE;strokeColor=#3F8F5B;fontColor=#205C39;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="734" y="164" width="280" height="132" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_supplier_item" value="&lt;b&gt;scm_supplier_item&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;供应商 SKU 到标准原料的映射&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：供应商 × SKU&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：supplier_id, supplier_sku, material_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="344" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_po" value="&lt;b&gt;scm_purchase_order&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;一张采购单的稳定身份与状态&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：供应商 × 门店 × 采购单&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：purchase_order_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF7EE;strokeColor=#3F8F5B;fontColor=#205C39;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="24" y="104" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_po_revision" value="&lt;b&gt;scm_purchase_order_revision&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;每次订货量增减、原因与审批&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：采购单 × 版本号&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：purchase_order_id, revision_no&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="344" y="174" width="250" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_po_line" value="&lt;b&gt;scm_purchase_order_line&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;某版本下每种供应商物料的订货量&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：采购单版本 × 供应商 SKU&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：po_revision_id, supplier_item_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF7EE;strokeColor=#3F8F5B;fontColor=#205C39;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="704" y="94" width="250" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_receipt" value="&lt;b&gt;scm_goods_receipt + _line&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;实际到货数量、批次与采购实价&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：收货单 × 采购行/原料&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：receipt_id, material_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E6F7F6;strokeColor=#2E8B88;fontColor=#175E5B;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="1064" y="174" width="270" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_price" value="&lt;b&gt;cost_card_item_price&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;按来源与生效期保留的原料价格版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：原料 × 价格版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：material_id, effective_from&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="24" y="184" width="250" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_cost_snapshot" value="&lt;b&gt;cost_card_product_cost_snapshot&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;锁定当日配方与价格集后的单位成本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：产品 × 门店 × 日期 × 成本版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：product_id, store_id, date&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="354" y="174" width="250" height="132" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_pos_sales" value="&lt;b&gt;item_hourly_sales / order_item&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;POS 实际销量与实收收入&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 日期 × 产品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E6F7F6;strokeColor=#2E8B88;fontColor=#175E5B;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="354" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_margin" value="&lt;b&gt;v_ops_daily_product_margin&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;当日收入、成本、毛利额与毛利率&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 日期 × 产品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id, date, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;dashed=1;dashPattern=6 4;" vertex="1" parent="group_3">
+          <mxGeometry x="674" y="184" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_manual" value="&lt;b&gt;人工只做业务判断&lt;/b&gt;&lt;br&gt;• 批准 suggested_qty → approved_qty&lt;br&gt;• 记录订货增减原因&lt;br&gt;• 无 WMS 时确认收货 / 异常&lt;br&gt;&lt;font color='#205C39'&gt;需求、在途、成本汇总、毛利自动算&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C94A4A;fontColor=#7D2525;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_4">
+          <mxGeometry x="34" y="24" width="290" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_finance" value="&lt;b&gt;finance_supplier_* 的位置&lt;/b&gt;&lt;br&gt;用于月结、对账与报表；&lt;br&gt;&lt;font color='#7D2525'&gt;不能反过来充当日常采购单和收货事实源&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#7A8390;fontColor=#3E4650;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_4">
+          <mxGeometry x="34" y="204" width="280" height="112" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3_sample" value="&lt;b&gt;黑巧 / 草莓塔验收&lt;/b&gt;&lt;br&gt;product_id 能准确追到配方版本、每种原料、订货与到货实价；&lt;br&gt;名称疑似错配时暂停计算并进入审核队列。" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C94A4A;fontColor=#7D2525;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_4">
+          <mxGeometry x="24" y="354" width="300" height="126" as="geometry"/>
+        </mxCell>
+        <mxCell id="e0" value="" style="endArrow=none;strokeOpacity=0;html=1;" edge="1" parent="1" source="p3_title" target="p3_plan_line">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="320" y="310"/><mxPoint x="390" y="310"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e1" value="product_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_plan_line" target="p3_link">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="650" y="310"/><mxPoint x="720" y="310"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e2" value="成本卡成品" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_link" target="p3_recipe">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="980" y="310"/><mxPoint x="1050" y="310"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="配方快照" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_recipe" target="p3_recipe_item">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1310" y="290"/><mxPoint x="1370" y="290"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="发布计划量" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_plan_line" target="p3_mr_run">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="520" y="230"/><mxPoint x="520" y="210"/><mxPoint x="520" y="210"/><mxPoint x="520" y="210"/><mxPoint x="1700" y="210"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="单位净用量" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_recipe_item" target="p3_mr_run">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1640" y="280"/><mxPoint x="1700" y="280"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e6" value="一对多" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_mr_run" target="p3_mr_line">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1970" y="250"/><mxPoint x="2060" y="250"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="毛需求" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_mr_line" target="p3_replenish">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2320" y="250"/><mxPoint x="2410" y="250"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e8" value="可用库存" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_inventory" target="p3_replenish">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2190" y="160"/><mxPoint x="2190" y="170"/><mxPoint x="2190" y="170"/><mxPoint x="2190" y="170"/><mxPoint x="2410" y="170"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e9" value="未到货在途" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;" edge="1" parent="1" source="p3_po_line" target="p3_replenish">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e10" value="生成 / 更新草案" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_replenish" target="p3_po">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" value="批准数量 + 原因" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;strokeColor=#C94A4A;fontColor=#7D2525;strokeWidth=2;" edge="1" parent="1" source="p3_manual" target="p3_po_revision">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2060" y="710"/><mxPoint x="2060" y="650"/><mxPoint x="2060" y="650"/><mxPoint x="2060" y="650"/><mxPoint x="1980" y="650"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e12" value="不可变版本" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_po" target="p3_po_revision">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1640" y="600"/><mxPoint x="1700" y="600"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e13" value="该版明细" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_po_revision" target="p3_po_line">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1970" y="600"/><mxPoint x="2060" y="600"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e14" value="供应商 SKU" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_supplier_item" target="p3_po_line">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1970" y="520"/><mxPoint x="2060" y="520"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e15" value="对单收货" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_po_line" target="p3_receipt">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2320" y="600"/><mxPoint x="2420" y="600"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e16" value="无 WMS / 异常时确认" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_manual" target="p3_receipt">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2330" y="720"/><mxPoint x="2330" y="680"/><mxPoint x="2330" y="680"/><mxPoint x="2330" y="680"/><mxPoint x="2420" y="680"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e17" value="实际采购价候选" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;" edge="1" parent="1" source="p3_receipt" target="p3_price">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e18" value="配方版本" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_recipe" target="p3_cost_snapshot">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e19" value="当日有效价格" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_price" target="p3_cost_snapshot">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1310" y="1180"/><mxPoint x="1370" y="1180"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e20" value="销量与收入" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_pos_sales" target="p3_margin">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1730" y="1000"/><mxPoint x="1840" y="1000"/><mxPoint x="1840" y="1000"/><mxPoint x="1840" y="1000"/><mxPoint x="1840" y="1090"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e21" value="当日单位成本" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_cost_snapshot" target="p3_margin">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1640" y="1160"/><mxPoint x="1700" y="1160"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e22" value="月结对账" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;" edge="1" parent="1" source="p3_receipt" target="p3_finance">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e23" value="端到端校验" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p3_margin" target="p3_sample">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e24" value="映射证据 / 状态" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;" edge="1" parent="1" source="p3_link" target="p3_sample">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="future-p4-hr" name="04 人事：评分到班表">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="group_0" value="从候选人到有效雇佣关系" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;fontColor=#6c8ebf;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="386" y="346" width="978" height="334" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_1" value="培训结果决定能不能上关键岗位" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#82b366;fontColor=#82b366;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1066" y="6" width="1268" height="324" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_2" value="班表先写需求，再指派具体人" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d79b00;fontColor=#d79b00;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="2036" y="336" width="988" height="350" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_3" value="实际工时与人效自动回读" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673a6;fontColor=#9673a6;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="2366" y="696" width="988" height="348" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_4" value="只录判断，不重复抄结果" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d6b656;fontColor=#d6b656;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="6" y="36" width="338" height="354" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_title" value="人事 × 培训 × 班表&lt;br&gt;&lt;font style='font-size:13px;font-weight:normal'&gt;人员链必须从应聘评分走到岗位资格、关键岗位指派、实际工时和人效&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=22;fontStyle=1;spacingLeft=18;spacingRight=18;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="20" y="500" width="320" height="112" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_application" value="&lt;b&gt;applications / appointments / trials&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;候选人、面试与试岗来源事实&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：候选人 × 阶段事件&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：candidate/application_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EDFA;strokeColor=#7C5AA6;fontColor=#493263;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="24" y="144" width="270" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_assessment" value="&lt;b&gt;hr_assessment&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;一次结构化评分与结论&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：候选人 × 评估轮次&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：assessment_id, candidate_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EDFA;strokeColor=#7C5AA6;fontColor=#493263;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="374" y="194" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_score" value="&lt;b&gt;hr_assessment_item_score&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;每个评分项、分值和证据&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：评估 × 评分项&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：assessment_id, item_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EDFA;strokeColor=#7C5AA6;fontColor=#493263;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="704" y="194" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_person" value="&lt;b&gt;hr_person&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;同一个自然人的稳定身份&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：一人一行&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：person_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="374" y="34" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_employment" value="&lt;b&gt;hr_employment&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;人与门店/公司的一段雇佣关系&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：人员 × 雇佣期间&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：employment_id, person_id, store_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="704" y="24" width="250" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_course" value="&lt;b&gt;hr_training_course&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;岗位培训课程与有效期规则&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：一个课程版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：course_id, version&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EDFA;strokeColor=#7C5AA6;fontColor=#493263;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="24" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_assignment" value="&lt;b&gt;hr_training_assignment&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;某雇员被安排参加某课程&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：雇佣关系 × 课程 × 批次&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：employment_id, course_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EDFA;strokeColor=#7C5AA6;fontColor=#493263;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="344" y="184" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_result" value="&lt;b&gt;hr_training_result&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;完成、分数、通过与证据&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：培训安排 × 考核&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：training_assignment_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EDFA;strokeColor=#7C5AA6;fontColor=#493263;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="674" y="184" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_role" value="&lt;b&gt;ops_role + ops_station&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;标准岗位和工作站，不用自由文本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：岗位 / 工作站&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：role_id, station_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="24" y="184" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_requirement" value="&lt;b&gt;ops_role_training_requirement&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;某岗位必须通过哪些课程&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：岗位 × 课程&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：role_id, course_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="344" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_eligibility" value="&lt;b&gt;v_hr_role_eligibility&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;某雇员当前可承担的岗位&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：雇佣关系 × 岗位 × 日期&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：employment_id, role_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;dashed=1;dashPattern=6 4;" vertex="1" parent="group_1">
+          <mxGeometry x="994" y="184" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_shift_plan" value="&lt;b&gt;ops_shift_plan&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;某店某日的稳定班表身份与版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 日期 × 班表版本&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：shift_plan_id, store_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="24" y="184" width="250" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_shift_req" value="&lt;b&gt;ops_shift_requirement&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;每时段需要多少岗位；关键岗位必须标明&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：班表 × 时段 × 岗位 × 工作站&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：shift_plan_id, role_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="354" y="194" width="250" height="132" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_shift_assign" value="&lt;b&gt;ops_shift_assignment&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;具体员工的起止时间、岗位和工作站&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：班表 × 雇佣关系 × 时间区间&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：employment_id, role_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EDFA;strokeColor=#7C5AA6;fontColor=#493263;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="354" y="24" width="250" height="132" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_gate" value="&lt;b&gt;发布门禁&lt;/b&gt;&lt;br&gt;所有 is_critical = true 的需求都已指派；&lt;br&gt;且被指派者在该日期具备岗位资格。&lt;br&gt;&lt;font color='#7D2525'&gt;不满足就不能发布班表。&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C94A4A;fontColor=#7D2525;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="684" y="24" width="280" height="126" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_sync" value="&lt;b&gt;hr_timesheet_sync_batch&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;Lark 月度实际工时读取批次&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：来源文件 × sheet × 读取时间&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：batch_id, source&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#4A74B5;fontColor=#17324D;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="24" y="194" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_time" value="&lt;b&gt;hr_timesheet_entry&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;每天实际工作时长与来源单元格&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：雇佣关系 × 门店 × 日期 × 工作区域/来源流&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：employment_id, store_id, date&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E6F7F6;strokeColor=#2E8B88;fontColor=#175E5B;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="344" y="184" width="290" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_sales" value="&lt;b&gt;pos_daily_sales&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;门店当日实际营收与单量&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 日期&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id, date&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E6F7F6;strokeColor=#2E8B88;fontColor=#175E5B;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;dashed=1;dashPattern=6 4;" vertex="1" parent="group_3">
+          <mxGeometry x="364" y="24" width="250" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_productivity" value="&lt;b&gt;v_ops_labor_productivity&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;营收 / 实际工时、单量 / 实际工时&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 × 日期 × 工作区域&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id, date&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;dashed=1;dashPattern=6 4;" vertex="1" parent="group_3">
+          <mxGeometry x="714" y="104" width="250" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_manual" value="&lt;b&gt;人工必须确认&lt;/b&gt;&lt;br&gt;• 面试 / 试岗评分与证据&lt;br&gt;• 培训通过结果&lt;br&gt;• 班表调整与关键岗位指派&lt;br&gt;&lt;font color='#493263'&gt;实际工时从 Lark 读取；人效自动算&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C94A4A;fontColor=#7D2525;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_4">
+          <mxGeometry x="24" y="194" width="290" height="136" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4_rule" value="&lt;b&gt;班表粒度&lt;/b&gt;&lt;br&gt;允许同一员工一天分段、跨工作区、多岗位；&lt;br&gt;不能只存“早班/晚班”文本，也不能把计划班表当实际工时。" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#7A8390;fontColor=#3E4650;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_4">
+          <mxGeometry x="24" y="24" width="290" height="122" as="geometry"/>
+        </mxCell>
+        <mxCell id="e0" value="" style="endArrow=none;strokeOpacity=0;html=1;" edge="1" parent="1" source="p4_title" target="p4_application">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="340" y="550"/><mxPoint x="400" y="550"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e1" value="进入评估" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_application" target="p4_assessment">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="680" y="570"/><mxPoint x="750" y="570"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e2" value="一对多" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_assessment" target="p4_score">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1010" y="590"/><mxPoint x="1070" y="590"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="去重建人" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_application" target="p4_person">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="780" y="510"/><mxPoint x="880" y="510"/><mxPoint x="880" y="510"/><mxPoint x="880" y="510"/><mxPoint x="880" y="510"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="一人多段雇佣" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_person" target="p4_employment">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1010" y="440"/><mxPoint x="1070" y="440"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="安排培训" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_employment" target="p4_assignment">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1430" y="410"/><mxPoint x="1540" y="410"/><mxPoint x="1540" y="410"/><mxPoint x="1540" y="410"/><mxPoint x="1540" y="320"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e6" value="课程版本" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_course" target="p4_assignment">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1370" y="90"/><mxPoint x="1390" y="90"/><mxPoint x="1390" y="90"/><mxPoint x="1390" y="90"/><mxPoint x="1390" y="220"/><mxPoint x="1390" y="220"/><mxPoint x="1390" y="220"/><mxPoint x="1400" y="220"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="考核结果" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_assignment" target="p4_result">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1660" y="250"/><mxPoint x="1730" y="250"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e8" value="岗位" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_role" target="p4_requirement">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1360" y="250"/><mxPoint x="1370" y="250"/><mxPoint x="1370" y="250"/><mxPoint x="1370" y="250"/><mxPoint x="1370" y="120"/><mxPoint x="1370" y="120"/><mxPoint x="1370" y="120"/><mxPoint x="1400" y="120"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e9" value="必修课程" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_course" target="p4_requirement">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1340" y="60"/><mxPoint x="1400" y="60"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e10" value="通过且在有效期" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_result" target="p4_eligibility">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1990" y="250"/><mxPoint x="2050" y="250"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e11" value="资格规则" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_requirement" target="p4_eligibility">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1850" y="90"/><mxPoint x="2190" y="90"/><mxPoint x="2190" y="90"/><mxPoint x="2190" y="90"/><mxPoint x="2190" y="180"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e12" value="人员需求" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_shift_plan" target="p4_shift_req">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2310" y="590"/><mxPoint x="2380" y="590"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e13" value="人员指派" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_shift_plan" target="p4_shift_assign">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e14" value="标准岗位 / 工作站" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_role" target="p4_shift_req">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e15" value="具体雇佣关系" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_employment" target="p4_shift_assign">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e16" value="可承担岗位" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_eligibility" target="p4_shift_assign">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e17" value="关键岗位覆盖" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_shift_req" target="p4_gate">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2690" y="600"/><mxPoint x="2730" y="600"/><mxPoint x="2730" y="600"/><mxPoint x="2730" y="600"/><mxPoint x="2730" y="500"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e18" value="人 / 时段 / 岗位" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_shift_assign" target="p4_gate">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2640" y="410"/><mxPoint x="2710" y="410"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e19" value="资格校验" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;strokeColor=#C94A4A;fontColor=#7D2525;strokeWidth=2;" edge="1" parent="1" source="p4_eligibility" target="p4_gate">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2510" y="250"/><mxPoint x="2860" y="250"/><mxPoint x="2860" y="250"/><mxPoint x="2860" y="250"/><mxPoint x="2860" y="350"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e20" value="逐日来源单元格" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_sync" target="p4_time">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2640" y="950"/><mxPoint x="2700" y="950"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e21" value="计划 vs 实际" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;" edge="1" parent="1" source="p4_shift_assign" target="p4_time">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e22" value="实际工时" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_time" target="p4_productivity">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="3010" y="900"/><mxPoint x="3070" y="900"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e23" value="实际营收 / 单量" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p4_sales" target="p4_productivity">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2990" y="820"/><mxPoint x="3070" y="820"/></Array></mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="future-p5-governance" name="05 共享身份与治理">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="group_0" value="外部系统的标识只作为来源身份" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#6c8ebf;fontColor=#6c8ebf;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="396" y="656" width="298" height="670" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_1" value="所有跨域关系只能走稳定 ID" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#82b366;fontColor=#82b366;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="746" y="556" width="1088" height="660" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_2" value="各域只写自己的事实" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d79b00;fontColor=#d79b00;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1876" y="446" width="708" height="796" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_3" value="问：预估单和班表到底人工录什么？" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#9673a6;fontColor=#9673a6;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="376" y="6" width="348" height="648" as="geometry"/>
+        </mxCell>
+        <mxCell id="group_4" value="没有来源、版本和责任人，就不是企业事实" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#d6b656;fontColor=#d6b656;verticalAlign=top;fontStyle=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1486" y="116" width="1488" height="180" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_title" value="共享身份与治理&lt;br&gt;&lt;font style='font-size:13px;font-weight:normal'&gt;跨表抓取速度来自稳定 ID、来源批次和单一写者；不是来自模糊名称或万能宽表&lt;/font&gt;" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=22;fontStyle=1;spacingLeft=18;spacingRight=18;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="0" y="810" width="320" height="112" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_pos_source" value="&lt;b&gt;RES / POS 标识&lt;/b&gt;&lt;br&gt;item_id、menu/listing_id、shop_id" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#4A74B5;fontColor=#17324D;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="34" y="164" width="240" height="92" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_cost_source" value="&lt;b&gt;成本卡标识&lt;/b&gt;&lt;br&gt;cost_card_item_id、recipe_id" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="34" y="24" width="240" height="92" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_supplier_source" value="&lt;b&gt;供应商标识&lt;/b&gt;&lt;br&gt;supplier_code、supplier_sku" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF7EE;strokeColor=#3F8F5B;fontColor=#205C39;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="34" y="294" width="240" height="92" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_hr_source" value="&lt;b&gt;Lark / 招聘标识&lt;/b&gt;&lt;br&gt;employee_no、open_id、application_id" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EDFA;strokeColor=#7C5AA6;fontColor=#493263;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="34" y="554" width="240" height="92" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_store_source" value="&lt;b&gt;门店来源标识&lt;/b&gt;&lt;br&gt;RES shop_id、WMS store_code、人工旧名称" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#7A8390;fontColor=#3E4650;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_0">
+          <mxGeometry x="24" y="424" width="250" height="92" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_store" value="&lt;b&gt;ops_store + ops_store_source_identity&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;企业门店主键与各系统门店映射&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：门店 / 来源系统门店&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：store_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="394" y="344" width="290" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_product" value="&lt;b&gt;pos_sellable_product&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;企业层可售产品身份；product_id 是主轴&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：一个业务可售产品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="394" y="24" width="290" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_listing" value="&lt;b&gt;pos_product&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;不同菜单 / 门店 / 时段的 POS listing&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：来源 listing&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：listing_id, product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#4A74B5;fontColor=#17324D;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="24" y="24" width="290" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_product_link" value="&lt;b&gt;cost_card_product_link&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;product_id 到成本卡成品的证据化映射&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：产品 × 成本卡成品&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：product_id, cost_card_item_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="774" y="24" width="290" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_people" value="&lt;b&gt;hr_person + hr_employment + _source_identity&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;人、雇佣关系及来源员工标识&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：人员 / 雇佣期间 / 来源身份&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：person_id, employment_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="394" y="504" width="300" height="132" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_material" value="&lt;b&gt;cost_card_item + scm_supplier_item&lt;/b&gt;&lt;br&gt;&lt;font color='#455160'&gt;标准原料及供应商 SKU 映射&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;粒度：原料 / 供应商 SKU&lt;/font&gt;&lt;br&gt;&lt;font color='#6C7683'&gt;关键键：material_id, supplier_item_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="394" y="174" width="290" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_mapping_queue" value="&lt;b&gt;分域映射审核队列&lt;/b&gt;&lt;br&gt;ops_product_mapping_review&lt;br&gt;hr_identity_mapping_review&lt;br&gt;scm_item_mapping_review&lt;br&gt;&lt;font color='#7D2525'&gt;不确定就阻断，不静默猜配&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C94A4A;fontColor=#7D2525;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="24" y="174" width="290" height="136" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_contract" value="&lt;b&gt;共享外键合同&lt;/b&gt;&lt;br&gt;store_id / product_id / employment_id / material_id&lt;br&gt;&lt;font color='#D8E8F7'&gt;所有核心事实禁用 name join&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#17324D;strokeColor=#17324D;fontColor=#FFFFFF;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_1">
+          <mxGeometry x="764" y="234" width="300" height="116" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_ops_fact" value="&lt;b&gt;ops_ 营运事实&lt;/b&gt;&lt;br&gt;预测、计划版本、调整、班表、发出、事件&lt;br&gt;&lt;font color='#7A3E00'&gt;键：store_id + product_id / employment_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="24" y="654" width="280" height="118" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_pos_fact" value="&lt;b&gt;pos_ 销售事实&lt;/b&gt;&lt;br&gt;订单、单品销量、报废、时段&lt;br&gt;&lt;font color='#175E5B'&gt;键：store_id + product_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#E6F7F6;strokeColor=#2E8B88;fontColor=#175E5B;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="24" y="504" width="270" height="112" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_scm_fact" value="&lt;b&gt;scm_ 供应链事实&lt;/b&gt;&lt;br&gt;库存、需求、补货、采购单版本、收货&lt;br&gt;&lt;font color='#205C39'&gt;键：store_id + material_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF7EE;strokeColor=#3F8F5B;fontColor=#205C39;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="24" y="344" width="280" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_hr_fact" value="&lt;b&gt;hr_ 人事事实&lt;/b&gt;&lt;br&gt;评估、雇佣、培训、实际工时&lt;br&gt;&lt;font color='#493263'&gt;键：employment_id + store_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F3EDFA;strokeColor=#7C5AA6;fontColor=#493263;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="24" y="184" width="270" height="112" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_cost_fact" value="&lt;b&gt;cost_card_ 成本事实&lt;/b&gt;&lt;br&gt;配方版本、价格版本、产品成本快照&lt;br&gt;&lt;font color='#6D5100'&gt;键：product_id + material_id&lt;/font&gt;" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="24" y="24" width="280" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_fact_bus" value="&lt;b&gt;规范化核心事实&lt;/b&gt;&lt;br&gt;一表一个业务粒度；计划、实际、销售、工时互不覆盖" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#7A8390;fontColor=#3E4650;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_2">
+          <mxGeometry x="394" y="194" width="290" height="108" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_auto" value="&lt;b&gt;自动采集&lt;/b&gt;&lt;br&gt;POS 销售/报废、官方节假日、Lark 实际工时、预测、成本汇总、毛利、产品占比" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#EAF2FF;strokeColor=#4A74B5;fontColor=#17324D;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="24" y="24" width="290" height="124" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_once" value="&lt;b&gt;一次性人工确认&lt;/b&gt;&lt;br&gt;门店、产品、员工、供应商 SKU 与标准身份映射" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#7A8390;fontColor=#3E4650;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="24" y="514" width="290" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_recurring" value="&lt;b&gt;日常人工判断&lt;/b&gt;&lt;br&gt;计划覆盖量/原因、突发事件、关键岗位指派、评分、培训结果、订货批准、收货异常" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF1E8;strokeColor=#D97706;fontColor=#7A3E00;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="24" y="344" width="300" height="132" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_never" value="&lt;b&gt;绝不人工重复录&lt;/b&gt;&lt;br&gt;销售额、总工时、产品占比、需求合计、成本合计、毛利率" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C94A4A;fontColor=#7D2525;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_3">
+          <mxGeometry x="24" y="194" width="290" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_provenance" value="&lt;b&gt;每条事实的来源证据&lt;/b&gt;&lt;br&gt;source_system / source_record_id / batch_id&lt;br&gt;observed_at / effective_at / recorded_at" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#7A8390;fontColor=#3E4650;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_4">
+          <mxGeometry x="784" y="24" width="300" height="122" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_writer" value="&lt;b&gt;一表一粒度一写者&lt;/b&gt;&lt;br&gt;res_api → pos_&lt;br&gt;BakeryOps → ops_ / hr_ / scm_&lt;br&gt;财务站 → finance_ / cost_card_ / app_" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#F5F6F8;strokeColor=#7A8390;fontColor=#3E4650;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_4">
+          <mxGeometry x="404" y="24" width="300" height="132" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_migration" value="&lt;b&gt;schema_migrations&lt;/b&gt;&lt;br&gt;version + checksum + owner_repo + applied_at&lt;br&gt;advisory lock 串行执行；生产库无 staging，DDL 只走迁移" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FDECEC;strokeColor=#C94A4A;fontColor=#7D2525;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_4">
+          <mxGeometry x="24" y="24" width="300" height="132" as="geometry"/>
+        </mxCell>
+        <mxCell id="p5_marts" value="&lt;b&gt;视图 / mart 后置&lt;/b&gt;&lt;br&gt;核心事实确认后再投影：毛利、人效、预测准确率、补货状态；&lt;br&gt;不靠一张宽表修复上游身份和粒度。" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#FFF7DD;strokeColor=#B88916;fontColor=#6D5100;align=left;verticalAlign=middle;fontSize=13;spacingLeft=10;spacingRight=10;spacingTop=8;spacingBottom=8;strokeWidth=1.5;" vertex="1" parent="group_4">
+          <mxGeometry x="1154" y="24" width="310" height="132" as="geometry"/>
+        </mxCell>
+        <mxCell id="e0" value="" style="endArrow=none;strokeOpacity=0;html=1;" edge="1" parent="1" source="p5_title" target="p5_pos_source">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="320" y="860"/><mxPoint x="410" y="860"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e1" value="shop_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_pos_source" target="p5_store">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="670" y="900"/><mxPoint x="1130" y="900"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e2" value="来源门店映射" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_store_source" target="p5_store">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="670" y="1130"/><mxPoint x="680" y="1130"/><mxPoint x="680" y="1130"/><mxPoint x="680" y="1130"/><mxPoint x="680" y="1000"/><mxPoint x="680" y="1000"/><mxPoint x="680" y="1000"/><mxPoint x="1130" y="1000"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="listing / item" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_pos_source" target="p5_listing">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="680" y="830"/><mxPoint x="690" y="830"/><mxPoint x="690" y="830"/><mxPoint x="690" y="830"/><mxPoint x="690" y="690"/><mxPoint x="690" y="690"/><mxPoint x="690" y="690"/><mxPoint x="760" y="690"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="归一 product_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_listing" target="p5_product">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1060" y="620"/><mxPoint x="1130" y="620"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="成本卡成品" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_cost_source" target="p5_product_link">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" value="product_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_product" target="p5_product_link">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1430" y="620"/><mxPoint x="1510" y="620"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="来源员工身份" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_hr_source" target="p5_people">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="550" y="1200"/><mxPoint x="550" y="1180"/><mxPoint x="550" y="1180"/><mxPoint x="550" y="1180"/><mxPoint x="1130" y="1180"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e8" value="supplier_sku" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_supplier_source" target="p5_material">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="830" y="980"/><mxPoint x="1110" y="980"/><mxPoint x="1110" y="980"/><mxPoint x="1110" y="980"/><mxPoint x="1110" y="820"/><mxPoint x="1110" y="820"/><mxPoint x="1110" y="820"/><mxPoint x="1130" y="820"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e9" value="标准原料" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_cost_source" target="p5_material">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="880" y="720"/><mxPoint x="1290" y="720"/><mxPoint x="1290" y="720"/><mxPoint x="1290" y="720"/><mxPoint x="1290" y="720"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e10" value="store_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_store" target="p5_contract">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1290" y="890"/><mxPoint x="1290" y="880"/><mxPoint x="1290" y="880"/><mxPoint x="1290" y="880"/><mxPoint x="1500" y="880"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e11" value="product_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_product" target="p5_contract">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1460" y="650"/><mxPoint x="1480" y="650"/><mxPoint x="1480" y="650"/><mxPoint x="1480" y="650"/><mxPoint x="1480" y="810"/><mxPoint x="1480" y="810"/><mxPoint x="1480" y="810"/><mxPoint x="1500" y="810"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e12" value="employment_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_people" target="p5_contract">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1510" y="1080"/><mxPoint x="1590" y="1080"/><mxPoint x="1590" y="1080"/><mxPoint x="1590" y="1080"/><mxPoint x="1590" y="910"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e13" value="material_id" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_material" target="p5_contract">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1430" y="830"/><mxPoint x="1500" y="830"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e14" value="未映射 / 冲突" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;strokeColor=#C94A4A;fontColor=#7D2525;strokeWidth=2;" edge="1" parent="1" source="p5_pos_source" target="p5_mapping_queue">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="670" y="850"/><mxPoint x="760" y="850"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e15" value="重名 / 缺号" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;strokeColor=#C94A4A;fontColor=#7D2525;strokeWidth=2;" edge="1" parent="1" source="p5_hr_source" target="p5_mapping_queue">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="790" y="1260"/><mxPoint x="970" y="1260"/><mxPoint x="970" y="1260"/><mxPoint x="970" y="1260"/><mxPoint x="970" y="880"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e16" value="名称漂移" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;strokeColor=#C94A4A;fontColor=#7D2525;strokeWidth=2;" edge="1" parent="1" source="p5_supplier_source" target="p5_mapping_queue">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="760" y="970"/><mxPoint x="870" y="970"/><mxPoint x="870" y="970"/><mxPoint x="870" y="970"/><mxPoint x="870" y="880"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e17" value="人工确认后生效" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;" edge="1" parent="1" source="p5_mapping_queue" target="p5_product">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1080" y="770"/><mxPoint x="1090" y="770"/><mxPoint x="1090" y="770"/><mxPoint x="1090" y="770"/><mxPoint x="1090" y="650"/><mxPoint x="1090" y="650"/><mxPoint x="1090" y="650"/><mxPoint x="1130" y="650"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e18" value="FK 合同" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_contract" target="p5_ops_fact">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1660" y="990"/><mxPoint x="1660" y="1150"/><mxPoint x="1660" y="1150"/><mxPoint x="1660" y="1150"/><mxPoint x="1890" y="1150"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e19" value="FK 合同" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_contract" target="p5_pos_fact">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1740" y="940"/><mxPoint x="1740" y="980"/><mxPoint x="1740" y="980"/><mxPoint x="1740" y="980"/><mxPoint x="1890" y="980"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e20" value="FK 合同" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_contract" target="p5_scm_fact">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1810" y="830"/><mxPoint x="1890" y="830"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e21" value="FK 合同" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_contract" target="p5_hr_fact">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1660" y="760"/><mxPoint x="1660" y="740"/><mxPoint x="1660" y="740"/><mxPoint x="1660" y="740"/><mxPoint x="1890" y="740"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e22" value="FK 合同" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_contract" target="p5_cost_fact">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1840" y="860"/><mxPoint x="1850" y="860"/><mxPoint x="1850" y="860"/><mxPoint x="1850" y="860"/><mxPoint x="1850" y="590"/><mxPoint x="1850" y="590"/><mxPoint x="1850" y="590"/><mxPoint x="1890" y="590"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e23" value="核心事实" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_ops_fact" target="p5_fact_bus">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2310" y="1160"/><mxPoint x="2490" y="1160"/><mxPoint x="2490" y="1160"/><mxPoint x="2490" y="1160"/><mxPoint x="2490" y="760"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e24" value="核心事实" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_pos_fact" target="p5_fact_bus">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2280" y="1000"/><mxPoint x="2420" y="1000"/><mxPoint x="2420" y="1000"/><mxPoint x="2420" y="1000"/><mxPoint x="2420" y="750"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e25" value="核心事实" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_scm_fact" target="p5_fact_bus">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2260" y="850"/><mxPoint x="2340" y="850"/><mxPoint x="2340" y="850"/><mxPoint x="2340" y="850"/><mxPoint x="2340" y="750"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e26" value="核心事实" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_hr_fact" target="p5_fact_bus">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2180" y="690"/><mxPoint x="2260" y="690"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e27" value="核心事实" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_cost_fact" target="p5_fact_bus">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2270" y="530"/><mxPoint x="2370" y="530"/><mxPoint x="2370" y="530"/><mxPoint x="2370" y="530"/><mxPoint x="2370" y="620"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e28" value="自动批次" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_auto" target="p5_provenance">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1130" y="80"/><mxPoint x="2420" y="80"/><mxPoint x="2420" y="80"/><mxPoint x="2420" y="80"/><mxPoint x="2420" y="130"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e29" value="确认映射" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_once" target="p5_mapping_queue">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="680" y="680"/><mxPoint x="680" y="750"/><mxPoint x="680" y="750"/><mxPoint x="680" y="750"/><mxPoint x="760" y="750"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e30" value="业务动作与证据" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_recurring" target="p5_fact_bus">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e31" value="全部派生" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;dashed=1;dashPattern=6 4;" edge="1" parent="1" source="p5_never" target="p5_marts">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1180" y="290"/><mxPoint x="2740" y="290"/><mxPoint x="2740" y="290"/><mxPoint x="2740" y="290"/><mxPoint x="2740" y="280"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e32" value="责任边界" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_writer" target="p5_provenance">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2190" y="200"/><mxPoint x="2250" y="200"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e33" value="可追溯输入" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_provenance" target="p5_marts">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="2570" y="200"/><mxPoint x="2630" y="200"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e34" value="共享库变更治理" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;strokeColor=#C94A4A;fontColor=#7D2525;strokeWidth=2;" edge="1" parent="1" source="p5_migration" target="p5_writer">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1810" y="200"/><mxPoint x="1880" y="200"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e35" value="可追溯核心" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#637083;strokeWidth=1.4;fontColor=#3E4650;fontSize=11;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="p5_fact_bus" target="p5_marts">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

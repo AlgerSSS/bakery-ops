@@ -17,3 +17,10 @@ res_api/_*
 
 # 生产库备份：pg_dump 全量转储，含全部业务数据。只在本机与异地存储保留，绝不入 git。
 backups/
+
+# Python 生成缓存与 Supabase CLI 本地状态：可再生，不入库
+__pycache__/
+supabase/.temp/
+
+# output/ 下是含员工姓名与薪资的分析报告 PDF：个人数据只在本机交付，不进 git 历史
+output/

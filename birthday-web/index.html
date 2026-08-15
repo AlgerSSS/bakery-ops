@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f2e6d6">
+<meta name="robots" content="noindex, nofollow">
+<title>生日快乐 — Hot Crush</title>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   HOT CRUSH · 生日贺卡 + 生日礼预约　完整可交互 H5
+   零 JavaScript：屏幕切换、选择状态、确认页汇总全部由
+   radio/checkbox + 兄弟选择器驱动。
+   色彩与字体 token 与 hbti-web/src/app/globals.css 同源。
+   ══════════════════════════════════════════════════════════════ */
+@font-face{font-family:"Neutra Text";src:url("https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com/designer/Font/NeutraTextDemiAlt.woff2") format("woff2");font-weight:400 700;font-display:swap;}
+@font-face{font-family:"OPPO Sans";src:url("https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com/designer/Font/OPPOSans-M-2.woff2") format("woff2");font-weight:400 700;font-display:swap;}
+/* 中文句子里的数字也走品牌字：用 unicode-range 只接管数字与拉丁字母，
+   汉字仍由 OPPO Sans 承担（Neutra 一个汉字都没有，实测过）。
+   这样「8 月 12 日」「第 3 个」里的数字就带上了 logo 的几何调性。 */
+@font-face{font-family:"Brand Digits";
+  src:url("https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com/designer/Font/NeutraTextDemiAlt.woff2") format("woff2");
+  unicode-range:U+0030-0039,U+0041-005A,U+0061-007A;font-weight:400;font-display:swap;}
+@font-face{font-family:"Neutra Display";src:url("https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com/designer/Font/NeutraTextDemiAlt.woff2") format("woff2");font-weight:400;font-display:swap;}
+
+:root{
+  --hc-paper:#fff7ea;--hc-oxblood:#6a1c13;--hc-red:#c51f2c;--hc-peach:#f3d0b8;
+  --cream-deep:#f2e6d6;--flesh-light:#fbe8dc;--ink-soft:#4e3b37;
+  --line:rgba(106,28,19,.14);
+  --shadow-soft:0 20px 56px rgba(63,21,15,.14);
+  --ease:cubic-bezier(.22,.76,.24,1);
+  --accent:#b4c876;
+  --font-brand:"Neutra Text","Avenir Next","Helvetica Neue","OPPO Sans","PingFang SC",sans-serif;
+  --font-copy:"Brand Digits","OPPO Sans","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-display:"Neutra Display","Neutra Text","Avenir Next","OPPO Sans","PingFang SC",sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html{background:var(--cream-deep);color-scheme:light;}
+body{min-height:100dvh;
+  background:radial-gradient(140% 60% at 50% 0%,var(--flesh-light) 0%,transparent 55%),var(--cream-deep);
+  font-family:var(--font-copy);color:var(--hc-oxblood);-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;justify-content:safe center;
+  padding:max(18px,env(safe-area-inset-top)) 16px max(28px,env(safe-area-inset-bottom));}
+body > input{position:absolute;opacity:0;width:1px;height:1px;}
+.stage{width:100%;max-width:400px;}
+
+.sc{flex-direction:column;animation:rise .45s var(--ease) both;}
+@keyframes rise{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:none;}}
+
+/* ── 贺卡 ── */
+.card{gap:26px;background:var(--hc-paper);
+  border-radius:1.25rem;box-shadow:var(--shadow-soft);padding:30px 28px 26px;position:relative;overflow:hidden;}
+.card::after{content:"";position:absolute;inset:0;border-radius:inherit;border:1px solid rgba(106,28,19,.09);pointer-events:none;}
+/* 烛光：光源落在火苗的位置（右上 ~78% 12%），整张卡是被这根蜡烛照亮的，
+   不再是一层与内容无关的顶部渐变。开卡时随火苗一起绽开。 */
+.card::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  z-index:-1;   /* 负层级：压在卡片底色之上、文字之下，否则光晕会冲淡内容 */
+
+  background:
+    radial-gradient(40% 19% at 50% 30%, rgba(243,208,184,.95) 0%, transparent 70%),
+    radial-gradient(120% 60% at 50% -6%, var(--flesh-light) 0%, transparent 62%);
+  animation:bloom 1.5s var(--ease) both, glow 3.7s ease-in-out 1.5s infinite;}
+@keyframes glow{0%,100%{opacity:1;}44%{opacity:.8;}}
+@keyframes bloom{from{opacity:0;transform:scale(.94);}to{opacity:1;transform:none;}}
+/* 页眉锁定关系与 hbti.module.css 的 .wordmark 一致：字标 + 红短杠 + 副标 */
+.brand{display:flex;align-items:center;}
+.logo{display:block;width:108px;aspect-ratio:305/38;flex:0 0 auto;
+  background:url("data:image/png;base64,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") center/contain no-repeat;}
+.brand .rl{width:1.3rem;height:3px;margin-inline:.45rem;flex:0 0 auto;background:var(--hc-red);}
+.sub2{font-family:var(--font-brand);font-size:10px;font-weight:700;
+  letter-spacing:.19em;line-height:1;text-transform:uppercase;color:var(--hc-oxblood);}
+/* 品牌箭头：只在完成屏出现一次，当作盖章 */
+.stamp{display:block;width:44px;height:44px;flex:0 0 auto;transform:rotate(-5deg);
+  background:url("data:image/png;base64,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") center/contain no-repeat;}
+.nm{font-family:var(--font-display);font-weight:700;font-size:31px;letter-spacing:-.035em;line-height:1.1;}
+.ld{font-size:19.5px;line-height:1.5;margin-top:-13px;}
+.heroTxt{display:flex;flex-direction:column;gap:6px;min-width:0;align-self:stretch;}
+/* 负边距原本是抵消卡片 20px 间距用的，进了 heroTxt 就会吃进名字里 */
+.heroTxt .ld{margin-top:0;}
+.cake{display:block;margin:2px auto 0;align-self:center;}
+.flame{transform-origin:80px 25px;
+  animation:catch .55s var(--ease) both, flicker 2.6s ease-in-out .55s infinite;}
+@keyframes catch{
+  0%{opacity:0;transform:scale(.15);}
+  55%{opacity:1;transform:scale(1.3);}
+  100%{opacity:.92;transform:scale(1);}}
+/* 真火不是正弦波：关键帧间隔与幅度都刻意不规则 */
+@keyframes flicker{
+  0%  {transform:scale(1) rotate(0) translateY(0);                 opacity:.92;}
+  12% {transform:scale(1.06,.94) rotate(-3.5deg) translateY(-.8px);opacity:1;}
+  26% {transform:scale(.92,1.09) rotate(2.5deg)  translateY(.4px); opacity:.84;}
+  41% {transform:scale(1.11,.96) rotate(-1.5deg) translateY(-1.3px);opacity:1;}
+  55% {transform:scale(.96,1.05) rotate(3.5deg)  translateY(.2px); opacity:.89;}
+  68% {transform:scale(1.04,.98) rotate(-2deg)   translateY(-.5px);opacity:.98;}
+  83% {transform:scale(.95,1.06) rotate(1.2deg)  translateY(.3px); opacity:.86;}
+  100%{transform:scale(1) rotate(0) translateY(0);                 opacity:.92;}}
+/* 内焰自己一套周期（1.9s 对外焰 2.6s），两层长期错相位，才不像在循环播放 */
+.core{transform-origin:80px 22px;animation:core 1.9s ease-in-out .55s infinite;}
+@keyframes core{
+  0%,100%{transform:scale(1) translateY(0);         opacity:.9;}
+  33%    {transform:scale(.84,1.14) translateY(.6px);opacity:1;}
+  66%    {transform:scale(1.12,.9) translateY(-.5px);opacity:.76;}}
+.body{margin-top:-10px;font-size:14.5px;line-height:1.85;color:var(--ink-soft);text-wrap:pretty;}
+.body em{font-style:normal;color:var(--hc-oxblood);font-weight:600;
+  border-bottom:1.5px solid var(--accent);padding-bottom:1px;}
+.hr{height:1px;background:var(--line);}
+.gift{display:flex;flex-direction:column;gap:10px;}
+.tier{font-family:var(--font-brand);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:rgba(106,28,19,.55);}
+.what{font-size:15.5px;line-height:1.6;}
+.note{font-size:12px;line-height:1.65;color:rgba(78,59,55,.7);}
+/* 右缘锚点其二：页脚右对齐，与右上的蜡烛构成对角 */
+.foot{font-size:12px;color:rgba(106,28,19,.5);align-self:flex-end;}
+
+/* ── 流程屏 ── */
+.sheet{gap:16px;background:var(--hc-paper);border-radius:1.25rem;
+  box-shadow:var(--shadow-soft);padding:22px 24px 26px;}
+.top{display:flex;align-items:center;gap:12px;}
+.back{width:34px;height:34px;flex:0 0 34px;display:grid;place-items:center;border-radius:50%;
+  background:rgba(106,28,19,.07);font-size:17px;cursor:pointer;line-height:1;}
+.back:active{background:rgba(106,28,19,.14);}
+.step{font-size:12.5px;color:rgba(106,28,19,.62);line-height:1.4;}
+.sheet h2{font-size:24px;line-height:1.35;letter-spacing:-.01em;font-weight:600;text-wrap:balance;}
+.sub{font-size:12.5px;line-height:1.7;color:rgba(78,59,55,.75);}
+.lab{font-size:14px;font-weight:600;margin-top:4px;}
+.opt{font-weight:400;font-size:11.5px;color:rgba(106,28,19,.45);margin-left:6px;}
+.hintline{font-size:12px;line-height:1.6;color:rgba(78,59,55,.68);}
+
+/* 大块选择卡 */
+.picks{display:flex;flex-direction:column;gap:9px;}
+.picks.row2{flex-direction:row;}
+.picks.row2 .pick{flex:1;}
+.pick{display:flex;flex-direction:column;gap:3px;padding:14px 16px;border-radius:.8rem;
+  border:1.5px solid var(--line);cursor:pointer;transition:.18s var(--ease);}
+.pick:active{transform:scale(.99);}
+.pick-t{font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.pick-d{font-size:12px;color:rgba(78,59,55,.7);}
+.tick{opacity:0;color:var(--hc-oxblood);font-size:15px;transition:opacity .18s;}
+
+/* 小圆片 */
+.chips{display:flex;flex-wrap:wrap;gap:7px;}
+.chip{padding:8px 15px;border-radius:999px;border:1.5px solid var(--line);
+  font-size:13.5px;cursor:pointer;transition:.16s var(--ease);user-select:none;}
+.chip:active{transform:scale(.97);}
+
+/* 展开忌口 */
+.expand{display:flex;align-items:center;gap:7px;font-size:14px;cursor:pointer;
+  padding:11px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+.caret{display:inline-block;transition:transform .22s var(--ease);color:rgba(106,28,19,.5);}
+.alBox{flex-direction:column;gap:10px;}
+
+/* 日历：表头一行 + 星期对齐，格子只放数字 */
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.dow{text-align:center;font-size:10px;line-height:1;padding-bottom:2px;
+  color:rgba(106,28,19,.38);}
+/* 日历数字回 OPPO Sans：实测 Neutra 无等宽数字（40px 下 1 宽 13.7、0 宽 29.6，
+   且没有 tnum 特性，tabular-nums 也救不回来），放进网格会歪。
+   正文里的数字仍走品牌字——那里比例数字本来就是对的。 */
+.day{display:grid;place-items:center;height:32px;border-radius:.5rem;
+  font-family:"OPPO Sans","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:14.5px;font-variant-numeric:tabular-nums;cursor:pointer;
+  border:1.5px solid transparent;transition:.15s var(--ease);}
+.day.pad{visibility:hidden;}
+.day.off{color:rgba(106,28,19,.22);cursor:not-allowed;}
+.day.bday{border-color:var(--accent);}
+.day:not(.off):not(.pad):active{transform:scale(.92);}
+
+/* 标签 + 选项一组，组内贴紧，组间才留白 */
+.fld{display:flex;flex-direction:column;gap:7px;}
+.tt{font-size:11px;opacity:.62;}
+/* 这一屏收紧间距，目标是一屏看完不用滑 */
+.sheet.tight{gap:13px;}
+.sheet.tight h2{font-size:22px;}
+.sheet.tight .chip{padding:7px 12px;}
+
+/* 汇总 */
+.sum{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line);}
+.sum > div{display:grid;grid-template-columns:56px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);}
+.sum dt{font-size:12.5px;color:rgba(106,28,19,.55);}
+.sum dd{font-size:15px;font-weight:600;}
+.sm-none,.sm-pt-empty{font-weight:400;color:rgba(106,28,19,.42);}
+
+/* 勾选框 */
+.check{display:flex;gap:11px;align-items:flex-start;font-size:13.5px;line-height:1.6;cursor:pointer;}
+.box{flex:0 0 19px;width:19px;height:19px;margin-top:1px;border-radius:.35rem;
+  border:1.5px solid var(--line);position:relative;transition:.16s;}
+.box::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;
+  color:var(--hc-paper);font-size:12px;opacity:0;transition:opacity .16s;}
+.fine{font-size:11.5px;line-height:1.65;color:rgba(78,59,55,.62);}
+
+/* 按钮 */
+.btn{display:block;text-align:center;margin-top:6px;padding:14px 22px;border-radius:.8rem;
+  background:var(--hc-oxblood);color:var(--hc-paper);font-size:15.5px;cursor:pointer;
+  transition:.18s var(--ease);}
+.btn:active{transform:scale(.985);background:#56150e;}
+.card .btn{align-self:flex-start;padding:13px 26px;}
+.btn.ghost{background:none;color:var(--hc-oxblood);border:1.5px solid var(--line);font-family:inherit;}
+
+/* 完成屏 */
+.done{display:flex;flex-direction:column;gap:11px;align-items:flex-start;padding:6px 0 4px;}
+/* 章独占一行贴右上角，标题与正文在它下面全宽左齐。
+   不与标题并排：「留好了。」只有四个字，并排会在中间空出一大段，
+   而且 38px 的章比 24px 的标题重，远近关系是反的。 */
+.done > .stamp{align-self:flex-end;margin-bottom:-4px;}
+.big{font-size:19px;line-height:1.55;font-weight:600;text-wrap:pretty;}
+.anniv{display:flex;flex-direction:column;gap:10px;}
+.annivRow{display:flex;flex-direction:column;gap:9px;}
+.dateIn{font:inherit;font-size:15px;color:inherit;padding:12px 14px;border-radius:.7rem;
+  border:1.5px solid var(--line);background:none;
+  -webkit-appearance:none;appearance:none;
+  width:100%;min-width:0;max-width:100%;}
+/* 列向 flex 的子项默认 min-width:auto，会被固有宽度撑破容器 */
+.anniv,.annivRow{min-width:0;}
+.annivRow > *{min-width:0;max-width:100%;}
+/* 「这一年」是一份报告，不是一张卡：整屏吸附、一屏一件事、往上滑。
+   position:fixed 让它脱离外层的居中卡片布局，直接铺满视口。 */
+.sc5{position:fixed;inset:0;z-index:10;display:none;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  scroll-snap-type:y mandatory;background:var(--hc-paper);}
+#s5:checked ~ .stage .sc5{display:block;}
+.w-panel{min-height:100dvh;scroll-snap-align:start;scroll-snap-stop:always;
+  display:flex;flex-direction:column;justify-content:space-between;gap:20px;
+  padding:calc(76px + env(safe-area-inset-top)) 28px calc(64px + env(safe-area-inset-bottom));
+  max-width:440px;margin:0 auto;
+  }
+/* 上中下三段：kicker 顶、.mid 主体吃掉剩余空间、收尾句落底。
+   ⚠ 别用 :nth-child(2) 选主体——blob 是绝对定位不占位，第 2 个子元素其实是 kicker，
+   那条规则会让英文小标题吞掉整屏空间，还会把插画行强制拧成竖列。 */
+.w-panel > .mid{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;}
+.w-panel:last-child{border-bottom:0;}
+.w-cover{background:radial-gradient(78% 40% at 50% 46%,var(--flesh-light) 0%,transparent 74%);}
+.w-title{font-family:var(--font-display);font-weight:700;font-size:clamp(52px,14.5vw,72px);
+  line-height:1.04;letter-spacing:-.045em;}
+.w-hint{align-self:center;margin-top:6px;text-align:center;
+  font-family:var(--font-brand);font-size:10px;letter-spacing:.2em;text-transform:uppercase;
+  color:rgba(106,28,19,.4);animation:bob 2.2s ease-in-out infinite;}
+@keyframes bob{0%,100%{transform:translateY(0);opacity:.4;}50%{transform:translateY(-5px);opacity:.75;}}
+.w-close{position:fixed;top:calc(14px + env(safe-area-inset-top));left:14px;z-index:12;
+  width:36px;height:36px;display:grid;place-items:center;border-radius:50%;
+  background:rgba(106,28,19,.08);font-size:17px;line-height:1;cursor:pointer;}
+/* 全部品名铺开——这屏的主体是「你都吃过什么」，不是那个数字本身 */
+.tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:20px;}
+.tag{display:inline-flex;align-items:baseline;gap:5px;padding:7px 13px;border-radius:999px;
+  border:1px solid rgba(106,28,19,.16);font-size:13px;line-height:1.3;color:var(--ink-soft);}
+.tag i{font-style:normal;font-family:var(--font-display);font-weight:700;font-size:12px;
+  color:var(--hc-oxblood);opacity:.75;}
+.w-end .mid{align-items:flex-start;}
+.artrow.small{align-self:center;}
+.w-panel[data-tone="peach"] .btn{background:var(--hc-oxblood);color:var(--hc-paper);}
+.w-end .btn{align-self:flex-start;padding:13px 26px;}
+.w-end .stamp{margin-bottom:6px;}
+/* 柔和的蜜桃色形状：给奶油纸底一点体积和暖意，位置逐屏变化，滑动时画面是活的 */
+.blob{position:absolute;border-radius:50%;pointer-events:none;z-index:0;
+  background:radial-gradient(circle at 35% 32%,var(--hc-peach) 0%,transparent 68%);
+  opacity:.55;animation:drift 14s ease-in-out infinite;}
+.b1{width:300px;height:300px;top:6%;right:-90px;}
+.b2{width:250px;height:250px;bottom:12%;left:-80px;animation-delay:-3s;}
+.b3{width:280px;height:280px;top:14%;left:-100px;animation-delay:-6s;}
+.b4{width:230px;height:230px;bottom:8%;right:-70px;animation-delay:-9s;}
+.b5{width:320px;height:320px;top:22%;right:-110px;animation-delay:-4s;}
+@keyframes drift{
+  0%,100%{transform:translate(0,0) scale(1);}
+  50%    {transform:translate(-14px,18px) scale(1.07);}}
+.w-panel > *{position:relative;z-index:1;}
+
+/* 烘焙插画：圆润简笔，每屏一到三个道具 */
+.art{width:64px;height:52px;display:block;overflow:visible;}
+.artrow{display:flex;align-items:flex-end;gap:14px;}
+.artrow .art{width:86px;height:70px;animation:float 5.5s ease-in-out infinite;}
+.artrow .art:nth-child(2){animation-delay:-1.8s;}
+.artrow .art:nth-child(3){animation-delay:-3.4s;}
+.artrow.small .art{width:56px;height:46px;opacity:.9;}
+@keyframes float{0%,100%{transform:translateY(0) rotate(0);}
+  50%{transform:translateY(-9px) rotate(-2.5deg);}}
+.fl2{transform-origin:32px 12px;animation:flicker 2.6s ease-in-out infinite;}
+.favwrap{display:flex;align-items:center;gap:16px;}
+.favwrap{gap:18px;}
+.favwrap .art{flex:0 0 auto;width:84px;height:68px;animation:float 6s ease-in-out infinite;}
+
+/* 滚动进场：元素随面板滑入而升起。不支持 view() 的浏览器直接是最终态。 */
+@supports (animation-timeline: view()){
+  .w-panel > .kicker,.w-panel > div,.w-panel > p,.w-panel > ul,.w-panel > label,.w-panel > .stamp{
+    animation:reveal linear both;animation-timeline:view();animation-range:entry 8% cover 32%;}
+  @keyframes reveal{from{opacity:0;transform:translateY(26px);}to{opacity:1;transform:none;}}
+}
+/* 一条连续渐变，不是五个色块。
+   相邻两屏共用交界色（t1 的收尾 = t2 的起始，依此类推），
+   所以整份报告滑下来是一段缓慢变暖再变回来的过渡，看不见任何一条边界。
+   之前用「奶油 → 蜜桃 → 酒红深底」的跳变，落差太大，刺眼。 */
+.w-panel[data-tone="t1"]{background:linear-gradient(180deg,#fff7ea 0%,#fdf1e3 100%);}
+.w-panel[data-tone="t2"]{background:linear-gradient(180deg,#fdf1e3 0%,#fae7d5 100%);}
+.w-panel[data-tone="t3"]{background:linear-gradient(180deg,#fae7d5 0%,#f6dcc6 100%);}
+.w-panel[data-tone="t4"]{background:linear-gradient(180deg,#f6dcc6 0%,#fae8d7 100%);}
+.w-panel[data-tone="t5"]{background:linear-gradient(180deg,#fae8d7 0%,#fff7ea 100%);}
+
+/* 底色变暖之后，柔光团要更淡，否则会糊成一片 */
+.blob{opacity:.4;}
+
+/* 标签三档：买得多的实心，只买过一次的描边。这是屏内的轻重，不是屏间的跳色 */
+.tag.t1{background:transparent;}
+.tag.t2{background:rgba(255,247,234,.72);border-color:transparent;}
+.tag.t3{background:var(--hc-oxblood);border-color:var(--hc-oxblood);color:var(--hc-paper);font-weight:600;}
+.tag.t3 i{color:var(--hc-peach);opacity:1;}
+
+/* 「最爱」那屏是全篇重音，但靠一个深色卡片给，不是把整屏刷成深色 */
+.favwrap{background:var(--hc-oxblood);color:var(--hc-paper);border-radius:1.1rem;
+  padding:18px 20px;gap:16px;box-shadow:0 14px 34px rgba(63,21,15,.18);}
+.favwrap .favname{color:var(--hc-paper);border-bottom:0;padding-bottom:0;
+  font-size:clamp(24px,6.6vw,32px);line-height:1.22;text-wrap:balance;}
+.favwrap .art{stroke:#fff7ea;stroke-opacity:.5;}
+.kicker{font-family:var(--font-brand);font-size:11px;letter-spacing:.16em;
+  text-transform:uppercase;color:rgba(106,28,19,.55);}
+.huge{font-family:var(--font-display);font-weight:700;font-size:clamp(74px,21vw,104px);
+  line-height:.88;letter-spacing:-.055em;}
+.huge small{display:inline;margin-left:10px;font-size:21px;font-weight:400;letter-spacing:0;margin-left:6px;font-family:var(--font-copy);}
+.say{font-size:16.5px;line-height:1.75;color:var(--ink-soft);}
+.say b{color:var(--hc-oxblood);font-weight:600;}
+.favname{font-family:var(--font-display);font-weight:700;font-size:clamp(32px,9vw,44px);line-height:1.15;
+  letter-spacing:-.03em;border-bottom:2px solid var(--hc-peach);padding-bottom:3px;align-self:flex-start;}
+.morelist{list-style:none;display:flex;flex-direction:column;gap:7px;margin-top:2px;}
+.morelist li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:15.5px;padding-top:4px;
+  color:var(--ink-soft);border-bottom:1px dashed var(--line);padding-bottom:6px;}
+.morelist li b{font-family:var(--font-display);font-weight:700;font-size:20px;color:var(--hc-oxblood);}
+.bars{display:flex;flex-direction:column;gap:18px;}
+.bar{display:grid;grid-template-columns:1fr 40px;align-items:baseline;gap:10px;font-size:14.5px;}
+.bar-n{color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bar-t{grid-column:1/-1;grid-row:2;height:12px;margin-top:2px;border-radius:99px;background:rgba(106,28,19,.09);overflow:hidden;}
+.bar-t i{display:block;height:100%;width:var(--w);border-radius:99px;background:var(--hc-oxblood);}
+.bar-q{grid-column:2;grid-row:1;text-align:right;font-family:var(--font-display);font-weight:700;font-size:19px;}
+.back-link{align-self:flex-start;font-size:13.5px;color:rgba(106,28,19,.6);cursor:pointer;
+  border-bottom:1px solid rgba(106,28,19,.22);padding-bottom:2px;margin-top:4px;}
+
+body > input:focus-visible ~ .stage label[for]{outline:none;}
+/* 短屏收紧一档（SE / 小屏安卓 / 内置浏览器带大头部时）：
+   贺卡屏与日历屏在 667 高的视口里本来会溢出，这里把内边距、间距、
+   蛋糕与日历格一起收一档，保证「一屏装下」这条硬要求不破。 */
+@media (max-height:700px){
+  body{padding:12px 14px 16px;}
+  .card{padding:24px 24px 22px;gap:20px;}
+  .nm{font-size:28px;}
+  .ld{font-size:18px;}
+  .cake{width:126px;height:95px;}
+  .body{font-size:14px;line-height:1.75;}
+  .sheet{padding:18px 20px 22px;gap:13px;}
+  .sheet h2{font-size:21px;}
+  .sheet.tight{gap:11px;}
+  .sheet.tight h2{font-size:20px;}
+  .pick{padding:11px 14px;}
+  .day{height:29px;font-size:13.5px;}
+  .btn{padding:12px 20px;font-size:15px;}
+  .big{font-size:17.5px;}
+}
+
+/* 高屏放大一档：小屏保持紧凑，大屏内容跟着长起来，
+   免得在 6.7 吋手机上一张卡缩在中间显得空。
+   上限受最高的那一屏（日历屏）约束，放大后仍须一屏装下。 */
+@media (min-height:740px){
+  .card{padding:32px 30px 28px;gap:25px;}   /* 加了「这一年」入口后要收一档，否则贺卡屏超出一屏 */
+  .nm{font-size:34px;}
+  .ld{font-size:20.5px;}
+  .body{font-size:15.5px;}
+  .cake{width:162px;height:122px;}
+  .what{font-size:16.5px;}
+  .sheet{padding:26px 26px 30px;gap:18px;}
+  .sheet h2{font-size:26px;}
+  .sheet.tight{gap:15px;}
+  .sheet.tight h2{font-size:24px;}
+  .pick{padding:16px 18px;}
+  .pick-t{font-size:17px;}
+  .day{height:36px;font-size:15.5px;}
+  .chip{padding:9px 16px;font-size:14.5px;}
+  .sheet.tight .chip{padding:8px 13px;}
+  .btn{padding:15px 24px;font-size:16px;}
+  .big{font-size:20.5px;}
+  .dateIn{padding:14px 16px;}
+}
+
+/* 大屏再放一档（Pro Max / 大屏安卓）：上一档在 932 高的屏上仍会上下各空 130+，
+   这一档把卡片撑到接近三分之二屏高。上限同样由日历屏兜底。 */
+@media (min-height:860px){
+  .card{padding:38px 32px 34px;gap:34px;}
+  .nm{font-size:37px;}
+  .ld{font-size:22px;}
+  .cake{width:178px;height:134px;}
+  .body{font-size:16px;line-height:1.9;}
+  .what{font-size:17.5px;}
+  .sheet{padding:30px 28px 34px;gap:21px;}
+  .sheet h2{font-size:28px;}
+  .sheet.tight{gap:17px;}
+  .sheet.tight h2{font-size:25px;}
+  .pick{padding:18px 20px;}
+  .pick-t{font-size:18px;}
+  .day{height:40px;font-size:16.5px;}
+  .chip{padding:10px 17px;font-size:15px;}
+  .sheet.tight .chip{padding:9px 14px;}
+  .btn{padding:16px 26px;font-size:17px;}
+  .big{font-size:22px;}
+  .dateIn{padding:15px 17px;font-size:16px;}
+}
+
+@media (prefers-reduced-motion:reduce){*{animation-duration:.01ms !important;transition-duration:.01ms !important;}}
+
+/* ── 屏幕切换 ── */
+.sc{display:none;}
+#s0:checked ~ .stage .sc0{display:flex;}
+#s1:checked ~ .stage .sc1{display:flex;}
+#s2:checked ~ .stage .sc2{display:flex;}
+#s3:checked ~ .stage .sc3{display:flex;}
+#s4:checked ~ .stage .sc4{display:flex;}
+#s5:checked ~ .stage .sc5{display:flex;}
+/* ── 口味 ── */
+#fl-rasp:checked ~ .stage label[for="fl-rasp"]{border-color:var(--hc-oxblood);background:var(--flesh-light);}
+#fl-rasp:checked ~ .stage label[for="fl-rasp"] .tick{opacity:1;}
+#fl-rasp:checked ~ .stage .sm-fl[data-v="rasp"]{display:inline;}
+#fl-blue:checked ~ .stage label[for="fl-blue"]{border-color:var(--hc-oxblood);background:var(--flesh-light);}
+#fl-blue:checked ~ .stage label[for="fl-blue"] .tick{opacity:1;}
+#fl-blue:checked ~ .stage .sm-fl[data-v="blue"]{display:inline;}
+.sm-fl,.sm-dt,.sm-sl,.sm-slx,.sm-pt{display:none;}
+.gate{opacity:.35;pointer-events:none;}
+#fl-rasp:checked ~ .stage .gate-fl,#fl-blue:checked ~ .stage .gate-fl{opacity:1;pointer-events:auto;}
+/* ── 忌口（可展开）── */
+.alBox{display:none;}
+#al-open:checked ~ .stage .alBox{display:flex;}
+#al-open:checked ~ .stage label[for="al-open"] .caret{transform:rotate(90deg);}
+#al-nut:checked ~ .stage label[for="al-nut"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#al-nut:checked ~ .stage .sm-al[data-v="nut"]{display:inline;}
+#al-dairy:checked ~ .stage label[for="al-dairy"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#al-dairy:checked ~ .stage .sm-al[data-v="dairy"]{display:inline;}
+#al-gluten:checked ~ .stage label[for="al-gluten"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#al-gluten:checked ~ .stage .sm-al[data-v="gluten"]{display:inline;}
+#al-egg:checked ~ .stage label[for="al-egg"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#al-egg:checked ~ .stage .sm-al[data-v="egg"]{display:inline;}
+#al-none:checked ~ .stage label[for="al-none"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#al-none:checked ~ .stage .sm-al[data-v="none"]{display:inline;}
+.sm-al{display:none;}
+.sm-none{display:block;}
+#al-nut:checked ~ .stage .sm-none,#al-dairy:checked ~ .stage .sm-none,#al-gluten:checked ~ .stage .sm-none,#al-egg:checked ~ .stage .sm-none,#al-none:checked ~ .stage .sm-none{display:none;}
+/* ── 日期 ── */
+#d9:checked ~ .stage label[for="d9"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d9:checked ~ .stage .sm-dt[data-v="d9"]{display:inline;}
+#d10:checked ~ .stage label[for="d10"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d10:checked ~ .stage .sm-dt[data-v="d10"]{display:inline;}
+#d11:checked ~ .stage label[for="d11"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d11:checked ~ .stage .sm-dt[data-v="d11"]{display:inline;}
+#d12:checked ~ .stage label[for="d12"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d12:checked ~ .stage .sm-dt[data-v="d12"]{display:inline;}
+#d13:checked ~ .stage label[for="d13"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d13:checked ~ .stage .sm-dt[data-v="d13"]{display:inline;}
+#d14:checked ~ .stage label[for="d14"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d14:checked ~ .stage .sm-dt[data-v="d14"]{display:inline;}
+#d15:checked ~ .stage label[for="d15"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d15:checked ~ .stage .sm-dt[data-v="d15"]{display:inline;}
+#d16:checked ~ .stage label[for="d16"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d16:checked ~ .stage .sm-dt[data-v="d16"]{display:inline;}
+#d17:checked ~ .stage label[for="d17"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d17:checked ~ .stage .sm-dt[data-v="d17"]{display:inline;}
+#d18:checked ~ .stage label[for="d18"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d18:checked ~ .stage .sm-dt[data-v="d18"]{display:inline;}
+#d19:checked ~ .stage label[for="d19"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d19:checked ~ .stage .sm-dt[data-v="d19"]{display:inline;}
+#d20:checked ~ .stage label[for="d20"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d20:checked ~ .stage .sm-dt[data-v="d20"]{display:inline;}
+#d21:checked ~ .stage label[for="d21"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d21:checked ~ .stage .sm-dt[data-v="d21"]{display:inline;}
+#d22:checked ~ .stage label[for="d22"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d22:checked ~ .stage .sm-dt[data-v="d22"]{display:inline;}
+#d23:checked ~ .stage label[for="d23"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d23:checked ~ .stage .sm-dt[data-v="d23"]{display:inline;}
+#d24:checked ~ .stage label[for="d24"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d24:checked ~ .stage .sm-dt[data-v="d24"]{display:inline;}
+#d25:checked ~ .stage label[for="d25"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d25:checked ~ .stage .sm-dt[data-v="d25"]{display:inline;}
+#d26:checked ~ .stage label[for="d26"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d26:checked ~ .stage .sm-dt[data-v="d26"]{display:inline;}
+#d27:checked ~ .stage label[for="d27"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d27:checked ~ .stage .sm-dt[data-v="d27"]{display:inline;}
+#d28:checked ~ .stage label[for="d28"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d28:checked ~ .stage .sm-dt[data-v="d28"]{display:inline;}
+#d29:checked ~ .stage label[for="d29"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d29:checked ~ .stage .sm-dt[data-v="d29"]{display:inline;}
+#d30:checked ~ .stage label[for="d30"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d30:checked ~ .stage .sm-dt[data-v="d30"]{display:inline;}
+#d31:checked ~ .stage label[for="d31"]{background:var(--hc-oxblood);color:var(--hc-paper);}
+#d31:checked ~ .stage .sm-dt[data-v="d31"]{display:inline;}
+#d9:checked ~ .stage .gate-dt,#d10:checked ~ .stage .gate-dt,#d11:checked ~ .stage .gate-dt,#d12:checked ~ .stage .gate-dt,#d13:checked ~ .stage .gate-dt,#d14:checked ~ .stage .gate-dt,#d15:checked ~ .stage .gate-dt,#d16:checked ~ .stage .gate-dt,#d17:checked ~ .stage .gate-dt,#d18:checked ~ .stage .gate-dt,#d19:checked ~ .stage .gate-dt,#d20:checked ~ .stage .gate-dt,#d21:checked ~ .stage .gate-dt,#d22:checked ~ .stage .gate-dt,#d23:checked ~ .stage .gate-dt,#d24:checked ~ .stage .gate-dt,#d25:checked ~ .stage .gate-dt,#d26:checked ~ .stage .gate-dt,#d27:checked ~ .stage .gate-dt,#d28:checked ~ .stage .gate-dt,#d29:checked ~ .stage .gate-dt,#d30:checked ~ .stage .gate-dt,#d31:checked ~ .stage .gate-dt{opacity:1;pointer-events:auto;}
+/* ── 时段 ── */
+#sl-noon:checked ~ .stage label[for="sl-noon"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#sl-noon:checked ~ .stage .sm-sl[data-v="noon"]{display:inline;}
+#sl-noon:checked ~ .stage .sm-slx[data-v="noon"]{display:inline;}
+#sl-night:checked ~ .stage label[for="sl-night"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#sl-night:checked ~ .stage .sm-sl[data-v="night"]{display:inline;}
+#sl-night:checked ~ .stage .sm-slx[data-v="night"]{display:inline;}
+/* ── 同行人数（选填）── */
+#pt-solo:checked ~ .stage label[for="pt-solo"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#pt-solo:checked ~ .stage .sm-pt[data-v="solo"]{display:inline;}
+#pt-p2:checked ~ .stage label[for="pt-p2"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#pt-p2:checked ~ .stage .sm-pt[data-v="p2"]{display:inline;}
+#pt-p34:checked ~ .stage label[for="pt-p34"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#pt-p34:checked ~ .stage .sm-pt[data-v="p34"]{display:inline;}
+#pt-p5:checked ~ .stage label[for="pt-p5"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#pt-p5:checked ~ .stage .sm-pt[data-v="p5"]{display:inline;}
+.sm-pt-empty{display:inline;}
+#pt-solo:checked ~ .stage .sm-pt-empty,#pt-p2:checked ~ .stage .sm-pt-empty,#pt-p34:checked ~ .stage .sm-pt-empty,#pt-p5:checked ~ .stage .sm-pt-empty{display:none;}
+/* ── 同意（两个独立勾选）── */
+#cs-txn:checked ~ .stage label[for="cs-txn"] .box{background:var(--hc-oxblood);border-color:var(--hc-oxblood);}
+#cs-txn:checked ~ .stage label[for="cs-txn"] .box::after{opacity:1;}
+#cs-mkt:checked ~ .stage label[for="cs-mkt"] .box{background:var(--hc-oxblood);border-color:var(--hc-oxblood);}
+#cs-mkt:checked ~ .stage label[for="cs-mkt"] .box::after{opacity:1;}
+/* ── 纪念日关系标签 ── */
+#rl-ta:checked ~ .stage label[for="rl-ta"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#rl-family:checked ~ .stage label[for="rl-family"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+#rl-friend:checked ~ .stage label[for="rl-friend"]{background:var(--hc-oxblood);color:var(--hc-paper);border-color:var(--hc-oxblood);}
+</style>
+</head>
+<body>
+
+<input type="radio" name="sc" id="s0" checked>
+<input type="radio" name="sc" id="s1">
+<input type="radio" name="sc" id="s2">
+<input type="radio" name="sc" id="s3">
+<input type="radio" name="sc" id="s4">
+<input type="radio" name="sc" id="s5">
+<input type="radio" name="fl" id="fl-rasp">
+<input type="radio" name="fl" id="fl-blue">
+<input type="checkbox" id="al-open">
+<input type="radio" name="al" id="al-nut">
+<input type="radio" name="al" id="al-dairy">
+<input type="radio" name="al" id="al-gluten">
+<input type="radio" name="al" id="al-egg">
+<input type="radio" name="al" id="al-none">
+<input type="radio" name="dt" id="d9">
+<input type="radio" name="dt" id="d10">
+<input type="radio" name="dt" id="d11">
+<input type="radio" name="dt" id="d12">
+<input type="radio" name="dt" id="d13">
+<input type="radio" name="dt" id="d14">
+<input type="radio" name="dt" id="d15">
+<input type="radio" name="dt" id="d16">
+<input type="radio" name="dt" id="d17">
+<input type="radio" name="dt" id="d18">
+<input type="radio" name="dt" id="d19">
+<input type="radio" name="dt" id="d20">
+<input type="radio" name="dt" id="d21">
+<input type="radio" name="dt" id="d22">
+<input type="radio" name="dt" id="d23">
+<input type="radio" name="dt" id="d24">
+<input type="radio" name="dt" id="d25">
+<input type="radio" name="dt" id="d26">
+<input type="radio" name="dt" id="d27">
+<input type="radio" name="dt" id="d28">
+<input type="radio" name="dt" id="d29">
+<input type="radio" name="dt" id="d30">
+<input type="radio" name="dt" id="d31">
+<input type="radio" name="sl" id="sl-noon" checked>
+<input type="radio" name="sl" id="sl-night">
+<input type="radio" name="pt" id="pt-solo">
+<input type="radio" name="pt" id="pt-p2">
+<input type="radio" name="pt" id="pt-p34">
+<input type="radio" name="pt" id="pt-p5">
+<input type="checkbox" id="cs-txn" checked><input type="checkbox" id="cs-mkt">
+<input type="radio" name="rl" id="rl-ta">
+<input type="radio" name="rl" id="rl-family">
+<input type="radio" name="rl" id="rl-friend">
+
+<div class="stage">
+  <section class="sc sc0 card">
+    <div class="brand">
+      <span class="logo" role="img" aria-label="Hot Crush"></span>
+      <span class="rl"></span>
+      <span class="sub2">Pavilion KL</span>
+    </div>
+    <div class="heroTxt">
+      <h1 class="nm">Nicole，</h1>
+      <p class="ld">今天是你的日子。</p>
+    </div>
+    <svg class="cake" width="146" height="110" viewBox="0 0 160 120" aria-hidden="true">
+      <!-- 落影 -->
+      <ellipse cx="80" cy="108" rx="50" ry="5" fill="#6a1c13" opacity=".12"/>
+      <!-- 蛋糕体（蜜桃）——烘焙纸之上露出的一圈 -->
+      <path d="M35 66h90v26c0 7-5 12-12 12H47c-7 0-12-5-12-12V66z" fill="#f3d0b8"/>
+      <!-- 褶皱烘焙纸：巴斯克的标志，九道褶 -->
+      <path d="M26 84q6-7 12 0t12 0 12 0 12 0 12 0 12 0 12 0 12 0 12 0v14q0 8-8 8H34q-8 0-8-8z"
+            fill="#f2e6d6"/>
+      <g stroke="#6a1c13" stroke-width="1" opacity=".14" stroke-linecap="round">
+        <path d="M38 84v18M50 84v18M62 84v18M74 84v18M86 84v18M98 84v18M110 84v18M122 84v18"/>
+      </g>
+      <!-- 烤焦的深色顶 -->
+      <ellipse cx="80" cy="66" rx="45" ry="10.5" fill="#6a1c13"/>
+      <ellipse cx="80" cy="64.6" rx="38" ry="7.6" fill="#7d2a1b" opacity=".55"/>
+      <!-- 蜡烛：烛身取会员选的个人色 -->
+      <rect x="74.5" y="30" width="11" height="34" rx="5.5" fill="var(--accent)"/>
+      <rect x="77" y="34" width="2.6" height="26" rx="1.3" fill="#fff7ea" opacity=".34"/>
+      <path d="M80 25.5v5" stroke="#6a1c13" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+      <!-- 火苗：全卡唯一的品牌红 -->
+      <g class="flame">
+        <path d="M80 5c4.6 5.6 6.9 9.9 6.9 13.1 0 4.1-3.1 7-6.9 7s-6.9-2.9-6.9-7C73.1 14.9 75.4 10.6 80 5z"
+              fill="#c51f2c" opacity=".92"/>
+        <path class="core" d="M80 12.4c2 2.6 3 4.6 3 6.1 0 1.9-1.3 3.3-3 3.3s-3-1.4-3-3.3c0-1.5 1-3.5 3-6.1z"
+              fill="#f3d0b8" opacity=".9"/>
+      </g>
+    </svg>
+    <p class="body">你是<em>深夜黑麦</em>——不需要安慰，只需要清醒。<br>但今天，甜的那一口该你了。</p>
+    <div class="hr"></div>
+    <div class="gift">
+      <p class="tier">Lv2 心动 · Sweet Crush</p>
+      <p class="what">生日当月，一份巴斯克，我们请。</p>
+      <label class="btn" for="s1">想吃哪个口味？</label>
+      <p class="note">提前 2 天告诉我们，好给你留着。</p>
+      <label class="save" for="s5">顺便看看你这一年 →</label>
+    </div>
+    <p class="foot">8 月 12 日 · 第 3 个和我们一起过的生日。</p>
+  </section>
+
+  <section class="sc sc1 sheet">
+    <div class="top"><label class="back" for="s0">←</label><p class="step">先挑口味</p></div>
+    <h2>一年就这么一天。<br>想吃哪一个？</h2>
+    <div class="picks">
+      <label class="pick" for="fl-rasp">
+        <span class="pick-t">浓醇树莓软心巴斯克<span class="tick">✓</span></span>
+        <span class="pick-d">树莓的酸压住甜，中心是流的</span>
+      </label>
+      <label class="pick" for="fl-blue">
+        <span class="pick-t">野果蓝莓软心巴斯克<span class="tick">✓</span></span>
+        <span class="pick-d">野生蓝莓，同样的软心</span>
+      </label>
+    </div>
+    <p class="hintline">这个月在烤的就这两款。换季会换，到时候名单会跟着变。</p>
+    <label class="expand" for="al-open"><span class="caret">›</span> 有什么是不能吃的？</label>
+    <div class="alBox">
+      <p class="hintline">食品安全要问清楚——这一项我们不靠猜。</p>
+      <div class="chips"><label class="chip" for="al-nut">坚果</label><label class="chip" for="al-dairy">乳制品</label><label class="chip" for="al-gluten">麸质</label><label class="chip" for="al-egg">蛋</label><label class="chip" for="al-none">都没有</label></div>
+    </div>
+    <label class="btn gate gate-fl" for="s2">选好了</label>
+  </section>
+
+  <section class="sc sc2 sheet tight">
+    <div class="top"><label class="back" for="s1">←</label><p class="step">口味选好了，就差哪天来拿</p></div>
+    <h2>哪天来拿？</h2>
+    <p class="sub">巴斯克要提前 2 天，灰掉的日子来不及。</p>
+    <div class="grid">
+        <span class="dow">一</span>
+        <span class="dow">二</span>
+        <span class="dow">三</span>
+        <span class="dow">四</span>
+        <span class="dow">五</span>
+        <span class="dow">六</span>
+        <span class="dow">日</span>
+        <span class="day pad"></span>
+        <span class="day pad"></span>
+        <span class="day pad"></span>
+        <span class="day pad"></span>
+        <span class="day pad"></span>
+        <span class="day off" title="已过">1</span>
+        <span class="day off" title="已过">2</span>
+        <span class="day off" title="已过">3</span>
+        <span class="day off" title="已过">4</span>
+        <span class="day off" title="已过">5</span>
+        <span class="day off" title="已过">6</span>
+        <span class="day off" title="来不及备料">7</span>
+        <span class="day off" title="来不及备料">8</span>
+        <label class="day" for="d9">9</label>
+        <label class="day" for="d10">10</label>
+        <label class="day" for="d11">11</label>
+        <label class="day bday" for="d12">12</label>
+        <label class="day" for="d13">13</label>
+        <label class="day" for="d14">14</label>
+        <label class="day" for="d15">15</label>
+        <label class="day" for="d16">16</label>
+        <label class="day" for="d17">17</label>
+        <label class="day" for="d18">18</label>
+        <label class="day" for="d19">19</label>
+        <label class="day" for="d20">20</label>
+        <label class="day" for="d21">21</label>
+        <label class="day" for="d22">22</label>
+        <label class="day" for="d23">23</label>
+        <label class="day" for="d24">24</label>
+        <label class="day" for="d25">25</label>
+        <label class="day" for="d26">26</label>
+        <label class="day" for="d27">27</label>
+        <label class="day" for="d28">28</label>
+        <label class="day" for="d29">29</label>
+        <label class="day" for="d30">30</label>
+        <label class="day" for="d31">31</label>
+    </div>
+    <div class="fld">
+      <p class="lab">几点来</p>
+      <div class="chips"><label class="chip" for="sl-noon">下午 <span class="tt">12:00–17:00</span></label><label class="chip" for="sl-night">晚上 <span class="tt">17:00–21:00</span></label></div>
+    </div>
+    <div class="fld">
+      <p class="lab">那天有人陪你吗？<span class="opt">选填 · 我们多备几把叉子</span></p>
+      <div class="chips"><label class="chip" for="pt-solo">自己</label><label class="chip" for="pt-p2">2 人</label><label class="chip" for="pt-p34">3–4 人</label><label class="chip" for="pt-p5">5 人+</label></div>
+    </div>
+    <label class="btn gate gate-dt" for="s3">好了</label>
+  </section>
+
+  <section class="sc sc3 sheet">
+    <div class="top"><label class="back" for="s2">←</label><p class="step">都好了，看一眼对不对</p></div>
+    <h2>确认一下。</h2>
+    <dl class="sum">
+      <div><dt>口味</dt><dd><span class="sm-fl" data-v="rasp">浓醇树莓软心巴斯克</span><span class="sm-fl" data-v="blue">野果蓝莓软心巴斯克</span></dd></div>
+      <div><dt>哪天</dt><dd><span class="sm-dt" data-v="d9">8 月 9 日</span><span class="sm-dt" data-v="d10">8 月 10 日</span><span class="sm-dt" data-v="d11">8 月 11 日</span><span class="sm-dt" data-v="d12">8 月 12 日</span><span class="sm-dt" data-v="d13">8 月 13 日</span><span class="sm-dt" data-v="d14">8 月 14 日</span><span class="sm-dt" data-v="d15">8 月 15 日</span><span class="sm-dt" data-v="d16">8 月 16 日</span><span class="sm-dt" data-v="d17">8 月 17 日</span><span class="sm-dt" data-v="d18">8 月 18 日</span><span class="sm-dt" data-v="d19">8 月 19 日</span><span class="sm-dt" data-v="d20">8 月 20 日</span><span class="sm-dt" data-v="d21">8 月 21 日</span><span class="sm-dt" data-v="d22">8 月 22 日</span><span class="sm-dt" data-v="d23">8 月 23 日</span><span class="sm-dt" data-v="d24">8 月 24 日</span><span class="sm-dt" data-v="d25">8 月 25 日</span><span class="sm-dt" data-v="d26">8 月 26 日</span><span class="sm-dt" data-v="d27">8 月 27 日</span><span class="sm-dt" data-v="d28">8 月 28 日</span><span class="sm-dt" data-v="d29">8 月 29 日</span><span class="sm-dt" data-v="d30">8 月 30 日</span><span class="sm-dt" data-v="d31">8 月 31 日</span></dd></div>
+      <div><dt>几点</dt><dd><span class="sm-sl" data-v="noon">下午 12:00–17:00</span><span class="sm-sl" data-v="night">晚上 17:00–21:00</span></dd></div>
+      <div><dt>同行</dt><dd><span class="sm-pt" data-v="solo">自己</span><span class="sm-pt" data-v="p2">2 人</span><span class="sm-pt" data-v="p34">3–4 人</span><span class="sm-pt" data-v="p5">5 人+</span><span class="sm-pt-empty">没说</span></dd></div>
+      <div><dt>忌口</dt><dd><span class="sm-al" data-v="nut">坚果</span><span class="sm-al" data-v="dairy">乳制品</span><span class="sm-al" data-v="gluten">麸质</span><span class="sm-al" data-v="egg">蛋</span><span class="sm-al" data-v="none">都没有</span><span class="sm-none">还没说</span></dd></div>
+    </dl>
+    <label class="check" for="cs-txn"><span class="box"></span>
+      <span>订好后和取货前一天，WhatsApp 提醒我。</span></label>
+    <label class="check" for="cs-mkt"><span class="box"></span>
+      <span>新品试吃和会员日福利，也发给我。</span></label>
+    <p class="fine">第一项是订单通知，取消了就收不到取货提醒。第二项是营销资讯，随时可退，不影响任何生日权益。</p>
+    <label class="btn" for="s4">留好我的生日礼</label>
+  </section>
+
+  <section class="sc sc4 sheet">
+    <div class="done">
+      <span class="stamp" role="img" aria-label="Hot Crush"></span>
+      <h2>留好了。</h2>
+      <p class="big"><span class="sm-dt" data-v="d9">8 月 9 日</span><span class="sm-dt" data-v="d10">8 月 10 日</span><span class="sm-dt" data-v="d11">8 月 11 日</span><span class="sm-dt" data-v="d12">8 月 12 日</span><span class="sm-dt" data-v="d13">8 月 13 日</span><span class="sm-dt" data-v="d14">8 月 14 日</span><span class="sm-dt" data-v="d15">8 月 15 日</span><span class="sm-dt" data-v="d16">8 月 16 日</span><span class="sm-dt" data-v="d17">8 月 17 日</span><span class="sm-dt" data-v="d18">8 月 18 日</span><span class="sm-dt" data-v="d19">8 月 19 日</span><span class="sm-dt" data-v="d20">8 月 20 日</span><span class="sm-dt" data-v="d21">8 月 21 日</span><span class="sm-dt" data-v="d22">8 月 22 日</span><span class="sm-dt" data-v="d23">8 月 23 日</span><span class="sm-dt" data-v="d24">8 月 24 日</span><span class="sm-dt" data-v="d25">8 月 25 日</span><span class="sm-dt" data-v="d26">8 月 26 日</span><span class="sm-dt" data-v="d27">8 月 27 日</span><span class="sm-dt" data-v="d28">8 月 28 日</span><span class="sm-dt" data-v="d29">8 月 29 日</span><span class="sm-dt" data-v="d30">8 月 30 日</span><span class="sm-dt" data-v="d31">8 月 31 日</span><span class="sm-slx" data-v="noon">下午</span><span class="sm-slx" data-v="night">晚上</span>，<span class="sm-fl" data-v="rasp">浓醇树莓软心巴斯克</span><span class="sm-fl" data-v="blue">野果蓝莓软心巴斯克</span>，等你。</p>
+      <p class="sub">到店报手机号就行，不用出示任何东西。</p>
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="anniv">
+      <p class="lab">除了自己的，还有没有想记住的日子？</p>
+      <p class="hintline">我们提前 5 天提醒你，顺手帮你留好蛋糕。</p>
+      <div class="annivRow">
+        <input class="dateIn" type="date" aria-label="想记住的日期">
+        <div class="chips"><label class="chip" for="rl-ta">TA</label><label class="chip" for="rl-family">家人</label><label class="chip" for="rl-friend">朋友</label></div>
+      </div>
+      <button class="btn ghost" type="button">记下来</button>
+      <p class="fine">我们只记日期和你标的关系，<b>不记对方的名字</b>——提醒是发给你的，「TA 的日子快到了」就够了。</p>
+    </div>
+
+    <label class="back-link" for="s0">← 回到我的卡片</label>
+  </section>
+
+  <section class="sc sc5">
+    <label class="w-close" for="s0">←</label>
+
+    <div class="w-panel w-cover" data-tone="t1">
+      <span class="blob b1"></span>
+      <p class="kicker">Hot Crush · 2026</p>
+      <div class="mid">
+        <h2 class="w-title">你的烘焙<br>这一年。</h2>
+        <p class="say">2 月 15 日到8 月 2 日，你来过 <b>15 天</b>。<br>这是我们记下的。</p>
+        <div class="artrow"><svg class="art" viewBox="0 0 64 52" aria-hidden="true" stroke="#6a1c13" stroke-opacity=".42" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="32" cy="46" rx="16" ry="3" fill="#6a1c13" opacity=".10" stroke="none"/>
+  <path d="M14 30h36v9c0 4-3 7-7 7H21c-4 0-7-3-7-7z" fill="#f2e6d6"/>
+  <ellipse cx="32" cy="30" rx="18" ry="5" fill="#6a1c13"/>
+  <rect x="29" y="12" width="6" height="17" rx="3" fill="var(--accent)"/>
+  <path class="fl2" d="M32 1c2.6 3.2 3.9 5.6 3.9 7.4 0 2.3-1.7 4-3.9 4s-3.9-1.7-3.9-4C28.1 6.6 29.4 4.2 32 1z" fill="#c51f2c" opacity=".92"/></svg><svg class="art" viewBox="0 0 64 52" aria-hidden="true" stroke="#6a1c13" stroke-opacity=".42" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="32" cy="46" rx="21" ry="3" fill="#6a1c13" opacity=".10" stroke="none"/>
+  <path d="M8 22c0-9 10-15 24-15s24 6 24 15c0 3.5-2.5 5-6 5H14c-3.5 0-6-1.5-6-5z" fill="#f3d0b8"/>
+  <path d="M9 26h46c1.7 0 3 1.3 3 3s-1.3 3-3 3H9c-1.7 0-3-1.3-3-3s1.3-3 3-3z" fill="#fff7ea"/>
+  <path d="M8 32c0 8 10 12 24 12s24-4 24-12c0-2-1.4-3-3-3H11c-1.6 0-3 1-3 3z" fill="#eabf9c"/>
+  <circle cx="22" cy="17" r="2" fill="#fff7ea" opacity=".6" stroke="none"/></svg><svg class="art" viewBox="0 0 64 52" aria-hidden="true" stroke="#6a1c13" stroke-opacity=".42" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="32" cy="45" rx="22" ry="3" fill="#6a1c13" opacity=".10" stroke="none"/>
+  <path d="M9 40c-3-14 6-26 23-26s26 12 23 26c-1 4-5 4-7 1-3-5-9-8-16-8s-13 3-16 8c-2 3-6 3-7-1z" fill="#f3d0b8"/>
+  <path d="M9 40c1 4 5 4 7 1M55 40c-1 4-5 4-7 1" fill="none" stroke="#6a1c13" stroke-opacity=".42"/>
+  <g stroke="#fff7ea" stroke-width="2" opacity=".55" stroke-linecap="round">
+    <path d="M21 34c-1-5 0-9 3-13M32 32V17M43 34c1-5 0-9-3-13"/></g></svg></div>
+      </div>
+      <span class="w-hint">往上滑</span>
+    </div>
+
+    <div class="w-panel" data-tone="t2">
+      <span class="blob b2"></span>
+      <p class="kicker">Never the same twice</p>
+      <div class="mid">
+        <p class="huge">19<small>种不重样</small></p>
+        <div class="tags"><span class="tag t3">法式心动草莓奶油挞<i>4</i></span><span class="tag t3">法式浓醇巧克力蛋糕泡芙<i>4</i></span><span class="tag t2">奶酪核桃马卡龙<i>3</i></span><span class="tag t2">心动蓝莓奶油蛋糕泡芙<i>3</i></span><span class="tag t2">蓝莓软心巴斯克<i>3</i></span><span class="tag t2">趁热心动蛋挞<i>3</i></span><span class="tag t2">青提茉莉奶酪马卡龙<i>3</i></span><span class="tag t2">树莓软心巴斯克<i>2</i></span><span class="tag t1">Pistachio Green jewel</span><span class="tag t1">手打爆爽柠檬茶</span><span class="tag t1">抹茶巴斯克</span><span class="tag t1">法式心动开心果蛋挞</span><span class="tag t1">法式心动树莓奶油挞</span><span class="tag t1">法式心动蓝莓奶油挞</span><span class="tag t1">法式草莓黑巧拿破仑酥</span><span class="tag t1">碱水红豆黄油冰贝果</span><span class="tag t1">红豆松松鲜吐司</span><span class="tag t1">芙洛芙拉开心果碱水结</span><span class="tag t1">轻糖伊朗开心果奶油巧克力拿破仑酥</span></div>
+      </div>
+      <p class="say">36 件里挑了 19 种。</p>
+    </div>
+
+    <div class="w-panel" data-tone="t3">
+      <span class="blob b3"></span>
+      <p class="kicker">Your one</p>
+      <div class="mid">
+        <div class="favwrap"><svg class="art" viewBox="0 0 64 52" aria-hidden="true" stroke="#6a1c13" stroke-opacity=".42" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="32" cy="46" rx="20" ry="3" fill="#6a1c13" opacity=".10" stroke="none"/>
+  <path d="M11 24h42l-3 15c-.6 3.4-3.6 5.9-7 5.9H21c-3.4 0-6.4-2.5-7-5.9z" fill="#f2e6d6"/>
+  <g stroke="#6a1c13" stroke-width="1" opacity=".13" stroke-linecap="round">
+    <path d="M18 26l-1.5 16M26 26l-1 17M34 26v17M42 26l1 17M50 26l1.5 16"/></g>
+  <ellipse cx="32" cy="24" rx="23" ry="7" fill="#6a1c13"/>
+  <ellipse cx="32" cy="22.6" rx="18" ry="5" fill="#8a3520" stroke="none"/>
+  <circle cx="26" cy="21" r="3.4" fill="#c51f2c" opacity=".85"/>
+  <circle cx="38" cy="22" r="2.8" fill="#c51f2c" opacity=".7"/>
+  <circle cx="32" cy="19.5" r="1.6" fill="#f3d0b8" opacity=".7" stroke="none"/></svg><p class="favname">法式心动草莓奶油挞</p></div>
+        <p class="say">买了 <b>4</b> 次，是你点得最多的一样。<br>全店还有 <b>41</b> 个人和你一样，把它排在第一。</p>
+      </div>
+      <ul class="morelist"><li><span>法式浓醇巧克力蛋糕泡芙</span><b>4</b></li><li><span>奶酪核桃马卡龙</span><b>3</b></li><li><span>青提茉莉奶酪马卡龙</span><b>3</b></li></ul>
+    </div>
+
+    <div class="w-panel" data-tone="t4">
+      <span class="blob b4"></span>
+      <p class="kicker">What you reach for</p>
+      <div class="mid"><div class="bars"><div class="bar"><span class="bar-n">可颂+罗马面包+泡芙+巴斯克</span><span class="bar-t"><i style="--w:100.0%"></i></span><span class="bar-q">14</span></div><div class="bar"><span class="bar-n">TOP榜，新品</span><span class="bar-t"><i style="--w:71.4%"></i></span><span class="bar-q">10</span></div><div class="bar"><span class="bar-n">水果塔+碱水类</span><span class="bar-t"><i style="--w:57.1%"></i></span><span class="bar-q">8</span></div><div class="bar"><span class="bar-n">贝果类，吐司类</span><span class="bar-t"><i style="--w:14.3%"></i></span><span class="bar-q">2</span></div></div></div>
+      <p class="say">最常<b>周日</b>来，比 <b>94%</b> 的会员都多。</p>
+    </div>
+
+    <div class="w-panel w-end" data-tone="t5">
+      <span class="blob b5"></span>
+      <div class="artrow small"><svg class="art" viewBox="0 0 64 52" aria-hidden="true" stroke="#6a1c13" stroke-opacity=".42" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="32" cy="46" rx="18" ry="3" fill="#6a1c13" opacity=".10" stroke="none"/>
+  <path d="M13 32c0-9 8.5-15 19-15s19 6 19 15c0 7-8.5 12-19 12s-19-5-19-12z" fill="#f3d0b8"/>
+  <path d="M15 27c2-7 9-11 17-11s15 4 17 11c-3-3-9-5-17-5s-14 2-17 5z" fill="#fff7ea" opacity=".75" stroke="none"/>
+  <ellipse cx="32" cy="30" rx="12" ry="4" fill="#6a1c13" opacity=".14" stroke="none"/>
+  <circle cx="24" cy="24" r="2" fill="#fff7ea" opacity=".65" stroke="none"/></svg><svg class="art" viewBox="0 0 64 52" aria-hidden="true" stroke="#6a1c13" stroke-opacity=".42" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="32" cy="46" rx="20" ry="3" fill="#6a1c13" opacity=".10" stroke="none"/>
+  <path d="M11 24h42l-3 15c-.6 3.4-3.6 5.9-7 5.9H21c-3.4 0-6.4-2.5-7-5.9z" fill="#f2e6d6"/>
+  <g stroke="#6a1c13" stroke-width="1" opacity=".13" stroke-linecap="round">
+    <path d="M18 26l-1.5 16M26 26l-1 17M34 26v17M42 26l1 17M50 26l1.5 16"/></g>
+  <ellipse cx="32" cy="24" rx="23" ry="7" fill="#6a1c13"/>
+  <ellipse cx="32" cy="22.6" rx="18" ry="5" fill="#8a3520" stroke="none"/>
+  <circle cx="26" cy="21" r="3.4" fill="#c51f2c" opacity=".85"/>
+  <circle cx="38" cy="22" r="2.8" fill="#c51f2c" opacity=".7"/>
+  <circle cx="32" cy="19.5" r="1.6" fill="#f3d0b8" opacity=".7" stroke="none"/></svg><svg class="art" viewBox="0 0 64 52" aria-hidden="true" stroke="#6a1c13" stroke-opacity=".42" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+  <ellipse cx="32" cy="46" rx="21" ry="3" fill="#6a1c13" opacity=".10" stroke="none"/>
+  <path d="M8 22c0-9 10-15 24-15s24 6 24 15c0 3.5-2.5 5-6 5H14c-3.5 0-6-1.5-6-5z" fill="#f3d0b8"/>
+  <path d="M9 26h46c1.7 0 3 1.3 3 3s-1.3 3-3 3H9c-1.7 0-3-1.3-3-3s1.3-3 3-3z" fill="#fff7ea"/>
+  <path d="M8 32c0 8 10 12 24 12s24-4 24-12c0-2-1.4-3-3-3H11c-1.6 0-3 1-3 3z" fill="#eabf9c"/>
+  <circle cx="22" cy="17" r="2" fill="#fff7ea" opacity=".6" stroke="none"/></svg></div>
+      <div class="mid">
+        <span class="stamp" role="img" aria-label="Hot Crush"></span>
+        <p class="say">明年今天，我们再数一次。</p>
+        <label class="btn" for="s0">回到我的生日卡</label>
+      </div>
+      <p class="fine">数据来自你用会员卡买的东西。<br>现金和电子钱包付的那几次，我们没记在这里。</p>
+    </div>
+  </section>
+</div>
+</body>
+</html>

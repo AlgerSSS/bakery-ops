@@ -6,6 +6,50 @@
 
 ---
 
+## 生日贺卡动态化完成并合入 main（2026-08-15，DSH，已合入 main 并推送）
+
+接替上一 DSH 会话在 `dsh/birthday-dynamic` 独立 worktree 的在途实现，收尾并合入 main：
+静态烘焙的生日贺卡改为按会员动态生成——专属签名链接进卡、年度消费回顾、资料收集、
+生日礼预约与门店通知。
+
+**做了什么**（3 个提交 `9cba8f0` / `0738fbb` / `4146913`，`04b4c6e` --no-ff 合入 main）：
+
+- 新增 `hbti-web/src/app/birthday/` 多屏 H5（封面/信/年度回顾/权益/资料/预约/确认/完成，
+  视觉复刻原静态卡）与 `/api/birthday/{view,profile,reserve,otp/verify}` 四个接口；
+- `src/lib/birthday/`：HMAC 签名链接（30 天过期、不含 PII、常数时间比对）、等级→权益
+  判定、预约落库（免费巴斯克每年一份靠部分唯一索引兜底幂等）、Lark 门店通知
+  （通知失败不回滚预约，只记 notify_status）；
+- `src/proxy.ts` 按域名分发：birthday.hotcrush.net 的页面请求重写到 /birthday，
+  hbti-test.hotcrush.net 行为不变、/api/* 两域名共享；/birthday 路由强制
+  `Cache-Control: private, no-store`；
+- 权益规则（2026-08-15 用户口述）：L1/L2 免费巴斯克每年一份；L3 450 积分限自己；L4 可送亲友。
+  现网等级只有 VIP1，桥接到默认权益；全部走环境变量可配；
+- 短信验证兜底**不再为非会员静默开户**（防批量养号薅免费蛋糕），RES 无会员返回 404 引导入会；
+- 迁移 `110_birthday_card.sql`：`mkt_birthday_profile` / `mkt_birthday_reservation`
+  （**尚未执行**，DDL 交人执行）。
+
+**门禁**：tsc、eslint、vitest **318 过 / 39 跳过**（生日专项 39 例）、next build 全绿；
+提交前凭据扫描干净。分支已删，worktree 已移除（其 .env.local 与主工作树逐字节一致，无丢失）。
+✅ **推送完成**：经 `127.0.0.1:7897` 代理推送 `a38fb53..04b4c6e`，origin/main 已同步。
+
+### 上线待办（本会话未动生产，以下全部需要人执行）
+
+1. **执行迁移 110**（DDL 交人执行，避开 KL 23:00 爬虫窗口，建议 01:00–13:00）：
+   建 `mkt_birthday_profile` / `mkt_birthday_reservation` 两张表。
+2. **Vercel 环境变量**（hotcrush-hbti 项目）：`BIRTHDAY_LINK_SECRET`（≥32 字节随机串，
+   与生成链接侧一致）、`BIRTHDAY_NOTIFY_WEBHOOK`（Lark 自定义群机器人，可不配）；
+   其余 `BIRTHDAY_CAMPAIGN_YEAR / BIRTHDAY_PICKUP_LEAD_DAYS / BIRTHDAY_PICKUP_WINDOW_DAYS /
+   BIRTHDAY_BENEFITS_JSON` 有默认值，需要再配。
+3. **部署**：`vercel build` + `vercel deploy --prebuilt`（沿用 OIDC token 流程）；
+   之后把 `birthday.hotcrush.net` 从静态归档项目切到 hotcrush-hbti 的本次部署
+   （proxy.ts 按域名分发，切域名即生效；静态归档版保留作回滚）。
+4. **生成专属链接**：`node hbti-web/scripts/generate-birthday-links.mjs --member <id>`
+   （需 BIRTHDAY_LINK_SECRET；`--top N` 灰度用，需 DATABASE_URL；输出绝不打印手机号）。
+5. **预约状态推进**（fulfilled/cancelled）暂无后台界面，先用 SQL 手工维护；
+   门店按 `ix_mkt_birthday_reservation_pickup` 的看板是下一迭代。
+
+---
+
 ## 分支大扫除 + 工作树清零 + deploy.sh 合并东京版（2026-08-15，Kimi，已完成）
 
 用户要求收编全部未提交改动并重排分支；随后确认 main 推送选方案 B（接受 birthday-web
@@ -36,9 +80,9 @@ hotcrush-core / hotcrush-res-api / hotcrush-alert-relay 三服务 active。deplo
 
 ⚠️ 下次 deploy 注意：main 现在包含 bakery-ops 意图路由/forecast 改动（a88b8df），
 相关单测已过但全量门禁未跑——deploy.sh 默认含门禁，别用 --skip-gate。
-终态：本地主工作树检出 main 且干净；另有 DSH 会话的活跃分支 `dsh/birthday-dynamic`
-在其独立 worktree 检出（生日页动态化在途，勿动）；`origin/main` 已与本地 main 同步，
-上述 4 个远程旧分支已删除。
+终态：本地主工作树检出 main 且干净；`origin/main` 已与本地 main 同步，上述 4 个
+远程旧分支已删除。此前登记的 `dsh/birthday-dynamic` 分支同日晚间已由 DSH 收尾合入
+main（见上一节），分支与 worktree 均已移除。
 
 ---
 
@@ -1694,6 +1738,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-15 | DSH | **生日贺卡动态化完成并合入 main（已推送）**：`dsh/birthday-dynamic` 分支 3 个提交 `04b4c6e` --no-ff 合入，生日卡从静态烘焙改为按会员动态生成。新增 /birthday 多屏 H5（封面/信/年度回顾/权益/资料/预约/确认）与 4 个 /api/birthday 接口；签名专属链接（HMAC、30 天过期、免登录进卡，短信验证兜底且不再为非会员静默开户）；预约落库与 Lark 门店通知；迁移 `110_birthday_card.sql`（mkt_birthday_profile / mkt_birthday_reservation，未执行）；proxy.ts 按域名分发、/birthday 强制 no-store。门禁 tsc/eslint/vitest 318 过 39 跳过（生日专项 39 例）/next build 全绿，凭据扫描干净；分支已删、worktree 已移除，origin/main 已同步。上线待办：迁移 110、Vercel 环境变量、vercel 部署、域名切换、链接生成（详见正文新节）。 |
 | 2026-08-15 | DSH | **生日贺卡源码归档入库（已合入 main）**：线上 `https://birthday.hotcrush.net/` 曾是唯一幸存副本（原 /tmp scratchpad 源码已被系统清理），已字节一致回收到 `birthday-web/`（index.html sha256 `5e2bd978…34120a55`，70525 字节），另归档两个品牌字体副本与 README（含 Vercel 项目/部署/证书/DNS 与重新部署方法）。经分支 `dsh/archive-birthday-web` --no-ff 合入 main；main 领先 origin/main 2 个提交、尚未 push。线上版本是为会员 Nicole 静态烘焙的单人页、无后端接口；今后改动以 `birthday-web/` 为准。 |
 | 2026-08-15 | Codex | **两个会员网页已使用自有域名上线**：HBTI 为 `https://hbti-test.hotcrush.net/`，首页与 `/api/health` 均 200、四项健康检查全绿；生日贺卡为 `https://birthday.hotcrush.net/`，Cloudflare 新增 DNS-only A `birthday → 76.76.21.21`，Vercel 别名指向 Ready 生产部署 `dpl_JDvL861xWm8d2uWiETD1aE93WKjB`。发现 DNS 生效后 Vercel 尚无子域名证书导致全球 TLS 失败，显式签发 `cert_z0teWyJCbiAUPhG451Nu0kkl` 后修复；洛杉矶、新加坡、德国三处均 HTTPS 200、TLS authorized，直连标题为“生日快乐 — Hot Crush”。未改源码、环境变量、数据库或服务器，未重建部署；共享工作树原有改动保留，未提交。 |
 | 2026-08-14 | Codex | **只读重审 HOT CRUSH 数据库蓝图（未改蓝图、未读写数据库）**：按“最小业务事实 / 来源汇总观察 / 来源快照 / 人工与工作流事实 / 决策输入快照 / 决策输出 / 派生视图 / 平台状态”重新核对 R6 与当前工作树中的 R6A1。结论：R6 的第一性原则方向成立，已明确纠正“行原子就等于整表必须落库”的旧错误；日/小时销售、会员日报等可保留为独立来源汇总与对账观察，但不能冒充最小交易事实，也不能与事件重算结果相加。当前不能批准 R6A1 实施：它仍标记 `DESIGN_ONLY_NOT_COMPILED / NOT_APPLY_COMPATIBLE / production_data_gate=BLOCKED`，Green 只证明旧 R6 的 100 表/1374 字段空结构（零数据、零视图、零策略/业务角色），R6A1 生成模型是 105 表/1470 字段，而新增评审稿仍写 1469，且当前 R6A1 测试门禁不绿（设计测试 45 项中 1 失败；implementation 测试 53 项中 21 error + 6 failure）；59 个逻辑视图只有 7 个达到 SELECT 规格就绪且 0 个实际创建/运行验证。还发现 `CORE_BASE_FACT` 混装原子事件与来源汇总，建议在目录中新增 `fact_kind` / `value_role` 元数据轴；客单价必须显式拆为 net/gross，`source_guest_count` 只能标“来源顾客计数、口径待确认”；R6A1 `pos_order_item` 已改为 Report211 原始冲销行粒度，但 `order_item_id`、`net_sales` 描述仍残留旧聚合语义。建议 P0：冻结唯一权威版本、解决 1469/1470 与测试漂移、恢复并运行验证核心 POS 视图、再编译 Green 100→105 的空库增量；未完成前暂停回填和 AI/BI 接入。另需轮换此前意外暴露的数据库凭据并更新消费者。工作区原有大量脏改动/未跟踪文件均保留，未提交。 |

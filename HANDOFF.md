@@ -6,6 +6,46 @@
 
 ---
 
+## 生日贺卡动态化全量上线（2026-08-15，DSH，已执行）
+
+用户指示「全部自己执行」后，把上节的 6 项上线待办全部完成并逐项验收：
+
+1. **迁移 110**——查证生产库 `schema_migrations` 已有版本 110，`mkt_birthday_profile` /
+   `mkt_birthday_reservation` 两表已建、列/索引与迁移文件逐项一致、当前 0 行
+   （更早的会话已执行过；本次只读核验，未重复执行）。
+2. **Vercel 环境变量**——hotcrush-hbti 生产环境新增 `BIRTHDAY_LINK_SECRET`
+   （64 hex = 32 字节随机串）与 `BIRTHDAY_CAMPAIGN_YEAR=2026`；同值写入本地
+   `hbti-web/.env.local`（gitignored）供链接生成脚本使用。
+   `BIRTHDAY_NOTIFY_WEBHOOK` **未配置**：缺一个门店用的 Lark 群机器人地址，
+   拿到后 `vercel env add BIRTHDAY_NOTIFY_WEBHOOK production` 再 `vercel redeploy` 即生效；
+   未配置期间预约照常落库、通知记 skipped。
+3. **部署**——`vercel build --prod` + `vercel deploy --prebuilt --prod`：
+   新生产部署 `hotcrush-hbti-h752wzi63-algersss-projects.vercel.app`（含全部生日路由），
+   已别名 `hbti-test.hotcrush.net`。
+4. **域名切换**——`birthday.hotcrush.net` 从静态项目 hotcrush-birthday-card 移除别名，
+   重新别名到上述新部署（域名在团队内已验证，DNS 与证书均未动；
+   证书 cert_z0teWyJCbiAUPhG451Nu0kkl 正常）。静态归档部署
+   `dpl_JDvL861xWm8d2uWiETD1aE93WKjB` 保留作回滚。
+5. **端到端验收**（全部真实生产路径）：
+   - `/api/health` 四检全绿；`/api/birthday/view` 无身份 401、坏令牌 401、过期 410；
+   - 用 `scripts/generate-birthday-links.mjs` 为会员 2063178969381101576（VIP1）生成
+     30 天签名链接，`/api/birthday/view?t=` 200：真实年度回顾（2026 年 29 单 /
+     RM4290.45 / 最爱「趁热心动蛋挞」139 件）、免费巴斯克权益、取货窗口
+     2026-08-17~09-14；hbti-test 与 birthday 两个域名均 200；
+   - 页面 `cache-control: private, no-store` 生效；`birthday.hotcrush.net` TLS 校验通过、
+     标题「生日快乐 — Hot Crush」。
+   - ⚠️ **未做真实预约写入**（会落一条真实预约记录）：写路径由 39 例单测覆盖，
+     首单真实预约建议人工点一遍。
+6. **推送**——已随本 HANDOFF 更新一起 push origin/main。
+
+**回滚方法（两步）**：
+1. `cd ~/hot/hbti-web && vercel alias rm birthday.hotcrush.net`
+2. 在 `vercel link --project hotcrush-birthday-card` 的目录里
+   `vercel alias set hotcrush-birthday-card-1i3cd8ad3-algersss-projects.vercel.app birthday.hotcrush.net`
+（hbti-test 域名回滚用 `vercel promote hotcrush-hbti-oeq4tt1pw-algersss-projects.vercel.app --yes`。）
+
+---
+
 ## 生日贺卡动态化完成并合入 main（2026-08-15，DSH，已合入 main 并推送）
 
 接替上一 DSH 会话在 `dsh/birthday-dynamic` 独立 worktree 的在途实现，收尾并合入 main：
@@ -32,7 +72,7 @@
 提交前凭据扫描干净。分支已删，worktree 已移除（其 .env.local 与主工作树逐字节一致，无丢失）。
 ✅ **推送完成**：经 `127.0.0.1:7897` 代理推送 `a38fb53..04b4c6e`，origin/main 已同步。
 
-### 上线待办（本会话未动生产，以下全部需要人执行）
+### 上线待办（✅ 已于同日由 DSH 全部执行，见上一节；以下保留原始清单备查）
 
 1. **执行迁移 110**（DDL 交人执行，避开 KL 23:00 爬虫窗口，建议 01:00–13:00）：
    建 `mkt_birthday_profile` / `mkt_birthday_reservation` 两张表。
@@ -1738,6 +1778,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-15 | DSH | **生日贺卡动态化全量上线（已执行）**：迁移 110 经查已在生产库生效（两表 0 行、列/索引与迁移一致）；Vercel 生产新增 BIRTHDAY_LINK_SECRET 与 BIRTHDAY_CAMPAIGN_YEAR=2026；`vercel build --prod` + `deploy --prebuilt --prod` 部署 `hotcrush-hbti-h752wzi63-algersss-projects.vercel.app` 并别名 hbti-test.hotcrush.net；`birthday.hotcrush.net` 从静态项目 hotcrush-birthday-card 切到新部署（DNS/证书未动，静态部署保留回滚）。端到端验收：health 四检全绿、view 接口 401/410 边界正确、为会员 2063178969381101576 生成签名链接后 view 200（真实年度回顾 + 免费巴斯克权益 + 取货窗口）、两域名 200、no-store 生效、TLS 通过。未做真实预约写入；BIRTHDAY_NOTIFY_WEBHOOK 待门店提供 Lark 机器人地址。 |
 | 2026-08-15 | DSH | **生日贺卡动态化完成并合入 main（已推送）**：`dsh/birthday-dynamic` 分支 3 个提交 `04b4c6e` --no-ff 合入，生日卡从静态烘焙改为按会员动态生成。新增 /birthday 多屏 H5（封面/信/年度回顾/权益/资料/预约/确认）与 4 个 /api/birthday 接口；签名专属链接（HMAC、30 天过期、免登录进卡，短信验证兜底且不再为非会员静默开户）；预约落库与 Lark 门店通知；迁移 `110_birthday_card.sql`（mkt_birthday_profile / mkt_birthday_reservation，未执行）；proxy.ts 按域名分发、/birthday 强制 no-store。门禁 tsc/eslint/vitest 318 过 39 跳过（生日专项 39 例）/next build 全绿，凭据扫描干净；分支已删、worktree 已移除，origin/main 已同步。上线待办：迁移 110、Vercel 环境变量、vercel 部署、域名切换、链接生成（详见正文新节）。 |
 | 2026-08-15 | DSH | **生日贺卡源码归档入库（已合入 main）**：线上 `https://birthday.hotcrush.net/` 曾是唯一幸存副本（原 /tmp scratchpad 源码已被系统清理），已字节一致回收到 `birthday-web/`（index.html sha256 `5e2bd978…34120a55`，70525 字节），另归档两个品牌字体副本与 README（含 Vercel 项目/部署/证书/DNS 与重新部署方法）。经分支 `dsh/archive-birthday-web` --no-ff 合入 main；main 领先 origin/main 2 个提交、尚未 push。线上版本是为会员 Nicole 静态烘焙的单人页、无后端接口；今后改动以 `birthday-web/` 为准。 |
 | 2026-08-15 | Codex | **两个会员网页已使用自有域名上线**：HBTI 为 `https://hbti-test.hotcrush.net/`，首页与 `/api/health` 均 200、四项健康检查全绿；生日贺卡为 `https://birthday.hotcrush.net/`，Cloudflare 新增 DNS-only A `birthday → 76.76.21.21`，Vercel 别名指向 Ready 生产部署 `dpl_JDvL861xWm8d2uWiETD1aE93WKjB`。发现 DNS 生效后 Vercel 尚无子域名证书导致全球 TLS 失败，显式签发 `cert_z0teWyJCbiAUPhG451Nu0kkl` 后修复；洛杉矶、新加坡、德国三处均 HTTPS 200、TLS authorized，直连标题为“生日快乐 — Hot Crush”。未改源码、环境变量、数据库或服务器，未重建部署；共享工作树原有改动保留，未提交。 |

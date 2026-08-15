@@ -97,11 +97,14 @@ interface BirthdayStats {
   favorite: BirthdayTopItem | null;
 }
 
-interface BirthdayBenefit {
-  kind: "free_basque" | "points_450";
+interface BirthdayOption {
+  giftType: "free_basque" | "points_450";
+  label: string;
+  cost: number;
   allowGift: boolean;
   yearlyLimit: number | null;
-  label: string;
+  available: boolean;
+  deniedReason?: string;
 }
 
 interface BirthdayProfile {
@@ -135,7 +138,7 @@ interface BirthdayView {
     registeredOn: string | null;
   };
   stats: BirthdayStats | null;
-  benefit: BirthdayBenefit;
+  options: BirthdayOption[];
   pickup: { minDate: string; maxDate: string };
   profile: BirthdayProfile | null;
   reservations: BirthdayReservation[];
@@ -143,6 +146,8 @@ interface BirthdayView {
 }
 
 type Slot = "noon" | "night";
+
+type GiftType = "free_basque" | "points_450";
 
 const SLOT_LABEL: Record<Slot, string> = {
   noon: "下午 12:00–17:00",
@@ -256,6 +261,7 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
   const [profileSaved, setProfileSaved] = useState(false);
 
   /* 预约表单 */
+  const [giftType, setGiftType] = useState<GiftType>("free_basque");
   const [pickupDate, setPickupDate] = useState<string>();
   const [slot, setSlot] = useState<Slot>("noon");
   const [forWhom, setForWhom] = useState<"self" | "gift">("self");
@@ -286,6 +292,12 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
         setBirthdayDay(data.profile?.birthdayDay ?? null);
         setAllergies(data.profile?.allergies ?? "");
         setPreferences(data.profile?.preferences ?? "");
+        /* 默认选中第一个可选礼物（有积分就优先积分兑换，没有就免费巴斯克）。 */
+        const firstAvailable =
+          data.options?.find((option) => option.available) ?? data.options?.[0];
+        if (firstAvailable) {
+          setGiftType(firstAvailable.giftType);
+        }
         setPhase("ready");
         return;
       }
@@ -405,6 +417,7 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...(activeToken ? { linkToken: activeToken } : {}),
+          giftType,
           forWhom,
           ...(forWhom === "gift" ? { recipientNote: recipientNote.trim() } : {}),
           pickupDate,
@@ -539,8 +552,14 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
       r.giftType === "free_basque" &&
       (r.status === "reserved" || r.status === "fulfilled"),
   );
+  const selectedOption =
+    view.options.find((option) => option.giftType === giftType) ??
+    view.options.find((option) => option.available) ??
+    view.options[0];
   const freeBasqueClaimed =
-    view.benefit.kind === "free_basque" && activeFreeBasque !== undefined;
+    selectedOption?.giftType === "free_basque" &&
+    !selectedOption.available &&
+    selectedOption.deniedReason === "FREE_BASQUE_ALREADY_CLAIMED";
 
   const stepProps = { headingRef };
 
@@ -574,6 +593,11 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
             <BenefitScreen
               {...stepProps}
               view={view}
+              giftType={giftType}
+              onSelectGiftType={(next) => {
+                setGiftType(next);
+                setReserveError(undefined);
+              }}
               onBack={() => goTo("year")}
               onContinue={() => goTo("profile")}
             />
@@ -623,6 +647,7 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
             <ReserveScreen
               {...stepProps}
               view={view}
+              giftType={giftType}
               birthdayMonth={birthdayMonth}
               birthdayDay={birthdayDay}
               claimed={freeBasqueClaimed ? activeFreeBasque : undefined}
@@ -661,7 +686,7 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
           {step === "confirm" && pickupDate && (
             <ConfirmScreen
               {...stepProps}
-              view={view}
+              giftType={giftType}
               pickupDate={pickupDate}
               slot={slot}
               forWhom={forWhom}
@@ -1181,6 +1206,8 @@ function reserveErrorMessage(error: string | undefined): string {
       return "这份权益只能留给自己。";
     case "TOO_MANY_ACTIVE_RESERVATIONS":
       return "已经有进行中的预约了——先到店取完，再约下一份。";
+    case "BENEFIT_NOT_AVAILABLE":
+      return "这份礼物这会儿还不能选——返回上一步换个选项。";
     case "INVALID_REQUEST":
       return "有些地方没填对，回去看一眼。";
     default:
@@ -1270,7 +1297,7 @@ function CoverScreen({
             : "Hot Crush 会员 · 生日礼遇"}
         </p>
         <p className={styles.what}>
-          {view.benefit.kind === "free_basque"
+          {view.options.some((option) => option.giftType === "free_basque")
             ? "生日当月，一份巴斯克，我们请。"
             : "生日当月，450 积分换一份生日蛋糕。"}
         </p>
@@ -1531,19 +1558,22 @@ function YearScreen({
 function BenefitScreen({
   headingRef,
   view,
+  giftType,
+  onSelectGiftType,
   onBack,
   onContinue,
 }: ScreenProps & {
   view: BirthdayView;
+  giftType: GiftType;
+  onSelectGiftType: (giftType: GiftType) => void;
   onBack: () => void;
   onContinue: () => void;
 }) {
-  const { benefit, member } = view;
+  const { options, member } = view;
   const points = member.pointBalance;
-  const pointsShort =
-    benefit.kind === "points_450" && points !== null && points < 450
-      ? 450 - points
-      : null;
+  const selected =
+    options.find((option) => option.giftType === giftType) ?? options[0];
+  const pointsShort = points !== null && points < 450 ? 450 - points : null;
 
   return (
     <section className={`${styles.screen} ${styles.sheet}`}>
@@ -1557,20 +1587,51 @@ function BenefitScreen({
             ? `${member.levelName} 会员 · ${view.campaignYear}`
             : `Hot Crush 会员 · ${view.campaignYear}`}
         </p>
-        <p className={styles.what}>{benefit.label}</p>
-        <p className={styles.sub}>
-          {benefit.kind === "free_basque"
-            ? `你是我们的${member.levelName ? ` ${member.levelName} ` : " "}会员，生日这天有一份免费巴斯克。提前订好哪天来拿，我们给你留着。`
-            : "450 积分即可兑换一份生日蛋糕。订好哪天来拿，到店报手机号就行。"}
-        </p>
+        <div
+          className={`${styles.picks} ${styles.picksRow}`}
+          role="radiogroup"
+          aria-label="选择生日礼"
+        >
+          {options.map((option) => {
+            const chosen = selected?.giftType === option.giftType;
+            const freeClaimed =
+              option.giftType === "free_basque" &&
+              option.deniedReason === "FREE_BASQUE_ALREADY_CLAIMED";
+            const notEnough = option.deniedReason === "INSUFFICIENT_POINTS";
+            return (
+              <button
+                className={styles.pick}
+                key={option.giftType}
+                type="button"
+                role="radio"
+                aria-checked={chosen}
+                data-selected={chosen}
+                disabled={!option.available}
+                onClick={() => onSelectGiftType(option.giftType)}
+              >
+                <span className={styles.pickT}>
+                  {option.label}
+                  {chosen && <span className={styles.tick}>✓</span>}
+                </span>
+                <span className={styles.pickD}>
+                  {freeClaimed
+                    ? "今年的这一份已经留过了"
+                    : notEnough
+                      ? points === null
+                        ? "现在还没有积分记录"
+                        : `还差 ${pointsShort} 分`
+                      : option.cost === 0
+                        ? "每会员每年一份"
+                        : "到店取货时在 POS 扣 450 积分"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
         {points !== null && (
-          <p className={styles.hintline}>
-            你现在有 {points} 积分。
-            {pointsShort !== null &&
-              `还差 ${pointsShort} 分——生日前再来几次就够了。`}
-          </p>
+          <p className={styles.hintline}>你现在有 {points} 积分。</p>
         )}
-        {benefit.allowGift && (
+        {selected?.allowGift && (
           <p className={styles.hintline}>
             这份心意也可以送给亲友——订的时候告诉我们送给谁就好。
           </p>
@@ -1743,6 +1804,7 @@ function ProfileScreen({
 function ReserveScreen({
   headingRef,
   view,
+  giftType,
   birthdayMonth,
   birthdayDay,
   claimed,
@@ -1762,6 +1824,7 @@ function ReserveScreen({
   onSeeReservations,
 }: ScreenProps & {
   view: BirthdayView;
+  giftType: GiftType;
   birthdayMonth: number | null;
   birthdayDay: number | null;
   claimed?: BirthdayReservation;
@@ -1782,6 +1845,22 @@ function ReserveScreen({
 }) {
   const { minDate, maxDate } = view.pickup;
   const months = buildCalendar(minDate, maxDate);
+  const selectedOption =
+    view.options.find((option) => option.giftType === giftType) ??
+    view.options[0];
+
+  /* 叠起来的日期选择：先给最近 7 天，其余收进「展开」里。 */
+  const [showFullCalendar, setShowFullCalendar] = useState(false);
+  const inRangeDates: string[] = [];
+  for (
+    let time = Date.parse(minDate + "T00:00:00Z");
+    time <= Date.parse(maxDate + "T00:00:00Z");
+    time += 86_400_000
+  ) {
+    inRangeDates.push(new Date(time).toISOString().slice(0, 10));
+  }
+  const quickDates = inRangeDates.slice(0, 7);
+  const hiddenCount = inRangeDates.length - quickDates.length;
 
   /* 免费巴斯克一年一份：已留过的会员再来，直接看状态，不给第二张表单。 */
   if (claimed) {
@@ -1814,65 +1893,111 @@ function ReserveScreen({
       <h2 ref={headingRef} tabIndex={-1}>
         哪天来拿？
       </h2>
-      <p className={styles.sub}>巴斯克要提前备料，灰掉的日子来不及。</p>
+      <p className={styles.sub}>
+        蛋糕要提前备料——最近七天直接挑，想选更后面的日子再展开。
+      </p>
 
-      {months.map((month) => (
-        <div className={styles.calBlock} key={month.key}>
-          <p className={styles.calMonth}>
-            {month.year} 年 {month.month} 月
-          </p>
-          <div className={styles.grid} role="group" aria-label={`${month.year} 年 ${month.month} 月`}>
-            {WEEKDAYS.map((dow) => (
-              <span className={styles.dow} key={dow} aria-hidden="true">
-                {dow}
-              </span>
-            ))}
-            {month.cells.map((cell, index) => {
-              if (cell === null) {
+      {selectedOption && (
+        <p className={styles.hintline}>
+          生日礼：{selectedOption.label}
+        </p>
+      )}
+
+      <div className={styles.chips} role="group" aria-label="最近七天">
+        {quickDates.map((cell) => {
+          const isBirthday =
+            birthdayMonth !== null &&
+            birthdayDay !== null &&
+            Number(cell.slice(5, 7)) === birthdayMonth &&
+            Number(cell.slice(8, 10)) === birthdayDay;
+          const selected = pickupDate === cell;
+          return (
+            <button
+              className={styles.chip}
+              key={cell}
+              type="button"
+              data-selected={selected}
+              aria-pressed={selected}
+              aria-label={`${formatDateZh(cell)}${isBirthday ? "，生日当天" : ""}`}
+              onClick={() => onSelectDate(cell)}
+            >
+              {formatDateZh(cell)}
+            </button>
+          );
+        })}
+      </div>
+
+      {hiddenCount > 0 && (
+        <button
+          className={styles.calToggle}
+          type="button"
+          aria-expanded={showFullCalendar}
+          onClick={() => setShowFullCalendar((value) => !value)}
+        >
+          {showFullCalendar
+            ? "收起日历 ▲"
+            : `想选更后面的日子 ▾（还有 ${hiddenCount} 天）`}
+        </button>
+      )}
+
+      {showFullCalendar &&
+        months.map((month) => (
+          <div className={styles.calBlock} key={month.key}>
+            <p className={styles.calMonth}>
+              {month.year} 年 {month.month} 月
+            </p>
+            <div className={styles.grid} role="group" aria-label={`${month.year} 年 ${month.month} 月`}>
+              {WEEKDAYS.map((dow) => (
+                <span className={styles.dow} key={dow} aria-hidden="true">
+                  {dow}
+                </span>
+              ))}
+              {month.cells.map((cell, index) => {
+                if (cell === null) {
+                  return (
+                    <span
+                      className={`${styles.day} ${styles.dayPad}`}
+                      key={`pad-${index}`}
+                      aria-hidden="true"
+                    />
+                  );
+                }
+                const inRange = cell >= minDate && cell <= maxDate;
+                if (!inRange) {
+                  return (
+                    <span
+                      className={`${styles.day} ${styles.dayOff}`}
+                      key={cell}
+                      title={cell < minDate ? "来不及备料" : "超出预约窗口"}
+                      aria-disabled="true"
+                    >
+                      {Number(cell.slice(8, 10))}
+                    </span>
+                  );
+                }
+                const isBirthday =
+                  birthdayMonth !== null &&
+                  birthdayDay !== null &&
+                  Number(cell.slice(5, 7)) === birthdayMonth &&
+                  Number(cell.slice(8, 10)) === birthdayDay;
+                const selected = pickupDate === cell;
                 return (
-                  <span
-                    className={`${styles.day} ${styles.dayPad}`}
-                    key={`pad-${index}`}
-                    aria-hidden="true"
-                  />
-                );
-              }
-              const inRange = cell >= minDate && cell <= maxDate;
-              if (!inRange) {
-                return (
-                  <span
-                    className={`${styles.day} ${styles.dayOff}`}
+                  <button
+                    className={`${styles.day}${isBirthday ? ` ${styles.dayBday}` : ""}`}
                     key={cell}
-                    title={cell < minDate ? "来不及备料" : "超出预约窗口"}
-                    aria-disabled="true"
+                    type="button"
+                    data-selected={selected}
+                    aria-pressed={selected}
+                    aria-label={`${formatDateZh(cell)}${isBirthday ? "，生日当天" : ""}`}
+                    onClick={() => onSelectDate(cell)}
                   >
                     {Number(cell.slice(8, 10))}
-                  </span>
+                  </button>
                 );
-              }
-              const isBirthday =
-                birthdayMonth !== null &&
-                birthdayDay !== null &&
-                Number(cell.slice(5, 7)) === birthdayMonth &&
-                Number(cell.slice(8, 10)) === birthdayDay;
-              const selected = pickupDate === cell;
-              return (
-                <button
-                  className={`${styles.day}${isBirthday ? ` ${styles.dayBday}` : ""}`}
-                  key={cell}
-                  type="button"
-                  data-selected={selected}
-                  aria-pressed={selected}
-                  aria-label={`${formatDateZh(cell)}${isBirthday ? "，生日当天" : ""}`}
-                  onClick={() => onSelectDate(cell)}
-                >
-                  {Number(cell.slice(8, 10))}
-                </button>
-              );
-            })}
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
 
       <div className={styles.fld}>
         <p className={styles.lab}>几点来</p>
@@ -1892,7 +2017,7 @@ function ReserveScreen({
         </div>
       </div>
 
-      {view.benefit.allowGift && (
+      {selectedOption?.allowGift && (
         <div className={styles.fld}>
           <p className={styles.lab}>这份留给谁？</p>
           <div className={`${styles.picks} ${styles.picksRow}`}>
@@ -1924,7 +2049,7 @@ function ReserveScreen({
         </div>
       )}
 
-      {view.benefit.allowGift && forWhom === "gift" && (
+      {selectedOption?.allowGift && forWhom === "gift" && (
         <div className={styles.fld}>
           <label className={styles.lab} htmlFor="birthday-recipient">
             送给谁
@@ -1970,7 +2095,7 @@ function ReserveScreen({
 /* ── 确认屏 ── */
 function ConfirmScreen({
   headingRef,
-  view,
+  giftType,
   pickupDate,
   slot,
   forWhom,
@@ -1982,7 +2107,7 @@ function ConfirmScreen({
   onBack,
   onSubmit,
 }: ScreenProps & {
-  view: BirthdayView;
+  giftType: GiftType;
   pickupDate: string;
   slot: Slot;
   forWhom: "self" | "gift";
@@ -2003,7 +2128,7 @@ function ConfirmScreen({
       <dl className={styles.sum}>
         <div>
           <dt>生日礼</dt>
-          <dd>{view.benefit.label}</dd>
+          <dd>{GIFT_TYPE_LABEL[giftType]}</dd>
         </div>
         <div>
           <dt>哪天</dt>

@@ -4,7 +4,7 @@ import { noStoreJson } from "@/lib/auth/http";
 import { getDb } from "@/lib/db/postgres";
 import { readBirthdayConfig } from "@/lib/birthday/config";
 import { resolveBirthdayAuth } from "@/lib/birthday/resolve-auth";
-import { resolveBenefit, pickupWindow } from "@/lib/birthday/eligibility";
+import { listBirthdayOptions, pickupWindow } from "@/lib/birthday/eligibility";
 import { readMemberBasics, readYearStats } from "@/lib/birthday/stats";
 import { listReservations, readProfile } from "@/lib/birthday/store";
 
@@ -39,7 +39,11 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     const levelName = basics?.levelName ?? null;
     const pointBalance = basics?.pointBalance ?? null;
-    const benefit = resolveBenefit(levelName, config);
+    const options = listBirthdayOptions(
+      { levelName, pointBalance },
+      reservations.map((r) => ({ giftType: r.giftType, status: r.status })),
+      config,
+    );
 
     return noStoreJson({
       authenticated: true,
@@ -56,7 +60,7 @@ export async function GET(request: Request): Promise<NextResponse> {
         registeredOn: basics?.registeredOn ?? null,
       },
       stats,
-      benefit,
+      options,
       pickup: pickupWindow(config),
       profile,
       reservations,

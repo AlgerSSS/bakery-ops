@@ -24,6 +24,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const bodySchema = z.strictObject({
   linkToken: z.string().max(512).optional(),
   forWhom: z.enum(["self", "gift"]),
+  giftType: z.enum(["free_basque", "points_450"]),
   recipientNote: z.string().trim().max(120).nullish(),
   pickupDate: z.string().regex(DATE_PATTERN),
   slot: z.enum(["noon", "night"]),
@@ -81,7 +82,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         pointBalance: basics?.pointBalance ?? null,
       },
       existing.map((r) => ({ giftType: r.giftType, status: r.status })),
-      { forWhom: input.forWhom },
+      { forWhom: input.forWhom, giftType: input.giftType },
       config,
     );
     if (!decision.ok) {
@@ -92,7 +93,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const created = await createReservation(sql, {
       memberId: auth.memberId,
       campaignYear: config.campaignYear,
-      giftType: decision.rule.kind,
+      giftType: input.giftType,
       forWhom: input.forWhom,
       recipientNote: input.forWhom === "gift" ? (input.recipientNote ?? null) : null,
       pickupDate: input.pickupDate,
@@ -105,20 +106,26 @@ export async function POST(request: Request): Promise<NextResponse> {
       return noStoreJson({ error: created.reason }, { status: 409 });
     }
 
-    const notifyOutcome = await notifyStore(config.notifyWebhook, {
-      reservation: created.reservation,
-      maskedPhone:
-        auth.kind === "session" ? auth.maskedPhone : (basics?.maskedPhone ?? null),
-      levelName: basics?.levelName ?? null,
-      pointsSnapshot: basics?.pointBalance ?? null,
-      allergies: profile?.allergies ?? null,
-    });
-    await markReservationNotified(sql, created.reservation.reservationId, notifyOutcome)
-      .catch((error: unknown) => {
-        console.error("[birthday] notify status update failed", {
-          message: error instanceof Error ? error.message : String(error),
-        });
+    // 门店通知：webhook 未配置时保持 notify_status='pending'，
+    // 由 tokyo-01 上的生日通知 relay（scripts/birthday-notify.mjs）收编发送——
+    // 通知通道部署在服务器上，Vercel 侧不配 BIRTHDAY_NOTIFY_WEBHOOK。
+    let notifyOutcome: "sent" | "skipped" | "failed" | "pending" = "pending";
+    if (config.notifyWebhook) {
+      notifyOutcome = await notifyStore(config.notifyWebhook, {
+        reservation: created.reservation,
+        maskedPhone:
+          auth.kind === "session" ? auth.maskedPhone : (basics?.maskedPhone ?? null),
+        levelName: basics?.levelName ?? null,
+        pointsSnapshot: basics?.pointBalance ?? null,
+        allergies: profile?.allergies ?? null,
       });
+      await markReservationNotified(sql, created.reservation.reservationId, notifyOutcome)
+        .catch((error: unknown) => {
+          console.error("[birthday] notify status update failed", {
+            message: error instanceof Error ? error.message : String(error),
+          });
+        });
+    }
 
     const reservations = await listReservations(sql, auth.memberId, config.campaignYear);
     return noStoreJson({

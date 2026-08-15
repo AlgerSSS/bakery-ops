@@ -6,6 +6,45 @@
 
 ---
 
+## 生日礼双选项 + 折叠日历 + 服务器 Lark 通知 relay（2026-08-15，DSH，已合入并部署）
+
+用户三项要求全部落地：
+
+1. **Lark 机器人配置**：用 lark-cli（app cli_aa82af2c7878de17，bot 身份）创建私有群
+   「HOT CRUSH 生日礼预约」（chat_id `oc_9d0e91b9f8206ef474ed213f150ddb72`），
+   机器人设为群管理、邀请邵伟亮；更多成员用群分享链接拉入即可。
+2. **450 积分兑换选项**：权益模型从「等级 → 单一权益」改为选项列表
+   （`listBirthdayOptions`）：免费巴斯克仍是等级权益（每年一份），450 积分兑换
+   对积分 ≥450 的会员开放（积分在门店 POS 结算，H5 不扣）；/api/birthday/view
+   返回 `options`，reserve 请求带 `giftType`；前端权益屏双卡片可选、预约/确认屏
+   随所选显示。迁移 111 已执行（`notify_attempts` 列）。
+3. **日期选择折叠**：预约屏只展示最近 7 天胶囊，其余收进「想选更后面的日子 ▾」
+   展开（两月网格仍在，默认收起）。
+
+**通知发送上服务器（Vultr tokyo-01，用户要求）**：
+- Vercel 侧不再发通知：`BIRTHDAY_NOTIFY_WEBHOOK` 未配时 reserve 保持
+  `notify_status='pending'`；
+- 新脚本 `scripts/birthday-notify.mjs` 每 15 分钟（`/etc/cron.d/hotcrush-birthday`）
+  轮询 pending 行，经 `lark_app.json`（与招募脚本共用 app cli_aa82af2c7878de17）
+  取 tenant token（磁盘缓存 2h）发到群，置 sent；失败 attempts+1、满 3 置 failed。
+  服务器配置 `/opt/hotcrush/scripts/birthday-notify.env`（DATABASE_URL + chat id，
+  600 权限，不入 git；模板 `birthday-notify.env.example` 入库，随 deploy.sh 的
+  scripts rsync 段上线）。
+- 已实测：本地与服务器各发一条测试消息进群；服务器 `--dry-run` 读生产库正常。
+
+**部署与验收**：
+- 门禁：tsc / eslint / vitest **330 过 39 跳过** / next build 全绿；凭据扫描干净。
+- Vercel 新生产部署 `hotcrush-hbti-hw85hmtso-algersss-projects.vercel.app`，
+  hbti-test 与 birthday 两个域名均已指到它。⚠️ 经验：`vercel deploy --prod`
+  只自动移项目原生域名（hbti-test），birthday 域名每次部署后要手动
+  `vercel alias set <新部署> birthday.hotcrush.net`。
+- 线上验证：view API 对 Nicole（4944 分）返回两个选项且积分选项 available；
+  Playwright 真机流程断言权益屏双卡片、4944 积分文案、预约屏 7 天胶囊 +
+  展开出现次月日历，全部通过。
+- ⚠️ 仍未做真实预约写入（会落真实记录 + 群通知），首单建议人工点一遍。
+
+---
+
 ## 生日贺卡动态化全量上线（2026-08-15，DSH，已执行）
 
 用户指示「全部自己执行」后，把上节的 6 项上线待办全部完成并逐项验收：
@@ -1778,6 +1817,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-15 | DSH | **生日礼双选项 + 折叠日历 + 服务器通知 relay（已部署）**：权益模型改选项列表，450 积分兑换对积分 ≥450 会员开放（免费巴斯克仍每年一份），view 返回 options、reserve 带 giftType；预约屏日期选择折叠为最近 7 天胶囊 + 展开。门店通知按用户要求搬上 tokyo-01：scripts/birthday-notify.mjs 每 15 分钟轮询 pending 行 → Lark 群「HOT CRUSH 生日礼预约」（机器人自建群，chat oc_9d0e91b9f8206ef474ed213f150ddb72）→ sent，失败 3 次置 failed（迁移 111 加 notify_attempts 已执行）；/etc/cron.d/hotcrush-birthday + 服务器 env（不入 git）。门禁 tsc/eslint/vitest 330 过 39 跳过/build 全绿；Vercel 新部署 hotcrush-hbti-hw85hmtso-algersss-projects.vercel.app（两域名已指到，注意 --prod 部署后 birthday 域名需手动 alias）；Playwright 实测双选项与折叠日历；本地+服务器 Lark 测试消息各一发。仍未做真实预约写入。 |
 | 2026-08-15 | DSH | **生日贺卡动态化全量上线（已执行）**：迁移 110 经查已在生产库生效（两表 0 行、列/索引与迁移一致）；Vercel 生产新增 BIRTHDAY_LINK_SECRET 与 BIRTHDAY_CAMPAIGN_YEAR=2026；`vercel build --prod` + `deploy --prebuilt --prod` 部署 `hotcrush-hbti-h752wzi63-algersss-projects.vercel.app` 并别名 hbti-test.hotcrush.net；`birthday.hotcrush.net` 从静态项目 hotcrush-birthday-card 切到新部署（DNS/证书未动，静态部署保留回滚）。端到端验收：health 四检全绿、view 接口 401/410 边界正确、为会员 2063178969381101576 生成签名链接后 view 200（真实年度回顾 + 免费巴斯克权益 + 取货窗口）、两域名 200、no-store 生效、TLS 通过。未做真实预约写入；BIRTHDAY_NOTIFY_WEBHOOK 待门店提供 Lark 机器人地址。 |
 | 2026-08-15 | DSH | **生日贺卡动态化完成并合入 main（已推送）**：`dsh/birthday-dynamic` 分支 3 个提交 `04b4c6e` --no-ff 合入，生日卡从静态烘焙改为按会员动态生成。新增 /birthday 多屏 H5（封面/信/年度回顾/权益/资料/预约/确认）与 4 个 /api/birthday 接口；签名专属链接（HMAC、30 天过期、免登录进卡，短信验证兜底且不再为非会员静默开户）；预约落库与 Lark 门店通知；迁移 `110_birthday_card.sql`（mkt_birthday_profile / mkt_birthday_reservation，未执行）；proxy.ts 按域名分发、/birthday 强制 no-store。门禁 tsc/eslint/vitest 318 过 39 跳过（生日专项 39 例）/next build 全绿，凭据扫描干净；分支已删、worktree 已移除，origin/main 已同步。上线待办：迁移 110、Vercel 环境变量、vercel 部署、域名切换、链接生成（详见正文新节）。 |
 | 2026-08-15 | DSH | **生日贺卡源码归档入库（已合入 main）**：线上 `https://birthday.hotcrush.net/` 曾是唯一幸存副本（原 /tmp scratchpad 源码已被系统清理），已字节一致回收到 `birthday-web/`（index.html sha256 `5e2bd978…34120a55`，70525 字节），另归档两个品牌字体副本与 README（含 Vercel 项目/部署/证书/DNS 与重新部署方法）。经分支 `dsh/archive-birthday-web` --no-ff 合入 main；main 领先 origin/main 2 个提交、尚未 push。线上版本是为会员 Nicole 静态烘焙的单人页、无后端接口；今后改动以 `birthday-web/` 为准。 |

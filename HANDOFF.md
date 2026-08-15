@@ -27,6 +27,695 @@ https://birthday.hotcrush.net/ 抓取回收，经独立分支 `dsh/archive-birth
 未切分支、未被触碰。合并后 main 领先 origin/main 2 个提交（含此前 1 个未推送提交），**尚未 push**，
 由用户决定推送时机。未改部署、DNS、证书、数据库。
 
+---
+
+## 「可计算不落库」硬规则重审 + AI 服务商清单重标（2026-08-15，Kimi，已完成）
+
+用户确认执行两件事：A= 按最终裁定的硬规则重审 R6A1 蓝图物理存储必要性；B= 把 Lark 在线数据清单的
+"数据形态"列按新业务标签组重标。硬规则原文：凡能从完整、不可变的最小事实和版本化规则中确定性重建的
+数据一律不落库（输入完整、公式版本明确、币种/舍入/时区口径固定、历史可重现才算"可计算"）；例外仅
+POS 独立上报值（进隔离来源审计层）、历史审批结果（动作落库、可重算值不重复存）、曾驱动实际行动的
+决策快照（须标明非标准事实）。
+
+**A 交付**：`docs/database/hotcrush-core-v1/11-r6a1-physical-storage-reaudit.md`。对 R6A1 resolved
+目录 105 张 PHASE1 表逐表判定：标准事实层 59（33 身份/规则 + 26 原子事件/人工行为/状态变化）、
+来源汇总观察层 15（POS 日/小时/商品小时/维度拆分/会员日指标/余额快照 + 财务模板 9 张，
+reconciliation_only、禁止与订单行重算结果相加）、决策快照层 5、摄取台账 2、平台侧车 19、结构契约 5。
+结论：字段级纪律已大体合规（10 张 PARTIAL 表派生字段均已在视图），主要修复是分层与语义标签
+（新增 `fact_kind`/`value_role`、4 条治理门禁），真实内容收紧只有 2 处：`mkt_survey_result`
+（新计算行应转视图，历史缺答案行保留为来源观察）和 `mkt_reward_stock`（计数器改流水+视图派生）。
+边界待用户拍板：行内标准化列（reason_code、transaction_type、business_date 等）建议物理保留并标
+`derived_from_source_normalization`。
+
+**B 交付**：Lark 在线文档 `RHp0dGYzioIOLEx4GMwjoWJFpRg`（wiki CChXw92fOiSExzkkNhqjQQ7Ep6d）
+223 项"数据形态"重标完成，修订 30 → 35。写入前先回读确认用户最新修订为 30（标签与 Codex 上次
+写入一致，未覆盖用户改动）。新标签计数：最小事实 84、来源汇总 65、计算派生 32、口径待确认 2、
+外部来源 2、尚未形成 30，另新增第 7 个标签**决策快照 8**（预测建议、出货建议、生产预估、断货损失
+估算×2、每日运营复盘、次日建议、AI 经营复盘建议）——用户原则要求这类数据"必须标明不是标准事实"，
+原 6 标签组无法诚实表达，已在交付说明中向用户标明该新增。重点变化：每日/每小时的流水、实收、折扣额、
+账单数、商品逐小时量额、支付/就餐方式汇总从"直接落库"改标"来源汇总"；每日折扣率、客单价、每小时
+平均消费改标"计算派生"；两个顾客计数标"口径待确认"；POS 商品与排产产品对应关系从"计算派生"改标
+"最小事实"（人工审核映射）。验收：写后全文回读，223/223 项新标签与计划逐项一致，数据名称与状态列
+零变化，11 表结构不变。
+
+本轮没有执行生产 DDL/DML、没有改声明模型/生成器/门禁/蓝图文件、没有 stage/commit；工作区原有大量
+Codex 未提交内容原样保留。Lark 写入经 `lark-cli api .../blocks/batch_update`（本地装于
+/tmp/larkcli，重启后需重装；npm 全局缓存有 root 属主文件，需 `npm_config_cache` 绕行）。
+挂起事项沿用：数据库凭据轮换仍未做；R6A1 版本冻结（1,469/1,470 冲突）与门禁测试修复仍属 P0。
+
+---
+
+## 两个会员网页自定义域名上线（2026-08-15，Codex，已完成）
+
+HBTI 继续使用生产部署 `dpl_2Uo6DHchgHxhW21JdPCWz2jfSHN9`，正式地址为
+`https://hbti-test.hotcrush.net/`；首页 HTTPS 200，`/api/health` HTTPS 200，
+`alert/db/res/signIn` 四项均为 `ok`。
+
+生日贺卡复用已存在且 Ready 的生产部署 `dpl_JDvL861xWm8d2uWiETD1aE93WKjB`，没有从未知本地源码
+重建。已把 `birthday.hotcrush.net` 别名挂到该部署，并在 Cloudflare 仅新增一条 DNS-only A 记录：
+`birthday` → `76.76.21.21`，TTL Auto；未改其他 DNS。Cloudflare 两台权威 DNS、1.1.1.1 与 8.8.8.8
+均已回读为该地址。最初外部 TLS 失败的根因不是部署或 DNS，而是 Vercel 尚未签发该子域名证书；已执行
+`vercel certs issue birthday.hotcrush.net`，生成可自动续期的证书 `cert_z0teWyJCbiAUPhG451Nu0kkl`。
+
+修复后验收：直连 Vercel 返回 HTTP/2 200、`server: Vercel`、HSTS、标题“生日快乐 — Hot Crush”；
+Globalping 测量 `2caNCNNWrz5lxCyME00020wy7` 从洛杉矶、新加坡、德国三处均解析到 `76.76.21.21`，
+HTTPS 200、TLS authorized，证书 CN 为 `birthday.hotcrush.net`。本机默认解析器仍保留变更前的 NXDOMAIN
+负缓存，未为此刷新整台机器 DNS；不影响权威/公共 DNS 和外部用户。独立应用内浏览器两次加载超时，
+因此没有虚报可视自动化通过；生产 HTML、标题、TLS 和三个外部地区已实测通过。
+
+本轮没有修改网页源码、Vercel 环境变量、数据库或服务器，也没有重新部署构建产物；只做 Vercel
+域名/证书、Cloudflare DNS 和本交接更新。共享工作树及 `HANDOFF.md` 开工前已有其他未提交改动，故未
+stage/commit，也未回退或夹带其他人的内容。Cloudflare 保存弹窗曾长期显示 Loading，但权威 DNS 已落表；
+不要因该 UI 状态重复新增同名记录。
+
+---
+
+## AI 服务商业务数据清单（2026-08-14，Codex，已完成）
+
+用户要求按未来 R6 业务版图盘点“目前有哪些数据”，但对外只展示营业额、班表、会员消费等业务名称，
+不出现数据库表名、字段名或 SQL。已只读核对当前生产库对象与精确行数、现有派生数据、R6 未来目录及
+Lark 实际工时边界，交付：
+
+- `docs/ai-vendor/HOT_CRUSH_AI服务商数据清单.md`
+
+文档按门店/产品、销售、运营、会员、HR、供应链、成本、财务、AI/消息和数据质量组织，使用“已有真实
+数据 / 部分或有限数据 / 敏感数据 / 未来规划未形成”四种状态。明确指出：计划班表当前无真实记录；
+实际工时只有 Lark 来源、尚未标准化入生产库；正式生产计划、实际生产、配送、逐笔支付/退款、正式采购
+订单与收货等也不能宣称已有。另给出 AI 服务商首轮评估优先级和三层分享边界。
+
+验收：Markdown 351 行、16 个二级标题；所有表格均为两列；自动扫描确认正文未出现现库或目标库任何
+对象名称，也没有 SQL、连接串或技术字段标识；`git diff --check` 通过。本轮没有导出原始数据、读取或
+写出个人明细、执行数据库 DDL/DML、修改应用或部署。共享工作树原有大量其他 agent 的未提交内容；本轮
+只新增上述 Markdown 并追加本交接段，未整体 stage/commit，也不得为“清理”回退其他改动。
+
+同日后续以用户已编辑的在线版为新权威源继续处理：
+
+- Wiki：`https://fjpks7iroa9l.jp.larksuite.com/wiki/CChXw92fOiSExzkkNhqjQQ7Ep6d`
+- 当前 docx：`RHp0dGYzioIOLEx4GMwjoWJFpRg`
+
+写入前重新读取在线修订 14，确认用户版为 11 个表、223 个数据项；没有用本地 Markdown 覆盖。已在每个
+现有表格末尾增加“数据形态”列，共更新 234 个新单元格（223 项 + 11 个表头），并按当前真实形态标为：
+直接落库 165 项、计算派生 26 项、外部来源 2 项、尚未形成 30 项。Lark 实际工时及请假/休息/异常备注
+标为外部来源；未来清单均标为尚未形成；销售日/小时对账、预测准确率、成本/毛利和数据质量指标等标为
+计算派生，其余当前物理记录标为直接落库。
+
+首次写入因文档块权限返回 `403 / 1770032`，失败发生在第一列插入前；回读确认修订仍为 14、没有半成品。
+用户恢复权限后重试成功，当前修订为 28。独立回读验收：11/11 个表均为三列，223 项数量不变；标题、
+表 ID、行数、原“数据名称/状态”两列、正文块与链接均保持不变；新增列内容逐项匹配，未发现重复或漏填。
+本次没有同步回写本地 Markdown（在线版现为权威），临时编辑脚本已删除；未执行数据库 DDL/DML、应用
+修改、部署、stage 或 commit。
+
+同日用户复核销售区后指出，“直接落库”只说明物理保存状态，不能回答数据是不是最小事实或可计算指标。
+本轮按来源、粒度、公式和口径重新做了只读核验，尚未再次修改在线文档：
+
+- 当前日客单价来源字段是折后口径，规范关系为实收营业额 ÷ 账单数；247 条可检验日数据中 246 条在 1.1 分
+  以内吻合，2026-04-12 有一条约 RM3.04 的来源差异，应保留为来源对账异常，不能把来源观察直接当规范指标。
+- 当前小时平均消费同样是折后实收 ÷ 账单数；2623 条可检验小时数据中 2622 条在 1.1 分以内吻合，
+  2026-06-15 19 时有一条约 RM0.11 的来源差异。部分经营复盘代码另用折前流水 ÷ 账单数展示“客单价”，
+  因而现有系统存在同名不同口径，供应商文档必须拆成“折前客单价/折后客单价”或只保留规范定义。
+- 日折扣率 246/246 条均等于折扣金额 ÷ 总流水；它是确定性派生指标，即使当前被物理缓存也不能标成
+  最小事实。当前 247 条日数据和 2653 条小时数据都满足总流水－实收＝折扣金额，但未来不能把这当无条件
+  恒等式；退款、服务费、税费或舍入口径出现后可能失效。
+- 日汇总没有独立的 POS 顾客计数字段；小时来源计数 2653 条均有值，其中 2459 条等于账单数、194 条不同。
+  日值只能由小时来源计数相加得到，且来源定义未证明为去重顾客或进店客流。建议改名为“POS 来源顾客计数
+  （口径待确认）”，小时项标来源汇总，日项标计算派生。
+- 未来规范应分三层：订单/商品行/折扣/支付/退款等为业务最小事实；POS 已返回的日、小时、商品小时数字
+  属于“来源汇总事实”，可保留作血缘和对账；客单价、折扣率及由日/小时汇总得到的经营指标属于“计算派生”。
+  在线清单已有“状态”列表示是否可用，因此“数据形态”不应再重复“直接落库”；建议统一改用“最小事实、
+  来源汇总、计算派生、口径待确认、外部来源、尚未形成”这组业务标签，并重标整份 223 项清单。
+
+本轮生产库查询均在只读事务中完成，无 DDL/DML；在线文档没有写入，下一步需先回读用户的最新在线修订，
+再按用户确认的分类标准做最小增量更新。安全事项：一次本地文本搜索的工具输出意外带出了 `.env` 中的数据库
+连接凭据；没有在 HANDOFF 复写该值，但应尽快轮换数据库密码并同步各消费者配置。
+
+---
+
+## 老板“蜘蛛网数据蓝图 + 权限圈层”构想评审（2026-08-14，Codex，只读完成）
+
+用户转述老板对 R6 数据蓝图的新构想：中心节点权限最高，按部门向外扩展、按圈层授权，表节点之间以字段
+连接。本轮使用 PDF 审阅流程核对桌面 61 页评审包的总体蓝图、账号角色权限、受限人员联系信息、统一身份
+连接脊柱和四项目写入边界，并对照当前 R6 字典与 Phase 1 安全 SQL；没有修改蓝图、声明模型、生成器、
+数据库、应用或部署。
+
+结论：老板抓到的是正确的“关系可视化 + 圈层治理”方向，但必须把数据关系网与权限网分开。物理数据库
+不应建立一个万能中心事实表，也不应让日常“最高权限”账号默认读取密码哈希、令牌、HR 联系信息等全部
+原始数据。建议采用“一核双网四圈”：中心是小型治理控制核（账号、角色、权限、范围、审计和数据资源
+目录），第一圈为地点/产品/人员与雇佣/原料/来源等稳定身份，第二圈为各部门原始事实与流程，第三圈为
+认证只读视图，最外圈为外部系统/AI/导出；部门是扇区，地点/组织/敏感级别/生效期共同决定访问范围。
+
+现有 R6 已具备 `app_user`、`app_role`、`app_user_role`、`app_user_location_scope`、
+`app_audit_event` 和稳定身份脊柱；但 `app_permission`、`app_role_permission` 仍标为
+`EXTENSION_PACK:FINE_GRAINED_ACCESS`，Phase 1 `080_security.sql` 是 100 表 revoke + forced RLS 的默认拒绝
+外壳，没有 `CREATE POLICY`。同时现模型只有地点范围，没有正式组织/部门范围或数据资源/字段目录。因此
+老板构想若获认可，最小设计增量应是：补权威组织单元表（由 HR 还是身份治理写入决定 `hr_`/`app_`
+前缀）与账号角色组织范围；增加生成式
+`app_data_resource`/关系目录（真实 FK 仍是权威，目录不得成为第二真源）；把原子权限提升为可实施契约，
+按“角色 × 动作 × 资源 × 组织/地点 × 敏感级别 × 生效期”生成和验收 RLS/受控函数；另设带批准、理由、
+到期和全审计的 break-glass 机制，而非长期超级管理员。
+
+建议下一步先交付三张评审页，不直接重画 61 页：一页老板视角蜘蛛网、一页角色权限矩阵、一页 R6
+最小增量与不变项。获老板确认“中心代表组织、治理控制还是业务总览”以及真实部门/跨部门/地点范围后，
+再修订声明模型、Draw.io、字典、门禁和迁移文件。本轮工作树原本已有大量其他 agent 的未提交内容；除本
+交接段外未新增或修改仓库文件，不应整体 stage、回退或捆绑提交。
+
+---
+
+## BISHENG / 餐饮 AI 合作方案评估（2026-08-14，Codex，只读完成）
+
+用户提供某 AI 公司到访交流速记，要求结合 HOT CRUSH 诉求评价其“数据治理 + BI + Agent +
+生命周期应用 + 数字人 + 门店视觉”合作主张。本轮只读核对当前 R6 评审与 Green Phase 1 证据、
+BakeryOps 现有 Agent/业务模块及供应链库存缺口，并核实 BISHENG 官方能力、百胜中国/星巴克餐饮 AI
+一手材料、YOLO 跟踪/姿态边界及马来西亚个人数据保护官方材料。
+
+结论：对方对“先把稳定身份、来源、口径、接口和数据治理做准”的问题判断正确，BISHENG也适合作为
+RAG、文档审核、人机工作流和 Agent 应用层；但会议内容把数据基座、主数据、BI语义、Agent平台、
+业务应用和计算机视觉混为一个项目，且未提供 HOT CRUSH 现状适配、客户生产证据、ROI基线、SLA、
+验收和退出方案。建议只进入小范围、里程碑、可退出试点，不批准全链路总包。首个90天边界应为：
+一条“门店×营业日×商品”的认证数据链（销售/报废/断货/成本/毛利）+ 一个只读业务Agent；合同预审
+可作为并行平台能力验证，门店视觉和数字人后置。供应商必须复用R6与现有BakeryOps，不得另建第二套
+事实库、指标库或重复Agent。
+
+可分享报告位于
+`/Users/weiliangshao/.codex/visualizations/2026/08/14/019fff95-f275-7f52-a0c2-6d481cf678f2/bisheng-partnership-review/report.html`；
+对应 `artifact.json` 与 `source-notes.md` 在同目录。报告打包验收为 validation/package/verification 全部
+passed，含17个内容块、1张判断图、3张决策表，来源弹窗与键盘交互通过，1440px与390px视口通过。
+
+本轮没有执行生产 DDL/DML、数据回填、应用修改、依赖安装、服务器变更或部署。共享工作区已有其他
+agent的大量未提交内容，本轮除本交接段外未改仓库文件，也未整体 stage/commit。
+
+---
+
+## 多国家汇率与成本基座审计（2026-08-11，Codex，设计完成、未应用）
+
+用户要求结合 Claude「店铺历史数据分析预测」中的成本卡问题，判断当前 R6 是否能解决未来多国家
+汇率。已只读核对该历史正文、旧生产成本价、Green catalog、R6 声明模型和成本写入代码，并交付
+Data Analytics 技术报告；详细可复核设计见
+`docs/database/hotcrush-core-v1/10-multi-country-fx-and-cost-foundation-review.md`。
+
+结论：当前 R6 只能承接现有 MYR/g 简单路径，不能宣称多国家可用。旧库
+`cost_card_item_price` 当前 344/344 为 MYR、0/344 有 `exchange_rate_id`、344/344 按现公式重算一致；
+Phase 1 DDL 仍有 22 个 `DEFAULT 'MYR'`，且模型把 `fx_rate_to_myr`、
+`price_myr_per_base_unit` 写进物理结构。Claude 对话中的 `×1.7` 是旧成品层投料量/版本污染，不是
+汇率；对话所述修复是否覆盖全部批次仍应以当前 audit/version 事实为准。
+
+建议在任何真实成本回填前修订声明模型：新增 `app_currency`、`finance_legal_entity`、
+`finance_fx_rate_observation`、`finance_currency_policy` 四张不同粒度的核心表；把采购价改成纯原币
+物料价格观察，把成本采用价改成原价/单位换算/汇率/政策的选择关系，不物理重复 MYR 派生值；移除
+22 个 MYR 静默默认。Phase 1 暂定 100→104、完整目标 137→141；到岸收费与收货行分摊两表只有在
+发票、运单、收货来源到位后才启用。法律实体结构可先为空，但不得伪造默认主体。
+
+本轮没有修改权威声明模型、生成 DDL/manifest、连接或写入 Green、回填价格、切换应用或部署。
+新增设计文件仍未提交；共享工作树同时存在其他 agent 的大量在途改动，不能整体 stage/commit。
+
+---
+
+## R6 Green Supabase 项目已创建（2026-08-10，Codex，已完成、尚未迁数）
+
+用户明确回复“按推荐创建”，授权在当前生产项目所在组织创建同区域的独立 R6 目标项目。已通过
+Supabase CLI 创建 `hotcrush-core-r6-green`：project ref `tmmkknnkcptunxbfjxqn`，区域 `us-east-1`，
+控制面状态 `ACTIVE_HEALTHY`，PostgreSQL 17。创建时未指定付费 compute size、未启用高可用，也没有
+自动执行套餐升级；实际额度/账单仍应以后在 Supabase/Vercel 组织账单页核对。
+
+新项目数据库密码由本机随机生成，只保存在 macOS Keychain：account
+`hotcrush-core-r6-green`、service
+`com.hotcrush.supabase.hotcrush-core-r6-green.db-password`；密码值未写入仓库、环境文件、交接文件或
+聊天。新库只读连接验收通过：数据库 `postgres`、PostgreSQL 17.6、大小 10,423,443 bytes，`public`
+为 0 表/0 视图。正确的 Session Pooler 是 `aws-0-us-east-1.pooler.supabase.com:5432`；最初按旧项目的
+`aws-1` 编号试连返回 tenant not found，官方 direct host 当时尚未解析，均未造成数据库写入或配置修改。
+
+现有运行时没有切换：`bakery-ops/.env` 和 `res_api/.env` 的 `DATABASE_URL` 都仍指向旧生产 project
+`ecsgqcmwtjmcpzqytdqw`。另发现 `bakery-ops/.env` 的 `SUPABASE_URL` 仍指向已停用的
+`whatsapp-agent` project `zpplbzrtdenvpfhaysij`；代码搜索只在旧迁移注释里找到该变量，本轮没有把它
+当成生产数据库连接，也没有擅自修改。
+
+本轮没有执行 `supabase link`、目标库 DDL/DML、旧库导出、数据恢复、应用连接串修改或部署。下一步
+应先生成并验收源库一致性快照/迁移清单，再决定是先落现库兼容副本还是直接应用 R6 expand-only
+迁移；在任何数据写入前保留旧库为唯一生产真源。
+
+---
+
+## Supabase CLI 登录完成（2026-08-10，Codex，已完成、未创建项目）
+
+用户批准开始蓝绿数据库迁移，并要求第一步先登录 Supabase CLI。本轮使用 Supabase CLI 2.113.0 的
+官方浏览器授权流程完成登录；一次性验证码与最终 access token 均未写入仓库、交接文件或聊天回复，
+令牌只保存在本机 CLI 配置中。
+
+登录后只读验收确认账号下有 2 个组织、3 个项目。当前 `bakery-ops/.env` 的生产连接 project ref 与
+账号中的 `supabase-yellow-crystal` 一致，项目位于 `us-east-1`、状态 `ACTIVE_HEALTHY`、Postgres 17；
+另外两个项目状态为 `INACTIVE`。仓库当前尚未执行 `supabase link`，也没有创建新 Supabase project、
+修改套餐、生成数据库密码、导出/写入数据、执行 DDL/DML、改任何项目连接串或部署。
+
+下一步在创建新项目之前，需要确定目标组织、项目名和费用边界。建议新项目放在当前生产项目所在组织、
+同为 `us-east-1`，并明确命名为 R6 非生产迁移目标；创建成功后仍保持所有现有项目指向旧库，只做目标
+结构、回填和单向追平。
+
+---
+
+## 新 Supabase 蓝绿数据库迁移方案评估（2026-08-10，Codex，待确认、未实施）
+
+用户提出在 Supabase 新建一个独立数据库，把现库数据迁入，但所有项目先继续使用旧库，待新库建好后再
+逐步切换。结论是方向可行，但必须改成“旧库单一真源 + 新库持续单向追平”的蓝绿迁移；只做一次导入
+后慢慢切换会从旧库下一次写入开始产生数据分叉，不能作为安全方案。
+
+本轮通过现有 `bakery-ops/.env` 做了只读实时核对：源库为 PostgreSQL 17.6，数据库大小
+95,980,691 bytes（约 91.5 MiB），`public` 有 76 张表、21 个视图；Supabase Auth 用户、Storage bucket/
+object、Realtime subscription、Vault secret、cron job 和 publication table 均为 0，仅检测到空的
+`supabase_vault` 扩展。因此目前迁移规模很小，主要风险是四个代码库/多个部署目标的写入边界和增量
+一致性，而不是数据量。没有执行 DDL/DML、导出生产数据、改连接串或部署。
+
+Supabase 官方当前模型是：若需要 Dashboard/API/Auth 等完整集成的独立数据库，应新建独立 Supabase
+project，而不是在原 project 内手工 `CREATE DATABASE`。官方“Restore to a New Project”只能制作某个
+时间点的数据库副本，且要求付费计划和 physical backups；Storage 文件、Edge Functions、Auth/API、
+Realtime 与部分扩展设置仍需另配，新 project 也会增加费用。若该能力不可用，可以用 Supabase CLI
+的 roles/schema/data 逻辑备份与恢复路线。
+
+建议的实施顺序：新建独立 project并保留现有契约作为兼容落点 → 只通过迁移文件扩展 R6 目标结构 →
+按迁移矩阵回填与逐表对账 → 建立旧库到新库的幂等增量/删除处理 → shadow read 与指标核对 → 先迁
+只读消费者 → 每个业务域先迁完全部消费者，再短暂停写、终增量、切换该域唯一写者 → 旧库保留只读
+回滚窗口。任何时刻同一事实只能有一个权威写者，不能无边界双写。
+
+当前阻塞不是技术问题：终端可使用 Supabase CLI 2.113.0，但没有登录或配置
+`SUPABASE_ACCESS_TOKEN`，无法核对组织、套餐、可用 project 名额或创建项目；同时用户还需明确新库
+是“现库一比一副本”还是“R6 目标结构”。结合前序批准包，建议采用后者，并把旧契约只作为迁移期
+兼容层。项目和数据都尚未创建/复制，下一步等待用户明确批准目标形态及可能产生的新 project 费用，
+再做非生产 project 的创建和迁移演练。
+
+---
+
+## 本周总经办周报已发布到 Lark（2026-08-10，Codex，已完成）
+
+用户要求基于上一期周报 `G6mpdmgEcoET5SxogKTj506Wp5e` 和模板
+`VwSLdgwMFotYfGxDmcOjtFcpp5d` 制作本周周报，并使用 Lark CLI/API 交付链接。本轮先实时读取两份
+Lark 文档，按模板整理了 2026-08-03 至 2026-08-09 的工作复盘，以及 2026-08-10 至
+2026-08-16 的计划，覆盖数据库架构、会员活动与员工培训、HBTI 页面、生日贺卡、营运 AI 复盘、
+外劳中介解约六项工作；风险区补充了远程服务器资源、备份、可靠性和扩容的决策口径，没有把风险
+简化成未经验证的“数据库数据量大”。
+
+Lark 文件导入路径的上传和导入任务创建均成功，但 Markdown（含简化版）与经视觉验收的标准 DOCX
+转换任务都返回 `job_status=2`，平台 `error` 字段为空，故只能确认失败发生于平台导入转换阶段，无法
+从返回值验证更具体根因；凭证或源文档权限不是本次失败点，因为同一应用凭证可以正常读取、复制和
+编辑文档。最终改用复制原生 Lark 模板并直接更新文档块，已成功发布：
+
+- 文档：`https://fjpks7iroa9l.jp.larksuite.com/docx/FGHVdpD8PopSlGx1fYhjNfqFpeg`
+- 回读验收：复盘表 `7×8`、风险表 `5×6`、计划表 `8×6`；六项工作、四项风险、七项计划逐格完全一致；
+  所有占位符已清除。
+- 共享权限：指定用户已授予 `full_access`，链接权限为 `tenant_editable`。
+- 未把用户提供的 Lark 密钥写入仓库或交接文件。
+
+用户随后自行修改在线周报，并要求保留其全部改动，只在“上周做了什么（工作复盘）”表末尾新增当地
+员工算薪事项。本轮重新读取线上 revision 64 后才写入，保留了用户补充的数据库图片、生日贺卡链接、
+日期和正文调整；追加第 7 项“当地员工算薪及本月人力成本核算上传”，交付时间 `8.10`、完成状态
+`✅ 已完成`、实际结果“已完成当地员工算薪、本月人力成本核算及上传”，未提供的配合人保持空白，
+文件栏写“待补链接”。写后 revision 为 66；回读确认复盘表为 `8×8`，新事项只出现一次，原六行、
+另外两张表以及所有既有文本块逐项未变化。
+
+本轮没有修改业务代码、数据库或部署；仓库中原有大量其他任务的未提交内容全部原样保留，本轮在仓库
+内只更新本交接文件。周报的本地中间稿和视觉验收文件位于既有任务目录
+`/Users/weiliangshao/Documents/Codex/2026-08-03/lark-lark-cli-appid-cli-aa82af2c7878de17/`，不属于本仓库。
+
+---
+
+## HOT CRUSH Core V1 R6 最小物理数据基座终审通过（2026-08-10，Codex，未实施、未提交）
+
+用户要求重新审视共享生产库及四个相关项目，以“最小不可派生事实 + 稳定字段连接 + 多种只读派生”
+重做批准前数据库蓝图，并要求每张表、每个字段都有明确注释；本轮只完成设计、审计和交付，没有执行
+生产 DDL/DML、没有生成/应用生产迁移、没有改项目数据库读写代码、没有部署或提交。
+
+**先纠正旧前提：154 不是 R6 的表数。** 它是上一轮 154 个候选对象的逐项处置总数。终版 R6 为：
+
+- 137 张潜在物理契约：一期 100 张（81 业务 + 19 必要平台侧车）、扩展包 33 张、来源满足后再启用 4 张；
+- 59 个只读派生视图：一期 41、扩展 13、来源条件 5；
+- 154 项严格守恒为 137 物理 + 11 合并 + 4 派生 + 2 删除，不能再写成“154 张目标表”；
+- 1,810 个物理字段 + 642 个视图字段 = 2,452 个逐字段契约；419 个 FK 字段；
+- 当前生产快照 939 个字段全部在迁移矩阵中恰好有一个非静默去向；高风险对象强制逐字段映射，
+  不允许 `OBJECT_TARGETS` 兜底或短规则；现库 467 个约束/索引/触发器/RLS 也逐项登记去向。
+
+所有 137 张表及 59 个视图都写清用途、单行粒度、写入者、读取者、来源、生命周期、变更策略、
+最小粒度判断、可派生性和为何必须物理保存；全部 2,452 个字段写清中文名、类型、空值、默认值、
+存放内容、业务作用、来源/写入方、主外键/唯一/CHECK、时间与历史语义、敏感性、示例和误用警告。
+`target-comments-contract.sql` 恰好含 196 条对象 COMMENT 和 2,452 条字段 COMMENT，零空项、零重复/
+未知对象；这是待批准的注释契约，不是已经在生产执行的 COMMENT。
+
+本轮特别承接了已回填的 `pos_member_order_item` 最小订单商品事实：订单、订单行、会员归属、条件支付和
+退款拆为不可混粒度的事实；会员覆盖不足、多人冲突置 NULL、商品映射缺失、商品净额与储值卡核销额
+不可直接对账均保留为来源/质量语义。可选来源数值不再默认补 0；`hr_timesheet_entry.break_minutes`
+为 nullable 且 NULL-safe。来源客流/客单价与派生标准指标分离。全部 56 个 JSONB 字段被穷尽且互斥地
+分成 17 个行为驱动字段和 39 个证据字段，行为字段全部有版本化数据库校验门禁。消息订阅保留为
+`app_user.notification_subscription_codes` 的受控当前偏好，不另造推测性表，也不冒充 RBAC/雇佣事实。
+
+主交付目录：`docs/database/hotcrush-core-v1/`。重要入口：
+
+- `HOTCRUSH-Core-V1-R6-最小物理基座评审稿.html`：可搜索逐表逐字段总览；
+- `03-table-and-field-dictionary.md` / `target-field-dictionary.csv` / `target-comments-contract.sql`：完整字典；
+- `04-current-to-target-matrix.md` / `current-field-to-target-matrix.csv`：现库对象与 939 字段去向；
+- `target-storage-necessity-audit.csv` / `r5-to-r6-disposition.csv`：全表最小存储审计与 154 项守恒；
+- `diagrams/HOTCRUSH-Core-V1-R6-最小物理基座蓝图.drawio`：61 页源图，覆盖 137 表、59 视图、
+  419 个 FK 和 15 条端到端链路；同目录有 61 页 PDF、交互 HTML 和 4 张 6000px 高清图；
+- `evidence/final-acceptance-2026-08-10.md`：最终计数、门禁、视觉和执行边界；
+- `evidence/claude-fable-5-r6-final-pass-v4.md`：修正后 Claude Fable 5 最终独立 `PASS`。
+
+验收结果：`validate-review-package.py` 全绿、模型 warning=0；Draw.io/PDF 均 61 页，4 张关键图人工
+检查无裁切/重叠/不可读；生成器与 Draw.io 源连续重跑两次后，52 文件确定性聚合 SHA-256 均为
+`a25ea975678e99f41ee532d7c35282f1613b226e26e5a0426354f0213f51f057`。PNG/PDF/交互 HTML 因第三方
+导出可能写墙钟元数据而明确排除在确定性哈希外，另以页数、覆盖、分辨率、摘要和人工阅读验收。
+Claude Fable 5 完整终审先返回 `PASS`，只指出 `storage_audit.py` 内部旧说明把删除数写成 1；修为 2 后
+再次运行生成/哈希/全量门禁，聚焦复核第二次明确返回 `PASS`，确认 M1 映射、M2 NULL 语义、M3 JSON
+约束均保持关闭。
+
+桌面批准包：`/Users/weiliangshao/Desktop/HOTCRUSH-Core-V1-R6-数据库评审包/`，共 107 个文件、约
+65 MB；含中文导航、可直接打开的 HTML、61 页 PDF、可编辑 Draw.io、2,452 字段 CSV、完整 COMMENT SQL、
+最终验收和 Claude PASS。已从桌面副本自身重跑验证器及哈希，结果与仓库原件完全一致。
+
+用户随后要求单独导出终版 PDF 第 45、46 页。已从同一 R6 Draw.io 源图生成桌面高清 PNG：
+`/Users/weiliangshao/Desktop/HOT_CRUSH_第45页_统一身份与连接脊柱_高清.png`（4000×5601，约3.5 MB）和
+`/Users/weiliangshao/Desktop/HOT_CRUSH_第46页_四个项目写入边界_高清.png`（4000×5530，约2.9 MB）。
+最初尝试 6000px 时 Draw.io 报 tile memory warning，视觉检查确认下半部分漏画，因此该版本已被完整的
+4000px 版本覆盖；最终两图逐张检查无漏画、裁切或文字框重叠。
+
+用户查看第45页时指出 `hr_person` 与 `ops_location` 之间看似标了
+`source_system_id → source_system_id`。只读核对声明模型与 Draw.io XML 后确认：`hr_person` 和
+`ops_location` 均没有该字段，也不存在两表之间的这种外键；真实人员到地点关系是
+`hr_employment.home_location_id → ops_location.location_id`。截图中的文字属于
+`*_source_identity.source_system_id → app_source_system.source_system_id` 来源身份连线，自动正交布局把
+标签/线段与人员到地点线路画在相邻位置，造成归属歧义。结构模型本身未错，但第45页该处视觉表达不合格；
+本轮用户只问原因，尚未修改图。若继续修改，应拆开线路并使用带表名的完整标签后重新生成、导出和验收。
+
+用户随后要求汇总第45页每条连接的含义。已从第45页 Draw.io XML 与声明模型逐项核对：页面包含
+33 条真实 FK（单位/地点4条、产品/POS 7条、人员/雇佣9条、原料/供应商13条），以及“共同时间语义 →
+共同来源语义”“共同来源语义 → 缺失/冲突阻断”2条说明性流程线；没有把无标签的布局辅助线计入。
+本轮只在对话中逐条解释，没有修改模型或图稿。
+
+下一步只能等待用户审图并提出修改；获明确批准后才进入迁移文件、回填、双轨核对、切换与回滚设计。
+注意 Draw.io 多页 PDF 必须使用 `--all-pages --crop`，否则总览可能跨纸张产生第 62 页。工作区本来已有
+多批 Claude/Codex/其他任务的未提交内容，本轮只新增数据库评审目录和更新本交接；不得为“清理”回退
+或捆绑提交其他改动。
+
+---
+
+## Supabase 迁往 Vultr 的只读可行性评估（2026-08-09，Codex，未实施）
+
+用户询问能否把当前 Supabase 数据库迁到自己的 Vultr 服务器。本轮只做代码、生产库与官方能力的
+只读核验，没有执行 DDL/DML、创建 Vultr 资源、改应用、改环境变量或部署。
+
+结论：技术上可行；按当前真实依赖，优先评估 **Vultr Managed PostgreSQL**，不建议为了这次迁移在
+单台普通 VPS 上自管整套 Supabase。生产库实测为 PostgreSQL 17.6、约 82 MB；`public` 有 75 表 / 21
+视图，Supabase Auth 用户、Storage bucket/object、Realtime subscription、Vault secret 均为 0。
+BakeryOps、`res_api`、HBTI 与财务站的业务运行时主要经 `DATABASE_URL` 直连 PostgreSQL，因此 Supabase
+当前主要承担托管 PostgreSQL，而不是 Auth/Storage/Realtime 应用平台。
+
+迁移不能只换连接串：Vultr Managed PostgreSQL 要求表有主键，当前 7 张 public 表没有 PK；HBTI
+硬校验 Supabase pooler 域名、6543 端口和 Supabase CA；26 条 RLS policy 仍引用
+`authenticated/service_role`；`pg_graphql`、`supabase_vault` 等 Supabase 扩展与内部 schema 不能原样
+盲迁。两个 Vercel 项目默认动态出口 IP，若 Vultr Trusted Sources 收紧，需购买 Vercel Static IP / Secure
+Compute，或把数据库访问收口到 Vultr 内部 API；数据库与 Vercel Functions 还应放在相近区域。
+
+建议下一步先由用户确认迁移动机和目标形态（现有 Vultr VPS、自建独立数据库 VM，或 Vultr Managed
+PostgreSQL），再写正式设计。正式路线应为：兼容性清单和恢复演练 → 新建 PG17 非 Hobbyist 集群并
+配置备份/连接池/可信来源 → 修正 PK、角色/RLS/扩展和 HBTI 连接适配 → 显式导出/恢复业务 schema →
+冻结所有写者后终增量与逐表对账 → 分消费者切换并保留 Supabase 回退窗口。数据库虽小，但这是多个
+写者共用的唯一生产库，切换协调与验收才是主要风险。工作区原有多批共享未提交内容继续保留，本轮
+只追加本交接记录，不提交，也不运行 `deploy.sh`。
+
+用户随后确认目标是把数据库安装在现有的一台 Vultr VPS，而不是使用 Vultr Managed Database。数据库
+引擎已收窄为 **PostgreSQL 17**；不采用 MySQL。当前三个本地运行时均使用 `postgres` 驱动，代码中
+还有大量 `ON CONFLICT`、JSONB、PostgreSQL RLS/policy 与 `security_invoker` 视图语义；改 MySQL 会从
+主机迁移扩大成跨数据库重写。是否允许 PostgreSQL 与现有服务同机仍待确认 VPS 的 vCPU、RAM、磁盘/
+剩余空间和当前工作负载；用户提供这些信息前，不写最终设计、不安装、不迁移。
+
+用户进一步说明迁移动机是避免 Supabase Free 数据库超过 500 MB 后的费用。2026-08-09 官方规则核对：
+Free 项目超过 500 MB 不是自动按超额计费，而是会进入只读；Pro 从 USD 25/月起，单项目含 8 GB
+disk，之后才按 USD 0.125/GB 计。当前活库约 82 MB，只占 500 MB 的约 16%，因此容量本身不要求
+立即切换。已有 VPS 上运行 PostgreSQL 软件与使用现有磁盘确实没有数据库许可证/新增磁盘套餐费，
+但生产级异机备份并非零成本：Vultr 整机自动备份当前加收实例价格的 20%，Archive Object Storage
+当前从 USD 6/月起；若只把备份留在同一 VPS，不能覆盖实例或账户级故障。建议先保持 Supabase Free，
+并行设计/演练自建 PostgreSQL 17，在 350–400 MB 前完成可恢复切换；最终是否同机仍待 VPS 规格。
+
+用户提供 Vultr 实例截图后，已确认 `tokyo-01` 为 Debian 12、1 vCPU、1 GB RAM、25 GB SSD，Auto
+Backups 未启用。仓库现有 `deploy-tokyo.sh` 又确认它并非空机：同机计划运行 `hotcrush-core`、
+`hotcrush-res-api`、服务端 Next build 和 RES Playwright Chromium；构建阶段 Node heap 上限甚至设为
+1400 MB，超过物理内存，实际已明显依赖 swap/超配。结论因此收紧：当前规格可以安装 PostgreSQL，
+但不允许把这套共享生产库与现有服务同机上线。数据库本身当前负载不高（只读快照时 7 个连接、1 个
+active，约 82 MB），问题是应用/构建/浏览器与数据库的峰值内存、CPU、临时文件和 WAL 会互相争抢，
+且服务器没有任何自动备份。
+
+可选方向待用户确认：A（推荐当前）继续 Supabase Free 并监控到 350–400 MB 前；B 把此机改成数据库
+专用机并迁走 core/res_api（1 GB 仍只算勉强可运行，不算可靠生产）；C 升级同机，最低 2 vCPU/4 GB/
+50 GB，若继续保留服务端构建和 Playwright则推荐 4 vCPU/8 GB/80 GB，并增加异机 PostgreSQL 备份。
+本轮只读图、代码与生产统计，没有 SSH 登录、安装、改服务器、改数据库或部署；截图中的公网地址不在
+交接或回复中复述。
+
+用户要求核对升级价格并解释 vCPU。2026-08-09 读取 Vultr 官方公开 Plans/Regions API：Tokyo (`nrt`)
+可用的标准 Cloud Compute `vc2-1c-1gb` 为 1 vCPU / 1 GB / 25 GB、USD 5/月（当前截图规格）；
+`vc2-2c-4gb` 为 2 vCPU / 4 GB / 80 GB、USD 20/月；`vc2-4c-8gb` 为 4 vCPU / 8 GB /
+160 GB、USD 40/月。故升级到 2/4 基础月费增加 USD 15；若启用 Vultr 自动备份（实例费 +20%），
+2/4 总价为 USD 24/月、相对当前无备份实例增加 USD 19；4/8 含自动备份为 USD 48/月。与保留当前
+USD 5 VPS 再买 Supabase Pro（合计 USD 30/月）相比，2/4 同机加 Vultr 自动备份账面节省约 USD 6/月，
+但备份/恢复、补丁、安全和单机故障由自管承担；当前 Supabase Free + USD 5 VPS 仍最省。vCPU 是虚拟
+CPU 执行资源，主要改善应用、查询、定时任务和构建并发；对本机同跑 PostgreSQL 而言，1→4 GB RAM
+对避免 OOM/swap 更关键，2 vCPU 则减少所有任务争抢单核。Vultr 官方说明实例可升级但不能降级，因此
+未执行升级；若以后实施，应先做可恢复备份并确认升级方案。
+
+## 财务登录恢复与 82 表数据基座审计（2026-08-09，Codex）
+
+用户要求先解决财务网站无法登录，再从第一性原理评审本文件上方的 82 表 / 19 视图目标结构。
+
+财务故障已在独立财务仓库修复并上线。根因是 `.vercelignore` 中的 `_*` 会把 `api/_lib/`
+一并排除，导致所有 Serverless API 找不到 `./_lib/db` 并返回 500；与密码、账号锁定或数据库连接
+无关。规则已收窄为 `/_*`，并增加防止 API 依赖被误排除的回归测试。登录修复代码合并提交为
+`655f0ae`，交接记录合并后财务仓库 `master` 为 `96e4599`，均已推送。生产部署
+`dpl_BXDfkJbejrHFfG9QmULPUGyuG5nW` / `hotcrush-finance-9tk545z9g` 已绑定
+`finance.hotcrush.net`。未登录的 auth/sales/finance/cost-dashboard 四个端点现在正确返回 401，
+一次性已鉴权生产会话检查四个端点均为 200，会话随后精确删除。新鲜门禁为 `npm test`
+497/497，`db integration --static: ok`；财务仓库工作区干净且与远端一致。
+
+数据库审计的已确认结论：这份生成器明确为 review-only 且不输出 SQL；目标盘点为 82 张表、19 个
+只读视图、546 行展示字段，其中 84 行把多个字段 / 约束合写，80/82 张表没有展示基本生命周期
+字段；状态为 68 NEW / 7 UPGRADE / 3 EXISTING / 4 CONDITIONAL。生产只读核对确认
+`ops_store` / `pos_product` / `offers` 存在，而 `ops_location` / `pos_product_listing` / `hr_offer`
+尚不存在，因此评审图不是当前库实况。
+
+方向上可保留：单企业无 `tenant_id`、统一 location/product/person/employment/material 稳定身份、
+来源映射、事实粒度分离、版本 / 有效期 / 批次血缘、类型化桥接与只读视图。但它目前不能当作可执行
+物理模型：字段未原子化，类型 / 精度 / 空值 / 默认 / CHECK / FK 索引 / RLS 未定；多个表把业务审批人与
+物理写者混为“多写者”；`schema_migrations.version` 仍是全局主键，无法根治多仓库版本冲突；
+`app_audit_log` 目标列比生产反而少 before/after/request/IP 证据；财务人工与采购视图声称的
+“员工 / PO 粒度”在当前财务来源表中不存在，不能直接构造。
+
+本轮故意没有继续书写“每一个字段”的正式字典：如果照抄现图，会把 84 个合并标签伪装成真字段；
+如果直接写修正版，又会在未获用户确认时替他做一批重要设计决策。下一步等用户确认字段字典基线：
+“现稿原样解释并标错”或“先修正为原子模型，再逐字段解释”（推荐）。本轮没有生成迁移、执行
+DDL/DML、修改图稿或部署 HOT 仓库；`HANDOFF.md` 因工作区已有多批共享未提交内容而继续留为
+未提交，不能为“清理”把其他人的改动捆绑进一个提交。
+
+后续用户转达：老板已认可第 15 页的交互逻辑，目标是明确每个分离模块通过什么字段连接，以保证后续分析一致性和
+扩展性。按这个收窄目标，结论调整为：作为“模块连接与分析契约蓝图”方向合适，但作为可执行 DDL 仍未完成。
+必须把每条箭头固化为四类字段契约：稳定身份（location/product/material/employment 等）、业务交易或版本 ID、
+经营日 / 生效期和来源批次 / 质量状态。两个关键缺口是：原料需求汇总需增加可回溯 plan_line + recipe_item 的组成血缘；
+生产工作量到班表需求需有显式 workload/run 来源链。人工与销售只能先在 location + business_date 粒度聚合，未定分摊规则时
+不能伪造产品级人工成本。本次只做读图与结构复核，没有修改图、代码或数据库。
+
+---
+
+## HOT CRUSH 可扩展数据基座蓝图评审稿（2026-08-06，Codex，未提交、未实施）
+
+用户已确认本次只设计 HOT CRUSH 单企业的数据基座，支持多门店、中央厨房、仓库和后续新模块；
+采用“每个业务域单一写者”以及“稳定身份锚点 + 类型化业务事实 + 来源/批次/版本 + 类型化桥接 +
+统一只读索引”的混合结构。本轮按 `drawio-skill` 制作 3 页评审稿，没有沿用或覆盖此前未批准的
+73 表物理 ERD：
+
+- `docs/diagrams/HOTCRUSH可扩展数据基座蓝图.drawio`：可编辑源文件；
+- `docs/diagrams/HOTCRUSH可扩展数据基座蓝图-01.png`：总体连接骨架；
+- `docs/diagrams/HOTCRUSH可扩展数据基座蓝图-02.png`：统一数据契约；
+- `docs/diagrams/HOTCRUSH可扩展数据基座蓝图-03.png`：新模块快速接入；
+- `docs/diagrams/build_extensible_data_foundation_blueprint.py`：可重复生成脚本。
+
+自动布局校验结果为 0 个错误、5 个非阻断交叉警告、评分 60；已完成两轮逐页视觉检查，未见文字截断、
+节点重叠或越界。当前 PNG 仅供评审，未嵌入 draw.io 数据；用户确认方向后再导出正式 SVG/PDF/内嵌源
+PNG。本轮没有修改数据库、业务代码或部署，也没有提交；工作区既有未提交内容未触碰，等待用户决定是否
+采用此基座方向及是否调整身份锚点、连接契约或模块接入流程。
+
+用户随后指出 3 页概念图没有把每张表的关系串起来。本轮继续使用 `drawio-skill` 新增独立的 15 页
+表级评审稿，前三页保留上述概念层，第 4 页列出全部目标表及跨域主路径，第 5–15 页展开每张表的
+PK、FK、粒度、写入者、只读视图血缘和端到端写入边界：
+
+- `docs/diagrams/HOTCRUSH可扩展数据基座与表关系评审稿.drawio`：82 张目标核心表、19 个只读视图；
+- `docs/diagrams/HOTCRUSH可扩展数据基座与表关系评审稿.html`：15 页交互查看器，含 157 个跳转链接；
+- `docs/diagrams/HOTCRUSH表关系评审-04-*.png` 至 `HOTCRUSH表关系评审-15-*.png`：表级逐页评审预览；
+- `docs/diagrams/build_extensible_table_relationship_blueprint.py`：可审计生成器及结构断言。
+
+新稿没有直接沿用旧 73 表身份设计：将仅适用于门店的 `ops_store / store_id` 修正为覆盖门店、中央厨房、
+仓库和办公室的 `ops_location / location_id`；把企业产品身份调整为 `ops_product`、POS listing 单独留在
+`pos_product_listing`；新增 SCM 所有的 `scm_material`，并用 `cost_card_material_link` 与成本卡对象明确
+桥接，避免 SCM 依赖财务域成本对象作为原料主数据。另增加五个域内 Outbox 和三个统一只读索引视图。
+
+生成器断言 82 表 / 19 视图 / 15 页且所有引用可解析；Draw.io 校验为 0 错误、0 节点重叠，剩余 27 个
+非阻断的连线交叉 / 近节点警告。总索引经过两轮布局检查后改为“全表目录 + 跨域主路径”，避免把全部
+外键压成线团；所有 12 个表级页面已导出，抽查身份、班表、供应链和模块接入页未见截字或节点重叠。
+这仍是未来目标核心的评审稿，不是当前生产库约百张历史 / 兼容表的实况映射；没有执行 DDL/DML、修改
+业务代码、部署或提交，旧 73 表文件及工作区其他未提交内容未改。
+
+用户根据第 4 页截图要求在每个表名后增加简单作用介绍。本轮只修改表级评审稿生成器：新增覆盖全部
+82 张目标表的 `TABLE_PURPOSES` 映射及缺失 / 多余 / 空描述断言，并把总索引卡片改为
+“`表名 — 一句话用途`”；其余 14 页的关系、PK/FK 和布局未改。已重新生成同名 `.drawio`、15 页
+交互 `.html` 和 `HOTCRUSH表关系评审-04-全表连接路径总索引.png`，视觉检查未见截字或节点重叠；
+Draw.io 校验仍为 0 错误、0 节点重叠、27 个非阻断连线提示。没有执行数据库变更、部署或提交。
+
+应用户要求，已把第 4 页另行导出为桌面清晰版
+`/Users/weiliangshao/Desktop/HOT_CRUSH_数据库全表关系清晰版.drawio.png`（2500 × 5869，2.3 MB）。
+该 PNG 已嵌入 Draw.io 源数据并执行 PNG 完整性修复；逐图检查确认 82 张表及底部模块均完整绘制。
+本次只新增桌面导出文件并更新本交接记录，没有改图中内容、数据库、业务代码或部署。
+
+用户随后要求在同名交互 HTML 中为所有可能不熟悉的内容补详细备注，并说明框色所属板块。已新增
+`docs/diagrams/build_extensible_table_relationship_review_html.py`：它先使用 `drawiohtml.py` 重新生成
+15 页自包含查看器，再注入默认展开、可收起且随当前页面联动的右侧说明栏。说明栏覆盖 15 页阅读方法、
+常见误解、概念页 12 类配色、表级页 10 类配色、框形 / 边框、4 类可见连线语义、82 张物理表、
+19 个只读视图及 34 个数据库术语；每个表备注包含用途、粒度、状态、写入者、全部字段和 FK 连接。
+
+同名 `HOTCRUSH可扩展数据基座与表关系评审稿.html` 已重新生成，仍含 15 页和 157 个页内跳转；浏览器
+验收确认说明栏开关、逐页联动、备注过滤、原图搜索和页面切换均正常，控制台无脚本错误。索引页显示
+82 个表备注，供应链页 14 个对象，财务页 4 个只读视图；静态检查确认注入标记各仅一份、JavaScript
+语法通过。此次没有修改 `.drawio` 内容、数据库、业务代码或部署，也没有触碰工作区其他未提交改动。
+
+应用户要求，已将同一评审稿第 15 页“端到端关系与写入边界”另行导出到桌面：
+`/Users/weiliangshao/Desktop/HOT_CRUSH_端到端关系与写入边界清晰版.drawio.png`（3200 × 2579，约
+1.1 MB）。该高清 PNG 已嵌入 Draw.io 源数据并执行完整性修复；视觉复核确认稳定身份、穿透供应链、
+采购与成本、销售与人员、录入边界及数据质量门禁均完整无裁切。另用该 PNG 成功回读并导出 SVG，
+确认可编辑数据有效。此次只新增桌面导出文件并更新本交接记录，没有改图中内容、数据库、业务代码或部署。
+
+## 2026 年 6/7 月工资单对比及 PDF 报告已完成（2026-08-05，Codex）
+
+用户要求比较 Desktop 上两份工资单 PDF。本轮确认文件对应 Jun 2026（46 人）与 Jul 2026（44 人），
+按员工身份对齐 37 人，另外识别 7 月独有 7 人、6 月独有 9 人；逐份验证应发合计、扣款合计和实发恒等式，
+90 份工资单均无解析残差，并抽查原始渲染页面。完整逐人上涨/下降、人员增减和工资项目差异已在对话中交付。
+
+用户随后要求 PDF，已新增交付物：
+
+- `output/pdf/HOT_CRUSH_2026-06_2026-07_员工薪资差异分析.pdf`：7 页 A4 中文报告，包含管理摘要、
+  总额与项目桥接、20 人上涨、17 人下降、7 月独有 7 人、6 月独有 9 人、Basic Salary 行变化、
+  风险边界和复核动作；只展示姓名与工号，不含 NRIC。
+
+PDF 已重新生成并验证：7/7 页可提取文字，53/53 名唯一员工均出现在报告，关键总额和人数均匹配，
+NRIC 暴露为 0，中文字体已嵌入；7 页均渲染为 PNG 并完成视觉检查，没有遮字、截断或分页错误。
+
+本轮没有修改应用代码、数据库或部署；含员工身份字段的解析文本、生成脚本和页面截图已删除，原始 PDF 未改。
+报告 PDF 是本轮唯一长期交付物，目前未提交。除本报告和按协议更新本段外，工作区原有未来数据库图、
+计划和他人未提交文件均未触碰。若用户下一步要求 Excel，再基于本次逐人核对结果单独生成并完成公式重算验证。
+
+## HOT CRUSH 未来数据库物理 ERD 已完成（2026-08-05，Codex，未提交、未实施）
+
+用户要求继续按第一性原理、使用 `drawio-skill`，把已审核的未来数据库蓝图展开成表、关键列、
+外键和视图血缘。本轮只制作目标设计资产，没有执行生产 DDL/DML，没有修改应用运行代码，
+没有部署。
+
+新增交付物均在 `docs/diagrams/`：
+
+- `HOTCRUSH未来数据库物理ERD.drawio`：11 页可编辑源文件，覆盖 73 张核心物理表、16 个关键视图；
+- `HOTCRUSH未来数据库物理ERD.html`：单文件交互查看器，可缩放、搜索、切页；
+- `HOTCRUSH未来数据库物理ERD.pdf`：使用 `--all-pages --crop` 导出，`pdfinfo` 确认 11 页；
+- `未来物理ERD-01…11-*.png/.svg`：逐页 4000px PNG 和可无损缩放 SVG，均内嵌 draw.io 数据；
+- `HOTCRUSH未来数据库物理ERD说明.md`：11 页索引、73 表/16 视图完整清单、人工/自动录入边界、
+  黑巧/草莓塔端到端链、三项硬门禁和写入责任；
+- `build_future_physical_erd.py`：可审计生成源，内置对象唯一性、逐页数量、引用完整性和条件表断言；
+- `README.md`：新增物理 ERD 入口，并明确它与 5 页业务蓝图、生产现状全图的边界。
+
+图把成本计算和财务核对拆为独立页面，以免把配方/采购价/成本快照与财务销售、采购、人工、毛利
+四条核对链混在一起。每张表只在一个主页面完整出现，跨组/跨页用 `REF` 卡引用；跨域只认
+`store_id / product_id / employment_id / material_id`。四张 POS 订单级表
+`pos_order / pos_order_item / pos_payment / pos_refund` 仍为 `CONDITIONAL`：RES 没有跨重跑稳定的
+来源 ID 前不得创建空壳表，也不得把时间桶伪装成订单。复用现有 `cost_card_recipe/_item`；
+`cost_card_item` 保留 bigint `id` 并增加 UUID `material_id`。
+
+验证结果：生成器断言精确得到 73 表、16 视图、11 页；drawio-skill validator 为 0 结构错误、
+0 节点重叠，剩余 18 条可读性提示（12 条边线交叉、6 条路线经过节点边界附近），已完成两轮布局
+修复并逐页视觉复核，没有遮字、错误指向或无法辨认的表；交叉线已从初稿 273 条降到 12 条。
+XML 可解析；11 张 PNG 均可由 ImageMagick 读取；PDF 11 页；HTML、SVG、PNG、PDF 均成功生成；
+语法校验产生的 `docs/diagrams/__pycache__` 已清理，没有把临时缓存留在工作区。
+
+当前工作区仍为混合未提交状态：本轮物理 ERD、此前 5 页未来蓝图、迁移总计划、`README.md` 和
+本 HANDOFF 尚未提交；他人所有的
+`bakery-ops/src/modules/data/migrations/109_margin_and_holiday_factor.sql` 与 `deploy-tokyo.sh`
+完全未改、不要纳入本轮提交。没有为了“清理工作区”去动任何无关文件。不要运行 `deploy.sh`。
+若下一步进入数据库实施，必须按
+`docs/superpowers/plans/2026-08-05-hotcrush-future-database-transition.md` 从 Task 0 的恢复服务、
+干净提交边界和可恢复基线开始；不能把图中的目标表当作生产库已经存在。
+
+---
+
+## 从当前生产状态迁移到未来数据库蓝图的实施总计划已完成（2026-08-05，Codex，未提交、未实施）
+
+用户要求按第一性原理写“从现在状态修改到蓝图”的详细方案。本轮基于已完成的生产库、
+BakeryOps、`res_api`、财务网站、HBTI 和未来蓝图只读审核，新增：
+
+- `docs/superpowers/plans/2026-08-05-hotcrush-future-database-transition.md`
+
+计划共 859 行、22 个 Task、214 个可勾选步骤，定义 73 张规范核心物理表（包含需升级的现有表）、
+16 张关键视图和 23 个全局迁移 ID；另明确现有 `finance_*`、招聘来源、账号、会员/HBTI 和兼容对象
+继续存在，所以 73/16 不是共享生产库最终总对象数。路线采用“恢复服务/冻结基线 → 迁移治理 →
+稳定门店/产品/原料/雇佣身份 → POS → 预测/预估单/实际执行 → 人事/培训/版本化班表/实际工时 →
+供应商/需求/PO/收货 → 交易日成本快照 → 毛利与财务对账 → 账号权限与旧对象退休”，每域先双写、
+再影子读，达到真实业务周期门槛才切主读。
+
+本轮把图里的物理模型进一步收敛：复用现有 `cost_card_recipe/_item`，不重建配方表；新增
+`ops_shift_plan_version`、`scm_supplier`、实际生产与实际发出两组事实、offer/onboarding、成本快照
+组件；POS 账单/支付/退款只有 RES 能证明稳定来源 ID 才创建，不能把时间桶伪装成订单；
+`cost_card_item` 先加 UUID `material_id`，保留 bigint 兼容；`offers` 采用同事务 rename + 可更新兼容
+视图；`app_audit_log` 由受控只追加函数跨域调用，不给运行时直接改表。产品到成本卡映射拆为
+`res_api`、BakeryOps、财务站各自所有的三个迁移，避免跨域越权。
+
+计划同时补了当前→目标对象对照、人工/自动录入边界、网站功能依赖、黑巧/草莓塔端到端验收、
+准确 SQL/代码文件路径、测试命令、生产窗口、对账阈值和 forward-fix/回读回退方式。节假日以 BKPP
+官方页面/公报为权威候选来源；未确认 data.gov.my 有专门公共假日 API，所以自动抓取后仍需保存
+URL/checksum/parser version 并人工批准。成本快照由财务站受保护的 Vercel 日任务生成，要求幂等、
+advisory lock、失败告警和按营业日补跑。
+
+交付前结构验证已通过：文件非空；22 Task、214 checkbox、73 张表、16 视图、23 个迁移 ID 数量均
+精确匹配；73/16 每个对象都在实施任务中再次出现；老板需求关键词和所有 Modify 路径均覆盖；
+无 TODO/TBD/占位符、tab 或行尾空格。没有运行应用测试，因为本轮只新增 Markdown 计划；没有执行
+生产 DDL/DML、没有修改应用代码、没有部署、没有提交。
+
+当前工作区仍含此前未提交的未来蓝图、`docs/diagrams/README.md` 和他人所有的
+`bakery-ops/src/modules/data/migrations/109_margin_and_holiday_factor.sql`、`deploy-tokyo.sh`；本轮只新增
+实施计划并更新本 HANDOFF。不要运行 `deploy.sh`。下一步若用户批准执行，从计划 Task 0 开始：
+先恢复财务 API、建立干净分支/提交边界和可恢复基线；财务 API 未恢复、迁移账本未治理前，禁止建
+任何新业务表。
+
+---
+
+## HOT CRUSH 未来数据库蓝图已完成（2026-08-05，Codex，未提交、未实施）
+
+用户指定使用 [Agents365 drawio-skill](https://github.com/Agents365-ai/drawio-skill)，要求把老板关于
+预估单、班表、关键岗位、供应链、成本卡、`product_id`、产品占比、订货增减和当日毛利的建议
+画成未来数据库蓝图。本轮先沿用 2026-08-05 已完成的生产库/代码/业务来源只读审核结论，再生成
+5 页目标模型；没有执行数据库 DDL/DML，没有修改应用代码，也没有部署。
+
+交付物在 `docs/diagrams/`：
+
+- `HOTCRUSH未来数据库蓝图.drawio`：5 页可编辑源文件，第一页可点击跳转各详细页；
+- `HOTCRUSH未来数据库蓝图.html`：5 页单文件查看器，可切页、缩放、搜索，4 个页内跳转已生成；
+- `HOTCRUSH未来数据库蓝图.pdf`：`pdfinfo` 已确认 5 页且每个逻辑页只占一个 PDF 页；
+- `未来蓝图-01…05-*.png/.svg`：逐页交付图，PNG 内嵌 draw.io 数据；
+- `HOTCRUSH未来数据库蓝图说明.md`：第一性原则、老板建议到表结构映射、人工/自动录入边界、
+  三条端到端事实链、黑巧/草莓塔验收用例和实施顺序；
+- `build_future_blueprint.py`：基于 drawio-skill `autolayout.py` 的可重生成脚本；
+- `README.md`：新增“未来蓝图”与“现状全图”的边界说明。
+
+图的核心决策：一个 BakeryOps 工作流可以一次提交多个业务动作，但同一事务分别写入正确粒度的表；
+跨域只用 `store_id / product_id / employment_id / material_id`，不按名称猜关联；预测、发布计划、
+实际发出、POS 售出、报废相互独立；计划班表与 Lark 实际工时独立；配方/价格/计划/采购单都版本化，
+历史毛利用交易日有效成本快照。人工只录业务判断与证据，不重复录销售、工时、占比、成本或毛利。
+
+验证：`.drawio` 通过 XML 解析；drawio-skill validator 为 0 结构错误、0 节点重叠、0 连线穿节点，
+大型详细页仍有 14 处边线交叉但已逐页视觉复核、没有遮字或错误指向；5 张 2400px PNG、5 张 SVG、
+5 页 PDF 和 5 页 HTML 均成功导出。指定 skill 安装在
+`~/.codex/skills/drawio-skill`；新会话若未发现它，需要重启 Codex 才会出现在技能目录。
+
+当前工作区边界：本轮蓝图文件和本 HANDOFF 尚未提交；原先未跟踪的
+`bakery-ops/src/modules/data/migrations/109_margin_and_holiday_factor.sql` 完全未改、仍属于其他工作。
+不要运行 `deploy.sh`。下一步只有在用户批准目标蓝图后，才应另写分阶段迁移和四个消费者改造清单；
+不能把图中的未来表名当作生产库已经存在。
+
+---
+
 ## HBTI 上线加固已合入 main（2026-08-04，Codex，已推送，未部署）
 
 全量门禁在本机通过：`npx tsc --noEmit`、`npx eslint .`（0 error / 0 warning）、
@@ -970,6 +1659,10 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
 | 2026-08-15 | DSH | **生日贺卡源码归档入库（已合入 main）**：线上 `https://birthday.hotcrush.net/` 曾是唯一幸存副本（原 /tmp scratchpad 源码已被系统清理），已字节一致回收到 `birthday-web/`（index.html sha256 `5e2bd978…34120a55`，70525 字节），另归档两个品牌字体副本与 README（含 Vercel 项目/部署/证书/DNS 与重新部署方法）。经分支 `dsh/archive-birthday-web` --no-ff 合入 main；main 领先 origin/main 2 个提交、尚未 push。线上版本是为会员 Nicole 静态烘焙的单人页、无后端接口；今后改动以 `birthday-web/` 为准。 |
+| 2026-08-15 | Codex | **两个会员网页已使用自有域名上线**：HBTI 为 `https://hbti-test.hotcrush.net/`，首页与 `/api/health` 均 200、四项健康检查全绿；生日贺卡为 `https://birthday.hotcrush.net/`，Cloudflare 新增 DNS-only A `birthday → 76.76.21.21`，Vercel 别名指向 Ready 生产部署 `dpl_JDvL861xWm8d2uWiETD1aE93WKjB`。发现 DNS 生效后 Vercel 尚无子域名证书导致全球 TLS 失败，显式签发 `cert_z0teWyJCbiAUPhG451Nu0kkl` 后修复；洛杉矶、新加坡、德国三处均 HTTPS 200、TLS authorized，直连标题为“生日快乐 — Hot Crush”。未改源码、环境变量、数据库或服务器，未重建部署；共享工作树原有改动保留，未提交。 |
+| 2026-08-14 | Codex | **只读重审 HOT CRUSH 数据库蓝图（未改蓝图、未读写数据库）**：按“最小业务事实 / 来源汇总观察 / 来源快照 / 人工与工作流事实 / 决策输入快照 / 决策输出 / 派生视图 / 平台状态”重新核对 R6 与当前工作树中的 R6A1。结论：R6 的第一性原则方向成立，已明确纠正“行原子就等于整表必须落库”的旧错误；日/小时销售、会员日报等可保留为独立来源汇总与对账观察，但不能冒充最小交易事实，也不能与事件重算结果相加。当前不能批准 R6A1 实施：它仍标记 `DESIGN_ONLY_NOT_COMPILED / NOT_APPLY_COMPATIBLE / production_data_gate=BLOCKED`，Green 只证明旧 R6 的 100 表/1374 字段空结构（零数据、零视图、零策略/业务角色），R6A1 生成模型是 105 表/1470 字段，而新增评审稿仍写 1469，且当前 R6A1 测试门禁不绿（设计测试 45 项中 1 失败；implementation 测试 53 项中 21 error + 6 failure）；59 个逻辑视图只有 7 个达到 SELECT 规格就绪且 0 个实际创建/运行验证。还发现 `CORE_BASE_FACT` 混装原子事件与来源汇总，建议在目录中新增 `fact_kind` / `value_role` 元数据轴；客单价必须显式拆为 net/gross，`source_guest_count` 只能标“来源顾客计数、口径待确认”；R6A1 `pos_order_item` 已改为 Report211 原始冲销行粒度，但 `order_item_id`、`net_sales` 描述仍残留旧聚合语义。建议 P0：冻结唯一权威版本、解决 1469/1470 与测试漂移、恢复并运行验证核心 POS 视图、再编译 Green 100→105 的空库增量；未完成前暂停回填和 AI/BI 接入。另需轮换此前意外暴露的数据库凭据并更新消费者。工作区原有大量脏改动/未跟踪文件均保留，未提交。 |
+| 2026-08-14 | Codex | **HBTI 已完成会员恢复原结果修复并上线**：已登录会员在进入体验或 OTP 验证成功后，先请求 `/api/complete/status`；若服务端已有完成记录，直接恢复服务端权威的人格、颜色与礼品结果，不再展示可重新作答的首页；仅 404（确实未参与）进入正常答题流程，状态检查异常则 fail closed 显示账户检查错误，避免会员先看到新本地结果、提交时又被旧结果替换。补齐登录恢复、OTP 恢复与三档手机尺寸 E2E 回归；门禁：typecheck、lint、Vitest **279 通过 / 39 跳过**、Playwright **45/45**、Next production build、`git diff --check` 全部通过。生产部署 `dpl_2Uo6DHchgHxhW21JdPCWz2jfSHN9`（`hotcrush-hbti-oeq4tt1pw-algersss-projects.vercel.app`）已 promote 至 `https://hbti-test.hotcrush.net`；线上复核：域名指向该部署且 Ready、首页 200、`/api/health` 200 且 `alert/db/res/signIn` 全部 `ok`、未登录 `/api/complete/status` 401。只改 `hbti-web/src/components/HbtiExperience.tsx` 与对应测试。 |
+| 2026-08-11 | Claude Code | **发现成本卡 ×1.7 系统性录入错误（未修复，修复脚本已备好待执行）**：2026-07-14 批次导入的成品卡，成品层每行用量 = 真实值 ×1.7（面团 306=180×1.7、包装袋 1.7g=1×1.7……），全目录约 85 张卡中招；半成品配方干净未受影响。三重证据：整数×1.7 模式、财务网站 7-29 重建的「奶酪核桃马卡龙新」（老卡 8.17÷1.7=4.81≈新卡 4.70）、研发部 7-27《黑松露牛肉坚果棒》规格书（分割 250g/个 vs 库中 425g）。受影响下游：`product_material_cost` 缓存同样虚高（daily-review 直接读它）。**✅ 已修复（2026-08-11，用户授权后执行 `docs/database/fix_x17_cost_cards_20260811.mjs`）**：8 张卡（34/35/62/63/64/92/93/94）共 41 行逐行核对后，按应用工作流建 v2 发布（#303–#310）、v1 归档保留原值；直改已发布行会被触发器 `cost_card_protect_recipe_item` 拒绝，必须走 draft→publish→archive。`product_material_cost` 实为视图（`v_cost_card_current_cost` 派生），配方修复后自动重算，实测已回正（牛肉坚果棒 8.11、咖啡马卡龙 6.04、榛子马卡龙 8.60、趁热奶酪核桃马卡龙 4.81）。回滚脚本 `docs/database/rollback_x17_fix_20260811.sql`（需停触发器、owner 执行）。**发现②已确认为真双算（2026-08-11 三条证据链）**：a) 引擎公式实读 = `q×(1+loss_rate)÷net_yield` 两字段同时生效；b) 全库已发布配方中 loss_rate>0 的行**全部**恰为 `loss=1−ny` 互补（58 行，非互补 0 行、纯 loss 0 行——该字段在现网数据里唯一"用途"就是重复净得率）；c) 物理自洽：腌制牛肉批产 1320g=Σ行用量，证明行用量是入批净料、ny 仅折算采购毛料，×(1+loss) 无物理对应；引擎展开西冷 204.545g/个 与公式复算逐位吻合，去双算后 151.5g/个，正是惠灵顿 13.92→11.23 的差额。**✅ 发现②已修复（2026-08-11 用户执行 `docs/database/fix_lossrate_dup_20260811.mjs`）**：47 个已发布配方（30 成品+17 半成品）各发新版本、58 行冗余 loss_rate→0、旧版归档。事后独立验证：已发布配方中 loss_rate>0 的行=0、每 item 恰一个 published 版本、94 张成品卡全部可算价。成本回正示例：招牌惠灵顿 13.92→11.23、菲力牛肉派 16.91→13.56、菲力牛肉塔 7.09→6.09、咸蛋黄碱水结 13.00→11.96。回滚脚本 `docs/database/rollback_lossrate_fix_20260811.sql`。**✅ ×1.7 已全目录清零（2026-08-11 用户执行 `docs/database/fix_x17_batch2_20260811.mjs`）**：第二批 86 张（A组56张未动过的导入v1 + B组27张loss修复版且逐行断言==导入v1 + C组3张测试拿破仑；92/93/94 显式排除防二次除）。半成品843行全扫零×1.7、每卡要求签名行或人工白名单（2/3/4/5/58/59 六张零签名卡逐行人工核对后放行，铁证=包装袋1.689≈1×1.7）。修复后独立验证：99张已发布成品卡零版本冲突、loss行0、残留×1.7签名恰好1条=471的袋1.7g（已知遗留）。合计两批 8+86=94 张卡修复，行级明细 `fix_x17_batch2_20260811.log`、回滚 `rollback_x17_batch2_20260811.sql`。**尾巴**：471袋1.7g→应为1；5张卡各缺3条已核验原料价算不出成本（19/23/27/57/75，修复前即如此）；两张圆大挞成本率81%/73%属真实薄利待经营复核；研发确认项=牛肉坚果棒松露酱8g vs 7-27规格10g、榛子面团180g vs 重建卡150g、可尔必思茉莉冷萃无卡。loss_rate 字段今后语义=净得率之外的额外制程损耗，录入时勿再与净得率互补重复。其余约 77 张卡未修——7 月中下旬有 32 次 cost_card.update 人工改动，盲目批量 ÷1.7 有二次损坏风险，需对 audit log 逐张核对后再批量。另：牛肉坚果棒黑松露酱库中 8g vs 7-27 新规格 10g，属配方更新非录入错误，未动。已交付用户校正版+最终版成本卡 Excel（马卡龙系列 7 品） |
 | 2026-08-04 | Claude Code | **✅ 端到端真实跑通：短信送达 → 验证 → 答题 → 抽礼品 → 发出真券。** 证据：`[otp/request] sent {"resCode":"000","resMessage":"ok","attemptsToday":5}`；随后 `otp/verify` 与 `/api/complete` 各一次；库里 `hbti_status=issued`、人格 `HSDA`、**礼品库存 已发 1 → 2（抽中爱心纸香卡，86 件剩 85）**、0 条 processing/review。**这一跑把此前唯一零里程的那段点亮了**——`acquireProcessing` 幂等锁 → `markPrepared` → `drawGift` 的 `FOR UPDATE` 事务 → RES 真实发券 → 回读对账 → 写 `pos_member`，全部在换过的 `DATABASE_URL`、内联 CA 的真证书校验、事务池 `:6543` 上验证过。**顺带修掉最后一个已知的顾客侧缺陷**：每次发码都新建 guest session、验证码绑在该 session 上，而前端一拿到新令牌就丢掉旧的；RES 对同号当天的重发**回 000 却不真的送达**（仓库实测 19 次请求：当日首次 11/13 到达、重复 0/6），于是「等不及点重发」这个最本能的动作会**把顾客手里真收到的那条码作废**，当天再无解。改成**两份令牌都留着，验证时先试新的、`INVALID_CODE` 时回退旧的**（只在「码不对」这一种错误上回退——过期/超次数/账户冲突另有含义，重试只会把它们变模糊；成功后以活着的那份为准，`changePhone` 会清空）。⚠️ **顾客「请求太频繁」= 我们自己的限流**（5 次/天/号），不是 RES；反复测试才会撞上，真实顾客一人一次。**+61 重复建号已查清**：两行的 `phone_country_code`/`phone_national`/`phone_e164` **完全一致**，不是号码格式问题——是 RES 侧本来就有两个会员记录；全库 4843 个会员里**只有这一个号**有多账号，而「无注册日期的空账号」在各国家码普遍存在（+60 就有 1071 个），**今天这次跑通没有产生第三个账号、正确复用了已有账号**，所以是开发早期的单个历史产物而非系统性缺陷，两个账号积分/余额/消费均为 0、无价值拆分。门禁：tsc / eslint / next build / **vitest 277 通过 39 跳过（316）** / **playwright 42/42** |
 | 2026-08-04 | Claude Code | **验证码上线后仍然发不出短信的完整排查（结论：一直是 CSP 少放行域名，不是别的）。** 症状演进：① 真机解完验证码，RES 回 `CRM-00-1105 captcha rejected! diff`；② 再点，浏览器里毫无反应、**服务端连一条日志都没有**。**定位手法值得复用**：先给错误链路补上 RES 的 `msg` 原文（此前只记 code，而 `CRM-00-1105` 既不在 RES 客户端语言包里也无公开文档，光有码查不动）；再**用一个语法合法但无效的票据打一次**做对照——它回 `decrypt fail`，而真实解题回 `diff`，说明 RES 是**原样回显腾讯 CaptchaCode 的描述**，且真实票据是能被解密的。查腾讯码表：`decrypt fail`=15（票据不合法），**`diff`=21（票据校验异常）**，而腾讯对 21 的说明是「**Ticket 带 `trerror` 前缀 = SDK 连不上自己后端、进入容灾降级**」。⚠️ **根因**：CSP 只放行了 `*.captcha.qcloud.com`，SDK 脚本能加载，但取题目的 `*.captcha.gtimg.com`、风控上报的 `www.turingfraud.net`、以及它要起的 blob Web Worker（`worker-src`）全被挡 → SDK 降级吐 `trerror_` 假票据 → 我们原样转发 → 腾讯判 21。**放行域名不能靠读源码**：SDK 混淆且部分域名运行时拼接，静态搜索必漏 `turingfraud.net`。正确做法是**问浏览器**——在 RES 自己那个能跑通的 H5 上触发一次记录它接触的全部主机，再回本站触发、用 `securitypolicyviolation` 事件核对到零违规。另注意：**弹层不是 iframe**（RES 自家页面也是 `iframe:0`），别拿「有没有 iframe」当成功信号，**零违规**才是。已加两道防御：`trerror_` 票据一律当「验证码不可用」不再转发（发出去必被拒，还白烧顾客当天 5 次发码额度中的一次）；解题等待加有界时限（回调永不触发时，顾客只会看到「点了没反应」，服务端连日志都没有）。**❌ 一条要撤回的推断**：中途我判断是「验证码绑 IP、RES 拿 Vercel 出口 IP 去核验导致不一致」，据此加了转发顾客真实 IP 的 `x-forwarded-for`/`x-real-ip`。腾讯码表证明 `diff`=21 与 IP 无关，**这个推断是错的**。转发 IP 的代码保留（让 RES 风控看到真实顾客而不是数据中心地址，本身是对的），但它从来不是拦住顾客的原因。顺带确认：**浏览器直连 RES 不可行**（CORS 全挡）；RES 挂在 Tencent EdgeOne + APISIX 3.7.0 后面。实测验证：CSP 零违规、弹层容器 `tcaptcha_transform_dy` 已渲染、回调拿到**真实票据**（腾讯对低风险会话会无感知放行；反复触发则升级为真人出题）。门禁：tsc / eslint / next build / vitest 276 通过 39 跳过（315）/ playwright 42/42 |
 | 2026-08-04 | Claude Code | **🔴 登录曾被 RES 单方面打死：租户级打开腾讯云图形验证码，`sendVerifyCode` 变成服务端强制要 `captcha`，HBTI 全站没人能登录。本次实现了验证码，并补上暴露这次故障的 health 盲区。** 发现过程：跑端到端时第一步就 503 `CAPTCHA_REQUIRED_UNSUPPORTED`，换号码复现，一条短信都没发出去。**证据**：在 RES 官方 H5 同源上下文里直接打它自家接口 —— `captcha/config` 回 `{"enable":true,"captchaType":"tencent_cloud","tencentCloud":{"captchaAppId":"189993702"}}`；不带验证码打 `sendVerifyCode` 回 `UNI-00-0103 missing required param: captcha`（**服务端强制，不是前端装饰**）；同样不带验证码打 `verifyCode` 却直接回「验证码错误」——**只有发码这一步强制**，改动范围因此减半。08-02 那天三条 HBTI 记录都走通了 OTP，所以开关是 08-02 12:45 之后被拨的。**契约从 RES 自己的 JS 包里挖出来**（`index-DgMgsMSQ.js`，登录页懒加载分片）：SDK `https://ca.turing.captcha.qcloud.com/TJNCaptcha-global.js`、容器 `tencent-captcha-container`、`new TencentCaptcha(container, appId, cb, {type:"popup", userLanguage})`。⚠️ **字段名是坑**：腾讯回调给 `{ticket, randstr}`，RES 要 `{token, randstr}` —— `ticket` 必须改名成 `token`，写错不报错，只会一直「missing required param」。改动：① 新增 `GET /api/auth/captcha`，前端挂载时问一次并预热 SDK（等点了「发送」再拉脚本，那几百毫秒空白里顾客通常已经又点了一次）；配置带 5 分钟缓存，目的不是省延迟而是让「要不要验证码」能判在**限流之前**——缺验证码的请求到不了 RES，不该烧顾客当天的发码额度。② `sendVerifyCode` 透传 `captcha`；发码失败即作废配置缓存，让下一次重新问 RES。③ **认不出的供应商一律 `unsupported` 并 fail closed**，绝不退化成「不需要验证码」——后者会让前端不加载 SDK，然后发码在 RES 那边失败，顾客看到一个点了没反应的按钮。④ CSP 放行 `https://*.captcha.qcloud.com`（script/img/connect/frame 四项）。⑤ **刻意不实现腾讯的 `trerror_*` 降级令牌**——那是 SDK 自身加载失败时的占位串，由我们主动构造就等于绕过验证码；SDK 起不来就如实报「暂不可用」。⑥ **health 补 `signIn` 一项**：此前 `res` 探的是**后台**（`bo.sea.…`，券模板），登录走的是**H5**（`f4klzbmr9n2d.m.sea.…`），两个不同系统 —— 登录全挂时 health 一路绿灯。现在 H5 探不通、或验证码换成驱动不了的供应商，health 直接 fail。门禁：tsc / eslint / **vitest 272 通过 39 跳过（311）** / next build / **playwright 42/42** 全绿。⚠️ **仍需人验收**：验证码必须由真人解一次才能走通发码，自动化不该也不会去解——上线前请人工走一遍登录。⚠️ 另外发现 **+61 号码会被 RES 建成第二个空会员账号**（`…2873` 无档案无注册日期，而同号的 `…1826` 是 4 月注册的真实会员）；同批 +60 的样本正确复用了原账号，差异疑似在国家码匹配，根因在 RES 侧。两个账号积分余额消费均为 0，本次未造成损失 |

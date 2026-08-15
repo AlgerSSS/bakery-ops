@@ -41,3 +41,48 @@ describe("normalizeDate 年份来源", () => {
     expect(normalizeDate("2024-06-29")).toBe("2024-06-29");
   });
 });
+
+// 相对日（2026-08-06 事故）：店长在追问里说「昨天的复盘」，系统仍按首轮锁定的今天去查，
+// 查到零流水日却报出一堆昨天的数字 —— 缺的字段被模型当场编了（含虚构的 TOP5 单品）。
+describe("normalizeDate 相对日", () => {
+  const KL = "Asia/Kuala_Lumpur";
+  const shift = (n: number) => {
+    const d = new Date(new Date().toLocaleString("en-US", { timeZone: KL }));
+    d.setDate(d.getDate() - n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+
+  it("带「复盘」时认相对日", () => {
+    expect(normalizeDate("昨天的复盘")).toBe(shift(1));
+    expect(normalizeDate("前天的复盘")).toBe(shift(2));
+    expect(normalizeDate("大前天的复盘")).toBe(shift(3));
+    expect(normalizeDate("复盘3天前")).toBe(shift(3));
+  });
+
+  it("整句就是一个日期词时也认", () => {
+    expect(normalizeDate("昨天")).toBe(shift(1));
+    expect(normalizeDate("前天的数据")).toBe(shift(2));
+    expect(normalizeDate("昨天的情况？")).toBe(shift(1));
+  });
+
+  // 「大前天」含「前天」子串，长的必须先判，否则会少算一天
+  it("大前天不被前天抢先", () => {
+    expect(normalizeDate("大前天")).toBe(shift(3));
+    expect(normalizeDate("大前天")).not.toBe(shift(2));
+  });
+
+  // 显式日期优先：这一条正是 2026-08-06 首次实现时踩的坑 ——
+  // 相对日判断排在数字之前，把「今天复盘：2026-07-01」解析成了今天。
+  it("显式日期压过同句里的相对词", () => {
+    expect(normalizeDate("今天复盘：2026-07-01 下午蛋挞断货")).toBe("2026-07-01");
+    expect(normalizeDate("昨天说的那个，看下 7.1")).toBe(`${new Date().getFullYear()}-07-01`);
+  });
+
+  // 追问阶段以原话优先，若无差别地抓相对词，店长在 08-01 的复盘里
+  // 随口问「今天生意怎么样」就会把复盘日整个跳走 —— 比原 bug 更难察觉。
+  it("普通对话里的相对词不算日期选择", () => {
+    expect(normalizeDate("今天生意怎么样")).toBe("");
+    expect(normalizeDate("跟昨天比呢")).toBe("");
+    expect(normalizeDate("昨天那个断货的问题解决了吗")).toBe("");
+  });
+});

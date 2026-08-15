@@ -1,0 +1,5820 @@
+{
+  "active_foreign_keys": [
+    {
+      "columns": [
+        "actor_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ai_call"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_run_id"
+      ],
+      "ref_table": "app_job_run",
+      "table": "ai_call"
+    },
+    {
+      "columns": [
+        "prompt_template_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "prompt_template_id"
+      ],
+      "ref_table": "ai_prompt_template",
+      "table": "ai_call"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ai_prompt_segment"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ai_prompt_segment"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ai_prompt_template"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ai_prompt_template"
+    },
+    {
+      "columns": [
+        "prompt_segment_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "prompt_segment_id"
+      ],
+      "ref_table": "ai_prompt_segment",
+      "table": "ai_prompt_template_segment"
+    },
+    {
+      "columns": [
+        "prompt_template_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "prompt_template_id"
+      ],
+      "ref_table": "ai_prompt_template",
+      "table": "ai_prompt_template_segment"
+    },
+    {
+      "columns": [
+        "actor_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "app_audit_event"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_run_id"
+      ],
+      "ref_table": "app_job_run",
+      "table": "app_audit_event"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "app_job_run"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "application_id"
+      ],
+      "ref_table": "hr_application",
+      "table": "app_one_time_token"
+    },
+    {
+      "columns": [
+        "campaign_member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "campaign_member_id"
+      ],
+      "ref_table": "mkt_campaign_member",
+      "table": "app_one_time_token"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "member_id"
+      ],
+      "ref_table": "pos_member",
+      "table": "app_one_time_token"
+    },
+    {
+      "columns": [
+        "user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "app_one_time_token"
+    },
+    {
+      "columns": [
+        "user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "app_session"
+    },
+    {
+      "columns": [
+        "canonical_unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "unit_id"
+      ],
+      "ref_table": "app_unit",
+      "table": "app_unit"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "app_unit"
+    },
+    {
+      "columns": [
+        "person_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "person_id"
+      ],
+      "ref_table": "hr_person",
+      "table": "app_user"
+    },
+    {
+      "columns": [
+        "granted_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "app_user_location_scope"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "app_user_location_scope"
+    },
+    {
+      "columns": [
+        "user_role_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_role_id"
+      ],
+      "ref_table": "app_user_role",
+      "table": "app_user_location_scope"
+    },
+    {
+      "columns": [
+        "granted_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "app_user_role"
+    },
+    {
+      "columns": [
+        "role_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "role_id"
+      ],
+      "ref_table": "app_role",
+      "table": "app_user_role"
+    },
+    {
+      "columns": [
+        "user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "app_user_role"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "currency_policy_id",
+        "target_currency_assignment_id",
+        "source_currency_code",
+        "target_currency_code"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "TABLE",
+      "ref_columns": [
+        "currency_policy_id",
+        "target_currency_assignment_id",
+        "source_currency_code",
+        "target_currency_code"
+      ],
+      "ref_table": "finance_currency_policy",
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "fx_rate_observation_id",
+        "source_currency_code",
+        "target_currency_code"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "TABLE",
+      "ref_columns": [
+        "fx_rate_observation_id",
+        "from_currency_code",
+        "to_currency_code"
+      ],
+      "ref_table": "finance_fx_rate_observation",
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "material_price_observation_id",
+        "material_id",
+        "source_currency_code"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "TABLE",
+      "ref_columns": [
+        "material_price_observation_id",
+        "material_id",
+        "transaction_currency_code"
+      ],
+      "ref_table": "scm_material_price_observation",
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "input_unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "unit_id"
+      ],
+      "ref_table": "app_unit",
+      "table": "cost_card_recipe_component"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "cost_card_recipe_component"
+    },
+    {
+      "columns": [
+        "material_unit_conversion_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_unit_conversion_id"
+      ],
+      "ref_table": "scm_material_unit_conversion",
+      "table": "cost_card_recipe_component"
+    },
+    {
+      "columns": [
+        "recipe_version_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "recipe_version_id"
+      ],
+      "ref_table": "cost_card_recipe_version",
+      "table": "cost_card_recipe_component"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "cost_card_recipe_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "cost_card_recipe_version"
+    },
+    {
+      "columns": [
+        "output_material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "cost_card_recipe_version"
+    },
+    {
+      "columns": [
+        "output_product_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "product_id"
+      ],
+      "ref_table": "ops_product",
+      "table": "cost_card_recipe_version"
+    },
+    {
+      "columns": [
+        "yield_unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "unit_id"
+      ],
+      "ref_table": "app_unit",
+      "table": "cost_card_recipe_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_accounting_entity"
+    },
+    {
+      "columns": [
+        "parent_accounting_entity_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "accounting_entity_id"
+      ],
+      "ref_table": "finance_accounting_entity",
+      "table": "finance_accounting_entity"
+    },
+    {
+      "columns": [
+        "verified_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_accounting_entity"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "finance_cashflow_line"
+    },
+    {
+      "columns": [
+        "finance_import_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "finance_import_batch_id"
+      ],
+      "ref_table": "finance_import_batch",
+      "table": "finance_cashflow_line"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_cashflow_line"
+    },
+    {
+      "columns": [
+        "accounting_entity_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "accounting_entity_id"
+      ],
+      "ref_table": "finance_accounting_entity",
+      "table": "finance_currency_assignment"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_currency_assignment"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_currency_assignment"
+    },
+    {
+      "columns": [
+        "currency_code"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "finance_currency_assignment"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_currency_assignment"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_currency_policy"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_currency_policy"
+    },
+    {
+      "columns": [
+        "rate_source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "finance_currency_policy"
+    },
+    {
+      "columns": [
+        "source_currency_code"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "finance_currency_policy"
+    },
+    {
+      "columns": [
+        "target_currency_assignment_id",
+        "target_currency_code"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "TABLE",
+      "ref_columns": [
+        "currency_assignment_id",
+        "currency_code"
+      ],
+      "ref_table": "finance_currency_assignment",
+      "table": "finance_currency_policy"
+    },
+    {
+      "columns": [
+        "from_currency_code"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "source_job_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_run_id"
+      ],
+      "ref_table": "app_job_run",
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "supersedes_fx_rate_observation_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "fx_rate_observation_id"
+      ],
+      "ref_table": "finance_fx_rate_observation",
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "to_currency_code"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "verified_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_run_id"
+      ],
+      "ref_table": "app_job_run",
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "scope_location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "supersedes_finance_import_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "finance_import_batch_id"
+      ],
+      "ref_table": "finance_import_batch",
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "finance_import_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "finance_import_batch_id"
+      ],
+      "ref_table": "finance_import_batch",
+      "table": "finance_inventory_flow_line"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_inventory_flow_line"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "finance_inventory_flow_line"
+    },
+    {
+      "columns": [
+        "finance_import_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "finance_import_batch_id"
+      ],
+      "ref_table": "finance_import_batch",
+      "table": "finance_inventory_snapshot_line"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_inventory_snapshot_line"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "finance_inventory_snapshot_line"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "finance_item_sales_monthly"
+    },
+    {
+      "columns": [
+        "finance_import_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "finance_import_batch_id"
+      ],
+      "ref_table": "finance_import_batch",
+      "table": "finance_item_sales_monthly"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_item_sales_monthly"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "product_id"
+      ],
+      "ref_table": "ops_product",
+      "table": "finance_item_sales_monthly"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "finance_monthly_cost_line"
+    },
+    {
+      "columns": [
+        "finance_import_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "finance_import_batch_id"
+      ],
+      "ref_table": "finance_import_batch",
+      "table": "finance_monthly_cost_line"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_monthly_cost_line"
+    },
+    {
+      "columns": [
+        "finance_import_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "finance_import_batch_id"
+      ],
+      "ref_table": "finance_import_batch",
+      "table": "finance_monthly_metric"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_monthly_metric"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "finance_order_logistics_line"
+    },
+    {
+      "columns": [
+        "finance_import_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "finance_import_batch_id"
+      ],
+      "ref_table": "finance_import_batch",
+      "table": "finance_order_logistics_line"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_order_logistics_line"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "finance_order_logistics_line"
+    },
+    {
+      "columns": [
+        "supplier_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "supplier_id"
+      ],
+      "ref_table": "scm_supplier",
+      "table": "finance_order_logistics_line"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_period_category_map"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_period_category_map"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "finance_sales_daily"
+    },
+    {
+      "columns": [
+        "finance_import_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "finance_import_batch_id"
+      ],
+      "ref_table": "finance_import_batch",
+      "table": "finance_sales_daily"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_sales_daily"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "finance_supplier_purchase_monthly"
+    },
+    {
+      "columns": [
+        "finance_import_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "finance_import_batch_id"
+      ],
+      "ref_table": "finance_import_batch",
+      "table": "finance_supplier_purchase_monthly"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_supplier_purchase_monthly"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "finance_supplier_purchase_monthly"
+    },
+    {
+      "columns": [
+        "supplier_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "supplier_id"
+      ],
+      "ref_table": "scm_supplier",
+      "table": "finance_supplier_purchase_monthly"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_target"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "finance_target"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "finance_target"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_application"
+    },
+    {
+      "columns": [
+        "job_requisition_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_requisition_id"
+      ],
+      "ref_table": "hr_job_requisition",
+      "table": "hr_application"
+    },
+    {
+      "columns": [
+        "person_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "person_id"
+      ],
+      "ref_table": "hr_person",
+      "table": "hr_application"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "hr_application"
+    },
+    {
+      "columns": [
+        "actor_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_application_stage_event"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "application_id"
+      ],
+      "ref_table": "hr_application",
+      "table": "hr_application_stage_event"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_run_id"
+      ],
+      "ref_table": "app_job_run",
+      "table": "hr_application_stage_event"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "hr_application_stage_event"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "application_id"
+      ],
+      "ref_table": "hr_application",
+      "table": "hr_appointment"
+    },
+    {
+      "columns": [
+        "confirmed_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_appointment"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_appointment"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "hr_appointment"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "application_id"
+      ],
+      "ref_table": "hr_application",
+      "table": "hr_assessment"
+    },
+    {
+      "columns": [
+        "appointment_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "appointment_id"
+      ],
+      "ref_table": "hr_appointment",
+      "table": "hr_assessment"
+    },
+    {
+      "columns": [
+        "assessor_employment_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "employment_id"
+      ],
+      "ref_table": "hr_employment",
+      "table": "hr_assessment"
+    },
+    {
+      "columns": [
+        "assessment_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "assessment_id"
+      ],
+      "ref_table": "hr_assessment",
+      "table": "hr_assessment_score"
+    },
+    {
+      "columns": [
+        "employment_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "employment_id"
+      ],
+      "ref_table": "hr_employment",
+      "table": "hr_employee_event"
+    },
+    {
+      "columns": [
+        "from_location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "hr_employee_event"
+    },
+    {
+      "columns": [
+        "recorded_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_employee_event"
+    },
+    {
+      "columns": [
+        "to_location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "hr_employee_event"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_employment"
+    },
+    {
+      "columns": [
+        "home_location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "hr_employment"
+    },
+    {
+      "columns": [
+        "origin_application_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "application_id"
+      ],
+      "ref_table": "hr_application",
+      "table": "hr_employment"
+    },
+    {
+      "columns": [
+        "person_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "person_id"
+      ],
+      "ref_table": "hr_person",
+      "table": "hr_employment"
+    },
+    {
+      "columns": [
+        "candidate_employment_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "employment_id"
+      ],
+      "ref_table": "hr_employment",
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "candidate_person_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "person_id"
+      ],
+      "ref_table": "hr_person",
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "confirmed_source_identity_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "employment_source_identity_id"
+      ],
+      "ref_table": "hr_employment_source_identity",
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "reviewed_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_employment_source_identity"
+    },
+    {
+      "columns": [
+        "employment_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "employment_id"
+      ],
+      "ref_table": "hr_employment",
+      "table": "hr_employment_source_identity"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "hr_employment_source_identity"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_job_requisition"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_job_requisition"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "hr_job_requisition"
+    },
+    {
+      "columns": [
+        "role_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "role_id"
+      ],
+      "ref_table": "ops_role",
+      "table": "hr_job_requisition"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "application_id"
+      ],
+      "ref_table": "hr_application",
+      "table": "hr_offer"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_offer"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "hr_offer"
+    },
+    {
+      "columns": [
+        "role_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "role_id"
+      ],
+      "ref_table": "ops_role",
+      "table": "hr_offer"
+    },
+    {
+      "columns": [
+        "supersedes_offer_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "offer_id"
+      ],
+      "ref_table": "hr_offer",
+      "table": "hr_offer"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_person"
+    },
+    {
+      "columns": [
+        "merged_into_person_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "person_id"
+      ],
+      "ref_table": "hr_person",
+      "table": "hr_person"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_person_contact"
+    },
+    {
+      "columns": [
+        "person_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "person_id"
+      ],
+      "ref_table": "hr_person",
+      "table": "hr_person_contact"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_screening_rule"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "hr_screening_rule"
+    },
+    {
+      "columns": [
+        "role_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "role_id"
+      ],
+      "ref_table": "ops_role",
+      "table": "hr_screening_rule"
+    },
+    {
+      "columns": [
+        "campaign_version_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "campaign_version_id"
+      ],
+      "ref_table": "mkt_campaign_version",
+      "table": "mkt_campaign_member"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "member_id"
+      ],
+      "ref_table": "pos_member",
+      "table": "mkt_campaign_member"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "mkt_campaign_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "mkt_campaign_version"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "mkt_campaign_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "mkt_reward"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "product_id"
+      ],
+      "ref_table": "ops_product",
+      "table": "mkt_reward"
+    },
+    {
+      "columns": [
+        "campaign_member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "campaign_member_id"
+      ],
+      "ref_table": "mkt_campaign_member",
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "redeemed_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "reward_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "reward_id"
+      ],
+      "ref_table": "mkt_reward",
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "reward_stock_id",
+        "reward_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "TABLE",
+      "ref_columns": [
+        "reward_stock_id",
+        "reward_id"
+      ],
+      "ref_table": "mkt_reward_stock",
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "survey_result_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "survey_result_id"
+      ],
+      "ref_table": "mkt_survey_result",
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "campaign_version_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "campaign_version_id"
+      ],
+      "ref_table": "mkt_campaign_version",
+      "table": "mkt_reward_stock"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "mkt_reward_stock"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "mkt_reward_stock"
+    },
+    {
+      "columns": [
+        "reward_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "reward_id"
+      ],
+      "ref_table": "mkt_reward",
+      "table": "mkt_reward_stock"
+    },
+    {
+      "columns": [
+        "selected_option_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "survey_question_option_id"
+      ],
+      "ref_table": "mkt_survey_question_option",
+      "table": "mkt_survey_answer"
+    },
+    {
+      "columns": [
+        "survey_question_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "survey_question_id"
+      ],
+      "ref_table": "mkt_survey_question",
+      "table": "mkt_survey_answer"
+    },
+    {
+      "columns": [
+        "survey_response_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "survey_response_id"
+      ],
+      "ref_table": "mkt_survey_response",
+      "table": "mkt_survey_answer"
+    },
+    {
+      "columns": [
+        "campaign_version_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "campaign_version_id"
+      ],
+      "ref_table": "mkt_campaign_version",
+      "table": "mkt_survey_question"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "mkt_survey_question"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "mkt_survey_question_option"
+    },
+    {
+      "columns": [
+        "survey_question_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "survey_question_id"
+      ],
+      "ref_table": "mkt_survey_question",
+      "table": "mkt_survey_question_option"
+    },
+    {
+      "columns": [
+        "campaign_member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "campaign_member_id"
+      ],
+      "ref_table": "mkt_campaign_member",
+      "table": "mkt_survey_response"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "mkt_survey_response"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "mkt_survey_result"
+    },
+    {
+      "columns": [
+        "survey_response_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "survey_response_id"
+      ],
+      "ref_table": "mkt_survey_response",
+      "table": "mkt_survey_result"
+    },
+    {
+      "columns": [
+        "app_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "msg_conversation"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "application_id"
+      ],
+      "ref_table": "hr_application",
+      "table": "msg_conversation"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "member_id"
+      ],
+      "ref_table": "pos_member",
+      "table": "msg_conversation"
+    },
+    {
+      "columns": [
+        "person_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "person_id"
+      ],
+      "ref_table": "hr_person",
+      "table": "msg_conversation"
+    },
+    {
+      "columns": [
+        "conversation_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "conversation_id"
+      ],
+      "ref_table": "msg_conversation",
+      "table": "msg_conversation_state"
+    },
+    {
+      "columns": [
+        "outbound_message_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "outbound_message_id"
+      ],
+      "ref_table": "msg_outbound_message",
+      "table": "msg_delivery_attempt"
+    },
+    {
+      "columns": [
+        "conversation_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "conversation_id"
+      ],
+      "ref_table": "msg_conversation",
+      "table": "msg_message"
+    },
+    {
+      "columns": [
+        "outbound_message_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "outbound_message_id"
+      ],
+      "ref_table": "msg_outbound_message",
+      "table": "msg_message"
+    },
+    {
+      "columns": [
+        "ai_call_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "ai_call_id"
+      ],
+      "ref_table": "ai_call",
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "appointment_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "appointment_id"
+      ],
+      "ref_table": "hr_appointment",
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "campaign_member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "campaign_member_id"
+      ],
+      "ref_table": "mkt_campaign_member",
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "conversation_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "conversation_id"
+      ],
+      "ref_table": "msg_conversation",
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_run_id"
+      ],
+      "ref_table": "app_job_run",
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "queued_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "review_action_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "review_action_id"
+      ],
+      "ref_table": "ops_review_action",
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_business_rule"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_business_rule"
+    },
+    {
+      "columns": [
+        "scope_location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "ops_business_rule"
+    },
+    {
+      "columns": [
+        "scope_product_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "product_id"
+      ],
+      "ref_table": "ops_product",
+      "table": "ops_business_rule"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_run_id"
+      ],
+      "ref_table": "app_job_run",
+      "table": "ops_calendar_event"
+    },
+    {
+      "columns": [
+        "ai_call_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "ai_call_id"
+      ],
+      "ref_table": "ai_call",
+      "table": "ops_daily_review"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_daily_review"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_daily_review"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "ops_daily_review"
+    },
+    {
+      "columns": [
+        "manager_currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "ops_daily_review"
+    },
+    {
+      "columns": [
+        "forecast_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "forecast_run_id"
+      ],
+      "ref_table": "ops_forecast_run",
+      "table": "ops_forecast_line"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "product_id"
+      ],
+      "ref_table": "ops_product",
+      "table": "ops_forecast_line"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_run_id"
+      ],
+      "ref_table": "app_job_run",
+      "table": "ops_forecast_run"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "ops_forecast_run"
+    },
+    {
+      "columns": [
+        "parent_location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "ops_location"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_location_source_identity"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "ops_location_source_identity"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "ops_location_source_identity"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_operational_event"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "ops_operational_event"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_operational_event_product"
+    },
+    {
+      "columns": [
+        "operational_event_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "operational_event_id"
+      ],
+      "ref_table": "ops_operational_event",
+      "table": "ops_operational_event_product"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "product_id"
+      ],
+      "ref_table": "ops_product",
+      "table": "ops_operational_event_product"
+    },
+    {
+      "columns": [
+        "base_unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "unit_id"
+      ],
+      "ref_table": "app_unit",
+      "table": "ops_product"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_product"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_product_alias"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "product_id"
+      ],
+      "ref_table": "ops_product",
+      "table": "ops_product_alias"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "ops_product_alias"
+    },
+    {
+      "columns": [
+        "based_on_plan_line_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "production_plan_line_id"
+      ],
+      "ref_table": "ops_production_plan_line",
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "confirmed_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "forecast_line_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "forecast_line_id"
+      ],
+      "ref_table": "ops_forecast_line",
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "product_id"
+      ],
+      "ref_table": "ops_product",
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "production_plan_version_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "production_plan_version_id"
+      ],
+      "ref_table": "ops_production_plan_version",
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "suggested_by_ai_call_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "ai_call_id"
+      ],
+      "ref_table": "ai_call",
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "unit_id"
+      ],
+      "ref_table": "app_unit",
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_production_plan_version"
+    },
+    {
+      "columns": [
+        "based_on_version_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "production_plan_version_id"
+      ],
+      "ref_table": "ops_production_plan_version",
+      "table": "ops_production_plan_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_production_plan_version"
+    },
+    {
+      "columns": [
+        "forecast_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "forecast_run_id"
+      ],
+      "ref_table": "ops_forecast_run",
+      "table": "ops_production_plan_version"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "ops_production_plan_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_review_action"
+    },
+    {
+      "columns": [
+        "daily_review_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "daily_review_id"
+      ],
+      "ref_table": "ops_daily_review",
+      "table": "ops_review_action"
+    },
+    {
+      "columns": [
+        "owner_employment_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "employment_id"
+      ],
+      "ref_table": "hr_employment",
+      "table": "ops_review_action"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_role"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "ops_stockout_event"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "ops_stockout_event"
+    },
+    {
+      "columns": [
+        "detected_job_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_run_id"
+      ],
+      "ref_table": "app_job_run",
+      "table": "ops_stockout_event"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "listing_id"
+      ],
+      "ref_table": "pos_product_listing",
+      "table": "ops_stockout_event"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "ops_stockout_event"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "pos_daily_breakdown"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_daily_breakdown"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_daily_breakdown"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "job_run_id"
+      ],
+      "ref_table": "app_job_run",
+      "table": "pos_ingest_batch"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_ingest_batch"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "pos_ingest_batch"
+    },
+    {
+      "columns": [
+        "supersedes_pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_ingest_batch"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "pos_item_sales_hour"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "listing_id"
+      ],
+      "ref_table": "pos_product_listing",
+      "table": "pos_item_sales_hour"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_item_sales_hour"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_item_sales_hour"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "pos_item_waste"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "listing_id"
+      ],
+      "ref_table": "pos_product_listing",
+      "table": "pos_item_waste"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_item_waste"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_item_waste"
+    },
+    {
+      "columns": [
+        "home_location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_member"
+    },
+    {
+      "columns": [
+        "merged_into_member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "member_id"
+      ],
+      "ref_table": "pos_member",
+      "table": "pos_member"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "pos_member"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "pos_member_balance_snapshot"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "member_id"
+      ],
+      "ref_table": "pos_member",
+      "table": "pos_member_balance_snapshot"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_member_balance_snapshot"
+    },
+    {
+      "columns": [
+        "issued_location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_member_card"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "member_id"
+      ],
+      "ref_table": "pos_member",
+      "table": "pos_member_card"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "pos_member_card"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "member_card_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "member_card_id"
+      ],
+      "ref_table": "pos_member_card",
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "member_id"
+      ],
+      "ref_table": "pos_member",
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "order_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "order_id"
+      ],
+      "ref_table": "pos_order",
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "member_id"
+      ],
+      "ref_table": "pos_member",
+      "table": "pos_member_contact"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "pos_member_daily_metric"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_member_daily_metric"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_member_daily_metric"
+    },
+    {
+      "columns": [
+        "first_seen_pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_order"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_order"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "pos_order"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "pos_order_item"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "listing_id"
+      ],
+      "ref_table": "pos_product_listing",
+      "table": "pos_order_item"
+    },
+    {
+      "columns": [
+        "order_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "order_id"
+      ],
+      "ref_table": "pos_order",
+      "table": "pos_order_item"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_order_item"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "pos_product_listing"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_product_listing"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "pos_product_listing"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "pos_product_mapping"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "listing_id"
+      ],
+      "ref_table": "pos_product_listing",
+      "table": "pos_product_mapping"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "product_id"
+      ],
+      "ref_table": "ops_product",
+      "table": "pos_product_mapping"
+    },
+    {
+      "columns": [
+        "candidate_product_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "product_id"
+      ],
+      "ref_table": "ops_product",
+      "table": "pos_product_mapping_review"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "pos_product_mapping_review"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "listing_id"
+      ],
+      "ref_table": "pos_product_listing",
+      "table": "pos_product_mapping_review"
+    },
+    {
+      "columns": [
+        "reviewed_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "pos_product_mapping_review"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "pos_sales_day"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_sales_day"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_sales_day"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "pos_sales_hour"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "location_id"
+      ],
+      "ref_table": "ops_location",
+      "table": "pos_sales_hour"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "pos_ingest_batch_id"
+      ],
+      "ref_table": "pos_ingest_batch",
+      "table": "pos_sales_hour"
+    },
+    {
+      "columns": [
+        "base_unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "unit_id"
+      ],
+      "ref_table": "app_unit",
+      "table": "scm_material"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "scm_material"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "scm_material_alias"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "scm_material_alias"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "scm_material_alias"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "material_unit_conversion_id",
+        "material_id",
+        "raw_price_unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "TABLE",
+      "ref_columns": [
+        "material_unit_conversion_id",
+        "material_id",
+        "from_unit_id"
+      ],
+      "ref_table": "scm_material_unit_conversion",
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "raw_price_unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "unit_id"
+      ],
+      "ref_table": "app_unit",
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "supersedes_material_price_observation_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_price_observation_id"
+      ],
+      "ref_table": "scm_material_price_observation",
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "supplier_item_id",
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "TABLE",
+      "ref_columns": [
+        "supplier_item_id",
+        "material_id"
+      ],
+      "ref_table": "scm_supplier_item",
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "transaction_currency_code"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "verified_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "scm_material_source_identity"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "scm_material_source_identity"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "scm_material_source_identity"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "from_unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "unit_id"
+      ],
+      "ref_table": "app_unit",
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "source_system_id"
+      ],
+      "ref_table": "app_source_system",
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "to_unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "unit_id"
+      ],
+      "ref_table": "app_unit",
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "verified_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "scm_supplier"
+    },
+    {
+      "columns": [
+        "default_quote_currency_code"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "currency_code"
+      ],
+      "ref_table": "app_currency",
+      "table": "scm_supplier"
+    },
+    {
+      "columns": [
+        "confirmed_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "user_id"
+      ],
+      "ref_table": "app_user",
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_id"
+      ],
+      "ref_table": "scm_material",
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "material_unit_conversion_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "material_unit_conversion_id"
+      ],
+      "ref_table": "scm_material_unit_conversion",
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "order_unit_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "unit_id"
+      ],
+      "ref_table": "app_unit",
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "supersedes_supplier_item_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "supplier_item_id"
+      ],
+      "ref_table": "scm_supplier_item",
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "supplier_id"
+      ],
+      "match_type": "SIMPLE",
+      "origin": "FIELD",
+      "ref_columns": [
+        "supplier_id"
+      ],
+      "ref_table": "scm_supplier",
+      "table": "scm_supplier_item"
+    }
+  ],
+  "apply_compatibility": "NOT_APPLY_COMPATIBLE",
+  "artifact_kind": "MODEL_DERIVED_REVIEW_CATALOG_NOT_PG_CATALOG_CAPTURE",
+  "constraint_trigger_catalog_status": "NOT_COMPILED",
+  "constraint_trigger_contracts": [
+    {
+      "catalog_status": "NOT_COMPILED",
+      "constraint_counting": "EXCLUDED_FROM_975_BUSINESS_CONSTRAINT_COMMENTS",
+      "invariant": "Child and referenced price/policy/assignment/FX parent-side eligibility, plus full-table restore acceptance.",
+      "required_kind": "DEFERRABLE_CONSTRAINT_TRIGGER_REQUIRED_CONTROLLED_FUNCTION_OPTIONAL",
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "catalog_status": "NOT_COMPILED",
+      "constraint_counting": "EXCLUDED_FROM_975_BUSINESS_CONSTRAINT_COMMENTS",
+      "invariant": "Branch parent kind/status, parent-cycle rejection and approved identity immutability.",
+      "required_kind": "DEFERRABLE_CONSTRAINT_TRIGGER_REQUIRED_CONTROLLED_FUNCTION_OPTIONAL",
+      "table": "finance_accounting_entity"
+    },
+    {
+      "catalog_status": "NOT_COMPILED",
+      "constraint_counting": "EXCLUDED_FROM_975_BUSINESS_CONSTRAINT_COMMENTS",
+      "invariant": "Scope identity/status/currency eligibility, controlled retirement and dependent-range safety.",
+      "required_kind": "DEFERRABLE_CONSTRAINT_TRIGGER_REQUIRED_CONTROLLED_FUNCTION_OPTIONAL",
+      "table": "finance_currency_assignment"
+    },
+    {
+      "catalog_status": "NOT_COMPILED",
+      "constraint_counting": "EXCLUDED_FROM_975_BUSINESS_CONSTRAINT_COMMENTS",
+      "invariant": "Assignment interval/target-currency consistency and dependent-selection range safety.",
+      "required_kind": "DEFERRABLE_CONSTRAINT_TRIGGER_REQUIRED_CONTROLLED_FUNCTION_OPTIONAL",
+      "table": "finance_currency_policy"
+    },
+    {
+      "catalog_status": "NOT_COMPILED",
+      "constraint_counting": "EXCLUDED_FROM_975_BUSINESS_CONSTRAINT_COMMENTS",
+      "invariant": "Authoritative job/audit provenance, terminal supersession, interpretation-version monotonicity and no cycles.",
+      "required_kind": "DEFERRABLE_CONSTRAINT_TRIGGER_REQUIRED_CONTROLLED_FUNCTION_OPTIONAL",
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "catalog_status": "NOT_COMPILED",
+      "constraint_counting": "EXCLUDED_FROM_975_BUSINESS_CONSTRAINT_COMMENTS",
+      "invariant": "Composite material/unit meaning, terminal supersession, automated verification provenance and append-only core.",
+      "required_kind": "DEFERRABLE_CONSTRAINT_TRIGGER_REQUIRED_CONTROLLED_FUNCTION_OPTIONAL",
+      "table": "scm_material_price_observation"
+    }
+  ],
+  "core_table_names": [
+    "ai_call",
+    "ai_prompt_segment",
+    "ai_prompt_template",
+    "ai_prompt_template_segment",
+    "app_audit_event",
+    "app_currency",
+    "app_job_run",
+    "app_one_time_token",
+    "app_rate_limit_event",
+    "app_role",
+    "app_schema_migration",
+    "app_session",
+    "app_source_system",
+    "app_unit",
+    "app_user",
+    "app_user_location_scope",
+    "app_user_role",
+    "cost_card_material_cost_selection",
+    "cost_card_recipe_component",
+    "cost_card_recipe_version",
+    "finance_accounting_entity",
+    "finance_cashflow_line",
+    "finance_currency_assignment",
+    "finance_currency_policy",
+    "finance_fx_rate_observation",
+    "finance_import_batch",
+    "finance_inventory_flow_line",
+    "finance_inventory_snapshot_line",
+    "finance_item_sales_monthly",
+    "finance_monthly_cost_line",
+    "finance_monthly_metric",
+    "finance_order_logistics_line",
+    "finance_period_category_map",
+    "finance_sales_daily",
+    "finance_supplier_purchase_monthly",
+    "finance_target",
+    "hr_application",
+    "hr_application_stage_event",
+    "hr_appointment",
+    "hr_assessment",
+    "hr_assessment_score",
+    "hr_employee_event",
+    "hr_employment",
+    "hr_employment_mapping_review",
+    "hr_employment_source_identity",
+    "hr_job_requisition",
+    "hr_offer",
+    "hr_person",
+    "hr_person_contact",
+    "hr_screening_rule",
+    "mkt_campaign_member",
+    "mkt_campaign_version",
+    "mkt_reward",
+    "mkt_reward_claim",
+    "mkt_reward_stock",
+    "mkt_survey_answer",
+    "mkt_survey_question",
+    "mkt_survey_question_option",
+    "mkt_survey_response",
+    "mkt_survey_result",
+    "msg_conversation",
+    "msg_conversation_state",
+    "msg_delivery_attempt",
+    "msg_message",
+    "msg_outbound_message",
+    "ops_business_rule",
+    "ops_calendar_event",
+    "ops_daily_review",
+    "ops_forecast_line",
+    "ops_forecast_run",
+    "ops_location",
+    "ops_location_source_identity",
+    "ops_operational_event",
+    "ops_operational_event_product",
+    "ops_product",
+    "ops_product_alias",
+    "ops_production_plan_line",
+    "ops_production_plan_version",
+    "ops_review_action",
+    "ops_role",
+    "ops_stockout_event",
+    "pos_daily_breakdown",
+    "pos_ingest_batch",
+    "pos_item_sales_hour",
+    "pos_item_waste",
+    "pos_member",
+    "pos_member_balance_snapshot",
+    "pos_member_card",
+    "pos_member_card_transaction",
+    "pos_member_contact",
+    "pos_member_daily_metric",
+    "pos_order",
+    "pos_order_item",
+    "pos_product_listing",
+    "pos_product_mapping",
+    "pos_product_mapping_review",
+    "pos_sales_day",
+    "pos_sales_hour",
+    "scm_material",
+    "scm_material_alias",
+    "scm_material_price_observation",
+    "scm_material_source_identity",
+    "scm_material_unit_conversion",
+    "scm_supplier",
+    "scm_supplier_item"
+  ],
+  "counts": {
+    "active_foreign_keys": 332,
+    "catalog_total_indexes": 505,
+    "check_constraints": 404,
+    "column_comments": 1470,
+    "columns": 1470,
+    "constraint_comments": 975,
+    "exclusion_constraints": 21,
+    "foreign_key_support_indexes": 266,
+    "index_comments": 266,
+    "primary_keys": 105,
+    "sql_views": 0,
+    "table_comments": 105,
+    "tables": 105,
+    "unique_constraints": 113
+  },
+  "counts_assertion": {
+    "active_foreign_keys": 332,
+    "catalog_total_indexes": 505,
+    "check_constraints": 404,
+    "column_comments": 1470,
+    "columns": 1470,
+    "constraint_comments": 975,
+    "exclusion_constraints": 21,
+    "foreign_key_support_indexes": 266,
+    "index_comments": 266,
+    "primary_keys": 105,
+    "sql_views": 0,
+    "table_comments": 105,
+    "tables": 105,
+    "unique_constraints": 113
+  },
+  "counts_assertion_status": "MATCHED_INDEPENDENT_MODEL_RECOMPUTE",
+  "foreign_key_support_indexes": [
+    {
+      "columns": [
+        "actor_user_id"
+      ],
+      "table": "ai_call"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "table": "ai_call"
+    },
+    {
+      "columns": [
+        "prompt_template_id"
+      ],
+      "table": "ai_call"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "ai_prompt_segment"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ai_prompt_segment"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "ai_prompt_template"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ai_prompt_template"
+    },
+    {
+      "columns": [
+        "prompt_segment_id"
+      ],
+      "table": "ai_prompt_template_segment"
+    },
+    {
+      "columns": [
+        "actor_user_id"
+      ],
+      "table": "app_audit_event"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "table": "app_audit_event"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "table": "app_job_run"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "table": "app_one_time_token"
+    },
+    {
+      "columns": [
+        "campaign_member_id"
+      ],
+      "table": "app_one_time_token"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "table": "app_one_time_token"
+    },
+    {
+      "columns": [
+        "user_id"
+      ],
+      "table": "app_one_time_token"
+    },
+    {
+      "columns": [
+        "user_id"
+      ],
+      "table": "app_session"
+    },
+    {
+      "columns": [
+        "canonical_unit_id"
+      ],
+      "table": "app_unit"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "app_unit"
+    },
+    {
+      "columns": [
+        "person_id"
+      ],
+      "table": "app_user"
+    },
+    {
+      "columns": [
+        "granted_by_user_id"
+      ],
+      "table": "app_user_location_scope"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "app_user_location_scope"
+    },
+    {
+      "columns": [
+        "granted_by_user_id"
+      ],
+      "table": "app_user_role"
+    },
+    {
+      "columns": [
+        "role_id"
+      ],
+      "table": "app_user_role"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "currency_policy_id",
+        "target_currency_assignment_id",
+        "source_currency_code",
+        "target_currency_code"
+      ],
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "fx_rate_observation_id",
+        "source_currency_code",
+        "target_currency_code"
+      ],
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "material_price_observation_id",
+        "material_id",
+        "source_currency_code"
+      ],
+      "table": "cost_card_material_cost_selection"
+    },
+    {
+      "columns": [
+        "input_unit_id"
+      ],
+      "table": "cost_card_recipe_component"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "table": "cost_card_recipe_component"
+    },
+    {
+      "columns": [
+        "material_unit_conversion_id"
+      ],
+      "table": "cost_card_recipe_component"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "cost_card_recipe_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "cost_card_recipe_version"
+    },
+    {
+      "columns": [
+        "output_material_id"
+      ],
+      "table": "cost_card_recipe_version"
+    },
+    {
+      "columns": [
+        "output_product_id"
+      ],
+      "table": "cost_card_recipe_version"
+    },
+    {
+      "columns": [
+        "yield_unit_id"
+      ],
+      "table": "cost_card_recipe_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "finance_accounting_entity"
+    },
+    {
+      "columns": [
+        "parent_accounting_entity_id"
+      ],
+      "table": "finance_accounting_entity"
+    },
+    {
+      "columns": [
+        "verified_by_user_id"
+      ],
+      "table": "finance_accounting_entity"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "finance_cashflow_line"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "finance_cashflow_line"
+    },
+    {
+      "columns": [
+        "accounting_entity_id"
+      ],
+      "table": "finance_currency_assignment"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "finance_currency_assignment"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "finance_currency_assignment"
+    },
+    {
+      "columns": [
+        "currency_code"
+      ],
+      "table": "finance_currency_assignment"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "finance_currency_assignment"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "finance_currency_policy"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "finance_currency_policy"
+    },
+    {
+      "columns": [
+        "rate_source_system_id"
+      ],
+      "table": "finance_currency_policy"
+    },
+    {
+      "columns": [
+        "source_currency_code"
+      ],
+      "table": "finance_currency_policy"
+    },
+    {
+      "columns": [
+        "target_currency_assignment_id",
+        "target_currency_code"
+      ],
+      "table": "finance_currency_policy"
+    },
+    {
+      "columns": [
+        "from_currency_code"
+      ],
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "source_job_run_id"
+      ],
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "supersedes_fx_rate_observation_id"
+      ],
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "to_currency_code"
+      ],
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "verified_by_user_id"
+      ],
+      "table": "finance_fx_rate_observation"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "scope_location_id"
+      ],
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "supersedes_finance_import_batch_id"
+      ],
+      "table": "finance_import_batch"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "finance_inventory_flow_line"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "table": "finance_inventory_flow_line"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "finance_inventory_snapshot_line"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "table": "finance_inventory_snapshot_line"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "finance_item_sales_monthly"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "finance_item_sales_monthly"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "table": "finance_item_sales_monthly"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "finance_monthly_cost_line"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "finance_monthly_cost_line"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "finance_monthly_metric"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "finance_order_logistics_line"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "finance_order_logistics_line"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "table": "finance_order_logistics_line"
+    },
+    {
+      "columns": [
+        "supplier_id"
+      ],
+      "table": "finance_order_logistics_line"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "finance_period_category_map"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "finance_period_category_map"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "finance_sales_daily"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "finance_sales_daily"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "finance_supplier_purchase_monthly"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "finance_supplier_purchase_monthly"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "table": "finance_supplier_purchase_monthly"
+    },
+    {
+      "columns": [
+        "supplier_id"
+      ],
+      "table": "finance_supplier_purchase_monthly"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "finance_target"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "finance_target"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "hr_application"
+    },
+    {
+      "columns": [
+        "job_requisition_id"
+      ],
+      "table": "hr_application"
+    },
+    {
+      "columns": [
+        "person_id"
+      ],
+      "table": "hr_application"
+    },
+    {
+      "columns": [
+        "actor_user_id"
+      ],
+      "table": "hr_application_stage_event"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "table": "hr_application_stage_event"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "table": "hr_application_stage_event"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "table": "hr_application_stage_event"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "table": "hr_appointment"
+    },
+    {
+      "columns": [
+        "confirmed_by_user_id"
+      ],
+      "table": "hr_appointment"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "hr_appointment"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "hr_appointment"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "table": "hr_assessment"
+    },
+    {
+      "columns": [
+        "appointment_id"
+      ],
+      "table": "hr_assessment"
+    },
+    {
+      "columns": [
+        "assessor_employment_id"
+      ],
+      "table": "hr_assessment"
+    },
+    {
+      "columns": [
+        "employment_id"
+      ],
+      "table": "hr_employee_event"
+    },
+    {
+      "columns": [
+        "from_location_id"
+      ],
+      "table": "hr_employee_event"
+    },
+    {
+      "columns": [
+        "recorded_by_user_id"
+      ],
+      "table": "hr_employee_event"
+    },
+    {
+      "columns": [
+        "to_location_id"
+      ],
+      "table": "hr_employee_event"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "hr_employment"
+    },
+    {
+      "columns": [
+        "home_location_id"
+      ],
+      "table": "hr_employment"
+    },
+    {
+      "columns": [
+        "person_id"
+      ],
+      "table": "hr_employment"
+    },
+    {
+      "columns": [
+        "candidate_employment_id"
+      ],
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "candidate_person_id"
+      ],
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "confirmed_source_identity_id"
+      ],
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "reviewed_by_user_id"
+      ],
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "table": "hr_employment_mapping_review"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "hr_employment_source_identity"
+    },
+    {
+      "columns": [
+        "employment_id"
+      ],
+      "table": "hr_employment_source_identity"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "hr_job_requisition"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "hr_job_requisition"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "hr_job_requisition"
+    },
+    {
+      "columns": [
+        "role_id"
+      ],
+      "table": "hr_job_requisition"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "hr_offer"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "hr_offer"
+    },
+    {
+      "columns": [
+        "role_id"
+      ],
+      "table": "hr_offer"
+    },
+    {
+      "columns": [
+        "supersedes_offer_id"
+      ],
+      "table": "hr_offer"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "hr_person"
+    },
+    {
+      "columns": [
+        "merged_into_person_id"
+      ],
+      "table": "hr_person"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "hr_person_contact"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "hr_screening_rule"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "hr_screening_rule"
+    },
+    {
+      "columns": [
+        "role_id"
+      ],
+      "table": "hr_screening_rule"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "table": "mkt_campaign_member"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "mkt_campaign_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "mkt_campaign_version"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "mkt_campaign_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "mkt_reward"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "table": "mkt_reward"
+    },
+    {
+      "columns": [
+        "campaign_member_id"
+      ],
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "redeemed_by_user_id"
+      ],
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "reward_id"
+      ],
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "reward_stock_id",
+        "reward_id"
+      ],
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "survey_result_id"
+      ],
+      "table": "mkt_reward_claim"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "mkt_reward_stock"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "mkt_reward_stock"
+    },
+    {
+      "columns": [
+        "reward_id"
+      ],
+      "table": "mkt_reward_stock"
+    },
+    {
+      "columns": [
+        "selected_option_id"
+      ],
+      "table": "mkt_survey_answer"
+    },
+    {
+      "columns": [
+        "survey_question_id"
+      ],
+      "table": "mkt_survey_answer"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "mkt_survey_question"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "mkt_survey_question_option"
+    },
+    {
+      "columns": [
+        "app_user_id"
+      ],
+      "table": "msg_conversation"
+    },
+    {
+      "columns": [
+        "application_id"
+      ],
+      "table": "msg_conversation"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "table": "msg_conversation"
+    },
+    {
+      "columns": [
+        "person_id"
+      ],
+      "table": "msg_conversation"
+    },
+    {
+      "columns": [
+        "ai_call_id"
+      ],
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "appointment_id"
+      ],
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "campaign_member_id"
+      ],
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "conversation_id"
+      ],
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "queued_by_user_id"
+      ],
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "review_action_id"
+      ],
+      "table": "msg_outbound_message"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "ops_business_rule"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_business_rule"
+    },
+    {
+      "columns": [
+        "scope_product_id"
+      ],
+      "table": "ops_business_rule"
+    },
+    {
+      "columns": [
+        "ai_call_id"
+      ],
+      "table": "ops_daily_review"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "ops_daily_review"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_daily_review"
+    },
+    {
+      "columns": [
+        "manager_currency"
+      ],
+      "table": "ops_daily_review"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "table": "ops_forecast_line"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "table": "ops_forecast_run"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "ops_forecast_run"
+    },
+    {
+      "columns": [
+        "parent_location_id"
+      ],
+      "table": "ops_location"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_location_source_identity"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "ops_location_source_identity"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_operational_event"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "ops_operational_event"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_operational_event_product"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "table": "ops_operational_event_product"
+    },
+    {
+      "columns": [
+        "base_unit_id"
+      ],
+      "table": "ops_product"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_product"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_product_alias"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "table": "ops_product_alias"
+    },
+    {
+      "columns": [
+        "based_on_plan_line_id"
+      ],
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "confirmed_by_user_id"
+      ],
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "forecast_line_id"
+      ],
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "suggested_by_ai_call_id"
+      ],
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "unit_id"
+      ],
+      "table": "ops_production_plan_line"
+    },
+    {
+      "columns": [
+        "approved_by_user_id"
+      ],
+      "table": "ops_production_plan_version"
+    },
+    {
+      "columns": [
+        "based_on_version_id"
+      ],
+      "table": "ops_production_plan_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_production_plan_version"
+    },
+    {
+      "columns": [
+        "forecast_run_id"
+      ],
+      "table": "ops_production_plan_version"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_review_action"
+    },
+    {
+      "columns": [
+        "daily_review_id"
+      ],
+      "table": "ops_review_action"
+    },
+    {
+      "columns": [
+        "owner_employment_id"
+      ],
+      "table": "ops_review_action"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_role"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "ops_stockout_event"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "ops_stockout_event"
+    },
+    {
+      "columns": [
+        "detected_job_run_id"
+      ],
+      "table": "ops_stockout_event"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "table": "ops_stockout_event"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "ops_stockout_event"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "pos_daily_breakdown"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "table": "pos_daily_breakdown"
+    },
+    {
+      "columns": [
+        "job_run_id"
+      ],
+      "table": "pos_ingest_batch"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "pos_ingest_batch"
+    },
+    {
+      "columns": [
+        "supersedes_pos_ingest_batch_id"
+      ],
+      "table": "pos_ingest_batch"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "pos_item_sales_hour"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "table": "pos_item_sales_hour"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "table": "pos_item_sales_hour"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "pos_item_waste"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "table": "pos_item_waste"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "pos_item_waste"
+    },
+    {
+      "columns": [
+        "home_location_id"
+      ],
+      "table": "pos_member"
+    },
+    {
+      "columns": [
+        "merged_into_member_id"
+      ],
+      "table": "pos_member"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "pos_member_balance_snapshot"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "table": "pos_member_balance_snapshot"
+    },
+    {
+      "columns": [
+        "issued_location_id"
+      ],
+      "table": "pos_member_card"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "table": "pos_member_card"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "member_card_id"
+      ],
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "member_id"
+      ],
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "order_id"
+      ],
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "table": "pos_member_card_transaction"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "pos_member_daily_metric"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "table": "pos_member_daily_metric"
+    },
+    {
+      "columns": [
+        "first_seen_pos_ingest_batch_id"
+      ],
+      "table": "pos_order"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "pos_order"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "pos_order_item"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "table": "pos_order_item"
+    },
+    {
+      "columns": [
+        "order_id"
+      ],
+      "table": "pos_order_item"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "pos_product_listing"
+    },
+    {
+      "columns": [
+        "location_id"
+      ],
+      "table": "pos_product_listing"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "pos_product_mapping"
+    },
+    {
+      "columns": [
+        "product_id"
+      ],
+      "table": "pos_product_mapping"
+    },
+    {
+      "columns": [
+        "candidate_product_id"
+      ],
+      "table": "pos_product_mapping_review"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "pos_product_mapping_review"
+    },
+    {
+      "columns": [
+        "listing_id"
+      ],
+      "table": "pos_product_mapping_review"
+    },
+    {
+      "columns": [
+        "reviewed_by_user_id"
+      ],
+      "table": "pos_product_mapping_review"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "pos_sales_day"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "table": "pos_sales_day"
+    },
+    {
+      "columns": [
+        "currency"
+      ],
+      "table": "pos_sales_hour"
+    },
+    {
+      "columns": [
+        "pos_ingest_batch_id"
+      ],
+      "table": "pos_sales_hour"
+    },
+    {
+      "columns": [
+        "base_unit_id"
+      ],
+      "table": "scm_material"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "scm_material"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "scm_material_alias"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "table": "scm_material_alias"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "material_unit_conversion_id",
+        "material_id",
+        "raw_price_unit_id"
+      ],
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "raw_price_unit_id"
+      ],
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "supersedes_material_price_observation_id"
+      ],
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "supplier_item_id",
+        "material_id"
+      ],
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "transaction_currency_code"
+      ],
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "verified_by_user_id"
+      ],
+      "table": "scm_material_price_observation"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "scm_material_source_identity"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "table": "scm_material_source_identity"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "from_unit_id"
+      ],
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "source_system_id"
+      ],
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "to_unit_id"
+      ],
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "verified_by_user_id"
+      ],
+      "table": "scm_material_unit_conversion"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "scm_supplier"
+    },
+    {
+      "columns": [
+        "default_quote_currency_code"
+      ],
+      "table": "scm_supplier"
+    },
+    {
+      "columns": [
+        "confirmed_by_user_id"
+      ],
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "created_by_user_id"
+      ],
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "material_id"
+      ],
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "material_unit_conversion_id"
+      ],
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "order_unit_id"
+      ],
+      "table": "scm_supplier_item"
+    },
+    {
+      "columns": [
+        "supersedes_supplier_item_id"
+      ],
+      "table": "scm_supplier_item"
+    }
+  ],
+  "physical_sql_views": [],
+  "release_status": "DESIGN_ONLY_NOT_COMPILED",
+  "resolved_model_sha256": "72c68f5961cbf2c6456cf61d39d3b3e8188f458de90c88ef7c1afaac4be80a7f",
+  "revision_id": "R6A1-FX-SIGNED-POS",
+  "status": "MODEL_DERIVED_DESIGN_ONLY",
+  "unique_constraint_subtypes": {
+    "nulls_distinct": 16,
+    "nulls_not_distinct": 10,
+    "ordinary": 87
+  },
+  "version": 1
+}

@@ -260,12 +260,26 @@ ${disambiguation ? `\n技能边界区分（务必据此选择最贴切的一个�
         return { action: "chat", reply: parsed.reply || "", needMoreInfo: false };
       }
 
+      const needMoreInfo = parsed.needMoreInfo || false;
+
+      // action=skill 时丢掉 parsed.reply —— 与关键词直击(:63)/向量命中(:79)/降级回落(:277)
+      // 三条同样 dispatch skill 的路径保持一致，它们都写死 reply: ""。
+      //
+      // 只有这条 LLM 路径原先会透传，而 LLM 完全可能返回自相矛盾的组合：
+      // 2026-08-06「复盘」一词同时命中 daily_review_chat 与 forecast_review，LLM 返回
+      // {action:"skill", skillId:"daily_review_chat", needMoreInfo:false} 却又在 reply 里
+      // 写「您想进行每日复盘还是预测复盘？」——于是店长同时收到一句反问和一整份复盘卡片，
+      // 看起来像跑了两套逻辑。needMoreInfo=false 已经表示「不用再问了」，此时的 reply 必然是废话。
+      //
+      // needMoreInfo=true 是另一回事（招聘搜索靠它收集 jdText），那条路要留着 reply 去追问。
+      const suppressReply = action === "skill" && !needMoreInfo;
+
       return {
         action,
-        reply: parsed.reply || "",
+        reply: suppressReply ? "" : parsed.reply || "",
         skillId: chosenSkillId,
         skillInput: parsed.skillInput,
-        needMoreInfo: parsed.needMoreInfo || false,
+        needMoreInfo,
       };
     } catch (err) {
       logger.error("IntentRouter LLM failed", { error: String(err) });

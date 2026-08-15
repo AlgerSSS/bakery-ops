@@ -1,0 +1,47 @@
+{
+  "evidence_version": 1,
+  "captured_at": "2026-08-09T10:38:22Z",
+  "method": "Read-only aggregate SQL against production public tables; no member IDs, names, phones, order IDs, or item keys were exported.",
+  "table": "pos_member_order_item",
+  "range": {
+    "min_business_date": "2026-01-01",
+    "max_business_date": "2026-08-08"
+  },
+  "aggregate": {
+    "row_count": 43997,
+    "distinct_order_count": 12760,
+    "distinct_item_key_count": 99,
+    "attributed_row_count": 35348,
+    "distinct_attributed_member_count": 2878,
+    "current_pos_member_row_count": 4845,
+    "net_sales_myr": "438756.90",
+    "quantity": "55974.000",
+    "zero_quantity_row_count": 0,
+    "negative_quantity_row_count": 0,
+    "minimum_quantity": "1.000",
+    "maximum_quantity": "34.000",
+    "negative_net_sales_row_count": 46,
+    "zero_net_sales_row_count": 9574
+  },
+  "product_mapping": {
+    "missing_product_row_count": 3,
+    "missing_product_item_key_count": 2
+  },
+  "member_attribution": {
+    "unique_member_order_count": 10047,
+    "ambiguous_member_order_count": 5,
+    "unmatched_order_count": 2708
+  },
+  "day_2026_08_07_current_state": {
+    "row_count": 106,
+    "distinct_order_count": 36,
+    "net_sales_myr": "1437.13",
+    "quantity": "141.000"
+  },
+  "evidence_limits": [
+    "The current-state query verifies the post-sync contents but cannot independently reconstruct the before/after states of Claude's rerun.",
+    "The reported same-day rerun proves conflict-upsert repeatability for an unchanged result set; it does not prove deletion-safe reconciliation when the source later removes a row.",
+    "The current table has no source_system_id, location_id, ingest batch, raw-row evidence, foreign keys, or batch completeness manifest.",
+    "member_id is a cached attribution result; the target model rebuilds attribution from member-card transaction facts and retains ambiguous/unmatched status."
+  ]
+}

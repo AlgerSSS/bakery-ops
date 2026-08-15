@@ -1,0 +1,952 @@
+﻿object_type,object_name,ordinal_position,column_name,data_type,nullable,default,identity_kind,generated_kind,meaning,meaning_evidence_status,constraints,misuse_warning
+table,ai_call_log,1,id,integer,False,nextval('ai_call_log_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_call_log,2,caller,character varying(80),True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_call_log,3,model,character varying(80),True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_call_log,4,prompt,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_call_log,5,response,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_call_log,6,prompt_tokens,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_call_log,7,completion_tokens,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_call_log,8,latency_ms,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_call_log,9,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_daily_correction,1,id,integer,False,nextval('ai_daily_correction_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_daily_correction,2,date,character varying(10),False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,unique: UNIQUE (date),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_daily_correction,3,coefficient,double precision,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_daily_correction,4,reason,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_daily_correction,5,adopted_at,timestamp with time zone,True,now(),,,字段名显示它可能存放 adopted 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ai_daily_correction,6,adopted_by,character varying(64),True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,1,id,bigint,False,nextval('app_audit_log_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE SET NULL | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,2,user_id,bigint,True,—,,,字段名显示它可能存放 user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE SET NULL,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,3,action,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(action) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,4,object_type,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(object_type) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,5,object_id,text,True,—,,,字段名显示它可能存放 object 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,6,before_data,jsonb,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,7,after_data,jsonb,True,—,,,审计载荷（JSON 对象）。084 起 action='finance.import' 的这一列就是财务导入的权威批次账本：batchId / payloadSha256 / results / sourceFiles / storeSlots / rowCount / templateTypes / stores，幂等判定与上传历史页都读它。⚠ 写入必须用 ${json}::text::jsonb —— 写成 ::jsonb 会被 postgres.js 二次编码成 jsonb 字符串。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,8,result,text,False,'success'::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (result = ANY (ARRAY['success'::text, 'denied'::text, 'failed'::text, 'attempted'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,9,request_id,text,True,—,,,字段名显示它可能存放 request 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,10,user_agent,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,11,ip_address,inet,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_audit_log,12,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_role,1,id,bigint,False,nextval('app_role_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_role,2,code,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (code ~ '^[a-z][a-z0-9_.-]*$'::text) | unique: UNIQUE (code),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_role,3,name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(name) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_role,4,description,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_role,5,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_role,6,permissions,text[],False,'{}'::text[],,,该角色拥有的权限码；← app_permission + app_role_permission（071 折入）。,已确认：生产库字段注释,"check: CHECK (permissions <@ ARRAY['finance.read'::text, 'finance.import'::text, 'cost_card.read'::text, 'cost_card.write'::text, 'cost_card.publish'::text, 'cost_item.price.write'::text, 'admin.users'::text, 'audit.read'::text])",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_session,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_session,2,user_id,bigint,False,—,,,字段名显示它可能存放 user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_session,3,token_hash,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (token_hash ~ '^[0-9a-f]{64}$'::text) | unique: UNIQUE (token_hash),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_session,4,expires_at,timestamp with time zone,False,—,,,字段名显示它可能存放 expires 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,check: CHECK (expires_at > created_at),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_session,5,revoked_at,timestamp with time zone,True,—,,,字段名显示它可能存放 revoked 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_session,6,user_agent,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_session,7,ip_address,inet,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_session,8,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,check: CHECK (expires_at > created_at),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_session,9,last_seen_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 last_seen 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,1,id,bigint,False,nextval('app_user_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,2,username,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(username) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,3,display_name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(display_name) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,4,email,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,5,password_hash,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(password_hash) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,6,is_active,boolean,False,true,,,字段名显示它可能是 is_active 的布尔标记；NULL 与 false 是否不同需确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,7,must_change_password,boolean,False,true,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,8,failed_login_count,integer,False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (failed_login_count >= 0),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,9,locked_until,timestamp with time zone,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,10,last_login_at,timestamp with time zone,True,—,,,字段名显示它可能存放 last_login 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,11,password_changed_at,timestamp with time zone,True,—,,,字段名显示它可能存放 password_changed 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,12,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,13,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,14,role_code,text,False,'viewer'::text,,,账号角色（← app_user_role，082 折入）。一个账号恰好一个角色，由 api/users.js 保证。会话载荷仍返回 roles: [role_code] 数组形状 —— isAdminRole(roles).includes('admin') 依赖它。,已确认：生产库字段注释,foreign_key: FOREIGN KEY (role_code) REFERENCES app_role(code) ON UPDATE CASCADE ON DELETE RESTRICT,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,15,role_assigned_by,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user,16,role_assigned_at,timestamp with time zone,True,—,,,字段名显示它可能存放 role_assigned 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user_role_pre083,1,user_id,bigint,True,—,,,字段名显示它可能存放 user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user_role_pre083,2,role_id,bigint,True,—,,,字段名显示它可能存放 role 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user_role_pre083,3,assigned_by,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user_role_pre083,4,assigned_at,timestamp with time zone,True,—,,,字段名显示它可能存放 assigned 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user_store_scope,1,user_id,bigint,False,—,,,字段名显示它可能存放 user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,"foreign_key: FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE | primary_key: PRIMARY KEY (user_id, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user_store_scope,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"foreign_key: FOREIGN KEY (store) REFERENCES finance_store(store) ON UPDATE CASCADE ON DELETE RESTRICT | primary_key: PRIMARY KEY (user_id, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user_store_scope,3,assigned_by,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,foreign_key: FOREIGN KEY (assigned_by) REFERENCES app_user(id) ON DELETE SET NULL,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,app_user_store_scope,4,assigned_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 assigned 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (employee_id) REFERENCES employees(id) | foreign_key: FOREIGN KEY (job_opening_id) REFERENCES job_openings(id) | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,2,store_id,text,False,—,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (store_id) REFERENCES ops_store(store_code),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,3,job_opening_id,uuid,True,—,,,字段名显示它可能存放 job_opening 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (job_opening_id) REFERENCES job_openings(id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,4,employee_id,uuid,True,—,,,当前员工标识；需核对 employees、staff 或外部人事来源。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (employee_id) REFERENCES employees(id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,5,external_applicant_id,text,True,—,,,字段名显示它可能存放 external_applicant 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,6,name,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,7,phone,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,8,contact_status,text,False,'needs_manual'::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (contact_status = ANY (ARRAY['ready'::text, 'needs_manual'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,9,role_area,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (role_area = ANY (ARRAY['FOH'::text, 'BOH'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,10,position_code,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,11,stage,application_stage,False,'new'::application_stage,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,12,source,text,True,—,,,来源标签；当前是否有受控字典和强约束需逐表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,13,lark_record_id,text,True,—,,,字段名显示它可能存放 lark_record 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,14,applied_at,timestamp with time zone,True,—,,,字段名显示它可能存放 applied 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,15,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,applications,16,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (application_id) REFERENCES applications(id) | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,2,store_id,text,False,—,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (store_id) REFERENCES ops_store(store_code),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,3,application_id,uuid,False,—,,,字段名显示它可能存放 application 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (application_id) REFERENCES applications(id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,4,kind,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (kind = ANY (ARRAY['interview'::text, 'trial'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,5,role_area,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (role_area = ANY (ARRAY['FOH'::text, 'BOH'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,6,position_code,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,7,scheduled_for,timestamp with time zone,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,8,trial_duration,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (trial_duration = ANY (ARRAY['1小时'::text, '4小时'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,9,status,text,False,'proposed'::text,,,该行业务状态；合法状态集合以当前 CHECK 或写入代码为准。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,10,confirmed_by_user_id,text,True,—,,,字段名显示它可能存放 confirmed_by_user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (confirmed_by_user_id) REFERENCES staff(user_id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,11,confirmed_at,timestamp with time zone,True,—,,,字段名显示它可能存放 confirmed 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,12,lark_record_id,text,True,—,,,字段名显示它可能存放 lark_record 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,appointments,13,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,business_rule,1,id,integer,False,nextval('business_rule_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,business_rule,2,rule_key,character varying(100),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,unique: UNIQUE (rule_key),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,business_rule,3,rule_value,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,business_rule,4,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,business_rule,5,updated_at,timestamp with time zone,True,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (application_id) REFERENCES applications(id) | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,2,store_id,text,False,—,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,"foreign_key: FOREIGN KEY (store_id) REFERENCES ops_store(store_code) | unique: UNIQUE (store_id, phone)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,3,application_id,uuid,True,—,,,字段名显示它可能存放 application 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (application_id) REFERENCES applications(id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,4,phone,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"unique: UNIQUE (store_id, phone)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,5,state,text,False,'INTAKE'::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (state = ANY (ARRAY['INTAKE'::text, 'AWAITING_INTERVIEW_CONFIRM'::text, 'INTERVIEW_SCHEDULED'::text, 'AWAITING_TRIAL_CONFIRM'::text, 'TRIAL_SCHEDULED'::text, 'POST_TRIAL'::text, 'DONE'::text, 'OPTED_OUT'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,6,context,jsonb,False,'{}'::jsonb,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,7,opted_out,boolean,False,false,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,8,last_inbound_at,timestamp with time zone,True,—,,,字段名显示它可能存放 last_inbound 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,9,last_outbound_at,timestamp with time zone,True,—,,,字段名显示它可能存放 last_outbound 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,10,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,candidate_conversations,11,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,chat_history,1,id,bigint,False,nextval('chat_history_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,chat_history,2,conversation_id,text,False,—,,,字段名显示它可能存放 conversation 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,chat_history,3,role,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (role = ANY (ARRAY['user'::text, 'assistant'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,chat_history,4,content,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,chat_history,5,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,context_event,1,id,integer,False,nextval('context_event_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,context_event,2,date,character varying(10),False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,context_event,3,event_type,character varying(50),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,context_event,4,event_tag,character varying(100),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,context_event,5,description,text,True,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,context_event,6,impact_products,text,True,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,context_event,7,created_by,character varying(50),True,'manual'::character varying,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,context_event,8,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item,1,id,bigint,False,nextval('cost_card_item_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item,2,name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(name) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item,3,item_type,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (item_type = ANY (ARRAY['product'::text, 'semi_finished'::text, 'ingredient'::text, 'packaging'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item,4,base_unit,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(base_unit) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item,5,status,text,False,'active'::text,,,该行业务状态；合法状态集合以当前 CHECK 或写入代码为准。,合理推测：通用命名；需代码确认,"check: CHECK (status = ANY (ARRAY['active'::text, 'inactive'::text, 'archived'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item,6,source_ref,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item,7,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item,8,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_name_lock,1,name_key,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (name_key = lower(btrim(name_key)) AND name_key <> ''::text) | primary_key: PRIMARY KEY (name_key),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_name_lock,2,revision,bigint,False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (revision >= 0),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,1,id,bigint,False,nextval('cost_card_item_price_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (created_by) REFERENCES app_user(id) ON DELETE SET NULL | foreign_key: FOREIGN KEY (item_id) REFERENCES cost_card_item(id) | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,2,item_id,bigint,False,—,,,字段名显示它可能存放 item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (item_id) REFERENCES cost_card_item(id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,3,supplier,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,4,unit_price,"numeric(18,6)",False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (unit_price >= 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,5,currency,character varying(3),False,'MYR'::character varying,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (currency::text ~ '^[A-Z]{3}$'::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,6,price_unit,text,False,'g'::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(price_unit) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,7,effective_from,date,False,CURRENT_DATE,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (effective_to IS NULL OR effective_to >= effective_from),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,8,effective_to,date,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (effective_to IS NULL OR effective_to >= effective_from),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,9,source,text,False,'manual'::text,,,来源标签；当前是否有受控字典和强约束需逐表确认。,合理推测：通用命名；需代码确认,check: CHECK (btrim(source) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,10,created_by,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,foreign_key: FOREIGN KEY (created_by) REFERENCES app_user(id) ON DELETE SET NULL,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,11,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,12,price_quantity,"numeric(18,6)",False,1,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (price_quantity > 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,13,normalized_price_myr,"numeric(24,12)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,14,normalized_unit,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,15,exchange_rate_id,bigint,True,—,,,字段名显示它可能存放 exchange_rate 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,16,verification_state,text,False,'legacy_unverified'::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (verification_state = ANY (ARRAY['verified'::text, 'pending_verification'::text, 'legacy_unverified'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_item_price,17,verification_note,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link,1,pos_item_id,text,False,—,,,pos_product.item_id。不加外键：pos_product 由 res_api 每晚整表 upsert，商品下架会消失。,已确认：生产库字段注释,primary_key: PRIMARY KEY (pos_item_id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link,2,item_id,bigint,False,—,,,字段名显示它可能存放 item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (item_id) REFERENCES cost_card_item(id) ON DELETE RESTRICT,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link,3,mapped_by,text,False,'manual'::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link,4,mapped_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 mapped 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link,5,note,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link_pre080,1,id,bigint,True,—,,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link_pre080,2,item_id,bigint,True,—,,,字段名显示它可能存放 item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link_pre080,3,external_source,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link_pre080,4,external_key,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link_pre080,5,store,text,True,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_product_link_pre080,6,sku,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,1,id,bigint,False,nextval('cost_card_recipe_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (created_by) REFERENCES app_user(id) ON DELETE SET NULL | foreign_key: FOREIGN KEY (item_id) REFERENCES cost_card_item(id) | foreign_key: FOREIGN KEY (published_by) REFERENCES app_user(id) ON DELETE SET NULL | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,2,item_id,bigint,False,—,,,字段名显示它可能存放 item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,"foreign_key: FOREIGN KEY (item_id) REFERENCES cost_card_item(id) | unique: UNIQUE (item_id, version)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,3,version,integer,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (version > 0) | unique: UNIQUE (item_id, version)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,4,status,text,False,'draft'::text,,,该行业务状态；合法状态集合以当前 CHECK 或写入代码为准。,合理推测：通用命名；需代码确认,"check: CHECK (status <> 'published'::text OR effective_from IS NOT NULL) | check: CHECK (status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,5,batch_yield,"numeric(18,6)",False,1,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (batch_yield > 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,6,batch_unit,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(batch_unit) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,7,sale_price,"numeric(18,6)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (sale_price IS NULL OR sale_price >= 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,8,effective_from,date,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (effective_to IS NULL OR effective_from IS NULL OR effective_to >= effective_from) | check: CHECK (status <> 'published'::text OR effective_from IS NOT NULL),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,9,effective_to,date,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (effective_to IS NULL OR effective_from IS NULL OR effective_to >= effective_from),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,10,notes,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,11,row_version,integer,False,1,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (row_version > 0),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,12,created_by,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,foreign_key: FOREIGN KEY (created_by) REFERENCES app_user(id) ON DELETE SET NULL,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,13,published_by,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,foreign_key: FOREIGN KEY (published_by) REFERENCES app_user(id) ON DELETE SET NULL,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,14,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe,15,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe_item,1,id,bigint,False,nextval('cost_card_recipe_item_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (component_item_id) REFERENCES cost_card_item(id) | foreign_key: FOREIGN KEY (recipe_id) REFERENCES cost_card_recipe(id) ON DELETE CASCADE | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe_item,2,recipe_id,bigint,False,—,,,字段名显示它可能存放 recipe 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,"foreign_key: FOREIGN KEY (recipe_id) REFERENCES cost_card_recipe(id) ON DELETE CASCADE | unique: UNIQUE (recipe_id, seq)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe_item,3,component_item_id,bigint,False,—,,,字段名显示它可能存放 component_item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (component_item_id) REFERENCES cost_card_item(id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe_item,4,quantity,"numeric(18,6)",False,—,,,数量；单位需按表及写入源确认。,合理推测：通用命名；需代码确认,check: CHECK (quantity > 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe_item,5,unit,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(unit) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe_item,6,net_yield,"numeric(8,6)",False,1,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (net_yield > 0::numeric AND net_yield <= 1::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe_item,7,loss_rate,"numeric(8,6)",False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (loss_rate >= 0::numeric AND loss_rate < 1::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe_item,8,seq,integer,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (seq > 0) | unique: UNIQUE (recipe_id, seq)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,cost_card_recipe_item,9,notes,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_breakdown,1,date,date,False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (date, dim_type, dim_value)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_breakdown,2,dim_type,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (dim_type = ANY (ARRAY['payment'::text, 'dining'::text])) | primary_key: PRIMARY KEY (date, dim_type, dim_value)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_breakdown,3,dim_value,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (date, dim_type, dim_value)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_breakdown,4,bill_count,integer,True,—,,,账单数；仅 dining 维度有意义，payment 维度恒为 NULL（一张账单可多种支付，拆不出）。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_breakdown,5,net_sales,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_breakdown,6,ratio,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_push_log,1,id,integer,False,nextval('daily_push_log_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_push_log,2,kind,character varying(40),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"unique: UNIQUE (kind, recipient, date)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_push_log,3,recipient,character varying(64),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"unique: UNIQUE (kind, recipient, date)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_push_log,4,date,character varying(10),False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,"unique: UNIQUE (kind, recipient, date)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_push_log,5,sent_at,timestamp with time zone,True,now(),,,字段名显示它可能存放 sent 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_revenue,1,date,character varying(10),False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,"unique: UNIQUE (date) | unique: UNIQUE (date, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_revenue,2,revenue,double precision,False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_revenue,3,transaction_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_revenue,4,avg_transaction_value,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_revenue,5,gross_sales,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_revenue,6,total_discount,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_revenue,7,discount_rate,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_revenue,8,member_sales_ratio,double precision,True,—,,,【兼容列，勿用于新分析】会员卡余额核销净额占当日总收款的比例，不含充值、不分门店。权威口径见 pos_member_daily.card_payment_ratio。本列保留仅为不打断 bakery-ops / 财务站的现有读取，并作为两条采集路径的一致性哨兵。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_revenue,9,store,text,False,'吉隆坡Pavilion门店'::text,,,门店名，取值与 pos_member.store / finance_*.store 一致（经 ops_store.pos_store_name 与 store_code 对应）。102 回填，此前 238 行全为 NULL。,已确认：生产库字段注释,"unique: UNIQUE (date, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_revenue,10,import_source,text,True,—,,,"Nullable writer ownership marker; finance-template rows use finance_template, legacy POS/crawler rows remain NULL.",已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,1,id,integer,False,nextval('daily_review_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,2,date,character varying(10),False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,unique: UNIQUE (date),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,3,review_json,jsonb,True,—,,,AI 复盘结论；NULL 表示这天只有店长手记。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,4,suggestions_json,jsonb,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,5,adopted,boolean,True,false,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,6,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,7,manager_text,text,True,—,,,店长手写复盘原文（← manager_review.content）。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,8,manager_insight,text,True,—,,,店长手记提炼（← manager_review.insight）。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,9,updated_at,timestamp with time zone,True,—,,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,10,manager_revenue,"numeric(12,2)",True,—,,,店长在复盘页手填的当日营业额。与 daily_revenue.revenue（POS 实测）是两个口径，并排存放互相对照，不再互相覆盖 —— 104 之前 bakery-ops 会用它无条件盖掉 POS 值。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,11,manager_transaction_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,12,manager_avg_transaction,"numeric(10,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,daily_review,13,manager_revenue_at,timestamp with time zone,True,—,,,手填时刻。为空表示店长当天没填，不代表填了 0。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employee_events,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employee_events,2,employee_id,uuid,False,—,,,当前员工标识；需核对 employees、staff 或外部人事来源。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employee_events,3,event_type,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employee_events,4,summary,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employee_events,5,raw_message,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employee_events,6,reported_by,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employee_events,7,data,jsonb,False,'{}'::jsonb,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employee_events,8,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,2,name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,3,phone,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,4,email,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,5,source,text,False,'manual'::text,,,来源标签；当前是否有受控字典和强约束需逐表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,6,source_url,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,7,candidate_id,text,True,—,,,字段名显示它可能存放 candidate 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,8,job_title,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,9,department,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,10,store_id,text,True,'pavilion'::text,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (store_id) REFERENCES ops_store(store_code),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,11,status,text,False,'candidate'::text,,,该行业务状态；合法状态集合以当前 CHECK 或写入代码为准。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,12,applied_at,timestamp with time zone,True,—,,,字段名显示它可能存放 applied 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,13,interviewed_at,timestamp with time zone,True,—,,,字段名显示它可能存放 interviewed 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,14,hired_at,timestamp with time zone,True,—,,,字段名显示它可能存放 hired 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,15,resigned_at,timestamp with time zone,True,—,,,字段名显示它可能存放 resigned 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,16,skills,text[],False,'{}'::text[],,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,17,languages,text[],False,'{}'::text[],,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,18,education,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,19,experience_summary,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,20,location,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,21,resume_file_id,text,True,—,,,字段名显示它可能存放 resume_file 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,22,resume_text,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,23,metadata,jsonb,False,'{}'::jsonb,,,半结构化补充数据；字段级含义需由写入方 schema 说明。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,24,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,employees,25,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,1,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (store, member_id, campaign_version, attempt_id)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,2,member_id,text,False,—,,,POS 来源会员标识；需与门店/来源命名空间一起解释。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (store, member_id, campaign_version, attempt_id)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,3,campaign_version,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (store, member_id, campaign_version, attempt_id)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,4,answered_at,timestamp with time zone,False,clock_timestamp(),,,用 clock_timestamp() 不用 now()：后者在一个事务里是常量，批量/重试路径会撞。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,5,attempt_id,text,False,—,,,与 pos_member.hbti_attempt_id 同源，用于把答案与那一次发券尝试对上。也是主键的一部分。,已确认：生产库字段注释,"primary_key: PRIMARY KEY (store, member_id, campaign_version, attempt_id)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,6,answers,jsonb,False,—,,,13 题原始作答。q1-q12 计分、q13 打包偏好。CHECK 保证 13 键齐全。,已确认：生产库字段注释,"check: CHECK (jsonb_typeof(answers) = 'object'::text AND answers ?& ARRAY['q1'::text, 'q2'::text, 'q3'::text, 'q4'::text, 'q5'::text, 'q6'::text, 'q7'::text, 'q8'::text, 'q9'::text, 'q10'::text, 'q11'::text, 'q12'::text, 'q13'::text])",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,7,hbti_code,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,8,visit_time,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,9,category,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,10,color,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,11,gender,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_hbti_response,12,age,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,1,work_date,date,False,—,,,字段名显示它可能存放 work_date 对应的自然日；时区和业务口径待确认。,合理推测,"primary_key: PRIMARY KEY (work_date, store_id, staff_name)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,2,store_id,text,False,—,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,"foreign_key: FOREIGN KEY (store_id) REFERENCES ops_store(store_code) ON UPDATE CASCADE ON DELETE RESTRICT | primary_key: PRIMARY KEY (work_date, store_id, staff_name)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,3,area,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (area = ANY (ARRAY['后厨'::text, '前场'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,4,staff_name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (work_date, store_id, staff_name)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,5,post,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (post = 'OFF'::text AND duration_h IS NULL AND on_time IS NULL AND off_time IS NULL OR post <> 'OFF'::text AND duration_h IS NOT NULL AND duration_h > 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,6,station,text,True,—,,,"岗位原文，可能是斜杠组合。主岗 = split_part(station,'/',1)。",已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,7,on_time,time without time zone,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (post = 'OFF'::text AND duration_h IS NULL AND on_time IS NULL AND off_time IS NULL OR post <> 'OFF'::text AND duration_h IS NOT NULL AND duration_h > 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,8,off_time,time without time zone,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (post = 'OFF'::text AND duration_h IS NULL AND on_time IS NULL AND off_time IS NULL OR post <> 'OFF'::text AND duration_h IS NOT NULL AND duration_h > 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,9,duration_h,"numeric(4,2)",True,—,,,门店手填的工时。后厨与前场的餐休口径不同（后厨 >9h 扣 2、前场一律扣 1），故不由 on/off 派生。,已确认：生产库字段注释,check: CHECK (duration_h IS NULL OR duration_h <= 16::numeric) | check: CHECK (post = 'OFF'::text AND duration_h IS NULL AND on_time IS NULL AND off_time IS NULL OR post <> 'OFF'::text AND duration_h IS NOT NULL AND duration_h > 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,10,notes,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,11,source_file,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,fact_shift,12,imported_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 imported 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_cashflow,1,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (month, store, item)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_cashflow,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (month, store, item)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_cashflow,3,item,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (month, store, item)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_cashflow,4,amount,numeric,False,0,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense,1,id,integer,False,nextval('finance_expense_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense,2,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense,3,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense,4,major,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense,5,sub,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense,6,source,text,True,''::text,,,来源标签；当前是否有受控字典和强约束需逐表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense,7,amount,numeric,False,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense_raw,1,id,integer,False,nextval('finance_expense_raw_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense_raw,2,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense_raw,3,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense_raw,4,category,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense_raw,5,sub,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense_raw,6,channel,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_expense_raw,7,amount,numeric,True,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_item_sales,1,id,integer,False,nextval('finance_item_sales_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_item_sales,2,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_item_sales,3,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_item_sales,4,name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_item_sales,5,category,text,True,'未分类'::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_item_sales,6,qty,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_item_sales,7,amount,numeric,True,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor,1,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (month, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (month, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor,3,domestic,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor,4,malay,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor,5,outsource,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor,6,welfare,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor_detail,1,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (month, store, category, item, org)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor_detail,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (month, store, category, item, org)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor_detail,3,item,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (month, store, category, item, org)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor_detail,4,amount,numeric,False,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor_detail,5,category,text,False,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (category <> '国内工资分摊'::text OR btrim(org) <> ''::text) | primary_key: PRIMARY KEY (month, store, category, item, org)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_labor_detail,6,org,text,False,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (category <> '国内工资分摊'::text OR btrim(org) <> ''::text) | primary_key: PRIMARY KEY (month, store, category, item, org)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_material,1,id,integer,False,nextval('finance_material_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_material,2,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_material,3,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_material,4,category,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_material,5,source,text,True,''::text,,,来源标签；当前是否有受控字典和强约束需逐表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_material,6,amount,numeric,False,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_order_base,1,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (month, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_order_base,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (month, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_order_base,3,amount,numeric,False,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,1,id,integer,False,nextval('finance_orders_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,2,order_no,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,3,store,text,True,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,4,name,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,5,spec,text,True,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,6,category,text,True,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,7,ptype,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,8,qty,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,9,amount,numeric,True,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,10,volume,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,11,supplier,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,12,d_order,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,13,d_pay,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,14,d_ship,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,15,d_arrive,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,16,d_deliver,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_orders,17,d_inbound,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_period_map,1,major,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (major, sub)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_period_map,2,sub,text,False,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (major, sub)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_period_map,3,period,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (period = ANY (ARRAY['销售费用'::text, '管理费用'::text, '财务费用'::text, '研发费用'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_pl_metrics,1,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (month, store, metric)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_pl_metrics,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (month, store, metric)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_pl_metrics,3,metric,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (month, store, metric)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_pl_metrics,4,amount,numeric,False,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_revenue_daily,1,date,text,False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,"unique: UNIQUE (date, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_revenue_daily,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"check: CHECK (btrim(store) <> ''::text) | unique: UNIQUE (date, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_revenue_daily,3,revenue,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_revenue_daily,4,gross_sales,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_revenue_daily,5,total_discount,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_revenue_daily,6,discount_rate,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_revenue_daily,7,import_source,text,False,'finance_template'::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (import_source = 'finance_template'::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,1,id,integer,False,nextval('finance_stock_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,2,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,3,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,4,name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,5,spec,text,True,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,6,category,text,True,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,7,ptype,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,8,in_stock,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,9,in_transit,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,10,monthly_use,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock,11,unit_volume,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock_flow,1,id,integer,False,nextval('finance_stock_flow_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock_flow,2,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock_flow,3,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock_flow,4,warehouse,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock_flow,5,name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock_flow,6,opening,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock_flow,7,inbound,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock_flow,8,used,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_stock_flow,9,closing,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_store,1,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,check: CHECK (btrim(store) <> ''::text) | primary_key: PRIMARY KEY (store),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_store,2,display_name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (btrim(display_name) <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_store,3,is_active,boolean,False,true,,,字段名显示它可能是 is_active 的布尔标记；NULL 与 false 是否不同需确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_store,4,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_store,5,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_store,6,active_from_month,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (active_from_month IS NULL OR active_from_month ~ '^\d{4}-(0[1-9]|1[0-2])$'::text) | check: CHECK (active_from_month IS NULL OR active_to_month IS NULL OR active_to_month >= active_from_month),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_store,7,active_to_month,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (active_from_month IS NULL OR active_to_month IS NULL OR active_to_month >= active_from_month) | check: CHECK (active_to_month IS NULL OR active_to_month ~ '^\d{4}-(0[1-9]|1[0-2])$'::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_supplier_orders,1,id,integer,False,nextval('finance_supplier_orders_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_supplier_orders,2,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_supplier_orders,3,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_supplier_orders,4,supplier,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_supplier_orders,5,item,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_supplier_orders,6,spec,text,True,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_supplier_orders,7,qty,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_supplier_orders,8,price,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_supplier_orders,9,amount,numeric,True,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_targets,1,month,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (month, store, item)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_targets,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (month, store, item)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_targets,3,item,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"primary_key: PRIMARY KEY (month, store, item)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,finance_targets,4,amount,numeric,False,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,forecast_snapshot,1,id,integer,False,nextval('forecast_snapshot_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,forecast_snapshot,2,date,character varying(10),False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,"unique: UNIQUE (date, product_name)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,forecast_snapshot,3,product_name,character varying(200),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"unique: UNIQUE (date, product_name)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,forecast_snapshot,4,suggested_qty,integer,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,forecast_snapshot,5,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_auth_token,1,token_hash,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (token_hash ~ '^[a-f0-9]{64}$'::text) | primary_key: PRIMARY KEY (token_hash),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_auth_token,2,kind,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (kind = 'challenge'::text AND state IS NOT NULL AND attempts IS NOT NULL OR kind = 'session'::text AND state IS NULL AND attempts IS NULL) | check: CHECK (kind = ANY (ARRAY['challenge'::text, 'session'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_auth_token,3,state,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (kind = 'challenge'::text AND state IS NOT NULL AND attempts IS NOT NULL OR kind = 'session'::text AND state IS NULL AND attempts IS NULL) | check: CHECK (state IS NULL OR (state = ANY (ARRAY['pending'::text, 'verifying'::text, 'consumed'::text])))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_auth_token,4,attempts,smallint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (kind = 'challenge'::text AND state IS NOT NULL AND attempts IS NOT NULL OR kind = 'session'::text AND state IS NULL AND attempts IS NULL) | check: CHECK (attempts IS NULL OR attempts >= 0 AND attempts <= 5),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_auth_token,5,payload,jsonb,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_auth_token,6,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_auth_token,7,expires_at,timestamp with time zone,False,—,,,字段名显示它可能存放 expires 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_gift_stock,1,template_name,text,False,—,,,RES 券模板名，代码按此字符串精确匹配,已确认：生产库字段注释,primary_key: PRIMARY KEY (template_name),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_gift_stock,2,display_name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_gift_stock,3,initial_stock,integer,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (initial_stock >= 0) | check: CHECK (issued_count <= initial_stock),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_gift_stock,4,issued_count,integer,False,0,,,已发数量；抽中即 +1，是唯一的可变量,已确认：生产库字段注释,check: CHECK (issued_count >= 0) | check: CHECK (issued_count <= initial_stock),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_gift_stock,5,is_active,boolean,False,true,,,设为 false 可临时把某个品项移出抽奖池，无需改库存,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_gift_stock,6,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_rate_limit,1,bucket,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,primary_key: PRIMARY KEY (bucket),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_rate_limit,2,count,integer,False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (count >= 0),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hbti_rate_limit,3,expires_at,timestamp with time zone,False,—,,,字段名显示它可能存放 expires 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,holiday,1,id,integer,False,nextval('holiday_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,holiday,2,date,character varying(10),False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,unique: UNIQUE (date),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,holiday,3,name,character varying(200),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,holiday,4,type,character varying(50),False,'public_holiday'::character varying,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,holiday,5,coefficient,double precision,True,—,,,实测销售倍数 = 当日营业额 ÷ 前后14天工作日均值。109 从历史回填（不需要外部 API）。仅已发生的假期有值；未来假期用 v_holiday_factor 按同类型均值兜底。⚠ 预估引擎目前**不读这一列** —— 回填只是把数据准备好，engine 侧仍需接入。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,holiday,6,note,character varying(500),False,''::character varying,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,holiday,7,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,holiday,8,updated_at,timestamp with time zone,True,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hourly_sales_summary,1,id,integer,False,nextval('hourly_sales_summary_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hourly_sales_summary,2,date,date,False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,"unique: UNIQUE (date, hour)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hourly_sales_summary,3,hour,integer,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"unique: UNIQUE (date, hour)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hourly_sales_summary,4,bill_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hourly_sales_summary,5,num_of_guests,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hourly_sales_summary,6,net_sales,"numeric(12,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hourly_sales_summary,7,gross_sales,"numeric(12,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hourly_sales_summary,8,avg_order_net_sales,"numeric(10,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hourly_sales_summary,9,total_discount,"numeric(10,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,hourly_sales_summary,10,synced_at,timestamp with time zone,True,now(),,,字段名显示它可能存放 synced 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_hourly_sales,1,id,integer,False,nextval('item_hourly_sales_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_hourly_sales,2,date,date,False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,"unique: UNIQUE (date, hour, item_name)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_hourly_sales,3,hour,integer,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"unique: UNIQUE (date, hour, item_name)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_hourly_sales,4,item_name,text,False,—,,,来源或展示商品名；可变且不能作为跨模块稳定连接键。,合理推测：通用命名；需代码确认,"unique: UNIQUE (date, hour, item_name)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_hourly_sales,5,qty,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_hourly_sales,6,net_sales,"numeric(10,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_hourly_sales,7,gross_sales,"numeric(10,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_hourly_sales,8,synced_at,timestamp with time zone,True,now(),,,字段名显示它可能存放 synced 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_hourly_sales,9,store,text,True,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_hourly_sales,10,item_key,text,True,—,,,RES 商品键，外键指向 pos_product。可空：目录里没有的商品（新品、套餐、内部餐标）仍照常入库。新代码请用它做关联；item_name 保留给尚未迁移的旧查询，最终会退役。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_last_sale,1,date,date,False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (date, item_name)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_last_sale,2,item_name,text,False,—,,,来源或展示商品名；可变且不能作为跨模块稳定连接键。,合理推测：通用命名；需代码确认,"primary_key: PRIMARY KEY (date, item_name)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_last_sale,3,last_sale_time,time without time zone,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_last_sale,4,day_qty,integer,False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_last_sale,5,synced_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 synced 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_last_sale,6,item_key,text,True,—,,,RES 商品键，外键指向 pos_product。可空。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_waste,1,id,integer,False,nextval('item_waste_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_waste,2,date,date,False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,"unique: UNIQUE (date, item_name, waste_reason)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_waste,3,item_name,text,False,—,,,来源或展示商品名；可变且不能作为跨模块稳定连接键。,合理推测：通用命名；需代码确认,"unique: UNIQUE (date, item_name, waste_reason)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_waste,4,waste_reason,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"unique: UNIQUE (date, item_name, waste_reason)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_waste,5,qty,"numeric(10,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_waste,6,amount,"numeric(10,2)",True,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_waste,7,synced_at,timestamp with time zone,True,now(),,,字段名显示它可能存放 synced 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_waste,8,store,text,True,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,item_waste,9,item_key,text,True,—,,,RES 商品键，外键指向 pos_product。可空。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,job_openings,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,job_openings,2,store_id,text,False,—,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (store_id) REFERENCES ops_store(store_code),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,job_openings,3,source,text,False,—,,,来源标签；当前是否有受控字典和强约束需逐表确认。,合理推测：通用命名；需代码确认,"check: CHECK (source = ANY (ARRAY['jobstreet'::text, 'qr_poster'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,job_openings,4,external_job_id,text,True,—,,,字段名显示它可能存放 external_job 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,job_openings,5,role_area,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (role_area = ANY (ARRAY['FOH'::text, 'BOH'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,job_openings,6,title,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,job_openings,7,qr_token,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,job_openings,8,status,text,False,'open'::text,,,该行业务状态；合法状态集合以当前 CHECK 或写入代码为准。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,job_openings,9,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,job_openings,10,description,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,offers,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (application_id) REFERENCES applications(id) | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,offers,2,store_id,text,False,—,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (store_id) REFERENCES ops_store(store_code),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,offers,3,application_id,uuid,False,—,,,字段名显示它可能存放 application 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (application_id) REFERENCES applications(id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,offers,4,position_code,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,offers,5,suggested_salary,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,offers,6,salary_source,text,False,'lark'::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (salary_source = ANY (ARRAY['lark'::text, 'manual'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,offers,7,approved_by_user_id,text,True,—,,,字段名显示它可能存放 approved_by_user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (approved_by_user_id) REFERENCES staff(user_id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,offers,8,status,text,False,'draft'::text,,,该行业务状态；合法状态集合以当前 CHECK 或写入代码为准。,合理推测：通用命名；需代码确认,"check: CHECK (status = ANY (ARRAY['draft'::text, 'approved'::text, 'sent'::text, 'accepted'::text, 'declined'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,offers,9,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,offers,10,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,1,run_id,uuid,False,—,,,字段名显示它可能存放 run 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,primary_key: PRIMARY KEY (run_id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,2,skill_id,text,False,—,,,字段名显示它可能存放 skill 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,3,user_id,text,False,—,,,字段名显示它可能存放 user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,4,channel,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,5,status,text,False,—,,,该行业务状态；合法状态集合以当前 CHECK 或写入代码为准。,合理推测：通用命名；需代码确认,"check: CHECK (status = ANY (ARRAY['queued'::text, 'running'::text, 'success'::text, 'error'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,6,input,jsonb,False,'{}'::jsonb,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,7,output,jsonb,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,8,error,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (status = ANY (ARRAY['queued'::text, 'running'::text, 'success'::text, 'error'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,9,started_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 started 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,10,finished_at,timestamp with time zone,True,—,,,字段名显示它可能存放 finished 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_audit_log,11,duration_ms,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,1,store_code,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,primary_key: PRIMARY KEY (store_code),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,2,name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,3,address,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,4,area,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,5,timezone,text,False,'Asia/Kuala_Lumpur'::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,6,manager_user_id,text,True,—,,,字段名显示它可能存放 manager_user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (manager_user_id) REFERENCES staff(user_id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,7,head_chef_user_id,text,True,—,,,字段名显示它可能存放 head_chef_user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (head_chef_user_id) REFERENCES staff(user_id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,8,interview_windows,jsonb,False,'{}'::jsonb,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,9,lark_base_token,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,10,lark_table_id,text,True,—,,,字段名显示它可能存放 lark_table 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,11,active,boolean,False,true,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,12,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,13,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,14,trial_windows,jsonb,False,'{}'::jsonb,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,ops_store,15,pos_store_name,text,True,—,,,本门店在 POS / 财务侧的名字（daily_revenue.store、pos_member.store、finance_*.store 用的值）。库里两套门店标识的唯一桥梁：store_code 供人事招聘域外键，pos_store_name 供销售财务域按值连接。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,1,id,integer,False,nextval('out_of_stock_record_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,2,date,character varying(10),False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,3,product_name,character varying(200),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,4,input_name,character varying(200),True,''::character varying,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,5,soldout_time,character varying(10),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,6,soldout_slot,character varying(10),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,7,day_type,character varying(20),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,8,loss_slots,text,True,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,9,estimated_loss_qty,double precision,True,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,10,estimated_loss_amount,double precision,True,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,out_of_stock_record,11,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,1,member_id,text,False,—,,,POS 内部 customerId（19 位雪花），伪匿名。脱离 Restosuite 后台无法据此认出任何真人。所有不需要联系本人的分析都应该只用这一列。,已确认：生产库字段注释,"unique: UNIQUE (store, member_id)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"unique: UNIQUE (store, member_id)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,3,has_profile,boolean,False,false,,,"true = 该 member_id 在 /crm/datamanage/customer/page 有档案行（实测 3,713 人）。false 的约 1,111 人只出现在卡列表（卡 shopId='0'）；他们同样 100% 有手机号，但没有 registered_on / source_type。此列区分「事实缺失」与「抓取失败」。",已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,4,phone_country_code,text,True,—,,,【个人资料 / PII】会员手机号的国家码，POS 字段 areaCode 的规范化结果：纯数字、**不带 '+'**（'60' / '65' / '86' …）。实测 17 种取值，60 占 95.8% —— **不要硬编码马来西亚**。用途：与 phone_national 一起构成可拨打 / 可与 POS 后台核对的完整号码；单独使用无意义。源值为空串 '' 时写 NULL，不要写 ''。★ 安全：本列受 RLS 保护（本表已 ENABLE ROW LEVEL SECURITY 且无任何 policy），且前置安全迁移已收回 anon / authenticated 的全部表级授予；本迁移第 5 节另行收回本表的 service_role 授予 —— **anon 无权访问**（越权读取直接报 42501）。仅 postgres（应用直连身份）可读。,已确认：生产库字段注释,"check: CHECK (phone_country_code ~ '^[1-9][0-9]{0,3}$'::text)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,5,phone_national,text,True,—,,,"【个人资料 / PII】会员手机号的本地号部分（**不含国家码**），POS 字段 phone 的规范化结果。规范化规则（写入侧 ~/hot/res_api 负责，本列的 CHECK 只是最后一道防线）：(1) 只保留数字，去掉 '+'、空格、连字符、括号（实测源值本就全是纯数字，这一步是防御性的）；(2) **去掉前导 0**（实测 11 条把国内长途冠码一起填进来了，不去掉同一个人会算成两个号）；(3) 空串 '' → NULL；(4) **不要自动剥离前导 60**：实测 6 条数字以 60 开头，与「用户把国家码填进了 phone」    无法区分，也可能是真实本地号 —— 原样入库，事后人工判读（查询见迁移文件附录 B）；(5) 规范化失败（长度异常 / 含非数字 / 不符合 CHECK）时写 **NULL 并报警**，    **不要把原始值塞进来**碰运气。实测长度 7–11（9 位占 83%），覆盖率 4,823/4,824 = 99.98%。NULL 是合法状态：既表示「从未填过」，也表示「POS 侧解绑了」（实测确有一条 有→空 的变更）。★ 安全：本列受 RLS 保护、前置安全迁移已收回 anon / authenticated 的表级授予；本迁移第 5 节另行收回本表的 service_role 授予，**anon 无权访问**。任何不需要联系会员本人的查询都不应该 SELECT 本列。",已确认：生产库字段注释,"check: CHECK (phone_national ~ '^[1-9][0-9]{5,14}$'::text)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,6,phone_e164,text,True,"
+CASE
+    WHEN ((phone_country_code IS NOT NULL) AND (phone_national IS NOT NULL)) THEN (('+'::text || phone_country_code) || phone_national)
+    ELSE NULL::text
+END",,s,"【个人资料 / PII】生成列（STORED）= '+' || phone_country_code || phone_national，两列任一为 NULL 时本列为 NULL。这是跨区号唯一正确的比较 / 去重 / 查找键：只比 phone_national 会把 +60 与 +65 的同号误判成同一人。★ 刻意**不加 UNIQUE 约束**，三条理由：(1) 手机号可以被解绑（实测有 有→空 的变更），空值必须允许多行；(2) 换绑存在时序窗口 —— A 解绑、B 绑同号，若快照抓在 A 的解绑落库之前，    一次同步内会出现瞬时重复；UNIQUE 会让整晚同步事务失败，而这不是数据错误，是快照撕裂；(3) 唯一性由 POS 保证，我们只是只读镜像 —— **镜像不该比源系统更严格**。当前实测零冲突（4,821 个持卡人 → 4,821 个不同号码，三个数据源互相印证）。若要监控冲突，用查询而不是约束：SELECT phone_e164, count(*) FROM pos_member WHERE phone_e164 IS NOT NULL GROUP BY 1 HAVING count(*) > 1;★ 安全：同 phone_national —— 受 RLS 保护，anon 无权访问。",已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,7,registered_on,date,True,—,,,字段名显示它可能存放 registered_on 对应的自然日；时区和业务口径待确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,8,register_shop_id,text,True,—,,,字段名显示它可能存放 register_shop 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,9,source_type,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,10,card_count,integer,False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,11,level_name,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,12,growth,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,13,point_balance,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,14,balance_total,"numeric(14,2)",True,—,,,跨该会员名下所有卡的可用余额合计（本金+赠送），MYR 元。源数据 /crm 返回整数分，入库前除以 100。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,15,balance_cash,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,16,balance_gift,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,17,balance_frozen,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,18,lifetime_topup_amount,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,19,lifetime_topup_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,20,lifetime_consume_amount,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,21,lifetime_consume_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,22,first_card_created_on,date,True,—,,,字段名显示它可能存放 first_card_created_on 对应的自然日；时区和业务口径待确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,23,last_recharge_at,timestamp with time zone,True,—,,,字段名显示它可能存放 last_recharge 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,24,last_trans_at,timestamp with time zone,True,—,,,字段名显示它可能存放 last_trans 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,25,snapshot_date,date,True,—,,,该行 POS 侧字段来自哪一天的会员快照，由 ~/hot/res_api 每晚写入。NULL 表示这一行是 hbti-web 在顾客完成 HBTI 时当场建的，POS 快照尚未收录该会员——当晚爬虫 upsert 会补齐它。060 的「靠 snapshot_date 识别失效行」口径只对非空行成立。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,26,fetched_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 fetched 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,27,hbti_campaign_version,text,True,—,,,"当前 hbti_* 画像来自哪一期活动。第二期活动会覆盖成最新一次；逐期历史在 hbti_completion 里按 (campaign_version, member_hash) 一期一行全量保留。写者 = hotcrush-hbti。",已确认：生产库字段注释,"check: CHECK (hbti_campaign_version IS NULL OR hbti_campaign_version ~ '^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$'::text) | check: CHECK (hbti_campaign_version IS NULL AND hbti_code IS NULL AND hbti_visit_time IS NULL AND hbti_category IS NULL AND hbti_color IS NULL AND hbti_completed_at IS NULL AND hbti_gender IS NULL AND hbti_age IS NULL OR hbti_campaign_version IS NOT NULL AND hbti_code IS NOT NULL AND hbti_visit_time IS NOT NULL AND hbti_category IS NOT NULL AND hbti_color IS NOT NULL AND hbti_completed_at IS NOT NULL)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,28,hbti_code,text,True,—,,,HBTI 16 型码，四轴依次为温度 I/H、浓度 L/S、甜度 B/D、社交 A/T，由 hbti-web 的 scoreHbti() 从第 1-4 题算出。写者 = hotcrush-hbti。,已确认：生产库字段注释,check: CHECK (hbti_code IS NULL OR hbti_code ~ '^[IH][LS][BD][AT]$'::text) | check: CHECK (hbti_campaign_version IS NULL AND hbti_code IS NULL AND hbti_visit_time IS NULL AND hbti_category IS NULL AND hbti_color IS NULL AND hbti_completed_at IS NULL AND hbti_gender IS NULL AND hbti_age IS NULL OR hbti_campaign_version IS NOT NULL AND hbti_code IS NOT NULL AND hbti_visit_time IS NOT NULL AND hbti_category IS NOT NULL AND hbti_color IS NOT NULL AND hbti_completed_at IS NOT NULL),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,29,hbti_visit_time,text,True,—,,,第 5 题「什么时段来」：morning / night。写者 = hotcrush-hbti。,已确认：生产库字段注释,"check: CHECK (hbti_campaign_version IS NULL AND hbti_code IS NULL AND hbti_visit_time IS NULL AND hbti_category IS NULL AND hbti_color IS NULL AND hbti_completed_at IS NULL AND hbti_gender IS NULL AND hbti_age IS NULL OR hbti_campaign_version IS NOT NULL AND hbti_code IS NOT NULL AND hbti_visit_time IS NOT NULL AND hbti_category IS NOT NULL AND hbti_color IS NOT NULL AND hbti_completed_at IS NOT NULL) | check: CHECK (hbti_visit_time IS NULL OR (hbti_visit_time = ANY (ARRAY['morning'::text, 'night'::text])))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,30,hbti_category,text,True,—,,,第 6 题「最想点哪一类」：drink / dessert / bakery。写者 = hotcrush-hbti。,已确认：生产库字段注释,"check: CHECK (hbti_category IS NULL OR (hbti_category = ANY (ARRAY['drink'::text, 'dessert'::text, 'bakery'::text]))) | check: CHECK (hbti_campaign_version IS NULL AND hbti_code IS NULL AND hbti_visit_time IS NULL AND hbti_category IS NULL AND hbti_color IS NULL AND hbti_completed_at IS NULL AND hbti_gender IS NULL AND hbti_age IS NULL OR hbti_campaign_version IS NOT NULL AND hbti_code IS NOT NULL AND hbti_visit_time IS NOT NULL AND hbti_category IS NOT NULL AND hbti_color IS NOT NULL AND hbti_completed_at IS NOT NULL)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,31,hbti_color,text,True,—,,,结果页顾客选定的品牌色标识（如 pistachio）。取值随活动可变，故只做格式约束不锁枚举。写者 = hotcrush-hbti。,已确认：生产库字段注释,check: CHECK ((hbti_color IS NULL OR btrim(hbti_color) = hbti_color AND length(hbti_color) >= 1 AND length(hbti_color) <= 32) AND (hbti_gender IS NULL OR btrim(hbti_gender) = hbti_gender AND length(hbti_gender) >= 1 AND length(hbti_gender) <= 32) AND (hbti_age IS NULL OR btrim(hbti_age) = hbti_age AND length(hbti_age) >= 1 AND length(hbti_age) <= 32)) | check: CHECK (hbti_campaign_version IS NULL AND hbti_code IS NULL AND hbti_visit_time IS NULL AND hbti_category IS NULL AND hbti_color IS NULL AND hbti_completed_at IS NULL AND hbti_gender IS NULL AND hbti_age IS NULL OR hbti_campaign_version IS NOT NULL AND hbti_code IS NOT NULL AND hbti_visit_time IS NOT NULL AND hbti_category IS NOT NULL AND hbti_color IS NOT NULL AND hbti_completed_at IS NOT NULL),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,32,hbti_gender,text,True,—,,,可选题：性别自述（woman / man / nonbinary / prefer-not）。顾客可跳过，为空即未填，不得用任何值冒充。写者 = hotcrush-hbti。,已确认：生产库字段注释,check: CHECK ((hbti_color IS NULL OR btrim(hbti_color) = hbti_color AND length(hbti_color) >= 1 AND length(hbti_color) <= 32) AND (hbti_gender IS NULL OR btrim(hbti_gender) = hbti_gender AND length(hbti_gender) >= 1 AND length(hbti_gender) <= 32) AND (hbti_age IS NULL OR btrim(hbti_age) = hbti_age AND length(hbti_age) >= 1 AND length(hbti_age) <= 32)) | check: CHECK (hbti_campaign_version IS NULL AND hbti_code IS NULL AND hbti_visit_time IS NULL AND hbti_category IS NULL AND hbti_color IS NULL AND hbti_completed_at IS NULL AND hbti_gender IS NULL AND hbti_age IS NULL OR hbti_campaign_version IS NOT NULL AND hbti_code IS NOT NULL AND hbti_visit_time IS NOT NULL AND hbti_category IS NOT NULL AND hbti_color IS NOT NULL AND hbti_completed_at IS NOT NULL),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,33,hbti_age,text,True,—,,,可选题：年龄段（under-18 / 18-24 / 25-34 / 35-44 / 45-plus / prefer-not）。顾客可跳过，为空即未填。写者 = hotcrush-hbti。,已确认：生产库字段注释,check: CHECK ((hbti_color IS NULL OR btrim(hbti_color) = hbti_color AND length(hbti_color) >= 1 AND length(hbti_color) <= 32) AND (hbti_gender IS NULL OR btrim(hbti_gender) = hbti_gender AND length(hbti_gender) >= 1 AND length(hbti_gender) <= 32) AND (hbti_age IS NULL OR btrim(hbti_age) = hbti_age AND length(hbti_age) >= 1 AND length(hbti_age) <= 32)) | check: CHECK (hbti_campaign_version IS NULL AND hbti_code IS NULL AND hbti_visit_time IS NULL AND hbti_category IS NULL AND hbti_color IS NULL AND hbti_completed_at IS NULL AND hbti_gender IS NULL AND hbti_age IS NULL OR hbti_campaign_version IS NOT NULL AND hbti_code IS NOT NULL AND hbti_visit_time IS NOT NULL AND hbti_category IS NOT NULL AND hbti_color IS NOT NULL AND hbti_completed_at IS NOT NULL),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,34,hbti_completed_at,timestamp with time zone,True,—,,,该画像对应的 HBTI 完成时刻。发券成功与否不影响本列——答完就算完成，发券结果看 hbti_completion.status。写者 = hotcrush-hbti。,已确认：生产库字段注释,check: CHECK (hbti_campaign_version IS NULL AND hbti_code IS NULL AND hbti_visit_time IS NULL AND hbti_category IS NULL AND hbti_color IS NULL AND hbti_completed_at IS NULL AND hbti_gender IS NULL AND hbti_age IS NULL OR hbti_campaign_version IS NOT NULL AND hbti_code IS NOT NULL AND hbti_visit_time IS NOT NULL AND hbti_category IS NOT NULL AND hbti_color IS NOT NULL AND hbti_completed_at IS NOT NULL),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,35,hbti_member_hash,text,True,—,,,旧幂等键 HMAC(手机号)。066 起幂等键改为 member_id 本身（顺带堵掉换号可重复领券的洞），本列仅留作审计与换键追溯。,已确认：生产库字段注释,check: CHECK (hbti_member_hash IS NULL OR hbti_member_hash ~ '^[a-f0-9]{64}$'::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,36,hbti_status,text,True,—,,,HBTI 完成状态：processing=进行中（此时 hbti_attempt_id 非空）；issued=已发券；review=待人工核对；unrewarded=答题完成但周边已发完，不发券。后三者都是终态，会挡住同一会员在本期活动内的第二次参与。,已确认：生产库字段注释,"check: CHECK (hbti_status = 'processing'::text AND hbti_attempt_id IS NOT NULL OR hbti_status IS DISTINCT FROM 'processing'::text AND hbti_attempt_id IS NULL) | check: CHECK (hbti_status IS NULL AND hbti_record IS NULL OR hbti_status IS NOT NULL AND hbti_record IS NOT NULL AND (hbti_record ->> 'status'::text) = hbti_status) | check: CHECK (hbti_status IS NULL OR (hbti_status = ANY (ARRAY['processing'::text, 'issued'::text, 'review'::text, 'unrewarded'::text])))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,37,hbti_attempt_id,uuid,True,—,,,当前持锁者。状态转移用 WHERE hbti_attempt_id = $1 做 CAS，非持锁者改不动。,已确认：生产库字段注释,check: CHECK (hbti_status = 'processing'::text AND hbti_attempt_id IS NOT NULL OR hbti_status IS DISTINCT FROM 'processing'::text AND hbti_attempt_id IS NULL),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,38,hbti_record,jsonb,True,—,,,完整 CompletionRecord（locked/prepared/issued/review 判别联合，含答题快照与发券回执），读出后由 TS 侧同一份 Zod 校验。phase 从这里读，不单独占列。,已确认：生产库字段注释,check: CHECK (hbti_status IS NULL AND hbti_record IS NULL OR hbti_status IS NOT NULL AND hbti_record IS NOT NULL AND (hbti_record ->> 'status'::text) = hbti_status),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member,39,hbti_expires_at,timestamp with time zone,True,—,,,字段名显示它可能存放 hbti_expires 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,1,txn_id,text,False,—,,,字段名显示它可能存放 txn 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,"unique: UNIQUE (store, txn_id)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"unique: UNIQUE (store, txn_id)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,3,pos_shop_id,text,True,—,,,字段名显示它可能存放 pos_shop 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,4,business_date,date,False,—,,,字段名显示它可能存放 business_date 对应的自然日；时区和业务口径待确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,5,txn_at,timestamp with time zone,True,—,,,POS 报表引擎返回的是不带时区的 KL 墙上时间，抓取侧显式补 +08:00 后入库。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,6,member_id,text,True,—,,,对应 pos_member.member_id。**刻意不加外键**：流水按 45 天滚动窗口同步、会员按整表快照同步，两者不同步时外键会让当晚同步整体失败。遇到 pos_member 里没有的 member_id 记 warning。手机号请到 pos_member 取，本表不存（理由见表注释）。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,7,card_no,text,True,—,,,POS 卡号，形态混杂（19 位雪花 / 7 位数字 / 含字母如 'A1222'），故为 text 而非数值。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,8,txn_type,smallint,False,—,,,"POS 原始交易类型码。10 充值 / 20 消费核销 / 30 充值退款 / 40 消费退款 / 50 调增 / 60 调减。注意 2026-06 整月充值为 0 而调增 RM 30,021.00 —— 类型 50 在本店会被当作进钱手段使用，做「充值额」口径时必须先明确是否把 50 计入。",已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,9,txn_type_label,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (txn_type_label = ANY (ARRAY['topup'::text, 'consume'::text, 'topup_refund'::text, 'consume_refund'::text, 'adjust_increase'::text, 'adjust_decrease'::text, 'unknown'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,10,money_amount,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,11,gift_amount,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,12,total_amount,"numeric(14,2)",True,—,,,M_Trade_Sum_countAmount = money_amount + gift_amount，**这才是真正的卡值变动**，金额分析请用本列。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,13,trade_amount,"numeric(14,2)",True,—,,,"【易错列】M_Trade_Sum_tradeAmount 原值，语义按 txn_type 变：充值行 = 本金（不含赠送）；消费/退款行 = 含赠送的总卡值；调整行恒为 0.00。只有 txn_type IN (20,40) 的 trade_amount 之和才与 daily_payment_breakdown 的 'Membership card balance' 对得上。不要拿本列跨类型求和。",已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,14,before_money_balance,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,15,after_money_balance,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,16,before_gift_balance,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,17,after_gift_balance,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,18,point_delta,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,19,pos_order_no,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,20,order_id,text,True,—,,,字段名显示它可能存放 order 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,21,source_code,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,22,source,text,False,'report_100150'::text,,,来源标签；当前是否有受控字典和强约束需逐表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_card_txn,23,fetched_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 fetched 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,1,date,date,False,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,"unique: UNIQUE (date, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,2,store,text,False,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,"unique: UNIQUE (date, store)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,3,new_member_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,4,consumed_member_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,5,recharged_member_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,6,points_member_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,7,member_consume_amount,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,8,total_consume_amount,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,9,member_consume_ratio,"numeric(8,4)",True,"
+CASE
+    WHEN (total_consume_amount > (0)::numeric) THEN round((member_consume_amount / total_consume_amount), 4)
+    ELSE NULL::numeric
+END",,s,会员贡献的营业额占比（不限支付方式），来自 POS /crm/memberMpp/homePage/queryCustomerConsumeRatio。与 card_payment_ratio 是**两个不同指标**，数值不应相等。注意该接口是 T+1 批次产出，归属日与报表引擎的 D_date 未必完全一致。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,10,topup_cash,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,11,topup_gift,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,12,topup_face_value,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,13,topup_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,14,topup_refund,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,15,redeem_amount,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,16,redeem_cash,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,17,redeem_gift,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,18,redeem_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,19,consume_refund,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,20,adjust_net,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (topup_adjust_amount IS NULL OR adjust_correction IS NULL OR adjust_net IS NULL OR abs(topup_adjust_amount + adjust_correction - adjust_net) <= 0.01),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,21,card_payment_net,"numeric(14,2)",True,(redeem_amount + consume_refund),,s,当日卡余额付款净额 = redeem_amount + consume_refund（后者为负）。实测逐日等于 daily_payment_breakdown 中 'Membership card balance' 的 net_sales。两条采集路径独立，偏差 > 0.01 即应报警。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,22,card_payment_ratio,"numeric(8,4)",True,"
+CASE
+    WHEN (total_consume_amount > (0)::numeric) THEN round(((redeem_amount + consume_refund) / total_consume_amount), 4)
+    ELSE NULL::numeric
+END",,s,卡余额付款占当日总收款的比例。与 daily_revenue.member_sales_ratio 同口径，但本列分门店、可区分 NULL 与真 0，是新分析应当采用的权威口径。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,23,net_stored_value_face,"numeric(14,2)",True,((((topup_face_value + topup_refund) + adjust_net) - redeem_amount) - consume_refund),,s,当日储值净额（面值口径，含赠送）= 充值面值 + 充值退款 + 调整净额 - 核销 - 消费退款。实测与 reportId=100242 的 changeOfPeriodSubTotal 逐日一致。**与 finance_pl_metrics 的 '储值净额' 无关，不可互相勾稽。**任一组成列为 NULL 时本列即为 NULL —— 这是刻意的，不用 COALESCE 掩盖缺数。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,24,net_stored_value_cash,"numeric(14,2)",True,—,,,"当日储值净额（现金口径，不含赠送），直接取自 reportId=100242 的 changeOfPeriodMoneyAmount，不由本表其他列推导。它是与财务 '储值净额' 最接近的可比项，但实测按月差 RM 50 ~ RM 10,170 且无规律，只做并排展示，不做自动勾稽。",已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,25,balance_end_total,"numeric(14,2)",True,—,,,"期末储值总余额快照（本金+赠送）。取自 reportId=100242 的**累计区间** [2024-01-01, date] 的 endOfPeriodSubTotal —— 注意 100242 的 begin/end 只覆盖查询区间内有过交易的卡，日区间查出来的 endOfPeriod 不是全量余额，必须用累计区间。实测 2026-07-25 累计值 391,572.41（本金 280,821.90），与 /crm 的 totalMoneyBalance 分文不差。",已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,26,balance_end_cash,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,27,balance_end_gift,"numeric(14,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,28,is_partial,boolean,False,false,,,true = 当晚至少一个来源抓取失败，本行部分数值列为 NULL（哪些来源见 missing_sources）。用于区分「真的是 0」与「没抓到」。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,29,missing_sources,text[],True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,30,source,text,True,—,,,来源标签；当前是否有受控字典和强约束需逐表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,31,fetched_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 fetched 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,32,topup_adjust_amount,"numeric(14,2)",True,—,,,"当日以后台调账（txn_type=50）形式入账、但**性质是客户预存**的金额，计入会员充值口径。判据是写者侧的金额阈值（默认 RM 1,000，见 ~/hot/res_api/lib/member-map.js 的 MEMBER_TOPUP_ADJUST_MIN），不是 POS 给的语义 —— 实测 1,000 以下 30 笔（最大 850）、以上 1 笔（2026-06-06 的 30,000），中间 35 倍空档。出现接近阈值的样本时必须人工判读，写者每次重分类都会打日志。",已确认：生产库字段注释,check: CHECK (topup_adjust_amount IS NULL OR adjust_correction IS NULL OR adjust_net IS NULL OR abs(topup_adjust_amount + adjust_correction - adjust_net) <= 0.01),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,33,adjust_correction,"numeric(14,2)",True,—,,,当日 txn_type=50/60 里**不计入充值**的部分：小额补偿与纠错条目。与 topup_adjust_amount 之和恒等于 adjust_net（有 CHECK 保证），因此两者不重复计算。,已确认：生产库字段注释,check: CHECK (topup_adjust_amount IS NULL OR adjust_correction IS NULL OR adjust_net IS NULL OR abs(topup_adjust_amount + adjust_correction - adjust_net) <= 0.01),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_daily,34,topup_total,"numeric(14,2)",True,(topup_face_value + topup_adjust_amount),,s,"【对外的「会员充值」就用这一列】= topup_face_value（POS 正常充值流程，txn_type=10） + topup_adjust_amount（走后台调账的客户预存）。任一为 NULL 则本列 NULL —— 不用 COALESCE 掩盖缺数。历史背景：2026-06 的 topup_face_value 为 0（实测确为无充值活动，非抓取缺失：当月 daily_revenue 30 天齐全、会员卡付款 30 天齐全），而 topup_adjust_amount 为 30,000。只看 topup_face_value 会把这个月读成「储值业务归零」。",已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_order_item,1,order_id,text,False,—,,,RES 订单号，与 pos_member_card_txn.order_id 同一 ID 空间（实测 2026-08-08 全量 18/18 命中）。,已确认：生产库字段注释,"primary_key: PRIMARY KEY (order_id, item_key)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_order_item,2,item_key,text,False,—,,,商品键，关联 pos_product.item_key 取 name_zh / name_en / category。刻意不在本表落商品名，避免改名造成历史漂移。,已确认：生产库字段注释,"primary_key: PRIMARY KEY (order_id, item_key)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_order_item,3,business_date,date,False,—,,,字段名显示它可能存放 business_date 对应的自然日；时区和业务口径待确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_order_item,4,member_id,text,True,—,,,由 order_id 反查 pos_member_card_txn 得到的冗余列。一单对应多个不同会员时写 NULL 并告警，不猜不取第一个。,已确认：生产库字段注释,"check: CHECK (member_id IS NULL OR member_id ~ '^[0-9]{1,32}$'::text)",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_order_item,5,qty,"numeric(12,3)",False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (qty > 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_order_item,6,net_sales,"numeric(14,2)",False,—,,,RES 的 M_Item_SUM_netSales（净额）。与 pos_member_card_txn.total_amount 口径不同（后者是储值卡核销额，一单可能只部分走卡），两者不应相互对账。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_member_order_item,7,synced_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 synced 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,1,item_key,text,False,—,,,RES menuItemNameKey，与销售报表维度 D_itemName 的值是同一个东西——这正是它能同时连上销售与成本的原因。,已确认：生产库字段注释,check: CHECK (item_key ~ '^[0-9]+-[0-9]+-[0-9A-Za-z-]+$'::text) | primary_key: PRIMARY KEY (item_key),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,2,item_id,text,False,—,,,字段名显示它可能存放 item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,3,org_id,text,False,—,,,字段名显示它可能存放 org 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,4,org_type,smallint,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,5,menu_item_code,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,6,name_en,text,False,—,,,RES menuItemNameML.en_US。**显示名会变、会重复，永远不要拿它当键。**,已确认：生产库字段注释,check: CHECK (btrim(name_en) = name_en AND name_en <> ''::text),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,7,name_zh,text,True,—,,,RES menuItemNameML.zh_CN，权威中文名。item_alias 是它出现之前的人工近似，应逐步退役。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,8,category_id,text,True,—,,,字段名显示它可能存放 category 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,9,category_en,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,10,category_zh,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,11,spec,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,12,sales_price,"numeric(12,4)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (sales_price IS NULL OR sales_price >= 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,13,res_cost_card_id,text,True,—,,,字段名显示它可能存放 res_cost_card 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,check: CHECK (has_cost_card = false OR res_cost_card_id IS NOT NULL),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,14,res_spec_id,text,True,—,,,字段名显示它可能存放 res_spec 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,15,has_cost_card,boolean,False,false,,,RES 上是否已建成本卡。实测 87/114 在售品已建，按营收覆盖 97.2%。,已确认：生产库字段注释,check: CHECK (has_cost_card = false OR res_cost_card_id IS NOT NULL),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,16,res_total_cost,"numeric(14,6)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,check: CHECK (res_total_cost IS NULL OR res_total_cost >= 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,17,res_theoretical_cost,"numeric(14,6)",True,—,,,RES 成本卡的理论成本快照，随同步刷新。**权威在 RES**，本列只是镜像，不要在本库里改它。,已确认：生产库字段注释,check: CHECK (res_theoretical_cost IS NULL OR res_theoretical_cost >= 0::numeric),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,18,res_status,smallint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,19,first_seen_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 first_seen 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,20,synced_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 synced 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,21,name_zh_display,text,True,—,,,人工校正的中文品名；NULL 表示直接用 name_zh。sync-catalog.mjs 不写此列。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,pos_product,22,category_display,text,True,—,,,人工校正的分类；NULL 表示直接用 category_zh。sync-catalog.mjs 不写此列。,已确认：生产库字段注释,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,1,id,integer,False,nextval('product_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,2,category,character varying(100),False,''::character varying,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,3,name,character varying(200),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,unique: UNIQUE (name),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,4,name_en,character varying(200),False,''::character varying,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,5,price,double precision,False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,6,pack_multiple,integer,False,1,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,7,unit_type,character varying(20),False,'batch'::character varying,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,8,display_full_quantity,integer,False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,9,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,10,updated_at,timestamp with time zone,True,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,11,item_key,text,True,—,,,POS 来源商品组合键；它是来源身份，不等于统一 product_id。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (item_key) REFERENCES pos_product(item_key) ON DELETE SET NULL,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,12,positioning,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,13,cold_hot,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,14,sales_ratio,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,15,target_tc,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,16,audience,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,17,break_stock_time,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,18,sort_order,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,19,avg_monday_to_thursday,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,20,avg_friday,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,21,avg_weekend,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,22,baseline_total_sales,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,23,baseline_day_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product,24,time_slots,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product_alias,1,id,integer,False,nextval('product_alias_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product_alias,2,alias,character varying(200),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,unique: UNIQUE (alias),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product_alias,3,standard_name,character varying(200),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product_alias,4,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product_alias,5,updated_at,timestamp with time zone,True,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,product_alias,6,item_key,text,True,—,,,POS 来源商品组合键；它是来源身份，不等于统一 product_id。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (item_key) REFERENCES pos_product(item_key) ON DELETE SET NULL,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,1,id,integer,False,nextval('prompt_segment_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,2,segment_key,character varying(100),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,unique: UNIQUE (segment_key),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,3,category,character varying(50),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,4,title,character varying(200),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,5,content,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,6,variables,text,True,''::text,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,7,sort_order,integer,True,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,8,is_active,boolean,True,true,,,字段名显示它可能是 is_active 的布尔标记；NULL 与 false 是否不同需确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,9,version,integer,True,1,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,10,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_segment,11,updated_at,timestamp with time zone,True,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,1,id,integer,False,nextval('prompt_template_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,2,template_key,character varying(100),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,unique: UNIQUE (template_key),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,3,title,character varying(200),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,4,system_instruction_key,character varying(100),False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,5,segment_keys,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,6,model,character varying(50),True,'gemini-2.5-flash'::character varying,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,7,temperature,double precision,True,0.1,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,8,top_p,double precision,True,0.85,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,9,is_active,boolean,True,true,,,字段名显示它可能是 is_active 的布尔标记；NULL 与 false 是否不同需确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,10,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,prompt_template,11,updated_at,timestamp with time zone,True,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,schema_migrations,1,version,integer,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,primary_key: PRIMARY KEY (version),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,schema_migrations,2,name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,schema_migrations,3,applied_at,timestamp with time zone,True,now(),,,字段名显示它可能存放 applied 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,schema_migrations,4,filename,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,schema_migrations,5,checksum,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,2,rule_type,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,3,category,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,4,description,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,5,evidence,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,6,confidence,real,False,0.5,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,7,sample_count,integer,False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,8,job_titles,text[],False,'{}'::text[],,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,9,departments,text[],False,'{}'::text[],,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,10,is_active,boolean,False,true,,,字段名显示它可能是 is_active 的布尔标记；NULL 与 false 是否不同需确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,11,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,screening_rules,12,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,session_state,1,conversation_id,text,False,—,,,字段名显示它可能存放 conversation 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,primary_key: PRIMARY KEY (conversation_id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,session_state,2,user_id,text,True,—,,,字段名显示它可能存放 user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,session_state,3,current_skill_id,text,True,—,,,字段名显示它可能存放 current_skill 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,session_state,4,pending_action,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,session_state,5,collected_inputs,jsonb,False,'{}'::jsonb,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,session_state,6,missing_inputs,text[],False,'{}'::text[],,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,session_state,7,last_active_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 last_active 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,1,user_id,text,False,—,,,业务主键。WhatsApp 来源沿用 ops_user.user_id；飞书来源为 'lark:'||open_id。,已确认：生产库字段注释,primary_key: PRIMARY KEY (user_id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,2,name,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,3,role,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,4,is_active,boolean,False,true,,,字段名显示它可能是 is_active 的布尔标记；NULL 与 false 是否不同需确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,5,phone,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,6,lid,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,7,permissions,text[],True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,8,store_ids,text[],True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,9,lark_open_id,text,True,—,,,字段名显示它可能存放 lark_open 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,unique: UNIQUE (lark_open_id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,10,lark_department,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,11,alias,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,12,subscriptions,text[],True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,13,lark_synced_at,timestamp with time zone,True,—,,,字段名显示它可能存放 lark_synced 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,14,created_at,timestamp with time zone,True,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,staff,15,updated_at,timestamp with time zone,False,now(),,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (appointment_id) REFERENCES appointments(id) | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,2,store_id,text,False,—,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (store_id) REFERENCES ops_store(store_code),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,3,appointment_id,uuid,False,—,,,字段名显示它可能存放 appointment 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (appointment_id) REFERENCES appointments(id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,4,position_code,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,5,score,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,6,feedback,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,7,attitude_summary,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,8,red_line,boolean,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,9,recommendation,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,"check: CHECK (recommendation = ANY (ARRAY['建议录用'::text, '有条件录用'::text, '延长试工'::text, '不建议录用'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,10,decided_by_user_id,text,True,—,,,字段名显示它可能存放 decided_by_user 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (decided_by_user_id) REFERENCES staff(user_id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,11,decided_at,timestamp with time zone,True,—,,,字段名显示它可能存放 decided 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,trials,12,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,1,id,uuid,False,gen_random_uuid(),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (application_id) REFERENCES applications(id) | primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,2,store_id,text,True,—,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,foreign_key: FOREIGN KEY (store_id) REFERENCES ops_store(store_code),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,3,phone,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,unique: UNIQUE (phone),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,4,application_id,uuid,True,—,,,字段名显示它可能存放 application 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,foreign_key: FOREIGN KEY (application_id) REFERENCES applications(id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,5,body,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,6,status,text,False,'queued'::text,,,该行业务状态；合法状态集合以当前 CHECK 或写入代码为准。,合理推测：通用命名；需代码确认,"check: CHECK (status = ANY (ARRAY['queued'::text, 'sending'::text, 'sent'::text, 'failed'::text, 'skipped'::text]))",现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,7,attempts,integer,False,0,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,8,max_attempts,integer,False,3,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,9,last_error,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,10,earliest_at,timestamp with time zone,False,now(),,,字段名显示它可能存放 earliest 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,11,sent_at,timestamp with time zone,True,—,,,字段名显示它可能存放 sent 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_outbound_queue,12,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_send_log,1,id,bigint,False,nextval('wa_send_log_id_seq'::regclass),,,该表当前使用的技术行标识；具体稳定性取决于表约束。,合理推测：通用命名；需代码确认,primary_key: PRIMARY KEY (id),现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_send_log,2,phone,text,False,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_send_log,3,sent_on,date,False,((now() AT TIME ZONE 'Asia/Kuala_Lumpur'::text))::date,,,字段名显示它可能存放 sent_on 对应的自然日；时区和业务口径待确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+table,wa_send_log,4,created_at,timestamp with time zone,False,now(),,,该行首次写入数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,daily_sales_record,1,product_name,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,daily_sales_record,2,standard_name,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,daily_sales_record,3,quantity,integer,True,—,,,数量；单位需按表及写入源确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,daily_sales_record,4,date,text,True,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,daily_sales_record,5,day_of_week,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,daily_sales_record,6,item_key,text,True,—,,,POS 来源商品组合键；它是来源身份，不等于统一 product_id。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,product_material_cost,1,product_name,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,product_material_cost,2,material_cost,"numeric(38,12)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,product_material_cost,3,cost_source,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,product_material_cost,4,confidence,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,product_material_cost,5,updated_at,timestamp with time zone,True,—,,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,timeslot_sales_record,1,product_name,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,timeslot_sales_record,2,day_type,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,timeslot_sales_record,3,time_slot,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,timeslot_sales_record,4,avg_quantity,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,timeslot_sales_record,5,sample_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,1,recipe_id,bigint,True,—,,,字段名显示它可能存放 recipe 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,2,item_id,bigint,True,—,,,字段名显示它可能存放 item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,3,item_name,text,True,—,,,来源或展示商品名；可变且不能作为跨模块稳定连接键。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,4,version,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,5,status,text,True,—,,,该行业务状态；合法状态集合以当前 CHECK 或写入代码为准。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,6,batch_yield,"numeric(18,6)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,7,batch_unit,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,8,sale_price,"numeric(18,6)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,9,total_cost,"numeric(38,12)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,10,unit_cost,"numeric(38,12)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,11,cost_rate,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,12,margin_rate,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,13,missing_price_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,14,effective_from,date,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,15,effective_to,date,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_current_cost,16,updated_at,timestamp with time zone,True,—,,,该行最后一次更新数据库的时间。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_data_quality,1,issue_type,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_data_quality,2,severity,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_data_quality,3,recipe_id,bigint,True,—,,,字段名显示它可能存放 recipe 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_data_quality,4,item_id,bigint,True,—,,,字段名显示它可能存放 item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_data_quality,5,item_name,text,True,—,,,来源或展示商品名；可变且不能作为跨模块稳定连接键。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_data_quality,6,message,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,1,item_id,bigint,True,—,,,字段名显示它可能存放 item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,2,price_id,bigint,True,—,,,字段名显示它可能存放 price 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,3,supplier,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,4,unit_price,"numeric(18,6)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,5,currency,character varying(3),True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,6,price_quantity,"numeric(18,6)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,7,price_unit,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,8,normalized_price_myr,"numeric(24,12)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,9,normalized_unit,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,10,exchange_rate_id,bigint,True,—,,,字段名显示它可能存放 exchange_rate 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,11,verification_state,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,12,verification_note,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,13,effective_from,date,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_price_current_normalized,14,effective_to,date,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_recipe_expanded,1,recipe_id,bigint,True,—,,,字段名显示它可能存放 recipe 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_recipe_expanded,2,source_recipe_id,bigint,True,—,,,字段名显示它可能存放 source_recipe 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_recipe_expanded,3,component_item_id,bigint,True,—,,,字段名显示它可能存放 component_item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_recipe_expanded,4,quantity,"numeric(38,12)",True,—,,,数量；单位需按表及写入源确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_recipe_expanded,5,unit,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_recipe_expanded,6,depth,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_recipe_expanded,7,item_path,bigint[],True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_recipe_expanded,8,cycle,boolean,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_cost_card_recipe_expanded,9,is_terminal,boolean,True,—,,,字段名显示它可能是 is_terminal 的布尔标记；NULL 与 false 是否不同需确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_daily_margin,1,date,date,True,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_daily_margin,2,net_sales,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_daily_margin,3,costed_sales,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_daily_margin,4,cogs,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_daily_margin,5,gross_profit,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_daily_margin,6,margin_pct,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_daily_margin,7,margin_pct_trusted,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_daily_margin,8,cost_coverage_pct,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_daily_margin,9,trusted_coverage_pct,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,1,date,date,True,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,2,item_key,text,True,—,,,POS 来源商品组合键；它是来源身份，不等于统一 product_id。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,3,name_zh,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,4,category,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,5,positioning,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,6,is_planned,boolean,True,—,,,字段名显示它可能是 is_planned 的布尔标记；NULL 与 false 是否不同需确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,7,suggested_qty,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,8,sold_qty,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,9,net_sales,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,10,deviation,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,11,direction,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_forecast_accuracy,12,error_pct,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_holiday_factor,1,date,character varying(10),True,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_holiday_factor,2,name,character varying(200),True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_holiday_factor,3,type,character varying(50),True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_holiday_factor,4,measured_factor,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_holiday_factor,5,factor,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_holiday_factor,6,factor_source,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_identity_gap,1,gap_type,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_identity_gap,2,name,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_identity_gap,3,rows,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_identity_gap,4,amount,numeric,True,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_identity_gap,5,last_seen,date,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_cost_quality,1,pos_item_id,text,True,—,,,字段名显示它可能存放 pos_item 的标识；当前数据库未给该列注释，是否有外键及命名空间见约束列。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_cost_quality,2,name_zh,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_cost_quality,3,sales_30d,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_cost_quality,4,qty_30d,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_cost_quality,5,realized_price,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_cost_quality,6,unit_cost,"numeric(38,12)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_cost_quality,7,missing_price_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_cost_quality,8,margin_rate,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_cost_quality,9,quality,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_cost_quality,10,cost_trusted,boolean,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,1,date,date,True,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,2,item_key,text,True,—,,,POS 来源商品组合键；它是来源身份，不等于统一 product_id。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,3,name_zh,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,4,category,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,5,is_planned,boolean,True,—,,,字段名显示它可能是 is_planned 的布尔标记；NULL 与 false 是否不同需确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,6,suggested_qty,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,7,sold_qty,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,8,net_sales,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,9,deviation,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,10,direction,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,11,waste_qty,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,12,waste_amount,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,13,scheduling_waste_amount,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,14,tasting_amount,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,15,oos_events,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,16,first_soldout_time,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,17,oos_loss_amount,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,18,total_loss_amount,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_daily_pulse,19,loss_pattern,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_sales_keyed,1,date,date,True,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_sales_keyed,2,item_key,text,True,—,,,POS 来源商品组合键；它是来源身份，不等于统一 product_id。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_sales_keyed,3,item_name,text,True,—,,,来源或展示商品名；可变且不能作为跨模块稳定连接键。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_sales_keyed,4,qty,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_sales_keyed,5,net_sales,"numeric(10,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_sales_keyed,6,key_recovered_by_name,boolean,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_waste_keyed,1,date,date,True,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_waste_keyed,2,item_key,text,True,—,,,POS 来源商品组合键；它是来源身份，不等于统一 product_id。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_waste_keyed,3,item_name,text,True,—,,,来源或展示商品名；可变且不能作为跨模块稳定连接键。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_waste_keyed,4,qty,"numeric(10,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_waste_keyed,5,amount,"numeric(10,2)",True,—,,,金额；币种、含税口径和正负号语义需按表确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_waste_keyed,6,waste_reason,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_item_waste_keyed,7,key_recovered_by_name,boolean,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_labor_productivity,1,work_date,date,True,—,,,字段名显示它可能存放 work_date 对应的自然日；时区和业务口径待确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_labor_productivity,2,store_id,text,True,—,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_labor_productivity,3,area,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_labor_productivity,4,on_duty,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_labor_productivity,5,off_duty,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_labor_productivity,6,total_hours,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_labor_productivity,7,turnover,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_labor_productivity,8,output_value,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_pos_item_by_name,1,name_en,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_pos_item_by_name,2,item_key,text,True,—,,,POS 来源商品组合键；它是来源身份，不等于统一 product_id。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,1,item_key,text,True,—,,,POS 来源商品组合键；它是来源身份，不等于统一 product_id。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,2,name_zh,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,3,name_en,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,4,category,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,5,positioning,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,6,pack_multiple,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,7,break_stock_time,character varying,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,8,time_slots,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,9,is_planned,boolean,True,—,,,字段名显示它可能是 is_planned 的布尔标记；NULL 与 false 是否不同需确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,10,product_id,integer,True,—,,,产品标识；需核对它引用 product、pos_product 还是成本卡对象。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_product_identity,11,sales_price,"numeric(12,4)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_manager_vs_pos,1,date,character varying(10),True,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_manager_vs_pos,2,manager_revenue,"numeric(12,2)",True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_manager_vs_pos,3,pos_revenue,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_manager_vs_pos,4,diff,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_manager_vs_pos,5,diff_pct,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_manager_vs_pos,6,manager_transaction_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_manager_vs_pos,7,pos_transaction_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_manager_vs_pos,8,manager_revenue_at,timestamp with time zone,True,—,,,字段名显示它可能存放 manager_revenue 的时间；发生、生效还是入库时间需由写入代码确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_reconciliation,1,date,character varying(10),True,—,,,当前表使用的日期字段；是否为营业日及其时区需按写入代码确认。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_reconciliation,2,store,text,True,—,,,当前库使用的门店文本/代码；现有表之间没有统一稳定身份保证。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_reconciliation,3,import_source,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_reconciliation,4,reported_revenue,double precision,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_reconciliation,5,hourly_revenue,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_reconciliation,6,revenue_diff,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_reconciliation,7,transaction_count,integer,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_reconciliation,8,hourly_bills,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_revenue_reconciliation,9,bill_diff,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_shift_by_post,1,work_date,date,True,—,,,字段名显示它可能存放 work_date 对应的自然日；时区和业务口径待确认。,合理推测,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_shift_by_post,2,store_id,text,True,—,,,当前表声明的门店标识；需确认它引用哪套门店主数据。,合理推测：通用命名；需代码确认,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_shift_by_post,3,area,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_shift_by_post,4,post,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_shift_by_post,5,main_station,text,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_shift_by_post,6,headcount,bigint,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。
+view,v_shift_by_post,7,hours,numeric,True,—,,,生产库没有该字段注释；仅凭字段名无法可靠确认其业务数据、单位或口径。,待验证,,现有列的业务定义若为待验证，不应直接复制到目标库；先以写入代码和样本数据核对。

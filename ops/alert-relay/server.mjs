@@ -1,153 +1,127 @@
 #!/usr/bin/env node
-// 告警中转：把「谁都能发的 {text} webhook」翻译成 Lark 应用 API 的一条消息。
+// 本机告警中转：把 HTTP POST 转成一条 Lark 私聊消息。
 //
-// 为什么需要它：四个告警发送点（hbti-web/Vercel、res_api 每晚刷新、HBTI 令牌轮换与保温）
-// 都只会 POST 一个 URL，而这台机器上唯一在用的 Lark 投递通道是**应用 API**
-// （/opt/hotcrush/scripts/lark_app.json，招聘早报每天在用），不是群机器人 hook。
-// 中转让四个运行时共用一个 URL，同时把 app_secret 留在这台机器的 600 文件里——
-// 不必复制进 Vercel（那把密钥同时能读 HR 多维表格，扩散出去代价太大）。
+// 为什么要它，而不是直接往 .env 填一个 Lark 群机器人 webhook：
+//   · 群机器人 webhook 是一个新的长期密钥，拿到它的人就能往群里发东西；
+//     而这台机器上**已经有** Lark 应用凭据（/opt/hotcrush/scripts/lark_app.json），
+//     复用它就不必再引入、保管、轮换一个新密钥。
+//   · 调用方（hbti-token 的 keepalive.sh / run.sh）只认「POST 一个 JSON，看 HTTP 2xx」，
+//     本机中转完全满足，而且只监听 127.0.0.1，不对外暴露。
 //
-// 契约（对调用方）：
-//   POST <BASE>/<PATH_TOKEN>   body: {"text": "..."}  或 Lark 形状 {"msg_type","content":{"text"}}
-//   200 {"code":0}      = Lark 已接收
-//   502 {"code":<非零>} = Lark 拒收，调用方应记为未送达并重试
-// 路径里的随机段就是凭据（与 Slack/Lark webhook 同一模型）；不在日志里回显它。
-
+// 2026-08-06 重建。原版在 Contabo 的 /opt/hotcrush/alert-relay/server.mjs，
+// **从未纳入版本控制**，随那台机器一起没了 —— 所以这次放进仓库。
+//
+// 用法：ALERT_WEBHOOK=http://127.0.0.1:8791/alert
+// 接受两种包体（调用方按目标 URL 形状二选一，这里都收）：
+//   {"text":"..."}                                  ← 通用分支
+//   {"msg_type":"text","content":{"text":"..."}}    ← Lark 群机器人分支
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 
-const PORT = Number(process.env.PORT || 8791);
-const LARK_APP_FILE =
-  process.env.LARK_APP_FILE || "/opt/hotcrush/scripts/lark_app.json";
-const PATH_TOKEN = process.env.ALERT_PATH_TOKEN?.trim();
-const OPEN_IDS = (process.env.ALERT_OPEN_IDS || "")
-  .split(",")
-  .map((id) => id.trim())
-  .filter(Boolean);
-const LARK_BASE = process.env.LARK_BASE || "https://open.larksuite.com";
-const MAX_BODY_BYTES = 16 * 1024;
+const PORT = Number(process.env.ALERT_RELAY_PORT || 8791);
+const HOST = "127.0.0.1"; // 只监听回环：这台机器同时跑着 Xray，任何多余的对外监听面都不要开
+const CONFIG = process.env.LARK_APP_CONFIG || "/opt/hotcrush/scripts/lark_app.json";
+const BASE = "https://open.larksuite.com/open-apis";
 
-if (!PATH_TOKEN || PATH_TOKEN.length < 24) {
-  console.error("ALERT_PATH_TOKEN 缺失或太短（至少 24 字符）——那是这个端点唯一的凭据");
-  process.exit(1);
-}
-if (OPEN_IDS.length === 0) {
-  console.error("ALERT_OPEN_IDS 为空——没有收件人的告警等于没有告警");
-  process.exit(1);
-}
-
-// 租户令牌有效期约 2 小时。提前 5 分钟过期重取，避免拿着刚好过期的令牌去发告警。
-let cachedToken = { value: "", expiresAt: 0 };
-
-async function tenantAccessToken() {
-  if (cachedToken.value && Date.now() < cachedToken.expiresAt) {
-    return cachedToken.value;
-  }
-  const app = JSON.parse(readFileSync(LARK_APP_FILE, "utf8"));
-  const res = await fetch(
-    `${LARK_BASE}/open-apis/auth/v3/tenant_access_token/internal`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        app_id: app.app_id,
-        app_secret: app.app_secret,
-      }),
-      signal: AbortSignal.timeout(10_000),
-    },
+const log = (msg, extra) =>
+  process.stdout.write(
+    `${new Date().toISOString()} ${msg}${extra ? ` ${JSON.stringify(extra)}` : ""}\n`,
   );
+
+function loadConfig() {
+  const c = JSON.parse(readFileSync(CONFIG, "utf8"));
+  const openId = process.env.ALERT_OPEN_ID || c.hr_open_id;
+  if (!c.app_id || !c.app_secret) throw new Error(`${CONFIG} 缺 app_id/app_secret`);
+  if (!openId) throw new Error(`${CONFIG} 缺 hr_open_id，且未设 ALERT_OPEN_ID`);
+  return { appId: c.app_id, appSecret: c.app_secret, openId };
+}
+
+// tenant_access_token 有效期约 2 小时。缓存它不只是省延迟 —— Lark 是按自然月
+// 10000 次计费的，告警本身很少，但每次都换令牌会让计费翻倍。提前 60 秒过期。
+let cached = { token: "", expiresAt: 0 };
+async function tenantToken({ appId, appSecret }) {
+  if (cached.token && Date.now() < cached.expiresAt) return cached.token;
+  const res = await fetch(`${BASE}/auth/v3/tenant_access_token/internal`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json; charset=utf-8" },
+    body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+    signal: AbortSignal.timeout(15_000),
+  });
   const body = await res.json();
   if (body.code !== 0 || !body.tenant_access_token) {
-    throw new Error(`tenant_access_token failed code=${body.code}`);
+    throw new Error(`取 tenant_access_token 失败 code=${body.code} msg=${body.msg}`);
   }
-  cachedToken = {
-    value: body.tenant_access_token,
-    expiresAt: Date.now() + Math.max(60, (body.expire ?? 7200) - 300) * 1_000,
+  cached = {
+    token: body.tenant_access_token,
+    expiresAt: Date.now() + Math.max(60, (body.expire ?? 7200) - 60) * 1000,
   };
-  return cachedToken.value;
+  return cached.token;
 }
 
-async function deliver(text) {
-  const token = await tenantAccessToken();
-  const failures = [];
-  for (const openId of OPEN_IDS) {
-    const res = await fetch(
-      `${LARK_BASE}/open-apis/im/v1/messages?receive_id_type=open_id`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          receive_id: openId,
-          msg_type: "text",
-          content: JSON.stringify({ text }),
-        }),
-        signal: AbortSignal.timeout(10_000),
-      },
-    );
-    const body = await res.json().catch(() => ({ code: -1 }));
-    // Lark 用 HTTP 200 + 非零 code 表示「没送到」，必须看 code 而不是状态码。
-    if (body.code !== 0) failures.push(`${openId.slice(0, 6)}…:${body.code}`);
-  }
-  return failures;
+async function sendLark(text) {
+  const cfg = loadConfig();
+  const token = await tenantToken(cfg);
+  const res = await fetch(`${BASE}/im/v1/messages?receive_id_type=open_id`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      receive_id: cfg.openId,
+      msg_type: "text",
+      content: JSON.stringify({ text }),
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const body = await res.json();
+  // Lark 用「HTTP 200 + 非零 code」表示拒收，只看状态码会把失败当成功。
+  if (body.code !== 0) throw new Error(`发送失败 code=${body.code} msg=${body.msg}`);
+  return body.data?.message_id ?? "";
 }
 
-createServer((request, response) => {
-  const reply = (status, payload) => {
-    const json = JSON.stringify(payload);
-    response.writeHead(status, {
-      "Content-Type": "application/json",
-      "Content-Length": Buffer.byteLength(json),
-    });
-    response.end(json);
+function extractText(raw) {
+  try {
+    const o = JSON.parse(raw);
+    if (typeof o?.text === "string" && o.text.trim()) return o.text.trim();
+    if (typeof o?.content?.text === "string" && o.content.text.trim()) return o.content.text.trim();
+    if (typeof o?.content === "string") {
+      const inner = JSON.parse(o.content);
+      if (typeof inner?.text === "string" && inner.text.trim()) return inner.text.trim();
+    }
+  } catch { /* 非 JSON：当纯文本处理 */ }
+  return raw.trim();
+}
+
+const server = createServer((req, res) => {
+  const reply = (status, obj) => {
+    res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify(obj));
   };
 
-  if (request.method !== "POST") return reply(405, { code: 405 });
-  // 路径就是凭据。长度不同直接判错，避免把「路径长度」当侧信道。
-  const supplied = (request.url || "").replace(/^\/+/, "").split("?")[0];
-  if (supplied !== PATH_TOKEN) return reply(404, { code: 404 });
+  if (req.method === "GET") return reply(200, { ok: true, service: "alert-relay" });
+  if (req.method !== "POST") return reply(405, { code: 405, msg: "POST only" });
 
   let raw = "";
-  let tooLarge = false;
-  request.on("data", (chunk) => {
-    raw += chunk;
-    if (raw.length > MAX_BODY_BYTES) {
-      tooLarge = true;
-      request.destroy();
+  req.on("data", (c) => {
+    raw += c;
+    if (raw.length > 64_000) req.destroy(); // 告警文案不可能这么长，防呆
+  });
+  req.on("end", async () => {
+    const text = extractText(raw);
+    if (!text) return reply(400, { code: 400, msg: "empty text" });
+    try {
+      const id = await sendLark(text);
+      log("已转发到 Lark", { chars: text.length, messageId: id });
+      // 回 code:0 —— 与 Lark 群机器人回包同形，调用方那套收据校验不用区分目标。
+      reply(200, { code: 0, msg: "ok" });
+    } catch (err) {
+      log("转发失败", { error: String(err) });
+      // 必须回非 2xx：调用方靠状态码判「送到了没有」，
+      // 这里回 200 会让一条没送出去的告警被记成已送达。
+      reply(502, { code: 502, msg: String(err) });
     }
   });
-  request.on("end", async () => {
-    if (tooLarge) return reply(413, { code: 413 });
-    let text = "";
-    try {
-      const parsed = JSON.parse(raw);
-      // 两种上游形状都收：老脚本发 {text}，改造后的 Lark 分支发 msg_type/content。
-      text =
-        typeof parsed?.text === "string"
-          ? parsed.text
-          : typeof parsed?.content?.text === "string"
-            ? parsed.content.text
-            : "";
-    } catch {
-      return reply(400, { code: 400 });
-    }
-    if (!text.trim()) return reply(400, { code: 400 });
-
-    try {
-      const failures = await deliver(text);
-      if (failures.length > 0) {
-        console.error(`[relay] 未送达 ${failures.join(" ")}`);
-        return reply(502, { code: 1, undelivered: failures.length });
-      }
-      console.log(`[relay] 已送达 ${OPEN_IDS.length} 人：${text.slice(0, 80)}`);
-      return reply(200, { code: 0 });
-    } catch (error) {
-      console.error(`[relay] 发送失败 ${String(error)}`);
-      return reply(502, { code: 2 });
-    }
-  });
-}).listen(PORT, "127.0.0.1", () => {
-  console.log(`[relay] listening on 127.0.0.1:${PORT}, ${OPEN_IDS.length} 个收件人`);
 });
+
+server.listen(PORT, HOST, () => log(`alert-relay 就绪 http://${HOST}:${PORT}`));

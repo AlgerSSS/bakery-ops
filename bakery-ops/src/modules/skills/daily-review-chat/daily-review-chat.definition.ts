@@ -59,7 +59,9 @@ async function getTodayDate(): Promise<string> {
 export function normalizeDate(raw: string): string {
   if (!raw) return "";
   const s = raw.trim();
-  const currentYear = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" })).getFullYear();
+  const klNow = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur" }));
+  const currentYear = klNow.getFullYear();
+
   // 带年：2026-07-01 / 2026.7.1 / 2026/7/1
   let m = s.match(/(\d{4})[-.\/](\d{1,2})[-.\/](\d{1,2})/);
   if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
@@ -72,6 +74,31 @@ export function normalizeDate(raw: string): string {
   // 短格式：7.1 / 7-1 / 7/1
   m = s.match(/(?:^|[^\d])(\d{1,2})[.\/-](\d{1,2})(?:[^\d]|$)/);
   if (m) return `${currentYear}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}`;
+
+  // 相对日（昨天/前天/N天前）。**必须排在所有显式日期之后** ——
+  // 「今天复盘：2026-07-01 下午蛋挞断货」里既有「今天」又有真日期，显式的那个才是店长要的。
+  //
+  // 而且只在【明确指定复盘对象】时才认，两种情形：
+  //   a) 句子里带「复盘」——「昨天的复盘」= 换一天复盘
+  //   b) 整句就是一个日期词 ——「昨天」「前天的数据」
+  // 否则一律返回空串。原因是追问路径现在以原话优先（见 execute 里 reviewDate 的解析），
+  // 若无差别地抓取，店长在 08-01 的复盘里问「今天生意怎么样」「跟昨天比呢」
+  // 就会把复盘日整个跳走 —— 那是比原 bug 更难察觉的错。
+  const REL_ONLY = /^(大前天|前天|昨天|昨日|今天|今日|本日)(的)?(复盘|数据|报告|分析|情况)?[？?。！!]?$/;
+  if (/复盘/.test(s) || REL_ONLY.test(s)) {
+    const shiftDays = (n: number) => {
+      const d = new Date(klNow);
+      d.setDate(d.getDate() - n);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    };
+    // 「大前天」含「前天」，长的先判
+    if (/大前天/.test(s)) return shiftDays(3);
+    if (/前天/.test(s)) return shiftDays(2);
+    if (/昨天|昨日/.test(s)) return shiftDays(1);
+    if (/今天|今日|本日/.test(s)) return shiftDays(0);
+    const nAgo = s.match(/(\d{1,3})\s*天前/);
+    if (nAgo) return shiftDays(Number(nAgo[1]));
+  }
   return "";
 }
 
@@ -394,7 +421,11 @@ export class DailyReviewChatSkillHandler implements SkillHandler {
     //   （如 2024）塞进 input.date；用户没说年份就用当前年，绝不信 LLM 填的年份。
     let reviewDate: string;
     if (isFollowUp) {
-      reviewDate = normalizeDate((input.input._reviewDate as string) || "") || normalizeDate(rawText);
+      // 【用户原话优先】店长在追问里改了日期（「昨天的复盘」）就以他说的为准，没说才沿用首轮锁定的。
+      // 原先顺序是 _reviewDate || normalizeDate(rawText)，而 _reviewDate 在追问阶段恒为 truthy，
+      // || 直接短路 —— 原话永远不会被解析。2026-08-06 店长说「昨天的复盘」，系统照旧查 08-06。
+      reviewDate =
+        normalizeDate(rawText) || normalizeDate((input.input._reviewDate as string) || "");
     } else {
       reviewDate =
         normalizeDate(rawText) ||
@@ -469,8 +500,27 @@ export class DailyReviewChatSkillHandler implements SkillHandler {
       return await this.handleEndConversation(date, history, question);
     }
 
-    // Query relevant data based on the question
-    const extraData = await queryDataForQuestion(question, date);
+    // 【基准数据必须每轮都带】原先追问只喂 queryDataForQuestion 的结果，它按意图分支，
+    // 命中不了就返回空串 —— 提示词里于是一个数字都没有，只剩一句「数据不足请诚实说明」的软约束。
+    // 2026-08-06 实测：店长追问「昨天的复盘」，compare_days 分支只回了
+    // 营业额/客单数/客单价/折扣率 四个字段，模型就把缺的全编了 ——
+    // 实收直接复用应收、折扣额拿四舍五入的折扣率反推、水吧金额从对话历史里上周同天那行搬过来、
+    // 会员占比凭空写 23.1%（真值 2.78%）、TOP5 单品整段虚构成「X/Y/Z 商品」+ 12345/9876 这类顺子数。
+    // 现在无论问什么都先给全当日基准（与初次复盘、每日早报同一份 getSalesData），
+    // extraData 只作为针对性补充。
+    const [baseData, extraData] = await Promise.all([
+      getSalesData(date).catch((err) => {
+        logger.warn("追问基准数据获取失败，仅用针对性查询", { date, error: String(err) });
+        return "";
+      }),
+      // 补充查询失败也不能把基准数据一起拖走 —— 那正好抵消掉「任何时候都有真值兜底」的用意。
+      // 它是真的会抛：意图里的字段来自 LLM，曾经 hour:"下午" 直接撞上 integer 列。
+      // parseIntent 现在挡住了已知的几种，但 LLM 的输出面比我们能枚举的大，这里再兜一层。
+      queryDataForQuestion(question, date).catch((err) => {
+        logger.warn("追问补充查询失败，回落到当日基准数据", { date, error: String(err) });
+        return "";
+      }),
+    ]);
 
     const prompt = `你是 Hot Crush Bakery 的运营分析顾问，正在和店长进行复盘对话。
 
@@ -480,11 +530,18 @@ ${history}
 【店长追问】
 ${question}
 
-${extraData ? `【系统查询到的数据】\n${extraData}\n` : ""}
+${baseData ? `【${date} 当日基准数据（权威，优先引用）】\n${baseData}\n` : ""}
+${extraData ? `【针对本次追问的补充查询】\n${extraData}\n` : ""}
 
-请基于数据回答店长的问题。如果涉及具体数字，必须从数据中引用。回答要具体、有数据支撑。
-如果数据不足以回答，诚实说明并建议其他角度。
-最后可以追问店长是否还有其他问题。`;
+【回答纪律 —— 必须严格遵守】
+1. 所有数字只能从上面两节里逐字引用，**禁止推算、禁止估计、禁止凭印象填写**。
+2. 上面没有的指标，直接说「系统没有这项数据」，**绝不允许编造占位值或示例值**。
+   尤其是单品排行：上面没有单品清单时就说没有，不要写「X 商品/Y 商品」这类占位名。
+3. 分清口径：**营业额(应收)是折扣前，实收(折后)是折扣后，两者相差一个折扣额**。
+   不要把应收当实收，也不要用「金额 × 折扣率」反推折扣额 —— 折扣额有独立字段，以字段为准。
+4. 【对话历史】里的数字可能属于**别的日期**（如上周同天对比行）。
+   回答本次追问时只用本次基准数据那一节，不要把历史里的对比值当成本日数值。
+5. 回答要具体、有数据支撑。最后可以追问店长是否还有其他问题。`;
 
     const reply = await aiProvider.chatCompletionLong(prompt);
 

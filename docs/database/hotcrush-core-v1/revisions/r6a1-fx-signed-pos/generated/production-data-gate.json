@@ -1,0 +1,23 @@
+{
+  "apply_compatibility": "NOT_APPLY_COMPATIBLE",
+  "authoritative_production_data_boundary": "LATEST_APPROVED_S0_CONSERVATION_AND_EXTERNAL_RAW_RES_REPORT211_REPLAY_ONLY",
+  "blockers": [
+    "NEW_SQL_PAYLOAD_AND_RELEASE_PINS_REQUIRED",
+    "LATEST_S0_CONSERVATION_REQUIRED",
+    "RAW_RES_REPORT211_REPLAY_REQUIRED",
+    "RECIPE_ARCHIVE_ROUTE_MANIFEST_REQUIRED",
+    "CONSTRAINT_TRIGGER_DDL_NOT_COMPILED",
+    "AFFECTED_VIEW_SELECT_SPECS_NOT_COMPILED",
+    "LOCATION_ACCOUNTING_ENTITY_EFFECTIVE_RELATION_DEFERRED"
+  ],
+  "constraint_trigger_catalog_capture": "NOT_STARTED",
+  "database_writes_allowed": false,
+  "ddl_status": "DESIGN_ONLY_NOT_COMPILED",
+  "historical_fixture_numbers_are_production_golden": false,
+  "physical_backfill_status": "PHYSICAL_BACKFILL_NOT_STARTED",
+  "production_data_gate": "BLOCKED",
+  "resolved_model_sha256": "72c68f5961cbf2c6456cf61d39d3b3e8188f458de90c88ef7c1afaac4be80a7f",
+  "source_reads_allowed": false,
+  "sql_payload_status": "NOT_GENERATED",
+  "status": "NOT_ACTIVATED"
+}

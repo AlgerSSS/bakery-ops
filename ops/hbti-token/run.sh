@@ -27,6 +27,19 @@ LOCK="/var/lock/hotcrush-bo-session.lock"
 mkdir -p "$LOG_DIR"
 
 main() {
+  # 未配置 ≠ 坏了。VERCEL_TOKEN 是可选项(轮换是兜底,日常保活靠 keepalive.sh)，
+  # 没填就干净地跳过，不要每 6 小时推一条「轮换失败」——那种噪音只会把人训练成忽略告警。
+  # 只取这一个键，不 source 整个 .env。
+  if [ -z "${VERCEL_TOKEN:-}" ] && [ -f "$ROOT/.env" ]; then
+    _vt=$(grep -E '^VERCEL_TOKEN=' "$ROOT/.env" | tail -1 | cut -d= -f2- | tr -d '"')
+  else
+    _vt="${VERCEL_TOKEN:-}"
+  fi
+  if [ -z "$_vt" ]; then
+    echo "$(date '+%F %T') 未配置 VERCEL_TOKEN,跳过轮换(保活仍由 keepalive.sh 承担)"
+    return 78   # EX_CONFIG:配置缺失,与 75 一样不触发告警
+  fi
+
   exec 9>"$LOCK"
   # 200 秒拿不到锁就放弃:多半是别的会话任务在跑,下一班再来。
   if ! flock -w 200 9; then
@@ -68,7 +81,7 @@ main() {
 # 现状:本机(含 res_api)**没有任何地方配过 ALERT_WEBHOOK**,所以失败时只会留下
 # logs/LAST_FAILURE 哨兵文件,不会有人被主动通知 —— 想要通知就往 .env 填一个
 # webhook 地址(已实测:填了就会 POST)。ALERT_WEBHOOK 只从环境/.env 读,不写死 URL。
-if [ "$CODE" != "0" ] && [ "$CODE" != "75" ]; then
+if [ "$CODE" != "0" ] && [ "$CODE" != "75" ] && [ "$CODE" != "78" ]; then
   echo "$(date '+%F %T') FAILED code=$CODE log=$LOG" > "$LOG_DIR/LAST_FAILURE"
   # 只取这一个键,不 source 整个 .env(避免把 Vercel 令牌灌进 shell 环境)。
   if [ -z "${ALERT_WEBHOOK:-}" ] && [ -f "$ROOT/.env" ]; then

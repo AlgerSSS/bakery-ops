@@ -69,6 +69,23 @@ export async function readMemberBasics(
   };
 }
 
+/** 只取年度实付消费总额（等级判定的口径，与 readYearStats 的 totalNetSales 同源）。 */
+export async function readAnnualSpend(
+  sql: SqlRunner,
+  memberId: string,
+  year: number,
+): Promise<number> {
+  const rows = await sql`
+    SELECT COALESCE(SUM(net_sales), 0)::float8 AS spend
+      FROM public.pos_member_order_item
+     WHERE member_id = ${memberId}
+       AND business_date >= ${year + "-01-01"}::date
+       AND business_date <  ${year + 1 + "-01-01"}::date
+  `;
+  const row = rows[0];
+  return row ? Number(row.spend) : 0;
+}
+
 export async function readYearStats(
   sql: SqlRunner,
   memberId: string,

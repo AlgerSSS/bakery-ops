@@ -2,10 +2,14 @@
  * 生日贺卡的服务端配置。全部从环境变量读，缺敏感项时 fail closed
  * （与 server-config.ts 的 requireEnvironmentVariable 同一套纪律）。
  *
- * 权益规则默认值来自 2026-08-15 用户口述：
- *   L1/L2 免费巴斯克（每会员每年一份）；L3 450 积分限自己；L4 450 积分可送亲友。
- * 当前库里实际只有 VIP1 一个等级，DEFAULT_LEVEL_KEY 把它桥接到 L1 权益；
- * RES 上线 L1-L4 等级体系后改 BIRTHDAY_BENEFITS_JSON 即可，不用改代码。
+ * 会员等级（2026-08-15 用户定版，等级由年累计实付消费实时计算，不看 RES 等级名）：
+ *   Lv1 初见会员 First Crush     注册入会（RM0）
+ *   Lv2 心动会员 Sweet Crush     年累计消费 RM250
+ *   Lv3 热爱会员 Hot Crush       年累计消费 RM750
+ *   Lv4 挚爱会员 Forever Crush   年累计消费 RM1,500
+ * 生日权益：L1/L2 只有免费巴斯克（每年一份）；L3/L4 才有 450 积分兑换蛋糕
+ * （L3 限自己、L4 可送亲友）。RES 里的等级名（如 VIP1）只作原始档案保留，
+ * 权益判定一律用 deriveLevelKey(年消费)。
  */
 
 export interface BirthdayBenefitRule {
@@ -64,6 +68,37 @@ const DEFAULT_BENEFITS: Record<string, BirthdayBenefitRule> = {
 };
 
 export const POINTS_CAKE_COST = 450;
+
+/** 会员等级体系（升级条件来自用户定版）。 */
+export interface MemberLevelInfo {
+  key: "L1" | "L2" | "L3" | "L4";
+  nameZh: string;
+  nameEn: string;
+  /** 年累计消费（RM，实付口径）达到即升级。 */
+  annualThreshold: number;
+}
+
+export const MEMBER_LEVELS: readonly MemberLevelInfo[] = [
+  { key: "L1", nameZh: "Lv1 初见会员", nameEn: "First Crush", annualThreshold: 0 },
+  { key: "L2", nameZh: "Lv2 心动会员", nameEn: "Sweet Crush", annualThreshold: 250 },
+  { key: "L3", nameZh: "Lv3 热爱会员", nameEn: "Hot Crush", annualThreshold: 750 },
+  { key: "L4", nameZh: "Lv4 挚爱会员", nameEn: "Forever Crush", annualThreshold: 1500 },
+];
+
+/** 年累计实付消费 → 等级。无消费记录（含消费口径外只付现金的会员）按 L1 初见。 */
+export function deriveLevelKey(
+  annualSpend: number | null | undefined,
+): MemberLevelInfo["key"] {
+  const spend = annualSpend ?? 0;
+  if (spend >= 1500) return "L4";
+  if (spend >= 750) return "L3";
+  if (spend >= 250) return "L2";
+  return "L1";
+}
+
+export function memberLevelInfo(key: MemberLevelInfo["key"]): MemberLevelInfo {
+  return MEMBER_LEVELS.find((level) => level.key === key) ?? MEMBER_LEVELS[0];
+}
 
 export function readBirthdayConfig(): BirthdayConfig {
   const linkSecret = requireEnvironmentVariable("BIRTHDAY_LINK_SECRET");

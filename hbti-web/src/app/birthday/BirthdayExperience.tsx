@@ -136,6 +136,18 @@ interface BirthdayView {
     levelName: string | null;
     pointBalance: number | null;
     registeredOn: string | null;
+    level: {
+      key: "L1" | "L2" | "L3" | "L4";
+      nameZh: string;
+      nameEn: string;
+      annualSpend: number;
+      next: {
+        key: "L2" | "L3" | "L4";
+        nameZh: string;
+        threshold: number;
+        gap: number;
+      } | null;
+    };
   };
   stats: BirthdayStats | null;
   options: BirthdayOption[];
@@ -1292,9 +1304,7 @@ function CoverScreen({
       <div className={styles.hr} />
       <div className={styles.gift}>
         <p className={styles.tier}>
-          {view.member.levelName
-            ? `${view.member.levelName} 会员 · 生日礼遇`
-            : "Hot Crush 会员 · 生日礼遇"}
+          {view.member.level.nameZh} · 生日礼遇
         </p>
         <p className={styles.what}>
           {view.options.some((option) => option.giftType === "free_basque")
@@ -1583,9 +1593,7 @@ function BenefitScreen({
       </h2>
       <div className={styles.gift}>
         <p className={styles.tier}>
-          {member.levelName
-            ? `${member.levelName} 会员 · ${view.campaignYear}`
-            : `Hot Crush 会员 · ${view.campaignYear}`}
+          {member.level.nameZh} · {view.campaignYear}
         </p>
         <div
           className={`${styles.picks} ${styles.picksRow}`}
@@ -1630,6 +1638,17 @@ function BenefitScreen({
         </div>
         {points !== null && (
           <p className={styles.hintline}>你现在有 {points} 积分。</p>
+        )}
+        {member.level.next && (
+          <p className={styles.hintline}>
+            今年已消费 RM{member.level.annualSpend.toFixed(2)}——
+            再花 RM{member.level.next.gap.toFixed(0)} 就升 {member.level.next.nameZh}。
+          </p>
+        )}
+        {member.level.key === "L4" && (
+          <p className={styles.hintline}>
+            今年已消费 RM{member.level.annualSpend.toFixed(2)}，是我们的挚爱会员。
+          </p>
         )}
         {selected?.allowGift && (
           <p className={styles.hintline}>

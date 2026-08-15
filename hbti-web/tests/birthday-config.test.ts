@@ -17,25 +17,31 @@ describe("readBirthdayConfig", () => {
     expect(() => readBirthdayConfig()).toThrow("32 bytes");
   });
 
-  it("默认配置完整可读", () => {
+  it("默认配置完整可读：L1 只有贺卡、L2 免费巴斯克、L3/L4 双选项", () => {
     vi.stubEnv("BIRTHDAY_LINK_SECRET", "s".repeat(32));
     vi.stubEnv("BIRTHDAY_NOTIFY_WEBHOOK", "");
     const config = readBirthdayConfig();
     expect(config.linkTtlDays).toBe(30);
     expect(config.pickupLeadDays).toBe(2);
-    expect(config.benefitsByLevel.L1.kind).toBe("free_basque");
-    expect(config.benefitsByLevel.L4.allowGift).toBe(true);
-    expect(config.defaultBenefit.kind).toBe("free_basque");
+    expect(config.benefitsByLevel.L1).toEqual([]);
+    expect(config.benefitsByLevel.L2.map((r) => r.kind)).toEqual(["free_basque"]);
+    expect(config.benefitsByLevel.L3.map((r) => r.kind)).toEqual([
+      "free_basque",
+      "points_450",
+    ]);
+    expect(config.benefitsByLevel.L3[1].allowGift).toBe(false);
+    expect(config.benefitsByLevel.L4[1].allowGift).toBe(true);
+    expect(config.defaultBenefits).toEqual([]);
     expect(config.notifyWebhook).toBeUndefined();
   });
 
-  it("BIRTHDAY_BENEFITS_JSON 可整体覆盖权益映射", () => {
+  it("BIRTHDAY_BENEFITS_JSON 可整体覆盖权益映射（每个等级一个数组）", () => {
     vi.stubEnv("BIRTHDAY_LINK_SECRET", "s".repeat(32));
     vi.stubEnv("BIRTHDAY_BENEFITS_JSON", JSON.stringify({
-      VIP1: { kind: "points_450", allowGift: false, yearlyLimit: null, label: "兑换" },
+      VIP1: [{ kind: "points_450", allowGift: false, yearlyLimit: null, label: "兑换" }],
     }));
     const config = readBirthdayConfig();
-    expect(config.benefitsByLevel.VIP1.kind).toBe("points_450");
+    expect(config.benefitsByLevel.VIP1[0].kind).toBe("points_450");
     expect(config.benefitsByLevel.L1).toBeUndefined();
   });
 

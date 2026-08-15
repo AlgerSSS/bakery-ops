@@ -1,7 +1,7 @@
 import type { BirthdayBenefitRule, BirthdayConfig } from "@/lib/birthday/config";
 
 /**
- * 会员等级 → 生日权益的解析与预约资格判定。规则本身在 config.ts，
+ * 会员等级 → 生日权益组的解析与预约资格判定。规则本身在 config.ts，
  * 这里只做纯函数判定，不碰数据库与网络，方便单测。
  */
 
@@ -15,23 +15,25 @@ export interface ExistingReservationLike {
   status: "reserved" | "fulfilled" | "cancelled";
 }
 
-export function resolveBenefit(
+/** 等级 → 可选权益组（2026-08-15 用户二次修订：L1 空组=只有贺卡；L2 免费巴斯克；
+ *  L3/L4 免费巴斯克 + 450 积分兑换，二选一）。 */
+export function resolveBenefits(
   levelName: string | null,
   config: BirthdayConfig,
-): BirthdayBenefitRule {
+): BirthdayBenefitRule[] {
   if (levelName) {
     const direct = config.benefitsByLevel[levelName];
     if (direct) return direct;
     // RES 等级名可能长成「L1 会员」这类带后缀的形式，做一次归一化匹配。
     const normalized = levelName.trim().toUpperCase();
-    for (const [key, rule] of Object.entries(config.benefitsByLevel)) {
+    for (const [key, rules] of Object.entries(config.benefitsByLevel)) {
       if (normalized === key.toUpperCase() || normalized.startsWith(key.toUpperCase())) {
-        return rule;
+        return rules;
       }
     }
   }
-  // VIP1（当前唯一在用的等级）与未知等级都落到默认权益：免费巴斯克。
-  return config.defaultBenefit;
+  // 未知等级（如 RES 的 VIP1）落保险丝默认：只有贺卡，没有蛋糕权益。
+  return config.defaultBenefits;
 }
 
 export type ReserveDenial =
@@ -44,9 +46,11 @@ export type ReserveDenial =
 export const POINTS_EXCHANGE_COST = 450;
 
 /**
- * 会员当前可选的生日礼选项。选项完全由等级权益决定（2026-08-15 用户定版）：
- *   - L1/L2：只有免费巴斯克（每会员每年一份）；
- *   - L3/L4：只有 450 积分兑换（L3 限自己，L4 可送亲友）。
+ * 会员当前可选的生日礼选项（2026-08-15 用户二次修订定版）：
+ *   - L1：[] —— 只有电子贺卡，没有任何蛋糕选项；
+ *   - L2：[免费巴斯克]；
+ *   - L3：[免费巴斯克, 450 积分兑换（限自己）]；
+ *   - L4：[免费巴斯克, 450 积分兑换（可送亲友）]。
  * 等级来自 deriveLevelKey(年累计消费)，见 config.ts；积分在门店 POS 结算。
  */
 export interface BirthdayOption {
@@ -65,45 +69,47 @@ export function listBirthdayOptions(
   existing: readonly ExistingReservationLike[],
   config: BirthdayConfig,
 ): BirthdayOption[] {
-  const rule = resolveBenefit(member.levelName, config);
+  const rules = resolveBenefits(member.levelName, config);
   const options: BirthdayOption[] = [];
 
-  if (rule.kind === "free_basque") {
-    const claimed = existing.some(
-      (r) => r.giftType === "free_basque" && r.status !== "cancelled",
-    );
-    options.push({
-      giftType: "free_basque",
-      label: rule.label,
-      cost: 0,
-      allowGift: rule.allowGift,
-      yearlyLimit: rule.yearlyLimit,
-      available:
-        !claimed && (rule.yearlyLimit === null || rule.yearlyLimit > 0),
-      deniedReason: claimed ? "FREE_BASQUE_ALREADY_CLAIMED" : undefined,
-    });
-  }
-
-  if (rule.kind === "points_450") {
-    const balance = member.pointBalance;
-    const activePoints = existing.filter(
-      (r) => r.giftType === "points_450" && r.status === "reserved",
-    ).length;
-    let pointsDenied: ReserveDenial | undefined;
-    if (balance === null || balance < POINTS_EXCHANGE_COST) {
-      pointsDenied = "INSUFFICIENT_POINTS";
-    } else if (activePoints >= config.maxActivePointsReservations) {
-      pointsDenied = "TOO_MANY_ACTIVE_RESERVATIONS";
+  for (const rule of rules) {
+    if (rule.kind === "free_basque") {
+      const claimed = existing.some(
+        (r) => r.giftType === "free_basque" && r.status !== "cancelled",
+      );
+      options.push({
+        giftType: "free_basque",
+        label: rule.label,
+        cost: 0,
+        allowGift: rule.allowGift,
+        yearlyLimit: rule.yearlyLimit,
+        available:
+          !claimed && (rule.yearlyLimit === null || rule.yearlyLimit > 0),
+        deniedReason: claimed ? "FREE_BASQUE_ALREADY_CLAIMED" : undefined,
+      });
     }
-    options.push({
-      giftType: "points_450",
-      label: rule.label,
-      cost: POINTS_EXCHANGE_COST,
-      allowGift: rule.allowGift,
-      yearlyLimit: null,
-      available: pointsDenied === undefined,
-      deniedReason: pointsDenied,
-    });
+
+    if (rule.kind === "points_450") {
+      const balance = member.pointBalance;
+      const activePoints = existing.filter(
+        (r) => r.giftType === "points_450" && r.status === "reserved",
+      ).length;
+      let pointsDenied: ReserveDenial | undefined;
+      if (balance === null || balance < POINTS_EXCHANGE_COST) {
+        pointsDenied = "INSUFFICIENT_POINTS";
+      } else if (activePoints >= config.maxActivePointsReservations) {
+        pointsDenied = "TOO_MANY_ACTIVE_RESERVATIONS";
+      }
+      options.push({
+        giftType: "points_450",
+        label: rule.label,
+        cost: POINTS_EXCHANGE_COST,
+        allowGift: rule.allowGift,
+        yearlyLimit: null,
+        available: pointsDenied === undefined,
+        deniedReason: pointsDenied,
+      });
+    }
   }
 
   return options;
@@ -112,7 +118,6 @@ export function listBirthdayOptions(
 export interface ReserveDecision {
   ok: boolean;
   denial?: ReserveDenial;
-  rule: BirthdayBenefitRule;
 }
 
 export function decideReservation(
@@ -121,20 +126,19 @@ export function decideReservation(
   input: { forWhom: "self" | "gift"; giftType: "free_basque" | "points_450" },
   config: BirthdayConfig,
 ): ReserveDecision {
-  const rule = resolveBenefit(member.levelName, config);
   const option = listBirthdayOptions(member, existing, config).find(
     (candidate) => candidate.giftType === input.giftType,
   );
   if (!option) {
-    return { ok: false, denial: "BENEFIT_NOT_AVAILABLE", rule };
+    return { ok: false, denial: "BENEFIT_NOT_AVAILABLE" };
   }
   if (!option.available) {
-    return { ok: false, denial: option.deniedReason ?? "BENEFIT_NOT_AVAILABLE", rule };
+    return { ok: false, denial: option.deniedReason ?? "BENEFIT_NOT_AVAILABLE" };
   }
   if (input.forWhom === "gift" && !option.allowGift) {
-    return { ok: false, denial: "GIFT_NOT_ALLOWED", rule };
+    return { ok: false, denial: "GIFT_NOT_ALLOWED" };
   }
-  return { ok: true, rule };
+  return { ok: true };
 }
 
 /** 可选取货日期窗口：提前 pickupLeadDays 天起，最长 pickupWindowDays 天。 */
@@ -154,3 +158,4 @@ export function pickupWindow(
     maxDate: fmt.format(new Date(now.getTime() + config.pickupWindowDays * dayMs)),
   };
 }
+

@@ -7,9 +7,12 @@
  *   Lv2 心动会员 Sweet Crush     年累计消费 RM250
  *   Lv3 热爱会员 Hot Crush       年累计消费 RM750
  *   Lv4 挚爱会员 Forever Crush   年累计消费 RM1,500
- * 生日权益：L1/L2 只有免费巴斯克（每年一份）；L3/L4 才有 450 积分兑换蛋糕
- * （L3 限自己、L4 可送亲友）。RES 里的等级名（如 VIP1）只作原始档案保留，
- * 权益判定一律用 deriveLevelKey(年消费)。
+ * 生日权益（2026-08-15 用户第二次修订，等级决定「可选权益组」）：
+ *   L1：只有电子贺卡，没有蛋糕权益；
+ *   L2：只有免费巴斯克（每年一份）；
+ *   L3：免费巴斯克（每年一份）或 450 积分兑换（限自己），二选一；
+ *   L4：免费巴斯克（每年一份）或 450 积分兑换（可送亲友），二选一。
+ * RES 里的等级名（如 VIP1）只作原始档案保留，权益判定一律用 deriveLevelKey(年消费)。
  */
 
 export interface BirthdayBenefitRule {
@@ -34,8 +37,10 @@ export interface BirthdayConfig {
   pickupWindowDays: number;
   /** 积分兑换每会员同时有效的预约数上限（防呆，不限量的业务规则不变）。 */
   maxActivePointsReservations: number;
-  benefitsByLevel: Record<string, BirthdayBenefitRule>;
-  defaultBenefit: BirthdayBenefitRule;
+  /** 等级 → 可选权益组（数组；空数组 = 该等级只有贺卡没有蛋糕权益）。 */
+  benefitsByLevel: Record<string, BirthdayBenefitRule[]>;
+  /** 未知等级的保险丝默认：空数组 = 只有贺卡。 */
+  defaultBenefits: BirthdayBenefitRule[];
   notifyWebhook: string | undefined;
 }
 
@@ -60,11 +65,12 @@ const POINTS_450_GIFT_RULE: BirthdayBenefitRule = {
   label: "450 积分兑换生日蛋糕（可送亲友）",
 };
 
-const DEFAULT_BENEFITS: Record<string, BirthdayBenefitRule> = {
-  L1: FREE_BASQUE_RULE,
-  L2: FREE_BASQUE_RULE,
-  L3: POINTS_450_SELF_RULE,
-  L4: POINTS_450_GIFT_RULE,
+/** 等级 → 可选权益组（用户 2026-08-15 二次修订定版）。 */
+export const DEFAULT_LEVEL_BENEFITS: Record<string, BirthdayBenefitRule[]> = {
+  L1: [], // 只有电子贺卡，没有蛋糕权益
+  L2: [FREE_BASQUE_RULE],
+  L3: [FREE_BASQUE_RULE, POINTS_450_SELF_RULE],
+  L4: [FREE_BASQUE_RULE, POINTS_450_GIFT_RULE],
 };
 
 export const POINTS_CAKE_COST = 450;
@@ -106,13 +112,19 @@ export function readBirthdayConfig(): BirthdayConfig {
     throw new Error("BIRTHDAY_LINK_SECRET must contain at least 32 bytes.");
   }
 
-  let benefitsByLevel = DEFAULT_BENEFITS;
+  let benefitsByLevel = DEFAULT_LEVEL_BENEFITS;
   const override = process.env.BIRTHDAY_BENEFITS_JSON?.trim();
   if (override) {
     try {
-      benefitsByLevel = JSON.parse(override) as Record<string, BirthdayBenefitRule>;
+      const parsed = JSON.parse(override) as Record<string, BirthdayBenefitRule[]>;
+      for (const value of Object.values(parsed)) {
+        if (!Array.isArray(value)) {
+          throw new Error("BIRTHDAY_BENEFITS_JSON levels must map to arrays.");
+        }
+      }
+      benefitsByLevel = parsed;
     } catch {
-      throw new Error("BIRTHDAY_BENEFITS_JSON is not valid JSON.");
+      throw new Error("BIRTHDAY_BENEFITS_JSON is not a valid benefits map.");
     }
   }
 
@@ -124,7 +136,7 @@ export function readBirthdayConfig(): BirthdayConfig {
     pickupWindowDays: readInteger("BIRTHDAY_PICKUP_WINDOW_DAYS", 30),
     maxActivePointsReservations: readInteger("BIRTHDAY_MAX_ACTIVE_POINTS_RESERVATIONS", 3),
     benefitsByLevel,
-    defaultBenefit: FREE_BASQUE_RULE,
+    defaultBenefits: [],
     notifyWebhook: readWebhook(),
   };
 }

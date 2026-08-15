@@ -495,6 +495,102 @@ export class ResH5MemberAuthClient {
     };
   }
 
+  /**
+   * 只验证既有会员：与 verifyLoginAndEnsureMember 相同的 verifyCode + login +
+   * userInfo 链路，但 RES 侧不是会员时**不注册**——生日贺卡的短信兜底入口
+   * 按产品决定「温柔引导加入会员」而不是静默开户（2026-08-15）。
+   * 免注册的另一个原因是风控：自动开户 + 免费生日礼会成为批量养号的入口。
+   */
+  async verifyLoginExistingMember(
+    input: ResH5VerifyLoginInput,
+  ): Promise<
+    | { kind: "member"; memberId: string; resToken: string }
+    | { kind: "not_member" }
+  > {
+    const phone = parsePhone(input.phone);
+    const code = parseVerificationCode(input.code);
+
+    const verifiedPayload = await this.post(
+      "/api/user-auth/verifyCode",
+      {
+        contactType: "PHONE",
+        phone: {
+          phone: phone.phone,
+          code,
+          isoCode: phone.isoCode,
+          countryCode: phone.countryCode,
+        },
+      },
+      input.session.token,
+      input.session.deviceId,
+      "verify_code_transport",
+    );
+    const verified = parseExternal(
+      apiEnvelopeSchema,
+      verifiedPayload,
+      "verify_code_response",
+    );
+    if (verified.code !== "000") {
+      throw new ResH5VerificationCodeError();
+    }
+
+    const rawLogin = await this.post(
+      "/api/user-auth/login",
+      {
+        contactType: "PHONE",
+        phone: {
+          phone: phone.phone,
+          code,
+          isoCode: phone.isoCode,
+          countryCode: phone.countryCode,
+        },
+        resolveConflicts: Boolean(input.resolveConflicts),
+      },
+      input.session.token,
+      input.session.deviceId,
+      "login_transport",
+    );
+    const loginEnvelope = parseExternal(
+      apiEnvelopeSchema,
+      rawLogin,
+      "login_response",
+    );
+    if (loginEnvelope.code === "CRM-00-2004") {
+      throw new ResH5LoginConflictError();
+    }
+    const login = parseExternal(
+      loginEnvelopeSchema,
+      rawLogin,
+      "login_response",
+    );
+    assertAccountSuccess(login, rawLogin, "login_rejected");
+    const resToken =
+      login.code === "CRM-00-0000"
+        ? parseExternal(
+            rotatedLoginEnvelopeSchema,
+            rawLogin,
+            "login_response",
+          ).data.token
+        : input.session.token;
+
+    const userInfo = await this.getUserInfo(
+      resToken,
+      input.session.deviceId,
+    );
+    const memberId = normalizeMemberId(userInfo.data.customerId);
+    if (!userInfo.data.isMember) {
+      return { kind: "not_member" };
+    }
+    if (!memberId) {
+      throw new ResH5AuthDiagnosticError({
+        stage: "member_id_missing",
+        message:
+          "RES H5 did not resolve an active member account.",
+      });
+    }
+    return { kind: "member", memberId, resToken };
+  }
+
   private async getUserInfo(
     token: string,
     deviceId: string,

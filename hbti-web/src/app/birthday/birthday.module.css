@@ -1,0 +1,1684 @@
+/*
+ * HOT CRUSH · 生日贺卡（动态版）
+ * 从 birthday-web/index.html 的内联 <style> 移植。两处有意的改动：
+ * 1. 零 JS 时代的 radio/checkbox 兄弟选择器全部换成 [data-selected] /
+ *    [data-open] / [data-checked] 属性选择器，由 React 状态驱动；
+ * 2. logo / 印章不再内联 base64，改用全站已有的 /hot-crush-wordmark.png
+ *    与 /hot-crush-arrow.png（同两张图，避免每张卡多扛 ~30KB）。
+ * 色彩、阴影、动效曲线全部引用 globals.css 的 token，不在此重复定义；
+ * 静态稿私有的 --line / --ease / --accent 在 .page 作用域内做别名。
+ */
+
+/* 中文句子里的数字与拉丁字母走品牌字（Neutra 的几何调性），汉字仍由
+   OPPO Sans 承担 —— 与静态稿完全同一套 unicode-range 手法。CDN 地址
+   沿用静态稿与 globals.css 同源的两个 url()。 */
+@font-face {
+  font-family: "Brand Digits";
+  src: url("https://resto-images-bj-1324130148.cos.ap-beijing.myqcloud.com/designer/Font/NeutraTextDemiAlt.woff2")
+    format("woff2");
+  unicode-range: U+0030-0039, U+0041-005A, U+0061-007A;
+  font-weight: 400;
+  font-display: swap;
+}
+
+.page {
+  /* 静态稿里 body 的角色：奶油底 + 顶部肤光，整页居中。 */
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  justify-content: safe center;
+  padding: max(18px, env(safe-area-inset-top)) 16px
+    max(28px, env(safe-area-inset-bottom));
+  background:
+    radial-gradient(140% 60% at 50% 0%, var(--flesh-light) 0%, transparent 55%),
+    var(--cream-deep);
+  color: var(--hc-oxblood);
+  font-family: "Brand Digits", var(--font-copy);
+  --line: rgba(106, 28, 19, 0.14);
+  --ease: var(--ease-storefront);
+  --accent: var(--pistachio);
+}
+
+.stage {
+  width: 100%;
+  max-width: 400px;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  animation: rise 0.45s var(--ease) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── 贺卡 ── */
+.card {
+  gap: 26px;
+  background: var(--hc-paper);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-soft);
+  padding: 30px 28px 26px;
+  position: relative;
+  overflow: hidden;
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(106, 28, 19, 0.09);
+  pointer-events: none;
+}
+
+/* 烛光：光源落在火苗的位置（右上 ~78% 12%），整张卡是被这根蜡烛照亮的。
+   负层级压在卡片底色之上、文字之下（.card 同时是 .screen，rise 动画的
+   transform 给它建了层叠上下文，::before 才不会沉到卡片底色后面）。 */
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(40% 19% at 50% 30%, rgba(243, 208, 184, 0.95) 0%, transparent 70%),
+    radial-gradient(120% 60% at 50% -6%, var(--flesh-light) 0%, transparent 62%);
+  animation:
+    bloom 1.5s var(--ease) both,
+    glow 3.7s ease-in-out 1.5s infinite;
+}
+
+@keyframes glow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  44% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes bloom {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 页眉锁定关系与 hbti.module.css 的 .wordmark 一致：字标 + 红短杠 + 副标 */
+.brand {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  display: block;
+  width: 108px;
+  aspect-ratio: 305 / 38;
+  flex: 0 0 auto;
+  background: url("/hot-crush-wordmark.png") center / contain no-repeat;
+}
+
+.rule {
+  width: 1.3rem;
+  height: 3px;
+  margin-inline: 0.45rem;
+  flex: 0 0 auto;
+  background: var(--hc-red);
+}
+
+.sub2 {
+  font-family: var(--font-brand);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.19em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: var(--hc-oxblood);
+}
+
+/* 品牌箭头：只在完成屏出现一次，当作盖章 */
+.stamp {
+  display: block;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  transform: rotate(-5deg);
+  background: url("/hot-crush-arrow.png") center / contain no-repeat;
+}
+
+.nm {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 31px;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.ld {
+  font-size: 19.5px;
+  line-height: 1.5;
+}
+
+.heroTxt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  align-self: stretch;
+}
+
+.cake {
+  display: block;
+  margin: 2px auto 0;
+  align-self: center;
+}
+
+.flame {
+  transform-origin: 80px 25px;
+  animation:
+    catch 0.55s var(--ease) both,
+    flicker 2.6s ease-in-out 0.55s infinite;
+}
+
+@keyframes catch {
+  0% {
+    opacity: 0;
+    transform: scale(0.15);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+  100% {
+    opacity: 0.92;
+    transform: scale(1);
+  }
+}
+
+/* 真火不是正弦波：关键帧间隔与幅度都刻意不规则 */
+@keyframes flicker {
+  0% {
+    transform: scale(1) rotate(0) translateY(0);
+    opacity: 0.92;
+  }
+  12% {
+    transform: scale(1.06, 0.94) rotate(-3.5deg) translateY(-0.8px);
+    opacity: 1;
+  }
+  26% {
+    transform: scale(0.92, 1.09) rotate(2.5deg) translateY(0.4px);
+    opacity: 0.84;
+  }
+  41% {
+    transform: scale(1.11, 0.96) rotate(-1.5deg) translateY(-1.3px);
+    opacity: 1;
+  }
+  55% {
+    transform: scale(0.96, 1.05) rotate(3.5deg) translateY(0.2px);
+    opacity: 0.89;
+  }
+  68% {
+    transform: scale(1.04, 0.98) rotate(-2deg) translateY(-0.5px);
+    opacity: 0.98;
+  }
+  83% {
+    transform: scale(0.95, 1.06) rotate(1.2deg) translateY(0.3px);
+    opacity: 0.86;
+  }
+  100% {
+    transform: scale(1) rotate(0) translateY(0);
+    opacity: 0.92;
+  }
+}
+
+/* 内焰自己一套周期（1.9s 对外焰 2.6s），两层长期错相位，才不像在循环播放 */
+.core {
+  transform-origin: 80px 22px;
+  animation: core 1.9s ease-in-out 0.55s infinite;
+}
+
+@keyframes core {
+  0%,
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 0.9;
+  }
+  33% {
+    transform: scale(0.84, 1.14) translateY(0.6px);
+    opacity: 1;
+  }
+  66% {
+    transform: scale(1.12, 0.9) translateY(-0.5px);
+    opacity: 0.76;
+  }
+}
+
+.body {
+  margin-top: -10px;
+  font-size: 14.5px;
+  line-height: 1.85;
+  color: var(--ink-soft);
+  text-wrap: pretty;
+}
+
+.body em {
+  font-style: normal;
+  color: var(--hc-oxblood);
+  font-weight: 600;
+  border-bottom: 1.5px solid var(--accent);
+  padding-bottom: 1px;
+}
+
+.hr {
+  height: 1px;
+  background: var(--line);
+}
+
+.gift {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tier {
+  font-family: var(--font-brand);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(106, 28, 19, 0.55);
+}
+
+.what {
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+
+.note {
+  font-size: 12px;
+  line-height: 1.65;
+  color: rgba(78, 59, 55, 0.7);
+}
+
+/* 右缘锚点其二：页脚右对齐，与右上的蜡烛构成对角 */
+.foot {
+  font-size: 12px;
+  color: rgba(106, 28, 19, 0.5);
+  align-self: flex-end;
+}
+
+/* ── 流程屏 ── */
+.sheet {
+  gap: 16px;
+  background: var(--hc-paper);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-soft);
+  padding: 22px 24px 26px;
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.back {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(106, 28, 19, 0.07);
+  color: var(--hc-oxblood);
+  font-size: 17px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.back:active {
+  background: rgba(106, 28, 19, 0.14);
+}
+
+.step {
+  font-size: 12.5px;
+  color: rgba(106, 28, 19, 0.62);
+  line-height: 1.4;
+}
+
+.sheet h2 {
+  font-size: 24px;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+.sub {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: rgba(78, 59, 55, 0.75);
+}
+
+.lab {
+  font-size: 14px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.opt {
+  font-weight: 400;
+  font-size: 11.5px;
+  color: rgba(106, 28, 19, 0.45);
+  margin-left: 6px;
+}
+
+.hintline {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(78, 59, 55, 0.68);
+}
+
+/* 大块选择卡（静态稿的 label.pick → 动态版的 button.pick） */
+.picks {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.picksRow {
+  flex-direction: row;
+}
+
+.picksRow .pick {
+  flex: 1;
+}
+
+.pick {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  border-radius: 0.8rem;
+  border: 1.5px solid var(--line);
+  background: none;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: 0.18s var(--ease);
+}
+
+.pick:active {
+  transform: scale(0.99);
+}
+
+.pick[data-selected="true"] {
+  border-color: var(--hc-oxblood);
+  background: var(--flesh-light);
+}
+
+.pickT {
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pickD {
+  font-size: 12px;
+  color: rgba(78, 59, 55, 0.7);
+}
+
+.tick {
+  opacity: 0;
+  color: var(--hc-oxblood);
+  font-size: 15px;
+  transition: opacity 0.18s;
+}
+
+.pick[data-selected="true"] .tick {
+  opacity: 1;
+}
+
+/* 小圆片 */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.chip {
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: 0.16s var(--ease);
+  user-select: none;
+}
+
+.chip:active {
+  transform: scale(0.97);
+}
+
+.chip[data-selected="true"] {
+  background: var(--hc-oxblood);
+  color: var(--hc-paper);
+  border-color: var(--hc-oxblood);
+}
+
+/* 展开忌口 */
+.expand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 11px 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.caret {
+  display: inline-block;
+  transition: transform 0.22s var(--ease);
+  color: rgba(106, 28, 19, 0.5);
+}
+
+.expand[data-open="true"] .caret {
+  transform: rotate(90deg);
+}
+
+.alBox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 日历：一个月一块；表头一行 + 星期对齐，格子只放数字 */
+.calBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.calMonth {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(106, 28, 19, 0.62);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.dow {
+  text-align: center;
+  font-size: 10px;
+  line-height: 1;
+  padding-bottom: 2px;
+  color: rgba(106, 28, 19, 0.38);
+}
+
+/* 日历数字回 OPPO Sans：Neutra 无等宽数字，放进网格会歪（静态稿实测）。
+   正文里的数字仍走品牌字 —— 那里比例数字本来就是对的。 */
+.day {
+  display: grid;
+  place-items: center;
+  height: 32px;
+  border-radius: 0.5rem;
+  font-family: "OPPO Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14.5px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  background: none;
+  color: inherit;
+  transition: 0.15s var(--ease);
+}
+
+.dayPad {
+  visibility: hidden;
+}
+
+.dayOff {
+  color: rgba(106, 28, 19, 0.22);
+  cursor: not-allowed;
+}
+
+.dayBday {
+  border-color: var(--accent);
+}
+
+.day:not(.dayOff):not(.dayPad):active {
+  transform: scale(0.92);
+}
+
+.day[data-selected="true"] {
+  background: var(--hc-oxblood);
+  color: var(--hc-paper);
+}
+
+/* 标签 + 选项一组，组内贴紧，组间才留白 */
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.tt {
+  font-size: 11px;
+  opacity: 0.62;
+}
+
+/* 这一屏收紧间距，目标是一屏看完不用滑 */
+.sheetTight {
+  gap: 13px;
+}
+
+.sheetTight h2 {
+  font-size: 22px;
+}
+
+.sheetTight .chip {
+  padding: 7px 12px;
+}
+
+/* 表单控件：与静态稿 .dateIn 同一副骨架 */
+.textInput,
+.textArea,
+.select {
+  font: inherit;
+  font-size: 15px;
+  color: inherit;
+  padding: 12px 14px;
+  border-radius: 0.7rem;
+  border: 1.5px solid var(--line);
+  background: none;
+  appearance: none;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.textArea {
+  min-height: 74px;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.select {
+  cursor: pointer;
+}
+
+.codeInput {
+  text-align: center;
+  font-size: 20px;
+  letter-spacing: 0.35em;
+}
+
+.phoneRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.phoneRow .countrySelect {
+  flex: 0 0 auto;
+}
+
+.countrySelect .select {
+  width: auto;
+  height: 100%;
+  padding-right: 10px;
+}
+
+.codeSentRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: rgba(78, 59, 55, 0.85);
+}
+
+.codeSentRow strong {
+  color: var(--hc-oxblood);
+}
+
+.codeSentRow button {
+  background: none;
+  border: 0;
+  color: rgba(106, 28, 19, 0.6);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(106, 28, 19, 0.22);
+  padding-bottom: 2px;
+}
+
+.inlineError {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--hc-red);
+}
+
+.inlineNote {
+  font-size: 12px;
+  line-height: 1.65;
+  color: rgba(78, 59, 55, 0.68);
+}
+
+.savedNote {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #4a6b1f;
+}
+
+/* 汇总 */
+.sum {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+
+.sum > div {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.sum dt {
+  font-size: 12.5px;
+  color: rgba(106, 28, 19, 0.55);
+}
+
+.sum dd {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sumEmpty {
+  font-weight: 400;
+  color: rgba(106, 28, 19, 0.42);
+}
+
+/* 勾选框 */
+.check {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  font-size: 13.5px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+
+.box {
+  flex: 0 0 19px;
+  width: 19px;
+  height: 19px;
+  margin-top: 1px;
+  border-radius: 0.35rem;
+  border: 1.5px solid var(--line);
+  position: relative;
+  transition: 0.16s;
+}
+
+.box::after {
+  content: "✓";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--hc-paper);
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.16s;
+}
+
+.check[data-checked="true"] .box {
+  background: var(--hc-oxblood);
+  border-color: var(--hc-oxblood);
+}
+
+.check[data-checked="true"] .box::after {
+  opacity: 1;
+}
+
+.fine {
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: rgba(78, 59, 55, 0.62);
+}
+
+/* 按钮 */
+.btn {
+  display: block;
+  text-align: center;
+  margin-top: 6px;
+  padding: 14px 22px;
+  border-radius: 0.8rem;
+  border: 0;
+  background: var(--hc-oxblood);
+  color: var(--hc-paper);
+  font: inherit;
+  font-size: 15.5px;
+  cursor: pointer;
+  transition: 0.18s var(--ease);
+}
+
+.btn:active {
+  transform: scale(0.985);
+  background: #56150e;
+}
+
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.card .btn {
+  align-self: flex-start;
+  padding: 13px 26px;
+}
+
+.btnGhost {
+  background: none;
+  color: var(--hc-oxblood);
+  border: 1.5px solid var(--line);
+}
+
+.btnGhost:active {
+  background: rgba(106, 28, 19, 0.07);
+}
+
+.textButton {
+  background: none;
+  border: 0;
+  color: rgba(106, 28, 19, 0.6);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  align-self: center;
+  border-bottom: 1px solid rgba(106, 28, 19, 0.22);
+  padding-bottom: 2px;
+}
+
+/* 完成屏 */
+.done {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 6px 0 4px;
+}
+
+/* 章独占一行贴右上角，标题与正文在它下面全宽左齐 */
+.done > .stamp {
+  align-self: flex-end;
+  margin-bottom: -4px;
+}
+
+.big {
+  font-size: 19px;
+  line-height: 1.55;
+  font-weight: 600;
+  text-wrap: pretty;
+}
+
+/* 已有预约列表 */
+.resvList {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.resvItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+}
+
+.resvTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.resvMeta {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: rgba(78, 59, 55, 0.7);
+}
+
+.statusTag {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 400;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--flesh-light);
+  color: var(--hc-oxblood);
+}
+
+.statusTag[data-tone="muted"] {
+  background: rgba(106, 28, 19, 0.08);
+  color: rgba(106, 28, 19, 0.55);
+}
+
+.backLink {
+  align-self: flex-start;
+  background: none;
+  border: 0;
+  color: rgba(106, 28, 19, 0.6);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(106, 28, 19, 0.22);
+  padding-bottom: 2px;
+  margin-top: 4px;
+}
+
+/* 载入中：一根还没点燃的蜡烛，火苗位置轻轻呼吸 */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  color: rgba(106, 28, 19, 0.6);
+  font-size: 13.5px;
+}
+
+.loadingDot {
+  width: 12px;
+  height: 18px;
+  border-radius: 50% 50% 50% 50% / 62% 62% 38% 38%;
+  background: var(--hc-red);
+  opacity: 0.9;
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.95;
+  }
+}
+
+/* ── 「这一年」年度回顾 ──
+   静态稿用 position:fixed 脱离外层卡片布局铺满视口；动态版同样处理，
+   区别在于显隐由 React 决定，不再依赖 #s5:checked。 */
+.yearOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: y mandatory;
+  background: var(--hc-paper);
+}
+
+.wClose {
+  position: fixed;
+  top: calc(14px + env(safe-area-inset-top));
+  left: 14px;
+  z-index: 12;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(106, 28, 19, 0.08);
+  color: var(--hc-oxblood);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wPanel {
+  position: relative;
+  overflow: hidden;
+  min-height: 100dvh;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+  padding: calc(76px + env(safe-area-inset-top)) 28px
+    calc(64px + env(safe-area-inset-bottom));
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+/* 上中下三段：kicker 顶、.mid 主体吃掉剩余空间、收尾句落底 */
+.wPanel > .mid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+}
+
+.wCover {
+  background: radial-gradient(
+    78% 40% at 50% 46%,
+    var(--flesh-light) 0%,
+    transparent 74%
+  );
+}
+
+.wTitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(52px, 14.5vw, 72px);
+  line-height: 1.04;
+  letter-spacing: -0.045em;
+}
+
+.wHint {
+  align-self: center;
+  margin-top: 6px;
+  text-align: center;
+  font-family: var(--font-brand);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(106, 28, 19, 0.4);
+  animation: bob 2.2s ease-in-out infinite;
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateY(-5px);
+    opacity: 0.75;
+  }
+}
+
+/* 全部品名铺开 —— 这屏的主体是「你都吃过什么」，不是那个数字本身 */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 20px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid rgba(106, 28, 19, 0.16);
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--ink-soft);
+}
+
+.tag i {
+  font-style: normal;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--hc-oxblood);
+  opacity: 0.75;
+}
+
+.wEnd .mid {
+  align-items: flex-start;
+}
+
+.artrowSmall {
+  align-self: center;
+}
+
+.wEnd .btn {
+  align-self: flex-start;
+  padding: 13px 26px;
+}
+
+.wEnd .stamp {
+  margin-bottom: 6px;
+}
+
+/* 柔和的蜜桃色形状：给奶油纸底一点体积和暖意，位置逐屏变化 */
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(
+    circle at 35% 32%,
+    var(--hc-peach) 0%,
+    transparent 68%
+  );
+  opacity: 0.4;
+  animation: drift 14s ease-in-out infinite;
+}
+
+.b1 {
+  width: 300px;
+  height: 300px;
+  top: 6%;
+  right: -90px;
+}
+
+.b2 {
+  width: 250px;
+  height: 250px;
+  bottom: 12%;
+  left: -80px;
+  animation-delay: -3s;
+}
+
+.b3 {
+  width: 280px;
+  height: 280px;
+  top: 14%;
+  left: -100px;
+  animation-delay: -6s;
+}
+
+.b4 {
+  width: 230px;
+  height: 230px;
+  bottom: 8%;
+  right: -70px;
+  animation-delay: -9s;
+}
+
+.b5 {
+  width: 320px;
+  height: 320px;
+  top: 22%;
+  right: -110px;
+  animation-delay: -4s;
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-14px, 18px) scale(1.07);
+  }
+}
+
+.wPanel > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* 烘焙插画：圆润简笔，每屏一到三个道具 */
+.art {
+  width: 64px;
+  height: 52px;
+  display: block;
+  overflow: visible;
+}
+
+.artrow {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.artrow .art {
+  width: 86px;
+  height: 70px;
+  animation: float 5.5s ease-in-out infinite;
+}
+
+.artrow .art:nth-child(2) {
+  animation-delay: -1.8s;
+}
+
+.artrow .art:nth-child(3) {
+  animation-delay: -3.4s;
+}
+
+.artrowSmall .art {
+  width: 56px;
+  height: 46px;
+  opacity: 0.9;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-9px) rotate(-2.5deg);
+  }
+}
+
+.fl2 {
+  transform-origin: 32px 12px;
+  animation: flicker 2.6s ease-in-out infinite;
+}
+
+.favwrap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.favwrap .art {
+  flex: 0 0 auto;
+  width: 84px;
+  height: 68px;
+  animation: float 6s ease-in-out infinite;
+}
+
+/* 滚动进场：元素随面板滑入而升起。不支持 view() 的浏览器直接是最终态。 */
+@supports (animation-timeline: view()) {
+  .wPanel > .kicker,
+  .wPanel > div,
+  .wPanel > p,
+  .wPanel > ul,
+  .wPanel > .stamp {
+    animation: reveal linear both;
+    animation-timeline: view();
+    animation-range: entry 8% cover 32%;
+  }
+
+  @keyframes reveal {
+    from {
+      opacity: 0;
+      transform: translateY(26px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+/* 一条连续渐变，不是五个色块：相邻两屏共用交界色，整份报告滑下来是
+   一段缓慢变暖再变回来的过渡，看不见任何一条边界。 */
+.wPanel[data-tone="t1"] {
+  background: linear-gradient(180deg, #fff7ea 0%, #fdf1e3 100%);
+}
+
+.wPanel[data-tone="t2"] {
+  background: linear-gradient(180deg, #fdf1e3 0%, #fae7d5 100%);
+}
+
+.wPanel[data-tone="t3"] {
+  background: linear-gradient(180deg, #fae7d5 0%, #f6dcc6 100%);
+}
+
+.wPanel[data-tone="t4"] {
+  background: linear-gradient(180deg, #f6dcc6 0%, #fae8d7 100%);
+}
+
+.wPanel[data-tone="t5"] {
+  background: linear-gradient(180deg, #fae8d7 0%, #fff7ea 100%);
+}
+
+/* 标签三档：买得多的实心，只买过一次的描边 */
+.tagT1 {
+  background: transparent;
+}
+
+.tagT2 {
+  background: rgba(255, 247, 234, 0.72);
+  border-color: transparent;
+}
+
+.tagT3 {
+  background: var(--hc-oxblood);
+  border-color: var(--hc-oxblood);
+  color: var(--hc-paper);
+  font-weight: 600;
+}
+
+.tagT3 i {
+  color: var(--hc-peach);
+  opacity: 1;
+}
+
+/* 「最爱」那屏是全篇重音，但靠一个深色卡片给，不是把整屏刷成深色 */
+.favCard {
+  background: var(--hc-oxblood);
+  color: var(--hc-paper);
+  border-radius: 1.1rem;
+  padding: 18px 20px;
+  gap: 16px;
+  box-shadow: 0 14px 34px rgba(63, 21, 15, 0.18);
+}
+
+.favCard .favname {
+  color: var(--hc-paper);
+  border-bottom: 0;
+  padding-bottom: 0;
+  font-size: clamp(24px, 6.6vw, 32px);
+  line-height: 1.22;
+  text-wrap: balance;
+}
+
+.favCard .art {
+  stroke: #fff7ea;
+  stroke-opacity: 0.5;
+}
+
+.kicker {
+  font-family: var(--font-brand);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(106, 28, 19, 0.55);
+}
+
+.huge {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(74px, 21vw, 104px);
+  line-height: 0.88;
+  letter-spacing: -0.055em;
+}
+
+.huge small {
+  display: inline;
+  font-size: 21px;
+  font-weight: 400;
+  letter-spacing: 0;
+  margin-left: 6px;
+  font-family: var(--font-copy);
+}
+
+.say {
+  font-size: 16.5px;
+  line-height: 1.75;
+  color: var(--ink-soft);
+}
+
+.say b {
+  color: var(--hc-oxblood);
+  font-weight: 600;
+}
+
+.favname {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(32px, 9vw, 44px);
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  border-bottom: 2px solid var(--hc-peach);
+  padding-bottom: 3px;
+  align-self: flex-start;
+}
+
+.morelist {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.morelist li {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 15.5px;
+  padding-top: 4px;
+  color: var(--ink-soft);
+  border-bottom: 1px dashed var(--line);
+  padding-bottom: 6px;
+}
+
+.morelist li b {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--hc-oxblood);
+}
+
+.bars {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.bar {
+  display: grid;
+  grid-template-columns: 1fr 40px;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 14.5px;
+}
+
+.barN {
+  color: var(--ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.barT {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  height: 12px;
+  margin-top: 2px;
+  border-radius: 99px;
+  background: rgba(106, 28, 19, 0.09);
+  overflow: hidden;
+}
+
+.barT i {
+  display: block;
+  height: 100%;
+  width: var(--w);
+  border-radius: 99px;
+  background: var(--hc-oxblood);
+}
+
+.barQ {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+}
+
+/* 短屏收紧一档（SE / 小屏安卓 / 内置浏览器带大头部时） */
+@media (max-height: 700px) {
+  .page {
+    padding: 12px 14px 16px;
+  }
+
+  .card {
+    padding: 24px 24px 22px;
+    gap: 20px;
+  }
+
+  .nm {
+    font-size: 28px;
+  }
+
+  .ld {
+    font-size: 18px;
+  }
+
+  .cake {
+    width: 126px;
+    height: 95px;
+  }
+
+  .body {
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  .sheet {
+    padding: 18px 20px 22px;
+    gap: 13px;
+  }
+
+  .sheet h2 {
+    font-size: 21px;
+  }
+
+  .sheetTight {
+    gap: 11px;
+  }
+
+  .sheetTight h2 {
+    font-size: 20px;
+  }
+
+  .pick {
+    padding: 11px 14px;
+  }
+
+  .day {
+    height: 29px;
+    font-size: 13.5px;
+  }
+
+  .btn {
+    padding: 12px 20px;
+    font-size: 15px;
+  }
+
+  .big {
+    font-size: 17.5px;
+  }
+}
+
+/* 高屏放大一档：小屏保持紧凑，大屏内容跟着长起来 */
+@media (min-height: 740px) {
+  .card {
+    padding: 32px 30px 28px;
+    gap: 25px;
+  }
+
+  .nm {
+    font-size: 34px;
+  }
+
+  .ld {
+    font-size: 20.5px;
+  }
+
+  .body {
+    font-size: 15.5px;
+  }
+
+  .cake {
+    width: 162px;
+    height: 122px;
+  }
+
+  .what {
+    font-size: 16.5px;
+  }
+
+  .sheet {
+    padding: 26px 26px 30px;
+    gap: 18px;
+  }
+
+  .sheet h2 {
+    font-size: 26px;
+  }
+
+  .sheetTight {
+    gap: 15px;
+  }
+
+  .sheetTight h2 {
+    font-size: 24px;
+  }
+
+  .pick {
+    padding: 16px 18px;
+  }
+
+  .pickT {
+    font-size: 17px;
+  }
+
+  .day {
+    height: 36px;
+    font-size: 15.5px;
+  }
+
+  .chip {
+    padding: 9px 16px;
+    font-size: 14.5px;
+  }
+
+  .sheetTight .chip {
+    padding: 8px 13px;
+  }
+
+  .btn {
+    padding: 15px 24px;
+    font-size: 16px;
+  }
+
+  .big {
+    font-size: 20.5px;
+  }
+
+  .textInput,
+  .textArea,
+  .select {
+    padding: 14px 16px;
+  }
+}
+
+/* 大屏再放一档（Pro Max / 大屏安卓） */
+@media (min-height: 860px) {
+  .card {
+    padding: 38px 32px 34px;
+    gap: 34px;
+  }
+
+  .nm {
+    font-size: 37px;
+  }
+
+  .ld {
+    font-size: 22px;
+  }
+
+  .cake {
+    width: 178px;
+    height: 134px;
+  }
+
+  .body {
+    font-size: 16px;
+    line-height: 1.9;
+  }
+
+  .what {
+    font-size: 17.5px;
+  }
+
+  .sheet {
+    padding: 30px 28px 34px;
+    gap: 21px;
+  }
+
+  .sheet h2 {
+    font-size: 28px;
+  }
+
+  .sheetTight {
+    gap: 17px;
+  }
+
+  .sheetTight h2 {
+    font-size: 25px;
+  }
+
+  .pick {
+    padding: 18px 20px;
+  }
+
+  .pickT {
+    font-size: 18px;
+  }
+
+  .day {
+    height: 40px;
+    font-size: 16.5px;
+  }
+
+  .chip {
+    padding: 10px 17px;
+    font-size: 15px;
+  }
+
+  .sheetTight .chip {
+    padding: 9px 14px;
+  }
+
+  .btn {
+    padding: 16px 26px;
+    font-size: 17px;
+  }
+
+  .big {
+    font-size: 22px;
+  }
+
+  .textInput,
+  .textArea,
+  .select {
+    padding: 15px 17px;
+    font-size: 16px;
+  }
+}

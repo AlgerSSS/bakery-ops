@@ -18,15 +18,31 @@ export function getJsonMutationRejection(
 
   const origin = request.headers.get("origin");
   const secFetchSite = request.headers.get("sec-fetch-site");
+  const expectedOrigins = [expectedOrigin, ...readExtraOrigins()].filter(
+    (value) => value.length > 0,
+  );
   if (
     !origin ||
-    !isExpectedOrigin(request, origin, expectedOrigin) ||
+    !isExpectedOrigin(request, origin, expectedOrigins) ||
     (secFetchSite !== null && secFetchSite !== "same-origin")
   ) {
     return noStoreJson({ error: "INVALID_ORIGIN" }, { status: 403 });
   }
 
   return null;
+}
+
+/**
+ * 同一套应用被部署到多个自有域名时（hbti-test.hotcrush.net 与
+ * birthday.hotcrush.net），额外的允许来源。逗号分隔的完整 origin，
+ * 与 HBTI_LINK_BASE_URL 取并集。
+ */
+function readExtraOrigins(): string[] {
+  const raw = process.env.HBTI_EXTRA_ORIGINS ?? "";
+  return raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
 }
 
 export function noStoreJson(
@@ -42,7 +58,7 @@ export function noStoreJson(
 function isExpectedOrigin(
   request: Request,
   origin: string,
-  expectedOrigin: string,
+  expectedOrigins: string[],
 ): boolean {
   let requestOrigin: string;
   let parsedOrigin: string;
@@ -55,7 +71,9 @@ function isExpectedOrigin(
   if (parsedOrigin !== origin) {
     return false;
   }
-  if (requestOrigin === expectedOrigin && parsedOrigin === expectedOrigin) {
+  // 请求自身的主机必须在允许名单里，且 Origin 头必须与它一致
+  // （浏览器对同源 fetch 本来就会带上与页面一致的 Origin）。
+  if (expectedOrigins.includes(requestOrigin) && requestOrigin === parsedOrigin) {
     return true;
   }
   if (process.env.NODE_ENV === "production") {

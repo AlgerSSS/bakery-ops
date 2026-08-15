@@ -44,13 +44,15 @@ HBTI_EXTRA_ORIGINS**，否则所有 POST 全 403。
 **通知发送上服务器（Vultr tokyo-01，用户要求）**：
 - Vercel 侧不再发通知：`BIRTHDAY_NOTIFY_WEBHOOK` 未配时 reserve 保持
   `notify_status='pending'`；
-- 新脚本 `scripts/birthday-notify.mjs` 每 15 分钟（`/etc/cron.d/hotcrush-birthday`）
-  轮询 pending 行，经 `lark_app.json`（与招募脚本共用 app cli_aa82af2c7878de17）
-  取 tenant token（磁盘缓存 2h）发到群，置 sent；失败 attempts+1、满 3 置 failed。
+- 新脚本 `scripts/birthday-notify.mjs` 每 2 分钟（`/etc/cron.d/hotcrush-birthday`，
+  2026-08-15 首单实测发现 15 分钟延迟对门店太慢，改 2 分钟）轮询 pending 行，经
+  `lark_app.json`（与招募脚本共用 app cli_aa82af2c7878de17）取 tenant token
+  （磁盘缓存 2h）发到群，置 sent；失败 attempts+1、满 3 置 failed。
   服务器配置 `/opt/hotcrush/scripts/birthday-notify.env`（DATABASE_URL + chat id，
   600 权限，不入 git；模板 `birthday-notify.env.example` 入库，随 deploy.sh 的
   scripts rsync 段上线）。
-- 已实测：本地与服务器各发一条测试消息进群；服务器 `--dry-run` 读生产库正常。
+- 已实测：本地与服务器各发一条测试消息进群；服务器 `--dry-run` 读生产库正常；
+  **首单真实预约（#1，Nicole，8-17 午间免费巴斯克）已由 relay 发送进群并置 sent**。
 
 **部署与验收**：
 - 门禁：tsc / eslint / vitest **330 过 39 跳过** / next build 全绿；凭据扫描干净。

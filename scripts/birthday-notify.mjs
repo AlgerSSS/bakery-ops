@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * 生日礼预约 → Lark 群 的门店通知 relay（跑在 tokyo-01，cron 每 15 分钟）。
+ * 生日礼预约 → Lark 群 的门店通知 relay（跑在 tokyo-01，cron 每 2 分钟）。
  *
  * 为什么不在 Vercel 上直接发：通知通道按 2026-08-15 决定部署在服务器上，
  * 与 res_api / 招募同步同一台机器；Vercel 侧不配 BIRTHDAY_NOTIFY_WEBHOOK，

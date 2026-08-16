@@ -6,6 +6,16 @@
 
 ---
 
+## AI 招聘流程图工具责任标注版（2026-08-16，Codex，已生成/未部署）
+
+用户要求在流程图上标出各环节负责工具。imagegen 再次因 TeamoRouter 缺 active Codex
+base_url/api_key 无法连接，按已告知的回退方案直接编辑 SVG；新增节点级责任徽标与图例，区分 Boss
+平台、boss-cli、HOT 招聘 Agent、Aural、Lark/面试官。标注版 PNG 位于
+`output/imagegen/hot-crush-ai-recruitment-flow-tools.png`，可编辑 SVG 同目录；原始无标注 PNG 仍保留。
+已本地渲染检查中文与布局。没有修改生产代码、数据库或部署。
+
+---
+
 ## AI 招聘 Agent 流程图图片（2026-08-16，Codex，已生成/未部署）
 
 用户要求把上一节完整招聘流程变成图片。imagegen 技能因 TeamoRouter 未连接（缺 active Codex

@@ -6,6 +6,16 @@
 
 ---
 
+## AI 招聘 Agent 流程图图片（2026-08-16，Codex，已生成/未部署）
+
+用户要求把上一节完整招聘流程变成图片。imagegen 技能因 TeamoRouter 未连接（缺 active Codex
+base_url/api_key）无法调用，已明确告知并改用本地 SVG 矢量绘制；生成 2048×1152 PNG 与可编辑 SVG：
+`output/imagegen/hot-crush-ai-recruitment-flow.{png,svg}`。图片包含 Boss 新消息、简历获取/筛选、
+Aural AI 面试、逐题评分、Lark 人工审批、Agent 约二面和自动提醒，并用珊瑚色/金色区分 AI 自动执行与
+人工决策点。已用本地渲染检查中文、布局和分支连线；没有修改生产代码、数据库或部署。
+
+---
+
 ## Boss Agent 全招聘链路 + 开源 AI 面试研究（2026-08-16，Codex，只读研究/未实施）
 
 用户提出 Boss 简历获取 → 筛选 → AI 初面 → 评分 → Lark 面试官审批 → Agent 回 Boss 约二面的

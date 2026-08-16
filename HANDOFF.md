@@ -6,6 +6,25 @@
 
 ---
 
+## Boss Agent 全招聘链路 + 开源 AI 面试研究（2026-08-16，Codex，只读研究/未实施）
+
+用户提出 Boss 简历获取 → 筛选 → AI 初面 → 评分 → Lark 面试官审批 → Agent 回 Boss 约二面的
+完整闭环。本轮核对现有招聘代码、boss-cli 与开源/商业 AI 面试产品，没有安装依赖、登录 Boss、发送
+消息、执行 DDL/DML、修改生产代码或部署。结论是链路可实现，但 boss-cli 当前仅明确支持读取未读、
+发文本、索要/预览简历和打招呼，未证明可稳定下载完整简历、提供消息事件或处理验证码；实施前必须做
+真实账号 P0 spike。现有 candidate scorer、application/appointment、WhatsApp FSM、Lark recruitment
+service 可复用，Boss 应作为可暂停的渠道适配器，状态机与审计留在 HOT 系统。
+
+AI 面试首选评估 Aural（MIT，Next.js + Supabase，自托管，中英、语音/文字/视频、分享链接、逐题评分、
+报告、REST/OpenAPI）；备选 FoloUp（MIT、关注度高，但语音依赖 Retell 且集成 API 较弱）。建议 Aural
+作为 tokyo-01 独立服务，不直接共享业务表，通过受限 API/回调接入；先做文字/语音结构化初面，不做
+表情、口音或情绪推断。商业备选公开价：InterviewAI Async $19/$39/$99 每月，Interview Express
+约 $1.50/30 分钟 AI 面试，Odevio $0.05/分钟（Pro $100/月另加分钟费），InterviewAgent $149/月
+100 场、$399/月 500 场，Hyring $79/$239 月但信用点消耗需另核实。下一步若批准，只做 P0：一个岗位、
+测试账号、10 名内部候选人，验证 Boss 简历取得/外链、Aural API、评分一致性、Lark 审批与幂等二面消息。
+
+---
+
 ## boss-cli / 猎聘同类工具核验（2026-08-16，Codex，只读研究/未实施）
 
 核对 boss-cli 当前仓库：它可用 `boss send` 向当前会话发消息、`list --unread` 读未读、

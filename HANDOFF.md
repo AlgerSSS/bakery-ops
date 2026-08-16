@@ -6,6 +6,17 @@
 
 ---
 
+## AI 招聘流程图纵向极简版（2026-08-16，Codex，已生成/未部署）
+
+用户提供参考截图，明确要纵向黑白极简流程而非横向信息图。已查看参考图并重绘 9:21（1152×2688）
+版本：`output/imagegen/hot-crush-ai-recruitment-flow-vertical.{png,svg}`；采用白底、浅灰圆角框、细灰
+箭头、左右决策分支，每个节点内以浅灰小字写负责工具，完整覆盖 Boss → boss-cli → 简历/硬条件 →
+Aural → Lark/面试官 → 二面预约。imagegen 仍因 TeamoRouter 缺 active Codex base_url/api_key 无法
+连接，且无 Action URL，故按已告知的回退方案用 SVG 精确绘制并本地渲染检查。无生产代码/数据库/部署
+变更。
+
+---
+
 ## AI 招聘流程图工具责任标注版（2026-08-16，Codex，已生成/未部署）
 
 用户要求在流程图上标出各环节负责工具。imagegen 再次因 TeamoRouter 缺 active Codex

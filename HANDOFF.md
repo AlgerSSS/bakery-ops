@@ -6,6 +6,39 @@
 
 ---
 
+## Fabric + DeepSeek Harness + PostgreSQL 目标架构（2026-08-16，Codex，设计完成/未实施）
+
+用户要求基于当前项目、生产库、R6 Green 和最小事实原则设计 Fabric 与企业 Agent 平台。
+已在活跃分支 `codex/fabric-agent-blueprint` 新增
+`docs/database/hotcrush-core-v1/12-fabric-agent-platform-target-architecture.md`，并登记到该目录
+`README.md`。本轮只做只读核验和设计：**没有执行 DDL/DML、没有创建 Fabric 资产、没有激活
+Fabric Trial、没有切换连接串或部署。**
+
+关键事实与结论：
+
+- 2026-08-16 只读实时核验：生产 PostgreSQL 17.6 约 92.6 MiB，`public` 78 表/21 视图，
+  68 张表有数据；最大表 `item_hourly_sales` 85,132 行；已有一条真实生日预约。此前“项目均未落地”
+  不成立，迁移必须保 POS/会员、HBTI/生日、招聘、财务/成本和消息功能。
+- R6 Green 约 18.8 MiB，100 表/1,374 列/0 视图，业务表为空；100/100 表强制 RLS 但 0 policy，
+  尚无应用连接。R6A1 是 105 表/1,470 列的设计 overlay，明确不可直接应用。因此先冻结 R6A2，
+  再重建空 Green、确定性回填、shadow read、分域蓝绿切换。
+- PostgreSQL 保持唯一 OLTP 事务真源；Fabric 只承接 Data Factory 增量复制 → OneLake/Lakehouse
+  replica → Warehouse 认证视图 → Power BI 语义模型。不要把现有 PostgreSQL 改成 Fabric SQL
+  Database，也不要做 Fabric → PostgreSQL 通用回写。
+- DeepSeek Harness 最大化复用但不 fork：锁定版本，通过 HOT CRUSH identity/policy/domain-tool/
+  approval/audit/session-export 插件接入。Agent 无裸 SQL、裸 Bash 或数据库凭据；业务写动作只能走
+  类型化 Command API、幂等、审批、事务、outbox 和审计。
+- 设计补齐 10 张 `ai_` 运行契约表、4 个首期 Agent/路由角色、R0–R4 工具风险、Fabric Workspace/
+  Lakehouse/Warehouse/semantic model 结构，以及 Phase 0–6 的迁移与验收门禁。
+- 旧 current-to-target 矩阵只冻结了 76 张表，当前生产已是 78 张；R6A2 必须刷新矩阵并覆盖新增生日表，
+  不能沿用旧数字宣称覆盖完成。
+
+下一步仅建议做设计/迁移准备包：① 冻结 R6A2 权威模型；② 生成 10 张 Agent 表的声明模型和
+**未执行**迁移草案；③ 给四个消费者建立 SQL/功能契约测试；④ 在 Fabric Trial 激活前批准区域、
+数据驻留和成本边界。该分支为已登记的活跃设计分支，待用户评审后再决定是否继续 R6A2 编译。
+
+---
+
 ## 权益分配二次修订：L1 只有贺卡、L2 只有免费巴斯克、L3/L4 二选一（2026-08-15，DSH，已合入并部署）
 
 用户再次修订生日权益分配，已实现上线：
@@ -1881,6 +1914,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-16 | Codex | **完成 Fabric + PostgreSQL + DeepSeek Harness 目标架构设计（未实施）**：只读核验生产库 78 表/21 视图/约 92.6 MiB 与空 R6 Green 100 表/1,374 列；纠正“项目均未落地”和“Fabric 可直接替 PostgreSQL”的前提。新设计规定 PostgreSQL 为唯一 OLTP 真源，Fabric 为 OneLake/Lakehouse replica + Warehouse 认证语义层，Harness 锁版本并只经受控 Domain API；补 10 张 `ai_` 契约表、Agent/工具风险、Phase 0–6 蓝绿迁移门禁。未执行 DDL/DML、未激活 Trial、未创建 Fabric 资产或部署。活跃分支 `codex/fabric-agent-blueprint`。 |
 | 2026-08-15 | DSH | **权益分配二次修订（已部署）**：L1 只有贺卡、L2 只有免费巴斯克、L3/L4 免费巴斯克或 450 积分兑换二选一（L3 限自己 L4 可送亲友）；权益模型改「等级→可选权益组数组」，BIRTHDAY_BENEFITS_JSON 覆盖同步改数组；L1 前端显示贺卡说明且无预约表单。门禁 336 过 39 跳过；线上验证 Nicole(L4) 双选项、免费因已领灰显；新部署 hotcrush-hbti-ojb3ix3yg-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **会员等级按用户定版（已部署）**：等级改为按年累计实付消费实时计算（Lv1 初见 RM0 / Lv2 心动 RM250 / Lv3 热爱 RM750 / Lv4 挚爱 RM1500），不再读 RES 等级名；权益收紧为 L1/L2 只有免费巴斯克、L3/L4 才有 450 积分兑换（L3 限自己 L4 可送亲友）；view 返回 member.level 含升级差，reserve 同口径判定；线上验证 Nicole=Lv4 挚爱、仅积分兑换选项。门禁 333 过 39 跳过；新部署 hotcrush-hbti-p9oyc6z0z-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **修复生日域名提交 403 INVALID_ORIGIN（已上线）**：Origin 白名单从单一 HBTI_LINK_BASE_URL 改为与 HBTI_EXTRA_ORIGINS 的并集（语义收紧为「主机 ∈ 名单 且 Origin===主机」）；Vercel 配 HBTI_EXTRA_ORIGINS=https://birthday.hotcrush.net；验证生日域名提交 403→400、hbti-test 不变、陌生 Origin 仍 403；新部署 hotcrush-hbti-fmwd9xk5x-algersss-projects.vercel.app。教训：应用加自有域名必须同步加白名单。 |

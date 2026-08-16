@@ -19,6 +19,8 @@
 12. `09-implementation-guardrails-and-security.md`：现库索引/约束/触发器/RLS逐项承接，以及137张潜在物理表的实施门禁。
 13. `r5-to-r6-disposition.csv`：原154个对象逐项唯一去向，并严格区分Claude原判与最终覆盖。
 14. `evidence/p0c-source-fidelity-and-reward-2026-08-10.md`：当前、生成式且明确非独立的来源保真/奖励履约证据；它取代旧final acceptance作为当前入口。
+15. `11-r6a1-physical-storage-reaudit.md`：按最小事实原则重审 R6A1 的物理存储必要性；仍是设计输入，不是执行授权。
+16. `12-fabric-agent-platform-target-architecture.md`：结合 2026-08-16 生产库、空 Green、Fabric 与 DeepSeek Harness 的目标分层、Agent 表、同步方式和蓝绿迁移门禁；仍是设计草案，不会创建 Fabric 资产或修改数据库。
 
 ## 可机器核对的数据
 

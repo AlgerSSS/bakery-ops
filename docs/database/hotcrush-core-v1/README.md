@@ -21,6 +21,7 @@
 14. `evidence/p0c-source-fidelity-and-reward-2026-08-10.md`：当前、生成式且明确非独立的来源保真/奖励履约证据；它取代旧final acceptance作为当前入口。
 15. `11-r6a1-physical-storage-reaudit.md`：按最小事实原则重审 R6A1 的物理存储必要性；仍是设计输入，不是执行授权。
 16. `12-fabric-agent-platform-target-architecture.md`：结合 2026-08-16 生产库、空 Green、Fabric 与 DeepSeek Harness 的目标分层、Agent 表、同步方式和蓝绿迁移门禁；仍是设计草案，不会创建 Fabric 资产或修改数据库。
+17. `../../agent-platform/hotcrush-deepseek-harness-blueprint.md`：基于 HOT 当前 15 个 Skill、渠道、权限、审计与后台任务的 Harness 专项设计；明确 Supabase 保留、Fabric 非依赖，以及 Query/Draft/Command/Worker 的迁移边界。
 
 ## 可机器核对的数据
 

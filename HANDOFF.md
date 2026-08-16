@@ -6,6 +6,51 @@
 
 ---
 
+## HOT CRUSH DeepSeek Harness 专项蓝图（2026-08-16，Codex，设计完成/未实施）
+
+用户在决定保留 Supabase、暂不把 Fabric 作为前置依赖后，要求基于 `hot` 当前代码设计
+DeepSeek Harness。已在活跃分支 `codex/fabric-agent-blueprint` 新增
+`docs/agent-platform/hotcrush-deepseek-harness-blueprint.md`，并从 Core V1 `README.md`
+登记入口。本轮只读检查代码和官方 DeepSeek Harness 资料：**没有安装 Harness、没有修改
+生产代码、没有 DDL/DML、没有切换模型/连接串、没有部署。**
+
+已确认的代码事实：
+
+- 当前 15 个 Skill + 三层 IntentRouter + 多轮状态已经是一套轻量自研 Harness；真正缺口是统一、
+  不可绕过的身份、Tool 权限、审批、幂等和事务审计，而不是先增加更多 Agent。
+- `SkillDefinition.permissions/riskLevel/requiresConfirmation` 没有形成中央执行管线；
+  `employee_management`、`resume_upload` 等真实写入能力仍标为 low/no-confirm，部门解析也有
+  observe-only/fail-open 路径，不能用于企业写操作。
+- 当前 AI Provider 会把完整 Prompt/响应写 `ai_call_log`；HR/简历/电话和经营数据接入 Harness 前
+  必须先经统一 Model Gateway 与脱敏策略。
+- Lark/WhatsApp、Web、Agent 和 Cron 目前混部；候选人状态机、Cron、Outbox 和外部重试应继续用
+  确定性代码，不应包装成自治 Agent。
+
+专项设计结论：
+
+- Supabase PostgreSQL 继续是唯一事务真源；Fabric 仅是未来可选分析层，不进入 Agent 在线链路。
+- 锁定 DeepSeek Harness commit，通过 HOT Bundle/Context/Policy/Domain Tools/Audit 插件接入，
+  不 fork；生产 Profile 明确移除 Bash、FS write、任意 Web、Subagent 和通用数据库执行器。
+- 15 个 Skill 全部映射为 Query / Draft / Command / Publish / Worker；首批只接
+  `ops.get_daily_facts`、`forecast.get_review`、`inventory.get_stock`、`knowledge.search` 四个 R0 Tool。
+- 首期只设 `hc-ops-readonly`、`hc-production-draft`、`hc-hr-coordinator` 三个服务器选择的 Profile，
+  不建设多 Agent 自由协作。
+- R2/R3 必须采用 prepare → 人工批准精确 payload hash → 幂等事务 commit → Outbox 的统一管线；
+  解雇、提权、批量人员变更等保持双人审批或只生成操作单。
+- 建议先在 tokyo-01 以 localhost 独立进程运行，旧 Orchestrator 保持整会话回退；Phase 0–5 依次为
+  特征冻结、影子路由、只读、草稿、HR 敏感解析、正式 Command。
+
+核验：15/15 Skill 均有唯一处置；DeepSeek 官方 `apps/cli/package.json` 与根 `package.json` 均为
+`0.1.0-rc.5`，仓库为 developer preview；官方 Node 要求为 `^22.19.0 || >=24.0.0`，本地
+`v24.4.1` 满足但 tokyo-01 尚未核对；文档 `git diff --check` 通过。未跑应用测试，因为只新增
+架构 Markdown 和索引入口，没有改运行代码。
+
+下一步若用户批准实施，只做第一条竖切：渠道消息 → ActorContext → `hc-ops-readonly` → 单个有限
+Query Tool → 带日期/范围/来源的回答；先写 Profile 能力快照、权限矩阵、数字忠实性和 PII 泄漏测试，
+再安装锁定版本，不要先建 10 张表或重写全部 Skill。
+
+---
+
 ## Fabric + DeepSeek Harness + PostgreSQL 目标架构（2026-08-16，Codex，设计完成/未实施）
 
 用户要求基于当前项目、生产库、R6 Green 和最小事实原则设计 Fabric 与企业 Agent 平台。

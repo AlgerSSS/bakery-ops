@@ -13,6 +13,7 @@ from .pdf_pipeline import (
     OpenRouterEmbedder,
     chunk_pages,
     extract_pdf_pages,
+    verify_ocr_runtime,
 )
 from .supabase_client import SupabasePlatformClient
 
@@ -139,9 +140,23 @@ def process_one(settings: Settings) -> bool:
             raise
 
 
+def drain_available(settings: Settings, *, max_runs: int) -> dict[str, int | bool]:
+    if not 1 <= max_runs <= 1000:
+        raise ValueError("max_runs must be between 1 and 1000")
+    processed = 0
+    while processed < max_runs:
+        if not process_one(settings):
+            return {"processed": processed, "drained": True}
+        processed += 1
+    return {"processed": processed, "drained": False}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Hot Crush Supabase PDF/RAG worker")
-    parser.add_argument("--loop", action="store_true", help="poll continuously instead of once")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--loop", action="store_true", help="poll continuously instead of once")
+    mode.add_argument("--drain", action="store_true", help="process a bounded queue until empty")
+    parser.add_argument("--max-runs", type=int, default=100)
     parser.add_argument("--poll-seconds", type=float, default=10)
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args()
@@ -149,6 +164,11 @@ def main() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     settings = Settings.from_env()
+    verify_ocr_runtime()
+
+    if args.drain:
+        print(json.dumps(drain_available(settings, max_runs=args.max_runs)))
+        return
 
     while True:
         processed = process_one(settings)

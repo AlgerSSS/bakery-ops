@@ -49,10 +49,12 @@ echo "==> build venv and start worker"
 "${SSH[@]}" "$REMOTE" '
   set -e
   cd /opt/hotcrush/bakery-ops/services/data-platform
-  if ! python3 -c "import ensurepip" >/dev/null 2>&1; then
+  if ! python3 -c "import ensurepip" >/dev/null 2>&1 \
+     || ! command -v tesseract >/dev/null 2>&1 \
+     || ! tesseract --list-langs 2>/dev/null | grep -qx eng; then
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
-    apt-get install -y -qq python3.11-venv
+    apt-get install -y -qq python3.11-venv tesseract-ocr tesseract-ocr-eng tesseract-ocr-chi-sim
   fi
   python3 -m venv --clear .venv
   .venv/bin/pip install --disable-pip-version-check --no-cache-dir --require-hashes -r requirements.lock >/dev/null

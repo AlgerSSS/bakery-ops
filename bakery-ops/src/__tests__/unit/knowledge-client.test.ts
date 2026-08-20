@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe("SupabaseKnowledgeClient", () => {
-  it("checks the REST endpoint without creating an embedding", async () => {
+  it("checks the controlled platform health RPC without creating an embedding", async () => {
     const fetchFn = vi.fn().mockResolvedValue(okResponse());
     const embed = vi.fn();
     const client = new SupabaseKnowledgeClient({
@@ -27,9 +27,11 @@ describe("SupabaseKnowledgeClient", () => {
     expect(await client.isAvailable()).toBe(true);
     expect(embed).not.toHaveBeenCalled();
     expect(fetchFn).toHaveBeenCalledWith(
-      "https://r6.example.test/rest/v1/",
+      "https://r6.example.test/rest/v1/rpc/ops_get_platform_health",
       expect.objectContaining({
+        method: "POST",
         headers: expect.objectContaining({ apikey: "secret", Authorization: "Bearer secret" }),
+        body: "{}",
       }),
     );
   });

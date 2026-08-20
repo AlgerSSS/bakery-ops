@@ -9,8 +9,8 @@ DynamicUser=yes
 UMask=0077
 WorkingDirectory=/opt/hotcrush/bakery-ops/services/data-platform
 ExecStart=/opt/hotcrush/bakery-ops/services/data-platform/.venv/bin/hotcrush-rag-worker --loop --poll-seconds 15
-Environment=SUPABASE_URL=https://tmmkknnkcptunxbfjxqn.supabase.co
-Environment=SUPABASE_SERVICE_KEY_FILE=%d/r6_secret
+Environment=R6_SUPABASE_URL=https://tmmkknnkcptunxbfjxqn.supabase.co
+Environment=R6_SUPABASE_SERVICE_KEY_FILE=%d/r6_secret
 Environment=OPENROUTER_API_KEY_FILE=%d/openrouter_api_key
 Environment=AI_EMBEDDING_MODEL=openai/text-embedding-3-small
 Environment=RAG_EMBEDDING_MODE=openrouter

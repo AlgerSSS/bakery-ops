@@ -7,11 +7,20 @@ chunking and embedding. It supersedes LightRAG as the write path after remote ac
 Commands:
 
 ```bash
+export R6_SUPABASE_URL="https://tmmkknnkcptunxbfjxqn.supabase.co"
+export R6_SUPABASE_SERVICE_KEY_FILE="/path/to/r6-secret"
 uv sync --dev
 uv run brainctl inventory "/path/to/Brain/raw"
+uv run brainctl plan "/path/to/Brain/raw" --output /secure/path/brain-manifest.json
+uv run brainctl batch "/path/to/Brain/raw" /secure/path/brain-manifest.json
+uv run brainctl batch "/path/to/Brain/raw" /secure/path/brain-manifest.json --apply
 uv run brainctl upload "/path/to/approved-c1.pdf"
 uv run brainctl search "opening checklist" --space-id 10000000-0000-7000-8000-000000000001
+uv run brainctl status --document-id DOCUMENT_UUID
+uv run brainctl unpublish DOCUMENT_UUID --reason "rollback rehearsal" --actor operator
+uv run brainctl restore DOCUMENT_UUID --reason "rollback passed" --actor operator --apply
 uv run hotcrush-rag-worker
+uv run hotcrush-rag-worker --drain --max-runs 100
 uv run hotcrush-rag-worker --loop
 uv run hotcrush-pos-worker
 uv run hotcrush-pos-worker --drain --max-runs 31
@@ -20,11 +29,21 @@ uv run pytest
 uv run ruff check .
 ```
 
+RAG and POS commands reject the generic `SUPABASE_URL` / `SUPABASE_SERVICE_KEY`
+variables even when the parent BakeryOps `.env` contains them. Every R6 command must receive
+the isolated `R6_SUPABASE_*` credentials explicitly.
+
 Only C1 documents classified as `AUTO` upload without an explicit review flag. HR-domain
 files are C2 review-required even when their names contain handbook/SOP keywords. C2/C3/C4
 can be stored with `--allow-review-required`, but database policy keeps them out of automatic
 RAG. Searches require at least one explicit knowledge-space UUID. Deterministic test embeddings require both localhost Supabase and
 `ALLOW_TEST_EMBEDDINGS=1`; they are rejected for hosted projects.
+
+`brainctl plan` hashes all PDFs and writes a tamper-evident manifest. Deduplication is scoped
+to one knowledge-space boundary; identical bytes in different security spaces never share a
+Raw object. `brainctl batch` is dry-run unless `--apply` is present and still uploads only
+`AUTO_UPLOAD` entries. RAG unpublish/restore commands are also dry-run unless `--apply` is
+explicit; they retain the original, chunks and vectors.
 
 BakeryOps 已有只读 R6 适配代码，但现网不配置、不启用，仍使用旧生产库与旧
 LightRAG。未来切换时必须使用独立的 `R6_SUPABASE_*` 变量，不能复用历史

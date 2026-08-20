@@ -23,7 +23,7 @@ npx supabase test db
 npx supabase db lint --local --schema public,private
 ```
 
-已验证基线：22 个 migrations，8 个 pgTAP 文件、74 项断言。
+已验证基线：24 个 migrations，10 个 pgTAP 文件、95 项断言。
 
 远端发布与 drift：
 
@@ -34,7 +34,24 @@ npx supabase db diff --linked --schema public,private
 npx supabase migration list --linked
 ```
 
-验收要求：lint 无错误，diff 为 `No schema changes found`，22 个编号两侧一致。
+验收要求：lint 无错误，diff 为 `No schema changes found`，24 个编号两侧一致。
+
+完整门禁已收敛成一个可重放命令。`local` 只重建本地测试库；`remote` 只检查已链接 R6、健康和
+应用检索；`all` 依次执行两者：
+
+```bash
+cd /Users/weiliangshao/hot
+./scripts/accept-r6-platform.sh local
+
+# 仅通过进程或仓库外 secret file 注入，不改旧应用 .env
+export R6_SUPABASE_URL="https://tmmkknnkcptunxbfjxqn.supabase.co"
+export R6_SUPABASE_SERVICE_KEY_FILE="/安全路径/r6-secret"
+export AI_EMBED_API_KEY_FILE="/安全路径/openrouter-secret"
+./scripts/accept-r6-platform.sh remote
+```
+
+脚本先验证链接 ref 是 R6、BakeryOps 与 `res_api` 两份旧 `.env` 都仍含旧生产 ref 且没有 R6 ref，
+再执行门禁。`R6_ACCEPTANCE_DEEP=1` 会额外执行耗时较长的远端 shadow schema diff。
 
 ## 3. R6 worker 凭据
 
@@ -197,13 +214,48 @@ npx supabase db query --linked \
 ```bash
 cd /Users/weiliangshao/hot/bakery-ops/services/data-platform
 uv run brainctl inventory "/path/to/Brain/raw"
-uv run brainctl upload "/path/to/approved-c1.pdf"
-uv run hotcrush-rag-worker
+uv run brainctl plan "/path/to/Brain/raw" --output /secure/path/brain-manifest.json
+uv run brainctl batch "/path/to/Brain/raw" /secure/path/brain-manifest.json
+uv run brainctl batch "/path/to/Brain/raw" /secure/path/brain-manifest.json --apply
+uv run hotcrush-rag-worker --drain --max-runs 100
+uv run brainctl status --document-id '<document-uuid>'
 uv run brainctl search "问题" \
   --space-id 10000000-0000-7000-8000-000000000001
 ```
 
-`inventory` 不上传；只有完成分级并满足 space policy 的文件可进入处理。C3/C4 不得因命令行方便而绕过准入。
+`plan` 会读取 SHA-256、按知识空间边界去重并生成带摘要的 manifest；`batch` 默认 dry-run，显式
+`--apply` 后也只处理 `AUTO_UPLOAD`。文件哈希、大小、分类或 manifest disposition 被修改都会拒绝。
+同一 PDF 跨权限空间不共用 Raw 对象。C3/C4 不得因命令行方便而绕过准入。
+
+真实 Brain 盘点结果：165 份均完成哈希；manifest 中 3 份 `AUTO_UPLOAD`、70 份
+`REVIEW_REQUIRED`、45 份 `DENIED`、47 份同空间重复跳过。只有 3 份 C1 写入 R6；其余没有上传。
+三个已发布文档为 3 + 1 + 25 页，共 32 chunks / 32 embeddings。技术论文、招聘价格表和品牌手册的
+精确查询均命中正确标题和页码。远端 Worker 已安装 Tesseract 英文/简体中文语言包，启动前会 fail-fast
+检查可执行文件，避免缺依赖时先消耗数据库重试次数。
+
+RAG publication 的回滚同样默认 dry-run：
+
+```bash
+uv run brainctl unpublish '<document-uuid>' \
+  --reason '检索验收失败' --actor 'operator'
+uv run brainctl unpublish '<document-uuid>' \
+  --reason '检索验收失败' --actor 'operator' --apply
+uv run brainctl restore '<document-uuid>' \
+  --reason '重新验收通过' --actor 'operator' --apply
+```
+
+unpublish 只从检索中移除 current publication；Storage 原件、chunks、vectors 和成功 run 保留。远端
+已实测价格表 unpublish 后查询消失，restore 后相同 `document_id` / `ingest_run_id` 与第 1 页结果恢复。
+
+应用侧验收不要求切换现网配置：
+
+```bash
+cd /Users/weiliangshao/hot/bakery-ops
+npm run verify:r6-knowledge
+```
+
+该命令使用显式 R6 凭据和空间 ID 调用 BakeryOps 的 `SupabaseKnowledgeClient`，必须返回价格表第 1 页。
+现网 `KNOWLEDGE_BACKEND` 默认仍是 `lightrag`，没有修改。
 
 ## 9. 当前明确不执行
 
@@ -211,5 +263,5 @@ uv run brainctl search "问题" \
 - 不启用 `R6_SHADOW_ENABLED=1`。
 - 不把 POS worker 配成常驻服务。
 - 不切 BakeryOps 知识查询 backend。
-- 不批量上传未分类 Brain PDF。
+- 不上传 manifest 中 `REVIEW_REQUIRED` / `DENIED` 的 Brain PDF。
 - 不因旧库 RLS advisory 直接执行 `ENABLE RLS`；先设计 policy 和兼容窗口。

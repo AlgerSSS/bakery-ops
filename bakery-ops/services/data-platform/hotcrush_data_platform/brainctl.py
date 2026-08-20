@@ -9,9 +9,11 @@ from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from .classification import Classification, classify_path
 from .config import Settings
+from .manifest import apply_manifest, brain_source_batch_key, build_manifest
 from .pdf_pipeline import DeterministicTestEmbedder, OpenRouterEmbedder
 from .supabase_client import SupabasePlatformClient
 
@@ -68,35 +70,13 @@ def upload_one(
     document_key = sha256[:32]
     object_path = f"{classification.space_id}/{document_key}/1/original.pdf"
     mime_type = mimetypes.guess_type(path.name)[0] or "application/pdf"
-    source_batch_key = f"brain:{sha256}"
+    source_batch_key = brain_source_batch_key(classification.space_id, sha256)
 
     with SupabasePlatformClient(
         settings.supabase_url,
         settings.supabase_service_key,
         settings.request_timeout_seconds,
     ) as client:
-        batch = client.one(
-            client.rpc(
-                "ops_register_raw_batch",
-                {
-                    "p_source_system": "BRAIN_PDF",
-                    "p_source_batch_key": source_batch_key,
-                    "p_schema_version": "brain-pdf-v1",
-                    "p_writer_id": "brainctl",
-                    "p_store_id": None,
-                    "p_expected_count": 1,
-                    "p_metadata": {
-                        "classification_reason": classification.reason,
-                        "source_modified_at": datetime.fromtimestamp(
-                            path.stat().st_mtime, tz=UTC
-                        ).isoformat(),
-                    },
-                },
-            )
-        )
-        if not batch:
-            raise RuntimeError("batch registration returned no row")
-
         uploaded = client.upload_object(
             classification.bucket_id,
             object_path,
@@ -105,9 +85,8 @@ def upload_one(
         )
         raw_object = client.one(
             client.rpc(
-                "ops_register_raw_object",
+                "ops_resolve_raw_object",
                 {
-                    "p_batch_id": batch["batch_id"],
                     "p_bucket_id": classification.bucket_id,
                     "p_object_path": object_path,
                     "p_sha256": sha256,
@@ -119,8 +98,48 @@ def upload_one(
                 },
             )
         )
-        if not raw_object:
-            raise RuntimeError("raw object registration returned no row")
+        if raw_object:
+            batch = {"batch_id": raw_object["batch_id"]}
+        else:
+            batch = client.one(
+                client.rpc(
+                    "ops_register_raw_batch",
+                    {
+                        "p_source_system": "BRAIN_PDF",
+                        "p_source_batch_key": source_batch_key,
+                        "p_schema_version": "brain-pdf-v1",
+                        "p_writer_id": "brainctl",
+                        "p_store_id": None,
+                        "p_expected_count": 1,
+                        "p_metadata": {
+                            "classification_reason": classification.reason,
+                            "source_modified_at": datetime.fromtimestamp(
+                                path.stat().st_mtime, tz=UTC
+                            ).isoformat(),
+                        },
+                    },
+                )
+            )
+            if not batch:
+                raise RuntimeError("batch registration returned no row")
+            raw_object = client.one(
+                client.rpc(
+                    "ops_register_raw_object",
+                    {
+                        "p_batch_id": batch["batch_id"],
+                        "p_bucket_id": classification.bucket_id,
+                        "p_object_path": object_path,
+                        "p_sha256": sha256,
+                        "p_size_bytes": len(content),
+                        "p_mime_type": mime_type,
+                        "p_data_class": classification.data_class,
+                        "p_source_record_key": document_key,
+                        "p_source_version": "1",
+                    },
+                )
+            )
+            if not raw_object:
+                raise RuntimeError("raw object registration returned no row")
 
         client.rpc(
             "ops_complete_raw_batch",
@@ -205,6 +224,79 @@ def search_knowledge(
     return result
 
 
+def get_document_status(
+    document_ids: list[str],
+    settings: Settings,
+) -> list[dict[str, Any]]:
+    if not 1 <= len(document_ids) <= 100:
+        raise ValueError("document status requires between 1 and 100 IDs")
+    normalized_ids = [str(UUID(document_id)) for document_id in document_ids]
+    with SupabasePlatformClient(
+        settings.supabase_url,
+        settings.supabase_service_key,
+        settings.request_timeout_seconds,
+    ) as client:
+        result = client.rpc(
+            "ai_get_document_ingest_status",
+            {"p_document_ids": normalized_ids},
+        )
+    if not isinstance(result, list):
+        raise TypeError("document status did not return a row list")
+    return result
+
+
+def change_document_state(
+    document_id: str,
+    action: str,
+    *,
+    reason: str,
+    actor: str,
+    apply: bool,
+    settings: Settings | None,
+) -> dict[str, Any]:
+    if action not in ("unpublish", "restore"):
+        raise ValueError("document action must be unpublish or restore")
+    normalized_id = str(UUID(document_id))
+    if not reason.strip() or not actor.strip():
+        raise ValueError("document state reason and actor are required")
+    intent = {
+        "mode": "APPLY" if apply else "DRY_RUN",
+        "action": action,
+        "document_id": normalized_id,
+        "reason": reason,
+        "actor": actor,
+    }
+    if not apply:
+        return intent
+    if settings is None:
+        raise ValueError("R6 settings are required in apply mode")
+
+    rpc_name = "ai_unpublish_document" if action == "unpublish" else "ai_restore_document"
+    with SupabasePlatformClient(
+        settings.supabase_url,
+        settings.supabase_service_key,
+        settings.request_timeout_seconds,
+    ) as client:
+        document = client.one(
+            client.rpc(
+                rpc_name,
+                {
+                    "p_document_id": normalized_id,
+                    "p_reason": reason,
+                    "p_actor": actor,
+                },
+            )
+        )
+    if not document:
+        raise RuntimeError("document state change returned no row")
+    return {
+        **intent,
+        "status": document["status"],
+        "is_current": document["is_current"],
+        "published_ingest_run_id": document["published_ingest_run_id"],
+    }
+
+
 def _write_json(value: Any, output: Path | None) -> None:
     text = json.dumps(value, ensure_ascii=False, indent=2)
     if output:
@@ -212,6 +304,13 @@ def _write_json(value: Any, output: Path | None) -> None:
         output.write_text(text + "\n", encoding="utf-8")
     else:
         print(text)
+
+
+def _read_json_object(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise TypeError("manifest must contain one JSON object")
+    return value
 
 
 def main() -> None:
@@ -222,6 +321,24 @@ def main() -> None:
     inventory_parser.add_argument("root", type=Path)
     inventory_parser.add_argument("--hash", action="store_true", help="read every file and calculate SHA-256")
     inventory_parser.add_argument("--output", type=Path)
+
+    plan_parser = subparsers.add_parser(
+        "plan", help="hash, classify and deduplicate a Brain directory into a manifest"
+    )
+    plan_parser.add_argument("root", type=Path)
+    plan_parser.add_argument("--output", type=Path, required=True)
+
+    batch_parser = subparsers.add_parser(
+        "batch", help="verify and optionally apply AUTO_UPLOAD entries from a manifest"
+    )
+    batch_parser.add_argument("root", type=Path)
+    batch_parser.add_argument("manifest", type=Path)
+    batch_parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="write verified AUTO_UPLOAD entries to R6; default is dry-run",
+    )
+    batch_parser.add_argument("--max-files", type=int)
 
     upload_parser = subparsers.add_parser("upload", help="upload and finalize exactly one PDF")
     upload_parser.add_argument("pdf", type=Path)
@@ -241,18 +358,75 @@ def main() -> None:
     )
     search_parser.add_argument("--limit", type=int, default=5)
 
+    status_parser = subparsers.add_parser("status", help="read bounded RAG ingest status")
+    status_parser.add_argument("--document-id", action="append", required=True)
+
+    for action in ("unpublish", "restore"):
+        state_parser = subparsers.add_parser(
+            action,
+            help=f"{action} one RAG document; default is dry-run",
+        )
+        state_parser.add_argument("document_id")
+        state_parser.add_argument("--reason", required=True)
+        state_parser.add_argument("--actor", required=True)
+        state_parser.add_argument("--apply", action="store_true")
+
     args = parser.parse_args()
     try:
         if args.command == "inventory":
             _write_json(inventory(args.root, include_hash=args.hash), args.output)
             return
 
-        settings = Settings.from_env()
+        if args.command == "plan":
+            _write_json(build_manifest(args.root), args.output)
+            return
+
+        if args.command == "batch":
+            manifest = _read_json_object(args.manifest)
+            settings = Settings.from_env(require_embedding=False) if args.apply else None
+            _write_json(
+                apply_manifest(
+                    args.root,
+                    manifest,
+                    apply=args.apply,
+                    settings=settings,
+                    max_files=args.max_files,
+                    upload_fn=upload_one,
+                ),
+                None,
+            )
+            return
+
+        if args.command == "status":
+            _write_json(
+                get_document_status(
+                    args.document_id,
+                    Settings.from_env(require_embedding=False),
+                ),
+                None,
+            )
+            return
+
+        if args.command in ("unpublish", "restore"):
+            settings = Settings.from_env(require_embedding=False) if args.apply else None
+            _write_json(
+                change_document_state(
+                    args.document_id,
+                    args.command,
+                    reason=args.reason,
+                    actor=args.actor,
+                    apply=args.apply,
+                    settings=settings,
+                ),
+                None,
+            )
+            return
+
         if args.command == "search":
             _write_json(
                 search_knowledge(
                     args.query,
-                    settings,
+                    Settings.from_env(),
                     space_ids=args.space_id,
                     limit=args.limit,
                 ),
@@ -266,7 +440,14 @@ def main() -> None:
                 f"classification is {classification.data_class}/{classification.rag_action}; "
                 "review before upload or pass --allow-review-required to store without auto-RAG"
             )
-        _write_json(upload_one(args.pdf, settings, classification=classification), None)
+        _write_json(
+            upload_one(
+                args.pdf,
+                Settings.from_env(require_embedding=False),
+                classification=classification,
+            ),
+            None,
+        )
     except Exception as exc:
         print(json.dumps({"error": type(exc).__name__, "message": str(exc)}, ensure_ascii=False), file=sys.stderr)
         raise SystemExit(1) from exc

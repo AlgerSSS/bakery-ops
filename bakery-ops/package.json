@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "eslint",
     "team:list": "node scripts/team-list.mjs",
-    "team:sync": "node scripts/build-server.mjs scripts/team-sync.ts scripts/.team-sync.cjs && node scripts/.team-sync.cjs"
+    "team:sync": "node scripts/build-server.mjs scripts/team-sync.ts scripts/.team-sync.cjs && node scripts/.team-sync.cjs",
+    "verify:r6-knowledge": "tsx scripts/verify-r6-knowledge.ts"
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.68.0",

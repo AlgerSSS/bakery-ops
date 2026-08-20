@@ -16,12 +16,12 @@ R6 Green 已建成一个适合单店阶段的 Supabase 分层数据平台：
 - 在同一个 Supabase Project 内使用 PostgreSQL、Storage、pgvector、RLS、RPC、Cron 和 Realtime。
 - Raw 原件放私有 Storage，PostgreSQL 只放元数据与处理状态。
 - Processed 层只建立已有明确粒度的结构化事实；目前已有 POS 日销售和小时销售版本表。
-- PDF RAG 已具备分级、上传、解析、切块、embedding、发布和检索的数据库契约。
+- PDF RAG 已具备 manifest 分级、权限内去重、上传、解析/OCR、切块、embedding、发布、检索和可逆回滚。
 - POS 已具备 Raw 文件校验、日/小时交叉对账、有界范围回填、版本发布、隔离和恢复的结构化 worker。
 - Agent 层只保存运行账本和追加事件，不让 Agent 直接任意写业务表。
 - 现网 BakeryOps、res_api 仍使用旧生产库；没有替换 `DATABASE_URL`，没有开启双写或切读。
 
-这不等于“整个旧业务库已迁移”。当前完成的是新库物理基座、PDF 技术样本，以及同时覆盖可信日和异常日的 POS 范围迁移演练；持续影子写入、完整历史回填、其他业务域回填和应用切换仍需以后分别批准。
+这不等于“整个旧业务库已迁移”。当前完成的是新库物理基座、3 份已批准 C1 PDF 的真实 RAG、BakeryOps 显式 opt-in 检索验收，以及同时覆盖可信日和异常日的 POS 范围迁移演练；持续影子写入、完整历史回填、其余 PDF 人工审核、其他业务域回填和应用切换仍需以后分别批准。
 
 ## 2. 前提检查
 
@@ -63,23 +63,23 @@ Cron 不应每天全量复制 Raw；它是补偿机制，不是主数据流。
 | 项目 | 已确认状态 |
 |---|---|
 | Supabase Project | `tmmkknnkcptunxbfjxqn`，ACTIVE_HEALTHY，us-east-1 |
-| CLI migrations | 22 个，本地与远程编号完全一致 |
+| CLI migrations | 24 个，本地与远程编号完全一致 |
 | 业务/平台表 | 14 张 |
 | views | 2 个 POS current views |
-| 受控 RPC | 34 个 `ops_*` / `ai_*` functions |
+| 受控 RPC | 39 个 `ops_*` / `ai_*` functions |
 | private Storage | 7 个 bucket，均 `public=false`，单文件限制 100 MiB |
 | extensions | `vector` 在 `extensions` schema；`pg_cron` 已安装 |
 | Cron | 6 个短任务 |
 | Realtime | 仅 `ops_agent_run`、`ops_agent_event`、`ai_ingest_run` |
 | machine roles | 7 个 NOLOGIN capability roles |
-| 本地数据库测试 | 8 个 pgTAP 文件，74 项通过 |
+| 本地数据库测试 | 10 个 pgTAP 文件，95 项通过 |
 | 远程 lint | `public` + `private` 无 schema error |
 | 远程 drift | `supabase db diff --linked --schema public,private` 无差异 |
-| PDF 样本 | 3 页 PDF 已完成 6 chunks / 1536 维 embedding 并可按页检索 |
+| Brain / RAG | 165 份完成哈希 manifest；仅 3 份 C1 发布，共 29 页、32 chunks / 32 个 1536 维 embedding，三类查询命中正确页码 |
 | POS 迁移演练 | 单日演练外，完成 6 日范围：5 日/57 小时进入 current，1 日异常隔离，范围自动对账 0 差异 |
-| 回滚演练 | 不完整 batch 已隔离；已接受 batch 在远端完成 quarantine→current 回退→restore |
+| 回滚演练 | POS 完成 quarantine→current 回退→restore；RAG 完成 unpublish→检索消失→restore→原页恢复 |
 | 当前健康 | `degraded`：2 个隔离中 1 个是已确认源质量异常，另 1 个不完整快照仍未确认；无失败 run、过期 lease 或 Storage lineage 缺口 |
-| 现网应用切换 | 未开始；仍只使用 `ecsgqcmwtjmcpzqytdqw` |
+| 应用接入 | BakeryOps R6 客户端已真实返回价格表第 1 页；默认 backend 和现网配置未切换，仍使用旧库/LightRAG |
 
 ## 4. 总体数据结构图
 
@@ -97,7 +97,7 @@ flowchart TB
     FILE[财务/HR/SCM 文件]
   end
 
-  subgraph R6[Supabase R6 Green · 同一 Project]
+  subgraph R6[Supabase R6 Green · 同一 Project · 24 migrations]
     subgraph RAW[1 Raw 证据层]
       STORE[7 个 Private Storage buckets]
       RB[ops_raw_batch]
@@ -112,8 +112,8 @@ flowchart TB
       KS[ai_knowledge_space]
       DOC[ai_raw_document]
       IR[ai_ingest_run]
-      CHUNK[ai_document_chunk]
-      VEC[ai_chunk_embedding vector\(1536\)]
+      CHUNK[3 C1 · 29 pages · 32 chunks]
+      VEC[32 embeddings vector\(1536\)<br/>unpublish ↔ restore]
     end
 
     subgraph AGENT[3 Agent 层]
@@ -130,8 +130,8 @@ flowchart TB
     GOV[RLS · Grants · Roles · Audit]
   end
 
-  WK[外部 worker<br/>OCR · 解析 · embedding · 长任务]
-  USERS[未来 Web / Lark / WhatsApp / Agent]
+  WK[外部 worker<br/>Tesseract OCR · 解析 · embedding · 长任务]
+  USERS[Web / Lark / WhatsApp / Agent<br/>BakeryOps opt-in 已验收 · 现网未切换]
   OLD[旧生产库<br/>ecsg...<br/>现在仍是唯一业务真源]
 
   POS -. 持续影子写入未启用；有界范围回填已验收 .-> RB
@@ -399,10 +399,10 @@ hc_msg_worker
 # 链接目标 Project（已完成）
 npx supabase link --project-ref tmmkknnkcptunxbfjxqn
 
-# 本地从零重放 22 个 migration
+# 本地从零重放 24 个 migration
 npx supabase db reset
 
-# 本地结构检查和 74 项 pgTAP
+# 本地结构检查和 95 项 pgTAP
 npx supabase db lint --local --schema public,private
 npx supabase test db
 
@@ -419,11 +419,15 @@ npx supabase db diff --linked --schema public,private
 npx supabase migration list --linked
 ```
 
-结果：22 个本地/远程 migration 一致，lint 无错，diff 为 `No schema changes found`。
+结果：24 个本地/远程 migration 一致，lint 无错，diff 为 `No schema changes found`。
 
 CLI 能完成 PostgreSQL objects、Storage bucket/policy、extensions、Cron、RLS、roles 和 publication 的创建。CLI 不会把 Playwright、PDF OCR、Tesseract 或 OpenRouter embedding 自动变成 PostgreSQL 内部计算；这些仍需外部 worker。
 
 POS 一次性迁移、处理和对账命令见 `docs/database/hotcrush-r6-green-cli-runbook.md`。这些命令使用独立的 `R6_SUPABASE_*` 凭据，不修改旧应用 `.env`。
+
+仓库根目录的 `scripts/accept-r6-platform.sh` 将本地迁移重放、95 项 pgTAP、Python/Node 测试、
+BakeryOps build、远端 migration/lint/健康和真实 R6 页码检索收敛为 `local|remote|all` 三种模式。
+脚本会先阻断错误链接 ref 或旧应用 `.env` 中出现 R6 ref；远端凭据只从进程变量或仓库外 secret file 读取。
 
 ## 12. 目前不应创建的结构
 
@@ -448,18 +452,22 @@ POS 一次性迁移、处理和对账命令见 `docs/database/hotcrush-r6-green-
 4. 已完成：旧库以只读事务导出 `LEGACY_POS_EXPORT`；每次最多 31 日，默认 dry-run，显式 apply 后才写 R6。
 5. 已完成范围演练：2026-04-09 至 04-14 中 5 日由 worker 发布，1 个来源异常日只登记 `LEGACY_POS_ANOMALY` 并隔离；范围逐字段对账 0 差异。
 6. 已完成全历史 dry-run：260 个日历日中 229 日可处理，31 日须隔离；没有把缺失或不一致来源伪造为事实。
-7. 黄金问题集验收 RAG；不以“向量有数据”代替检索质量验收。
-8. 单独批准后才开启一个项目的影子写入；后续再批准切读。
-9. 所有写入者切换、高水位一致且回滚演练通过后，才考虑冻结旧库写入。
+7. 已完成代表性 RAG 验收：技术论文、招聘价格表和品牌手册均命中正确标题/页码；价格表完成真实 unpublish/restore。
+8. 待完成：对 70 份 `REVIEW_REQUIRED` 文档逐份审核，并扩展正式业务黄金问题集；不以“向量有数据”代替质量验收。
+9. 单独批准后才开启一个项目的影子写入；后续再批准切读。
+10. 所有写入者切换、高水位一致且回滚演练通过后，才考虑冻结旧库写入。
 
 ## 14. 验收门槛
 
 ### 已通过
 
 - 从空本地库重放所有 migrations。
-- 74 项数据库合同/安全/回滚测试通过。
+- 95 项数据库合同/安全/回滚测试通过。
 - RLS、Storage private、NOLOGIN roles、Realtime 最小集、Cron 数量均有断言。
-- PDF 真实样本从 Storage 到页码引用检索通过。
+- Brain 165 份完成 SHA-256 manifest；3 份 C1 从 Storage 到 32 个 chunks/vectors 和页码引用检索通过。
+- RAG Worker 在 tokyo-01 使用显式 R6 encrypted credentials，Tesseract 英文/简中依赖已安装并 fail-fast 检查。
+- RAG 价格表在远端完成 unpublish、检索消失、restore、同一页码恢复演练；chunks/vectors 未删除。
+- BakeryOps 的默认关闭 R6 客户端真实返回价格表第 1 页，现网 backend 未切换。
 - R6 远程 lint 无错，migration ledger 对齐，schema diff 无漂移。
 - POS 不完整快照在业务对账失败后被真实远端 quarantine，current view 归零且版本未删除。
 - POS 最终单日回填通过 1 个日事实 + 11 个小时事实自动对账，随后真实完成回滚与恢复演练。
@@ -470,17 +478,18 @@ POS 一次性迁移、处理和对账命令见 `docs/database/hotcrush-r6-green-
 
 - 旧生产数据尚未全量回填。
 - POS 仅完成单日和 6 日范围迁移演练，尚未形成持续影子写入或完整历史回填；HR/SCM/Finance/Marketing 未逐域对账。
-- Brain 目录尚未完成全量分类审核与上传。
-- RAG 只有技术样本通过，尚无业务黄金问题集。
+- Brain manifest 已完成，但 70 份待人工审核、45 份禁止、47 份同权限空间重复均未上传。
+- RAG 已通过三类代表性精确问题，尚未形成覆盖所有业务主题和权限角色的正式黄金问题集。
 - 应用配置、Vercel 变量、`DATABASE_URL` 和现网读写路径均未切换。
 
 ## 15. 事实、推测、建议和暂无法验证项
 
 ### 已确认事实
 
-- R6 Green 当前结构可由 22 个 CLI migration 从零重建。
+- R6 Green 当前结构可由 24 个 CLI migration 从零重建。
 - 现网 BakeryOps/res_api 仍使用旧生产库。
-- PDF 样本检索能返回正确页码与相关文本。
+- 三份已批准 C1 PDF 共 29 页、32 个 chunks/vectors；精确查询能返回正确标题与页码。
+- BakeryOps 应用客户端在不修改现网配置时通过显式 R6 CLI 验收。
 - 2026-07-26 最终 POS 日/小时事实从旧库只读导出后，与 R6 current 自动对账 0 差异。
 - 2026-04-09 至 04-14 的范围演练中，5 日事实与 57 条小时事实对账 0 差异，04-12 的来源不一致只进入隔离证据。
 - 先前的半日 POS Raw 虽技术处理成功，但业务对账失败，现为 `QUARANTINED`，说明“run 成功”不是迁移验收。
@@ -499,5 +508,5 @@ POS 一次性迁移、处理和对账命令见 `docs/database/hotcrush-r6-green-
 ### 暂无法验证
 
 - 未切换前无法证明所有旧库业务读写都可无缝迁往 R6。
-- 未全量盘点 Brain 文件内容前，无法证明所有 PDF 都可合规自动 RAG。
+- 165 份 Brain PDF 已完成元数据与哈希盘点，但 70 份待审文档尚未逐页内容审核，无法证明它们可合规进入 RAG。
 - 财务网站的生产 Vercel secret 为不可回读配置；本阶段既不更改，也不假设其可直接切换。

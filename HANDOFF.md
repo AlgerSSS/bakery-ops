@@ -12,13 +12,13 @@
 （project ref `tmmkknnkcptunxbfjxqn`），不得修改旧应用数据库连接、启用持续 shadow/POS worker，或把现网
 切到新库。旧生产真源是 `supabase-yellow-crystal`（project ref `ecsgqcmwtjmcpzqytdqw`），不是早期文档
 写的失活项目 `txaawdpmyjnmhihjkpud`。本地 BakeryOps 与 `res_api` 的 `DATABASE_URL` 收工时仍解析到旧库；
-两份 `.env` 均没有 `R6_*` 运行开关或密钥。本轮没有修改 `.env`、Vercel、systemd 或 `DATABASE_URL`；
+两份 `.env` 均没有 `R6_*` 运行开关或密钥。本轮没有修改 `.env`、Vercel、旧应用 systemd 或 `DATABASE_URL`；
 一次性迁移/对账脚本对旧库的第一条事务语句固定为 `SET TRANSACTION READ ONLY`，只把结果写入 R6。
-此前已在 tokyo-01 核验旧服务连接和无 R6 drop-in；最后一次 SSH 重试因本机 DNS 无法解析该主机而未
-重复取证，未据此改动任何配置。
+本轮只在 tokyo-01 部署独立的 `hotcrush-rag-worker` systemd 服务，使用 systemd encrypted credentials
+且只接受 `R6_SUPABASE_*`；旧应用 systemd 配置未动，POS/shadow worker 未常驻、未切库。
 
-R6 Green 现由 22 个可重放 Supabase migration 完整定义，远端为 14 张平台/业务表、2 个 POS current
-view、34 个 `ops_*`/`ai_*` 受控函数、7 个私有 Storage bucket、7 个 NOLOGIN capability role、6 个
+R6 Green 现由 24 个可重放 Supabase migration 完整定义，远端为 14 张平台/业务表、2 个 POS current
+view、39 个 `ops_*`/`ai_*` 受控函数、7 个私有 Storage bucket、7 个 NOLOGIN capability role、6 个
 pg_cron job；`vector` 位于 `extensions` schema，Realtime 只发布 3 张运行状态表。物理分层为：
 `ops_raw_batch/object` 原始证据与 `ops_processing_run` 租约队列 → 版本化 `pos_sales_day/hour` 与 RAG
 文档/chunk/vector → 追加式 Agent run/event → RPC/Realtime 用户交互契约。没有为单店阶段引入 Fabric、
@@ -51,21 +51,37 @@ R6 当前有 6 个 current 日、36 个日版本、111 个小时版本。健康�
 `quarantined_unacknowledged=1`。处理、RAG、Agent 失败/过期租约及 Storage 血缘缺口均为 0，6 个 cron
 均活跃。不得为追求绿色状态恢复不完整半日快照。
 
-CLI 验收结果：本地与远端 migration 22/22 对齐；远端 `public,private` lint 无错误；
-`supabase db diff --linked --schema public,private` 从空影子库重放后返回 `No schema changes found`；8 个
-pgTAP 文件共 74 项全部通过。`res_api` API 22/22、Node unit 133/133 通过；Python RAG/POS worker Ruff 与 pytest 21/21
-通过；提交前 `git diff --check` 和变更文件密钥扫描均通过。此前基座验收的 BakeryOps TypeScript、Vitest
-（45 files / 463 tests）与 Next build 仍沿用；本轮没有改这些代码。Next build 既存 Turbopack warning 与
-Python PyMuPDF/SWIG 弃用 warning 不影响本轮结果。
+统一入口 `scripts/accept-r6-platform.sh [local|remote|all]` 已跑通完整验收：10 个 pgTAP
+文件/95 项断言、Python pytest 38/38 + Ruff、`res_api` unit 133/133 + API 22/22、BakeryOps TypeScript +
+45 files/463 Vitest + Next build；远端 24/24 migration、lint、健康不变量和真实带页码检索也均通过。脚本
+先硬检查 linked ref 必须是 R6，且 BakeryOps/`res_api` 两份 `.env` 必须仍指向旧生产并且不得出现 R6 ref。
+`supabase db diff --linked --schema public,private` 从空影子库重放后返回 `No schema changes found`；提交前
+`git diff --check` 和变更文件密钥/本机路径扫描均通过。Next build 既存 Turbopack warning、NFT 全项目
+追踪 warning 与 Python PyMuPDF/SWIG 弃用 warning 不影响本轮结果。
 
-PDF/RAG 已完成一份 3 页样本的真实远端闭环：私有 bucket → 文档登记 → worker 解析/切块 → 6 chunks →
-1536 维 embedding → 发布 READY → RPC 检索，精确页内问题能返回第 2 页。宽泛语义查询排序尚未达到业务
-验收标准，因此只能确认技术链路可用，不能声称检索质量或桌面 `brain` 全量导入已完成。R6 独立 RAG
-worker 使用 systemd encrypted credentials，只连接 R6，不改变旧应用数据库配置。
+桌面 Brain 根目录已完成 165 份 PDF 的本地哈希盘点，但 manifest 本体因包含相对文件名/潜在 PII 没有
+提交仓库。按同知识空间内去重后的决策为：3 `AUTO_UPLOAD`、70 `REVIEW_REQUIRED`、45 `DENIED`、47
+`DUPLICATE_SKIP`；跨安全空间的同哈希文件不会共用 Raw object。3 份 C1 文档经页面渲染人工检查后已
+真实导入 R6，当前共 3 个 READY/current 文档、29 页、32 chunks/embeddings。代表性检索分别命中技术
+文档第 2 页、招聘价格对比第 1 页和品牌册相关页面；这证明技术链路与代表性精确查询可用，不能外推成
+所有业务问题的检索质量已验收。
 
-仍未做：把已盘点的 229 个可信历史日全部回填、持续旧源增量、应用 shadow read、任何消费者切换、完整
-`brain` PDF 分类与质量验收。下一步在当前边界内可按 31 日窗口执行“旧库只读 → R6 Raw → Processed →
-自动对账”，31 个异常日只保留隔离证据；不得直接改 `DATABASE_URL`。旧生产只读审计还发现
+Brain 批处理默认 dry-run，仅 `AUTO_UPLOAD` 可选中；执行时重验路径、大小、SHA-256、分类和 manifest
+digest。旧 batch-key 升级造成的同对象重放冲突已通过 migration 23 的 immutable-object resolve 与空
+batch recovery 修复，远端遗留空 batch 已安全标记 FAILED。migration 24 新增精确 ingest status，以及
+保留 Raw/chunk/vector 的 `unpublish ↔ restore`；招聘价格文档已完成下架后检索消失、恢复后同页命中的
+回滚演练。`brainctl status/unpublish/restore/batch` 控制面只需 R6 凭据，search/worker 才要求 embedding
+凭据。远端 Worker 已补齐并启动 Tesseract 英文/简中 OCR，最终重部署状态为 active/running。
+
+BakeryOps 新增 R6 Supabase knowledge backend 的真实验收脚本，并修复跨区域健康探测：现在调用
+`ops_get_platform_health`，超时 10 秒；知识空间环境变量隔离为 `R6_KNOWLEDGE_SPACE_IDS`。该 backend
+仍默认关闭（默认继续使用旧 `lightrag`），只在进程级显式 opt-in 时连接 R6；真实验收返回招聘价格文档
+第 1 页引用。本轮没有把 opt-in 写进任何旧应用配置。
+
+仍未做：把已盘点的 229 个可信历史 POS 日全部回填、持续旧源增量、应用 shadow read、任何消费者切换，
+以及 70 份 PDF 的逐份人工内容复核；45 份 DENIED 不应入 RAG。下一步若用户继续维持当前边界，可先人工
+审批 PDF 或按 31 日窗口执行“旧库只读 → R6 Raw → Processed → 自动对账”，31 个异常日只保留隔离证据；
+不得直接改 `DATABASE_URL`。旧生产只读审计还发现
 `mkt_birthday_profile`、`mkt_birthday_reservation` 未启用 RLS；不能只开 RLS 而没有配套 policy，否则可能
 直接阻断现有调用，须另开变更窗口确认读写者与策略后处理。实施主文档为
 `docs/database/hotcrush-r6-green-database-blueprint-v1.md`，CLI 手册为

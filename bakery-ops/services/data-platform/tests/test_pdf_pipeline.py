@@ -1,3 +1,8 @@
+from typing import Any
+
+import pytest
+
+from hotcrush_data_platform import pdf_pipeline
 from hotcrush_data_platform.pdf_pipeline import (
     DeterministicTestEmbedder,
     PageText,
@@ -19,3 +24,12 @@ def test_deterministic_test_embeddings_are_stable_and_1536_dimensional() -> None
     first, second = embedder.embed(["opening checklist", "opening checklist"])
     assert first == second
     assert len(first) == 1536
+
+
+def test_ocr_runtime_fails_before_claiming_work_when_tesseract_is_missing(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setattr(pdf_pipeline.shutil, "which", lambda _name: None)
+
+    with pytest.raises(RuntimeError, match="tesseract executable is required"):
+        pdf_pipeline.verify_ocr_runtime()

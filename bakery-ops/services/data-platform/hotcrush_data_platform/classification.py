@@ -39,7 +39,7 @@ class Classification:
 
 def classify_path(path: Path) -> Classification:
     value = str(path).casefold()
-    top_level = path.parts[0].casefold() if path.parts else ""
+    domain_parts = {part.casefold() for part in path.parts}
 
     payroll = ("payroll", "payslip", "工资", "薪资", "薪酬", "wage", "bank statement")
     identity = ("身份证", "passport", "护照", "个人财务")
@@ -54,13 +54,17 @@ def classify_path(path: Path) -> Classification:
     if any(keyword in value for keyword in recruiting):
         space = "hr-recruiting-private"
         return Classification("C3", BUCKETS[space], SPACE_IDS[space], "RESUME", "REVIEW_REQUIRED", "recruiting PII keyword")
-    if top_level in ("finance", "财务") or any(keyword in value for keyword in finance):
+    if domain_parts.intersection(("finance", "财务")) or any(
+        keyword in value for keyword in finance
+    ):
         space = "finance-private"
         return Classification("C3", BUCKETS[space], SPACE_IDS[space], "FINANCE_RECORD", "DENY", "finance domain/record keyword")
-    if top_level in ("legal", "法务") or any(keyword in value for keyword in legal):
+    if domain_parts.intersection(("legal", "法务")) or any(
+        keyword in value for keyword in legal
+    ):
         space = "legal-private"
         return Classification("C3", BUCKETS[space], SPACE_IDS[space], "CONTRACT", "REVIEW_REQUIRED", "legal domain/keyword")
-    if top_level in ("hr", "人力资源", "人事"):
+    if domain_parts.intersection(("hr", "人力资源", "人事")):
         space = "hr-policy-restricted"
         return Classification("C2", BUCKETS[space], SPACE_IDS[space], "HR_POLICY", "REVIEW_REQUIRED", "HR domain requires review")
     if any(keyword in value for keyword in internal):

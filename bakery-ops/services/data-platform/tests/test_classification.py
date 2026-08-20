@@ -44,3 +44,10 @@ def test_finance_domain_overrides_sop_keyword() -> None:
     assert result.data_class == "C3"
     assert result.bucket_id == "finance-private"
     assert result.rag_action == "DENY"
+
+
+def test_absolute_hr_path_cannot_bypass_domain_review() -> None:
+    result = classify_path(Path("/Users/example/Brain/raw/HR/制度与手册/员工SOP.pdf"))
+    assert result.data_class == "C2"
+    assert result.space_id == "10000000-0000-7000-8000-000000000007"
+    assert result.rag_action == "REVIEW_REQUIRED"

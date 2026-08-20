@@ -90,7 +90,7 @@ export class SupabaseKnowledgeClient implements KnowledgeBackend {
   constructor(options: SupabaseKnowledgeClientOptions = {}) {
     this.baseUrl = (options.baseUrl || process.env.R6_SUPABASE_URL || "").replace(/\/$/, "");
     this.serviceKey = options.serviceKey || readSecret("R6_SUPABASE_SERVICE_KEY");
-    this.spaceIds = options.spaceIds || parseSpaceIds(process.env.KNOWLEDGE_SPACE_IDS);
+    this.spaceIds = options.spaceIds || parseSpaceIds(process.env.R6_KNOWLEDGE_SPACE_IDS);
     this.modelVersion = options.modelVersion || process.env.AI_EMBEDDING_MODEL || "openai/text-embedding-3-small";
     this.fetchFn = options.fetchFn || fetch;
     this.embed = options.embed || ((text) => aiProvider.getEmbedding(text));
@@ -99,10 +99,15 @@ export class SupabaseKnowledgeClient implements KnowledgeBackend {
   async isAvailable(): Promise<boolean> {
     if (!this.baseUrl || !this.serviceKey || this.spaceIds.length === 0) return false;
     try {
-      const response = await this.fetchFn(`${this.baseUrl}/rest/v1/`, {
-        headers: this.headers(),
-        signal: AbortSignal.timeout(3000),
-      });
+      const response = await this.fetchFn(
+        `${this.baseUrl}/rest/v1/rpc/ops_get_platform_health`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...this.headers() },
+          body: "{}",
+          signal: AbortSignal.timeout(10000),
+        },
+      );
       return response.ok;
     } catch {
       return false;

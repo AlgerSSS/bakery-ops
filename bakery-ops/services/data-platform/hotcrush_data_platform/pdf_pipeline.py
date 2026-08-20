@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -70,6 +71,11 @@ class DeterministicTestEmbedder:
         values = values[:1536]
         norm = math.sqrt(sum(value * value for value in values)) or 1.0
         return [value / norm for value in values]
+
+
+def verify_ocr_runtime() -> None:
+    if shutil.which("tesseract") is None:
+        raise RuntimeError("tesseract executable is required before the RAG worker can claim work")
 
 
 def _normalize_text(text: str) -> str:

@@ -8,9 +8,9 @@ flowchart TB
 
   OLD["旧生产库<br/>ecsgqcmwtjmcpzqytdqw<br/>现网唯一业务真源"]:::frozen
   BACKFILL["只读有界 POS 回填<br/>6 日范围：5 接纳 + 1 隔离<br/>逐字段零差异"]:::source
-  SOURCES["RES POS · Brain PDF · 财务/HR/SCM"]:::source
+  SOURCES["RES POS · Brain 165 PDF manifest · 财务/HR/SCM"]:::source
 
-  subgraph R6["Supabase R6 Green · tmmkknnkcptunxbfjxqn"]
+  subgraph R6["Supabase R6 Green · tmmkknnkcptunxbfjxqn · 24 migrations"]
     direction TB
     subgraph L1["1  Raw 证据层"]
       STORAGE["7 个 Private Storage buckets"]:::raw
@@ -19,7 +19,7 @@ flowchart TB
     subgraph L2["2  预处理 / 事实 / RAG"]
       RUN["ops_processing_run<br/>pipeline_health<br/>1–31 日范围对账"]:::processed
       POS["pos_sales_day<br/>pos_sales_hour<br/>v_pos_*_current"]:::processed
-      RAG["ai_raw_document<br/>ai_ingest_run<br/>ai_document_chunk<br/>ai_chunk_embedding vector(1536)"]:::processed
+      RAG["ai_raw_document / ai_ingest_run<br/>3 C1 · 29 pages · 32 chunks/vectors<br/>unpublish ↔ restore"]:::processed
     end
     subgraph L3["3  Agent 层"]
       AGENT["ops_agent_run<br/>ops_agent_event (只追加)"]:::agent
@@ -30,8 +30,8 @@ flowchart TB
     CRON["6 个 Cron<br/>恢复 · 汇总 · 对账 · 清理"]:::agent
   end
 
-  WORKER["外部 Worker<br/>OCR · POS 校验 · Embedding · 长任务"]:::source
-  USERS["Web · Lark · WhatsApp · AI Agent<br/>(现网尚未切换)"]:::frozen
+  WORKER["外部 Worker<br/>Tesseract OCR · POS 校验 · Embedding<br/>encrypted R6 credentials"]:::source
+  USERS["Web · Lark · WhatsApp · AI Agent<br/>BakeryOps opt-in 已验收 · 现网未切换"]:::frozen
 
   SOURCES -. "持续影子写入未启用" .-> STORAGE
   OLD -. "只读导出；不改旧库" .-> BACKFILL --> STORAGE

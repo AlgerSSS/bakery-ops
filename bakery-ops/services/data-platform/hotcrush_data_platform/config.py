@@ -36,10 +36,10 @@ class Settings:
     request_timeout_seconds: float
 
     @classmethod
-    def from_env(cls) -> Settings:
+    def from_env(cls, *, require_embedding: bool = True) -> Settings:
         settings = cls(
-            supabase_url=os.getenv("SUPABASE_URL", "").rstrip("/"),
-            supabase_service_key=_secret_from_env("SUPABASE_SERVICE_KEY"),
+            supabase_url=os.getenv("R6_SUPABASE_URL", "").rstrip("/"),
+            supabase_service_key=_secret_from_env("R6_SUPABASE_SERVICE_KEY"),
             openrouter_api_key=_secret_from_env("OPENROUTER_API_KEY"),
             openrouter_base_url=os.getenv(
                 "OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"
@@ -53,12 +53,16 @@ class Settings:
             allow_test_embeddings=os.getenv("ALLOW_TEST_EMBEDDINGS", "") == "1",
             request_timeout_seconds=float(os.getenv("DATA_PLATFORM_HTTP_TIMEOUT", "60")),
         )
-        settings.validate()
+        settings.validate(require_embedding=require_embedding)
         return settings
 
-    def validate(self) -> None:
+    def validate(self, *, require_embedding: bool = True) -> None:
         if not self.supabase_url or not self.supabase_service_key:
-            raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY are required")
+            raise ValueError(
+                "R6_SUPABASE_URL and R6_SUPABASE_SERVICE_KEY are required for RAG"
+            )
+        if not require_embedding:
+            return
         if self.embedding_mode == "deterministic":
             is_local = self.supabase_url.startswith(("http://127.0.0.1", "http://localhost"))
             if not self.allow_test_embeddings or not is_local:

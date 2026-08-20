@@ -75,7 +75,7 @@ def process_one(
                 },
             )
         )
-        if not claim:
+        if not claim or claim.get("processing_run_id") is None:
             return False
 
         run_id = int(claim["processing_run_id"])
@@ -141,9 +141,26 @@ def process_one(
             raise
 
 
+def drain_available(
+    settings: PosWorkerSettings,
+    *,
+    max_runs: int,
+    process: Callable[[PosWorkerSettings], bool] = process_one,
+) -> int:
+    if max_runs < 1 or max_runs > 10_000:
+        raise ValueError("max_runs must be between 1 and 10000")
+    processed = 0
+    while processed < max_runs and process(settings):
+        processed += 1
+    return processed
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Hot Crush Supabase structured POS worker")
-    parser.add_argument("--loop", action="store_true", help="poll continuously instead of once")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--loop", action="store_true", help="poll continuously instead of once")
+    mode.add_argument("--drain", action="store_true", help="process available work then exit")
+    parser.add_argument("--max-runs", type=int, default=100)
     parser.add_argument("--poll-seconds", type=float, default=10)
     parser.add_argument("--log-level", default="INFO")
     args = parser.parse_args()
@@ -154,6 +171,11 @@ def main() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     settings = PosWorkerSettings.from_env()
+
+    if args.drain:
+        processed = drain_available(settings, max_runs=args.max_runs)
+        print(json.dumps({"processed": processed, "drained": processed < args.max_runs}))
+        return
 
     while True:
         processed = process_one(settings)

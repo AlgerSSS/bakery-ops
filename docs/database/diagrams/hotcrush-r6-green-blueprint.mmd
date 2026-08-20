@@ -7,17 +7,17 @@ flowchart TB
   classDef frozen fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray: 6 4
 
   OLD["旧生产库<br/>ecsgqcmwtjmcpzqytdqw<br/>现网唯一业务真源"]:::frozen
-  BACKFILL["只读一次性 POS 回填<br/>1 日已零差异验收"]:::source
+  BACKFILL["只读有界 POS 回填<br/>6 日范围：5 接纳 + 1 隔离<br/>逐字段零差异"]:::source
   SOURCES["RES POS · Brain PDF · 财务/HR/SCM"]:::source
 
   subgraph R6["Supabase R6 Green · tmmkknnkcptunxbfjxqn"]
     direction TB
     subgraph L1["1  Raw 证据层"]
       STORAGE["7 个 Private Storage buckets"]:::raw
-      RAW["ops_raw_batch<br/>READY / QUARANTINED<br/>ops_raw_object"]:::raw
+      RAW["ops_raw_batch<br/>READY / QUARANTINED<br/>已确认源异常单独计数<br/>ops_raw_object"]:::raw
     end
     subgraph L2["2  预处理 / 事实 / RAG"]
-      RUN["ops_processing_run<br/>pipeline_health"]:::processed
+      RUN["ops_processing_run<br/>pipeline_health<br/>1–31 日范围对账"]:::processed
       POS["pos_sales_day<br/>pos_sales_hour<br/>v_pos_*_current"]:::processed
       RAG["ai_raw_document<br/>ai_ingest_run<br/>ai_document_chunk<br/>ai_chunk_embedding vector(1536)"]:::processed
     end

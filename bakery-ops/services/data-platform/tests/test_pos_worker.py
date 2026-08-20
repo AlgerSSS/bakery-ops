@@ -6,7 +6,7 @@ import pytest
 
 from hotcrush_data_platform.config import PosWorkerSettings
 from hotcrush_data_platform.pos_pipeline import PosDataValidationError
-from hotcrush_data_platform.pos_worker import process_one
+from hotcrush_data_platform.pos_worker import drain_available, process_one
 
 CSV_BYTES = (
     b"Business Date,Store Name,Bill Count,Num Of Guests,Gross Sales,Amount Of Discount,"
@@ -33,9 +33,16 @@ JSON_BYTES = json.dumps(
 
 
 class FakeClient:
-    def __init__(self, *, corrupt_hash: bool = False, source_system: str = "RES_POS_DAILY") -> None:
+    def __init__(
+        self,
+        *,
+        corrupt_hash: bool = False,
+        source_system: str = "RES_POS_DAILY",
+        empty_claim: bool = False,
+    ) -> None:
         self.corrupt_hash = corrupt_hash
         self.source_system = source_system
+        self.empty_claim = empty_claim
         self.calls: list[tuple[str, dict]] = []
         self.objects = {
             "raw/daily.csv": CSV_BYTES,
@@ -89,6 +96,8 @@ class FakeClient:
     def rpc(self, name: str, payload: dict):
         self.calls.append((name, payload))
         if name == "ops_claim_processing_run_for_pipeline":
+            if self.empty_claim:
+                return {"processing_run_id": None}
             return [{"processing_run_id": 7}]
         if name == "ops_get_processing_input":
             manifest = []
@@ -168,6 +177,16 @@ def test_pos_worker_claims_only_pos_pipeline_and_publishes_projection() -> None:
     assert len(load_call["p_hourly_rows"]) == 1
 
 
+def test_pos_worker_treats_null_composite_claim_as_an_empty_queue() -> None:
+    client = FakeClient(empty_claim=True)
+
+    assert process_one(_settings(), client_factory=lambda *_args: client) is False
+
+    assert [name for name, _payload in client.calls] == [
+        "ops_claim_processing_run_for_pipeline"
+    ]
+
+
 def test_pos_worker_records_non_retryable_integrity_failure() -> None:
     client = FakeClient(corrupt_hash=True)
 
@@ -187,3 +206,15 @@ def test_pos_worker_processes_explicit_legacy_export_contract() -> None:
     load_call = next(payload for name, payload in client.calls if name == "ops_load_pos_daily_sales")
     assert load_call["p_daily_rows"][0]["net_sales"] == "100.00"
     assert len(load_call["p_hourly_rows"]) == 1
+
+
+def test_drain_available_stops_when_the_queue_is_empty() -> None:
+    outcomes = iter([True, True, False, True])
+
+    processed = drain_available(
+        _settings(),
+        max_runs=10,
+        process=lambda _settings: next(outcomes),
+    )
+
+    assert processed == 2

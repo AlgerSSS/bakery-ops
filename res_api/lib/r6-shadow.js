@@ -273,6 +273,128 @@ export function buildLegacyPosExport({
   }));
 }
 
+export function buildLegacyPosAnomaly({
+  businessDate,
+  storeId,
+  sourceProjectRef,
+  exportedAt,
+  dailyRows,
+  hourly,
+  reasonCode,
+  reasonSummary,
+}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) throw new Error('businessDate must be YYYY-MM-DD');
+  if (!storeId?.trim()) throw new Error('storeId is required');
+  if (!/^[a-z]{20}$/.test(sourceProjectRef)) throw new Error('sourceProjectRef is invalid');
+  if (!/^[A-Z][A-Z0-9_]{2,119}$/.test(reasonCode || '')) throw new Error('reasonCode is invalid');
+  if (!reasonSummary?.trim()) throw new Error('reasonSummary is required');
+  if (!Array.isArray(dailyRows) || dailyRows.length > 100) throw new Error('dailyRows must contain at most 100 rows');
+  if (!Array.isArray(hourly) || hourly.length > 1000) throw new Error('hourly must contain at most 1000 rows');
+  for (const row of [...dailyRows, ...hourly]) {
+    if (row.date !== businessDate) throw new Error('anomaly source date does not match businessDate');
+  }
+
+  return Buffer.from(JSON.stringify({
+    schema_version: 'legacy-pos-anomaly-v1',
+    source_project_ref: sourceProjectRef,
+    exported_at: new Date(exportedAt).toISOString(),
+    business_date: businessDate,
+    store_id: storeId.trim(),
+    reason_code: reasonCode,
+    reason_summary: reasonSummary.trim().slice(0, 1900),
+    daily_rows: dailyRows,
+    hourly_rows: hourly,
+  }));
+}
+
+export async function registerLegacyPosAnomaly({
+  businessDate,
+  storeId,
+  sourceProjectRef,
+  exportedAt,
+  dailyRows,
+  hourly,
+  reasonCode,
+  reasonSummary,
+  env = process.env,
+  fetchImpl = fetch,
+}) {
+  const baseUrl = (env.R6_SUPABASE_URL || '').replace(/\/$/, '');
+  const key = secretFromEnv(env);
+  if (!baseUrl || !key) throw new Error('R6_SUPABASE_URL and R6_SUPABASE_SECRET_KEY(_FILE) are required');
+  const content = buildLegacyPosAnomaly({
+    businessDate,
+    storeId,
+    sourceProjectRef,
+    exportedAt,
+    dailyRows,
+    hourly,
+    reasonCode,
+    reasonSummary,
+  });
+  const contentSha256 = sha256(content);
+  const watermarkFrom = new Date(`${businessDate}T00:00:00+08:00`);
+  const watermarkTo = new Date(watermarkFrom.getTime() + 24 * 60 * 60 * 1000);
+  const sourceBatchKey = `legacy-pos-anomaly:${businessDate}:${storeId}:${contentSha256.slice(0, 20)}`;
+  const batch = one(await rpc(fetchImpl, baseUrl, key, 'ops_register_raw_batch', {
+    p_source_system: 'LEGACY_POS_ANOMALY',
+    p_source_batch_key: sourceBatchKey,
+    p_schema_version: 'legacy-pos-anomaly-v1',
+    p_writer_id: 'res_api:legacy-pos-backfill',
+    p_store_id: storeId,
+    p_watermark_from: watermarkFrom.toISOString(),
+    p_watermark_to: watermarkTo.toISOString(),
+    p_expected_count: 1,
+    p_metadata: {
+      mode: 'one-shot-backfill-anomaly',
+      business_date: businessDate,
+      source_project_ref: sourceProjectRef,
+      reason_code: reasonCode,
+      health_impact: 'acknowledged_source_quality',
+      artifact_sha256: contentSha256,
+    },
+  }), 'ops_register_raw_batch');
+  const objectPath = `legacy_pos_anomaly/${businessDate.slice(0, 4)}/${businessDate.slice(5, 7)}/${batch.batch_id}/${contentSha256}.json`;
+  const uploaded = await uploadObject(fetchImpl, baseUrl, key, objectPath, {
+    mimeType: 'application/json', content,
+  });
+  await rpc(fetchImpl, baseUrl, key, 'ops_register_raw_object', {
+    p_batch_id: batch.batch_id,
+    p_bucket_id: BUCKET_ID,
+    p_object_path: objectPath,
+    p_sha256: contentSha256,
+    p_size_bytes: content.length,
+    p_mime_type: 'application/json',
+    p_data_class: 'C1',
+    p_source_record_key: 'legacy_pos_anomaly.json',
+    p_source_version: contentSha256,
+  });
+
+  let status = batch.status;
+  if (status !== 'QUARANTINED') {
+    if (status && status !== 'RECEIVING') {
+      throw new Error(`legacy anomaly batch has unexpected status ${status}`);
+    }
+    const completed = one(await rpc(fetchImpl, baseUrl, key, 'ops_complete_raw_batch', {
+      p_batch_id: batch.batch_id,
+      p_accepted_count: 0,
+      p_rejected_count: 1,
+      p_pipeline_keys: [],
+      p_pipeline_version: 'pos-anomaly-v1',
+      p_error_summary: `${reasonCode}: ${reasonSummary.trim()}`.slice(0, 2000),
+    }), 'ops_complete_raw_batch');
+    status = completed.status;
+  }
+  return {
+    batchId: batch.batch_id,
+    status,
+    objectPath,
+    contentSha256,
+    uploaded,
+    reasonCode,
+  };
+}
+
 export async function registerLegacyPosRawBackfill({
   businessDate,
   storeId,

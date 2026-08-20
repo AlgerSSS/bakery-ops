@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  buildLegacyPosAnomaly,
   buildLegacyPosExport,
   compareLegacyPosWithR6,
+  registerLegacyPosAnomaly,
   registerLegacyPosRawBackfill,
 } from '../lib/r6-shadow.js';
 
@@ -70,6 +72,25 @@ test('legacy export rejects a final daily/hourly money mismatch', () => {
   );
 });
 
+test('legacy anomaly preserves source evidence without pretending it is an accepted fact', () => {
+  const rows = sourceRows({ dailyNetSales: 90 });
+  const payload = JSON.parse(buildLegacyPosAnomaly({
+    businessDate: '2026-07-26',
+    storeId: 'HC001',
+    sourceProjectRef: 'ecsgqcmwtjmcpzqytdqw',
+    exportedAt: '2026-07-26T16:00:00.000Z',
+    dailyRows: [rows.daily],
+    hourly: rows.hourly,
+    reasonCode: 'SOURCE_RECONCILIATION_FAILED',
+    reasonSummary: 'net_sales mismatch',
+  }));
+
+  assert.equal(payload.schema_version, 'legacy-pos-anomaly-v1');
+  assert.equal(payload.reason_code, 'SOURCE_RECONCILIATION_FAILED');
+  assert.equal(payload.daily_rows[0].revenue, 90);
+  assert.equal(payload.hourly_rows.length, 2);
+});
+
 test('legacy backfill registers one immutable Raw object and queues POS processing', async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {
@@ -99,6 +120,78 @@ test('legacy backfill registers one immutable Raw object and queues POS processi
   const completePayload = JSON.parse(completeCall.options.body);
   assert.deepEqual(completePayload.p_pipeline_keys, ['pos_daily_sales']);
   assert.equal(completePayload.p_pipeline_version, 'pos-backfill-v1');
+});
+
+test('legacy anomaly becomes a quarantined Raw batch with no processing run', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/rpc/ops_register_raw_batch')) {
+      return response(200, [{ batch_id: 'batch-anomaly', status: 'RECEIVING' }]);
+    }
+    if (url.includes('/storage/v1/object/')) return response(200, { Key: 'stored' });
+    if (url.endsWith('/rpc/ops_register_raw_object')) return response(200, [{ raw_object_id: 'object-anomaly' }]);
+    if (url.endsWith('/rpc/ops_complete_raw_batch')) return response(200, [{ status: 'QUARANTINED' }]);
+    throw new Error(`unexpected request: ${url}`);
+  };
+  const rows = sourceRows({ dailyNetSales: 90 });
+
+  const result = await registerLegacyPosAnomaly({
+    businessDate: '2026-07-26',
+    storeId: 'HC001',
+    sourceProjectRef: 'ecsgqcmwtjmcpzqytdqw',
+    exportedAt: '2026-07-26T16:00:00.000Z',
+    dailyRows: [rows.daily],
+    hourly: rows.hourly,
+    reasonCode: 'SOURCE_RECONCILIATION_FAILED',
+    reasonSummary: 'net_sales mismatch',
+    env: { R6_SUPABASE_URL: 'https://r6.example', R6_SUPABASE_SECRET_KEY: 'secret' },
+    fetchImpl,
+  });
+
+  assert.equal(result.status, 'QUARANTINED');
+  const registerPayload = JSON.parse(calls[0].options.body);
+  assert.equal(registerPayload.p_source_system, 'LEGACY_POS_ANOMALY');
+  assert.equal(
+    registerPayload.p_metadata.health_impact,
+    'acknowledged_source_quality',
+  );
+  const completeCall = calls.find((call) => call.url.endsWith('/rpc/ops_complete_raw_batch'));
+  const completePayload = JSON.parse(completeCall.options.body);
+  assert.equal(completePayload.p_accepted_count, 0);
+  assert.equal(completePayload.p_rejected_count, 1);
+  assert.deepEqual(completePayload.p_pipeline_keys, []);
+  assert.equal(completePayload.p_error_summary, 'SOURCE_RECONCILIATION_FAILED: net_sales mismatch');
+});
+
+test('replaying an existing quarantined anomaly does not try to complete it again', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    if (url.endsWith('/rpc/ops_register_raw_batch')) {
+      return response(200, [{ batch_id: 'batch-anomaly', status: 'QUARANTINED' }]);
+    }
+    if (url.includes('/storage/v1/object/')) return response(409, 'already exists');
+    if (url.endsWith('/rpc/ops_register_raw_object')) return response(200, [{ raw_object_id: 'object-anomaly' }]);
+    throw new Error(`unexpected request: ${url}`);
+  };
+  const rows = sourceRows({ dailyNetSales: 90 });
+
+  const result = await registerLegacyPosAnomaly({
+    businessDate: '2026-07-26',
+    storeId: 'HC001',
+    sourceProjectRef: 'ecsgqcmwtjmcpzqytdqw',
+    exportedAt: '2026-07-26T16:00:00.000Z',
+    dailyRows: [rows.daily],
+    hourly: rows.hourly,
+    reasonCode: 'SOURCE_RECONCILIATION_FAILED',
+    reasonSummary: 'net_sales mismatch',
+    env: { R6_SUPABASE_URL: 'https://r6.example', R6_SUPABASE_SECRET_KEY: 'secret' },
+    fetchImpl,
+  });
+
+  assert.equal(result.status, 'QUARANTINED');
+  assert.equal(calls.some((call) => call.url.endsWith('/rpc/ops_complete_raw_batch')), false);
 });
 
 test('reconciliation compares every accepted daily and hourly fact', () => {

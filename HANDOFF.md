@@ -9,8 +9,9 @@
 ## See You Often 会员体系接管：历史等级回算 + RES 积分商城核验（2026-08-20，Codex，进行中）
 
 活跃实现分支：`codex/see-you-often-loyalty-engine`，独立 worktree
-`/private/tmp/hot-see-you-often-loyalty`。本节代码尚未部署，也没有修改 RES 生产配置或
-Supabase 数据。
+`/private/tmp/hot-see-you-often-loyalty`。本节代码尚未部署、Supabase 未写入；但下述三项
+已确认规则已经通过带基线/并发/回读/回滚门禁的脚本写入 RES 生产：积分规则、成长值
+倍率、L1 正式名称。会员卡历史成长值/等级仍只有只读预演，尚未批量写入。
 
 **近 12 个月等级回算只读预演**：
 
@@ -27,12 +28,36 @@ Supabase 数据。
   同一会员卡等级相互冲突的情况。旧默认等级 `VIP1` 的 ID 被明确映射为 L1，未把显示名
   当稳定身份。
 - 已从 RES 前端只读审计出单卡改级契约：`/crm/memberCard/web/card/modifyCard`，改级时
-  `changeTypeList=["2"]`；也确认批量成长值调整为 type 24，官方导入模板只有
-  `Card number` / `Growth` 两列并带版本元数据。尚未调用这些生产 mutation。
+  `changeTypeList=["2"]`；也确认成长值调整契约
+  `/crm/memberCard/web/card/adjustGrowth` 和批量成长值调整 type 24，官方导入模板只有
+  `Card number` / `Growth` 两列并带版本元数据。尚未对会员卡调用这些生产 mutation。
 - 核验过程中 L4 卡数从 14 自动变为 15，证明 RES 仍会按不清零的累计成长值自动升级；
   它不能独立实现“近 12 个月滚动”。正式方案必须同时把成长值校准为滚动实付并按目标
   等级回写，之后持续周期性重算，否则一次回填后仍会再次漂移。
-- 门禁：等级专项 9/9、全量 `npm run test:unit` 139/139、脚本语法与 `--help` 均通过。
+- 已新增 `res_api/lib/loyalty-reconciliation.js`；原只读预览 CLI 现有显式 apply 模式，
+  默认仍只读，正式模式必须带 `SEE_YOU_OFTEN_LEVELS_V1`，逐卡校验快照、调整成长值、
+  自动升级或直接改级、回读成长值＋等级，单卡失败时恢复该卡。流水号为 KL 时间 14 位
+  加进程内单秒序号 4 位，避免批量碰撞。详情接口已抽查包含所有写入/回滚必需字段。
+- 最新重算：4,862 张卡中 3,259 张需至少一项变化；3,234 张成长值增加（合计
+  471,698）、20 张减少（合计 128,801）、429 张改级。当前为营业时段，未跑生产会员卡
+  canary；闭店后应先用固定窗口和 `--limit=1` 做成长值小样本，再单独覆盖改级样本，
+  回读无误后才分批全量。
+- 6 张旧卡在列表中 `levelId="0"`、详情中等级仍为空且成长值为 0；RES 尚无已验证的
+  “恢复为未分配等级”契约。自动回算会明确跳过并报告它们，避免假装可回滚；全量安全批次
+  完成后，再把这 6 张作为单独的 L1 补分配批次处理。
+
+**RES 成长规则与等级目录已正式修正**：
+
+- 2026-08-20 审计发现后台 Level Rules 显示“消费 RM0.01 = 1 成长值”，接口是
+  `amount="1"`；这是旧配置 100 倍倍率错误，也是现有等级持续漂移的直接原因。已新增
+  `lib/level-program-config.js` / `scripts/configure-level-program.mjs`，正式把购买规则改为
+  `amount="100"`，即实付 RM1 = 1 成长值；其他成长来源仍关闭，成长值支付规则为空，
+  未启用原生降级。独立回读 `modifyTime=2026-08-20T11:09:48.716164Z`，写入成功且未回滚。
+- 等级列表接口核验 L2/L3/L4 的门槛已经是 250/750/1500，名称正确；默认 L1 名称仍为
+  `VIP1`。已新增 `lib/level-catalog-config.js` / `scripts/configure-level-catalog.mjs`，只保留
+  原字段并正式改名为 `Lv1 初见会员 First Crush`；字段级回读一致，未触发回滚。
+- 本轮门禁：等级/回算专项 26/26；全量 `npm run test:unit` **156/156**；脚本语法与
+  `git diff --check` 通过。
 
 **RES 积分规则已正式改为 See You Often 口径**：
 

@@ -4,6 +4,8 @@ import "dotenv/config";
 import postgres from "postgres";
 
 import {
+  assertOk,
+  exitCodeFor,
   fetchCrmList,
   fetchReportRowsByDateChunks,
   openAuthedPage,
@@ -12,38 +14,69 @@ import {
   buildLevelTransitionPreview,
   buildTierPreview,
   isActiveProgramCard,
+  LOYALTY_LEVELS,
   qualifyingActualPaid,
   resolveOrderMember,
 } from "../lib/loyalty-levels.js";
+import {
+  assertCardMatchesPlanBaseline,
+  buildCardReconciliationPlan,
+  buildGrowthAdjustmentPayload,
+  buildLevelChangePayload,
+  cardPlanHasRestorableLevel,
+  cardMatchesReconciliationTarget,
+  createReferenceIdFactory,
+  summarizeCardReconciliation,
+} from "../lib/loyalty-reconciliation.js";
 
 const DEFAULT_CORPORATION_ID = "450020844";
 const DEFAULT_ORG_PATH = "/1000833/1000835/900846";
 const DEFAULT_SHOP_ID = "406994127";
 const DEFAULT_CARD_PROGRAM_ID = "1991044916737863680";
+const DEFAULT_OWNER_ORG_ID = "1991027325256417283";
+const DEFAULT_OWNER_ORG_TYPE = "7";
+const CONFIRMATION = "SEE_YOU_OFTEN_LEVELS_V1";
+const CARD_DETAILS_PATH = "/crm/datamanage/card/details";
+const ADJUST_GROWTH_PATH = "/crm/memberCard/web/card/adjustGrowth";
+const MODIFY_CARD_PATH = "/crm/memberCard/web/card/modifyCard";
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function usage() {
   return [
     "Usage:",
     "  npm run loyalty:preview -- --from=YYYY-MM-DD --to=YYYY-MM-DD",
+    `  npm run loyalty:reconcile -- --from=YYYY-MM-DD --to=YYYY-MM-DD --apply --confirm=${CONFIRMATION}`,
     "",
-    "Read-only: queries RES and PostgreSQL, prints an aggregate preview, and never updates levels.",
+    "Default mode is read-only. Apply mode requires the exact confirmation",
+    "phrase, verifies every card against the snapshot, adjusts growth, aligns",
+    "the level, reads back both values, and restores the card if verification fails.",
   ].join("\n");
 }
 
 function parseArgs(argv) {
+  const known = new Set(["from", "to", "apply", "confirm", "limit", "help"]);
   const args = Object.fromEntries(
     argv.map((arg) => {
       const [key, value] = arg.replace(/^--/, "").split("=");
       return [key, value ?? true];
     }),
   );
+  const unknown = Object.keys(args).find((key) => !known.has(key));
+  if (unknown) throw new Error(`Unknown argument: --${unknown}`);
   if (args.help) return { help: true };
   if (!DATE_RE.test(String(args.from || "")) || !DATE_RE.test(String(args.to || ""))) {
     throw new Error("Both --from and --to must use YYYY-MM-DD.");
   }
   if (args.from > args.to) throw new Error("--from must not be after --to.");
-  return { from: args.from, to: args.to, help: false };
+  const apply = args.apply === true;
+  if (apply && args.confirm !== CONFIRMATION) {
+    throw new Error("Apply mode requires the exact confirmation phrase.");
+  }
+  const limit = args.limit === undefined ? null : Number(args.limit);
+  if (limit !== null && (!Number.isInteger(limit) || limit < 1)) {
+    throw new Error("--limit must be a positive integer.");
+  }
+  return { from: args.from, to: args.to, apply, limit, help: false };
 }
 
 function addSet(index, key, value) {
@@ -55,6 +88,214 @@ function addSet(index, key, value) {
 
 const number = (value) => Number(value) || 0;
 const round = (value) => Math.round(value * 100) / 100;
+
+const referenceId = createReferenceIdFactory();
+
+async function fetchCardDetails(session, cardId, corporationId) {
+  return assertOk(
+    await session.call(CARD_DETAILS_PATH, { corporationId, cardId }),
+    "card details",
+  ).data;
+}
+
+async function readbackCard(session, cardId, corporationId, predicate) {
+  let latest;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    latest = await fetchCardDetails(session, cardId, corporationId);
+    if (predicate(latest)) return latest;
+    await session.page.waitForTimeout(500);
+  }
+  return latest;
+}
+
+function cardMatchesOriginal(card, original) {
+  return (
+    String(card?.id ?? "") === String(original.id) &&
+    String(card?.customerId ?? "") === String(original.customerId) &&
+    Number(card?.status) === Number(original.status) &&
+    String(card?.levelId ?? card?.levelAccount?.levelId ?? "") ===
+      String(original.levelId ?? original.levelAccount?.levelId ?? "") &&
+    Number(card?.levelAccount?.growth ?? 0) ===
+      Number(original.levelAccount?.growth ?? 0)
+  );
+}
+
+async function adjustGrowth(session, card, delta, context, remark) {
+  if (!delta) return;
+  assertOk(
+    await session.call(
+      ADJUST_GROWTH_PATH,
+      buildGrowthAdjustmentPayload(card, delta, {
+        shopId: context.shopId,
+        orgPath: context.orgPath,
+        referenceId: referenceId(),
+        remark,
+      }),
+    ),
+    "adjust card growth",
+  );
+}
+
+async function changeLevel(session, card, targetLevelId, context) {
+  assertOk(
+    await session.call(
+      MODIFY_CARD_PATH,
+      buildLevelChangePayload(card, targetLevelId, {
+        ownerOrgId: context.ownerOrgId,
+        ownerOrgType: context.ownerOrgType,
+        orgPath: context.orgPath,
+      }),
+    ),
+    "change card level",
+  );
+}
+
+async function restoreCard(session, original, context, remark) {
+  let latest = await fetchCardDetails(
+    session,
+    original.id,
+    original.corporationId,
+  );
+  const growthDelta =
+    Number(original.levelAccount?.growth ?? 0) -
+    Number(latest.levelAccount?.growth ?? 0);
+  if (growthDelta) {
+    await adjustGrowth(session, latest, growthDelta, context, `${remark} rollback`);
+    latest = await readbackCard(
+      session,
+      original.id,
+      original.corporationId,
+      (card) =>
+        Number(card?.levelAccount?.growth ?? 0) ===
+        Number(original.levelAccount?.growth ?? 0),
+    );
+  }
+
+  const originalLevelId = String(
+    original.levelId ?? original.levelAccount?.levelId ?? "",
+  );
+  const latestLevelId = String(
+    latest?.levelId ?? latest?.levelAccount?.levelId ?? "",
+  );
+  if (latestLevelId !== originalLevelId) {
+    const knownLevel = LOYALTY_LEVELS.some(
+      (level) => level.resLevelId === originalLevelId,
+    );
+    if (!knownLevel) {
+      throw new Error("The original card level cannot be restored safely.");
+    }
+    await changeLevel(session, latest, originalLevelId, context);
+  }
+
+  const restored = await readbackCard(
+    session,
+    original.id,
+    original.corporationId,
+    (card) => cardMatchesOriginal(card, original),
+  );
+  if (!cardMatchesOriginal(restored, original)) {
+    throw new Error("Card rollback could not be verified.");
+  }
+}
+
+async function applyReconciliation(plans, context) {
+  const actionable = plans.filter(
+    (plan) => plan.growthDelta !== 0 || plan.levelChangeNeeded,
+  );
+  const skippedUnknownLevelCards = actionable.filter(
+    (plan) => !cardPlanHasRestorableLevel(plan),
+  ).length;
+  const selected = actionable
+    .filter(cardPlanHasRestorableLevel)
+    .sort(
+      (a, b) =>
+        Number(a.levelChangeNeeded) - Number(b.levelChangeNeeded) ||
+        Math.abs(a.growthDelta) - Math.abs(b.growthDelta),
+    );
+  const batch = context.limit === null ? selected : selected.slice(0, context.limit);
+  const session = await openAuthedPage({
+    storageState: context.storageState,
+    warmupPath: "/card-management",
+    log: () => {},
+  });
+  let completed = 0;
+  let growthAdjustments = 0;
+  let directLevelChanges = 0;
+  try {
+    for (const plan of batch) {
+      const original = await fetchCardDetails(
+        session,
+        plan.cardId,
+        context.corporationId,
+      );
+      assertCardMatchesPlanBaseline(original, plan, context.cardProgramId);
+      let mutated = false;
+      try {
+        if (plan.growthDelta) {
+          await adjustGrowth(
+            session,
+            original,
+            plan.growthDelta,
+            context,
+            context.remark,
+          );
+          mutated = true;
+          growthAdjustments += 1;
+        }
+        let latest = await readbackCard(
+          session,
+          plan.cardId,
+          context.corporationId,
+          (card) =>
+            Number(card?.levelAccount?.growth ?? 0) === plan.targetGrowth,
+        );
+        if (Number(latest?.levelAccount?.growth ?? 0) !== plan.targetGrowth) {
+          throw new Error("Growth adjustment readback did not match the target.");
+        }
+        const latestLevelId = String(
+          latest?.levelId ?? latest?.levelAccount?.levelId ?? "",
+        );
+        if (latestLevelId !== plan.targetLevelId) {
+          await changeLevel(session, latest, plan.targetLevelId, context);
+          mutated = true;
+          directLevelChanges += 1;
+        }
+        const finalCard = await readbackCard(
+          session,
+          plan.cardId,
+          context.corporationId,
+          (card) => cardMatchesReconciliationTarget(card, plan),
+        );
+        if (!cardMatchesReconciliationTarget(finalCard, plan)) {
+          throw new Error("Card reconciliation readback did not match the target.");
+        }
+        completed += 1;
+      } catch (error) {
+        if (mutated) {
+          try {
+            await restoreCard(session, original, context, context.remark);
+          } catch (rollbackError) {
+            throw new Error(
+              `Card reconciliation failed and rollback could not be verified: ${rollbackError.message}`,
+            );
+          }
+        }
+        throw error;
+      }
+    }
+  } finally {
+    await session.close();
+  }
+  return {
+    selectedCards: batch.length,
+    completedCards: completed,
+    growthAdjustments,
+    directLevelChanges,
+    remainingCards: selected.length - batch.length,
+    partial: batch.length !== selected.length,
+    skippedUnknownLevelCards,
+  };
+}
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -70,6 +311,9 @@ async function main() {
   const cardProgramId =
     process.env.LOYALTY_CARD_PROGRAM_ID || DEFAULT_CARD_PROGRAM_ID;
   const storageState = process.env.RES_STORAGE_STATE || "storageState.json";
+  const ownerOrgId = process.env.CRM_OWNER_ORG_ID || DEFAULT_OWNER_ORG_ID;
+  const ownerOrgType =
+    process.env.CRM_OWNER_ORG_TYPE || DEFAULT_OWNER_ORG_TYPE;
 
   const session = await openAuthedPage({
     storageState,
@@ -327,8 +571,12 @@ async function main() {
     );
   }
 
+  const reconciliationPlans = buildCardReconciliationPlan(
+    activeCards,
+    spendByMember,
+  );
   const preview = {
-    mode: "read-only",
+    mode: args.apply ? "apply" : "read-only",
     window: { from: args.from, to: args.to },
     source: {
       reportChunks: orderResult.chunks.length,
@@ -368,12 +616,29 @@ async function main() {
     },
     tierPreview: buildTierPreview(activeMembers, spendByMember),
     transitionPreview: buildLevelTransitionPreview(activeCards, spendByMember),
+    reconciliationPreview: summarizeCardReconciliation(
+      reconciliationPlans,
+    ),
   };
+
+  if (args.apply) {
+    preview.applyResult = await applyReconciliation(reconciliationPlans, {
+      corporationId,
+      cardProgramId,
+      shopId,
+      orgPath,
+      ownerOrgId,
+      ownerOrgType,
+      storageState,
+      limit: args.limit,
+      remark: `See You Often rolling 12m ${args.from}..${args.to}`,
+    });
+  }
 
   console.log(JSON.stringify(preview, null, 2));
 }
 
 main().catch((error) => {
   console.error(`[loyalty-preview] ${error.message || error.constructor?.name || error}`);
-  process.exitCode = 1;
+  process.exitCode = exitCodeFor(error);
 });

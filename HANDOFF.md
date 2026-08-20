@@ -59,7 +59,7 @@ R6 当前有 229 个 current 日、259 个日版本、2742 个小时版本。健
 均活跃。不得为追求绿色状态恢复不完整半日快照。
 
 统一入口 `scripts/accept-r6-platform.sh [local|remote|all]` 已跑通完整验收：11 个 pgTAP
-文件/109 项断言、Python pytest 41/41 + Ruff、`res_api` unit 143/143 + API 22/22、BakeryOps TypeScript +
+文件/109 项断言、Python pytest 49/49 + Ruff、`res_api` unit 143/143 + API 22/22、BakeryOps TypeScript +
 45 files/463 Vitest + Next build；远端 25/25 migration、lint、健康不变量、RAG 审阅不变量和真实带页码检索也均通过。脚本
 先硬检查 linked ref 必须是 R6，且 BakeryOps/`res_api` 两份 `.env` 必须仍指向旧生产并且不得出现 R6 ref。
 2026-08-21 的最终 remote 门禁还强制执行全历史九窗对账，260/229/31、2699 小时与 0 mismatch
@@ -94,14 +94,25 @@ batch recovery 修复，远端遗留空 batch 已安全标记 FAILED。migration
 search/worker 才要求 embedding 凭据。远端 Worker 已补齐并启动 Tesseract 英文/简中 OCR，最终重部署
 状态为 active/running。六文档完成态批处理复跑全部 `uploaded=false`，文档/review/run 数量不变。
 
+新增 `brainctl auto` 作为 Brain 新 PDF 的安全增量入口：每次重新 hash/classify，只把本次新增且
+`AUTO_UPLOAD` 的 C1 交给上传函数，C2/C3/C4 永不自动跨过审阅边界；相同目录二次执行为
+`NO_CHANGES/selected=0`。状态原子写入本机 700 目录，JSON/lock 为 600；上传失败、源内容改变或删除均
+不推进最后成功 state，并以非阻塞文件锁拒绝并发运行。真实 Brain 首跑为 165 新文件、3 个 C1 成功，
+第二次 0 上传。独立的 30 分钟 LaunchAgent、Keychain-only R6 runner、300 秒硬超时和可恢复卸载脚本已
+提供，但 2026-08-21 后台首跑被 macOS TCC 卡在 iCloud Brain `opendir`；相同命令交互式约 4 秒成功。
+为避免挂起进程，LaunchAgent 已卸载并确认无残留进程；用户授予实际 Python/runner Full Disk Access、
+重新安装并取得一次 `last exit code=0` 前，不能声称无人值守自动发现已上线。完整证据矩阵见
+`docs/database/hotcrush-r6-completion-audit-2026-08-21.md`。
+
 BakeryOps 新增 R6 Supabase knowledge backend 的真实验收脚本，并修复跨区域健康探测：现在调用
 `ops_get_platform_health`，超时 10 秒；知识空间环境变量隔离为 `R6_KNOWLEDGE_SPACE_IDS`。该 backend
 仍默认关闭（默认继续使用旧 `lightrag`），只在进程级显式 opt-in 时连接 R6；真实验收返回招聘价格文档
 第 1 页及两份 C2 的预期页引用。本轮没有把 opt-in 写进任何旧应用配置。当前客户端同时发送 `apikey`
 和 Bearer header，故应使用 legacy `service_role` JWT；把新版 `sb_secret_...` 直接代入同一变量实测 401。
 
-仍未做：持续旧源增量、应用 shadow read、任何消费者切换、真正的 C3 脱敏流水线，以及覆盖全业务主题/
-权限角色的正式黄金问题集；67 份审阅拒绝和 45 份规则 DENIED 不应入 RAG。2026-08-21 对旧源
+仍未做：持续旧 POS 源增量、应用 shadow read、任何消费者切换、真正的 C3 脱敏流水线、PDF 后台
+Full Disk Access 验收，以及覆盖全业务主题/权限角色的正式黄金问题集；67 份审阅拒绝和 45 份规则
+DENIED 不应入 RAG。2026-08-21 对旧源
 2026-08-20 做了只读 dry-run，已是可处理日，但未写 R6；
 这明确证明当前高水位固定在 08-19，而非假装已实现连续同步。下一步若继续维持当前边界，可人工
 对新 POS 日手动运行同一个只读源/有界写 R6/自动对账 CLI；启用定时增量仍需用户单独批准，
@@ -114,6 +125,8 @@ BakeryOps 新增 R6 Supabase knowledge backend 的真实验收脚本，并修复
 安全交接：收工核对旧 `.env` ref 时，Codex 的终端命令错误输出了完整旧库 `DATABASE_URL` 到本任务日志。
 文件未改、旧库未写，但该旧库密码应视为已暴露。不能在本任务内擅自改旧配置；应另开维护窗口轮换旧
 Supabase 数据库密码，并同步四个既有消费者后再撤销旧凭据。
+当前分支为 `codex/fabric-agent-blueprint`；本轮提交后工作树应保持干净。旧生产配置没有修改，R6 PDF
+LaunchAgent 当前明确为未安装状态。
 
 ---
 
@@ -2453,7 +2466,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
-| 2026-08-21 | Codex | **完成 R6 审阅式 C2 RAG 与统一验收（未切库）**：migration 25 新增不可变 `ai_document_review`/受控批准 RPC 并修复 `kb-restricted` Raw constraint；70 个待审项形成 3 批准/67 拒绝，R6 现有 3 C1+3 C2、108 页、113 chunks/vectors；C3/C4 因无真实脱敏保持拒绝。25 migrations/109 pgTAP/41 Python/143+22 RES/463 BakeryOps/build、远端三空间检索、幂等、权限、回滚、九窗 POS 对账和 shadow diff 均通过。旧配置未改；旧连接串因验收命令输出到任务日志，须另窗轮换。 |
+| 2026-08-21 | Codex | **完成 R6 审阅式 C2 RAG、增量 PDF 入口与统一验收（未切库）**：migration 25 新增不可变 `ai_document_review`/受控批准 RPC 并修复 `kb-restricted` Raw constraint；70 个待审项形成 3 批准/67 拒绝，R6 现有 3 C1+3 C2、108 页、113 chunks/vectors；C3/C4 因无真实脱敏保持拒绝。`brainctl auto` 真实首跑 165 文件只处理 3 个 C1、二次 0 上传，并由测试证明后续只处理本次新增 C1；30 分钟 LaunchAgent 因 macOS TCC 无法后台读取 iCloud Brain 而卸载，待 Full Disk Access 后重验。25 migrations/109 pgTAP/49 Python/143+22 RES/463 BakeryOps/build、远端三空间检索、幂等、权限、回滚、九窗 POS 对账均通过。旧配置未改；旧连接串因验收命令输出到任务日志，须另窗轮换。 |
 | 2026-08-16 | Codex | **完成 Fabric + PostgreSQL + DeepSeek Harness 目标架构设计（未实施）**：只读核验生产库 78 表/21 视图/约 92.6 MiB 与空 R6 Green 100 表/1,374 列；纠正“项目均未落地”和“Fabric 可直接替 PostgreSQL”的前提。新设计规定 PostgreSQL 为唯一 OLTP 真源，Fabric 为 OneLake/Lakehouse replica + Warehouse 认证语义层，Harness 锁版本并只经受控 Domain API；补 10 张 `ai_` 契约表、Agent/工具风险、Phase 0–6 蓝绿迁移门禁。未执行 DDL/DML、未激活 Trial、未创建 Fabric 资产或部署。活跃分支 `codex/fabric-agent-blueprint`。 |
 | 2026-08-15 | DSH | **权益分配二次修订（已部署）**：L1 只有贺卡、L2 只有免费巴斯克、L3/L4 免费巴斯克或 450 积分兑换二选一（L3 限自己 L4 可送亲友）；权益模型改「等级→可选权益组数组」，BIRTHDAY_BENEFITS_JSON 覆盖同步改数组；L1 前端显示贺卡说明且无预约表单。门禁 336 过 39 跳过；线上验证 Nicole(L4) 双选项、免费因已领灰显；新部署 hotcrush-hbti-ojb3ix3yg-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **会员等级按用户定版（已部署）**：等级改为按年累计实付消费实时计算（Lv1 初见 RM0 / Lv2 心动 RM250 / Lv3 热爱 RM750 / Lv4 挚爱 RM1500），不再读 RES 等级名；权益收紧为 L1/L2 只有免费巴斯克、L3/L4 才有 450 积分兑换（L3 限自己 L4 可送亲友）；view 返回 member.level 含升级差，reserve 同口径判定；线上验证 Nicole=Lv4 挚爱、仅积分兑换选项。门禁 333 过 39 跳过；新部署 hotcrush-hbti-p9oyc6z0z-algersss-projects.vercel.app。 |

@@ -17,6 +17,7 @@ R6 Green 已建成一个适合单店阶段的 Supabase 分层数据平台：
 - Raw 原件放私有 Storage，PostgreSQL 只放元数据与处理状态。
 - Processed 层只建立已有明确粒度的结构化事实；目前已有 POS 日销售和小时销售版本表。
 - PDF RAG 已具备 manifest 分级、逐文件审阅账本、源文件/manifest 哈希绑定、权限内去重、上传、解析/OCR、切块、embedding、发布、检索和可逆回滚。
+- 新 PDF 的 `brainctl auto` 安全入口已实跑，但 macOS LaunchAgent 因 iCloud Full Disk Access 尚未授权而卸载；不能把交互式 CLI 成功写成无人值守已上线。
 - POS 已具备 Raw 文件校验、日/小时交叉对账、有界范围回填、版本发布、隔离和恢复的结构化 worker。
 - Agent 层只保存运行账本和追加事件，不让 Agent 直接任意写业务表。
 - 现网 BakeryOps、res_api 仍使用旧生产库；没有替换 `DATABASE_URL`，没有开启双写或切读。
@@ -80,6 +81,7 @@ Cron 不应每天全量复制 Raw；它是补偿机制，不是主数据流。
 | 回滚演练 | POS 完成 quarantine→current 回退→restore；C1 与人工批准 C2 均完成 RAG unpublish→检索消失→restore→原页恢复 |
 | 当前健康 | `degraded`：32 个隔离中 31 个是已确认源质量异常，另 1 个不完整快照仍未确认；无失败 run、过期 lease 或 Storage lineage 缺口 |
 | 应用接入 | BakeryOps R6 客户端已真实返回 C1 价格表第 1 页、C2 会员方案第 2 页、C2 HR 制度第 11 页；默认 backend 和现网配置未切换，仍使用旧库/LightRAG |
+| PDF 自动发现 | 交互式首跑 165 文件只上传 3 C1，二次 `NO_CHANGES/selected=0`；LaunchAgent 后台被 macOS TCC 阻断并已卸载，待 Full Disk Access 后重验 |
 
 ## 4. 总体数据结构图
 
@@ -136,7 +138,7 @@ flowchart TB
   OLD[旧生产库<br/>ecsg...<br/>现在仍是唯一业务真源]
 
   POS -. 持续影子写入未启用；260 日历史回填已验收 .-> RB
-  PDF --> STORE
+  PDF -. brainctl auto CLI 已通过；后台待 Full Disk Access .-> STORE
   FILE -. 未迁移 .-> STORE
   RB --> RO
   RO --> PR
@@ -469,8 +471,9 @@ BakeryOps build、远端 migration/lint/健康、RAG 审阅不变量和三个知
 9. 已完成 70 份 `REVIEW_REQUIRED` 清单决策：3 份安全 C2 批准，67 份拒绝；数据库批准记录绑定原 manifest 与源文件 SHA，冲突重放会失败。
 10. 已完成代表性 RAG 验收：C1 价格表、C2 会员方案、C2 HR 制度均命中预期标题/页码；C1 与 C2 均完成真实 unpublish/restore。
 11. 待完成：实现可证明的 C3 脱敏流水线，并扩展正式业务黄金问题集；不以“向量有数据”或布尔标记代替质量/安全验收。
-12. 单独批准后才开启一个项目的影子写入；后续再批准切读。
-13. 所有写入者切换、高水位一致且回滚演练通过后，才考虑冻结旧库写入。
+12. 待完成：为 LaunchAgent 授予 iCloud Brain 所需的 macOS Full Disk Access，并留下后台退出 0 证据。
+13. 单独批准后才开启一个项目的影子写入；后续再批准切读。
+14. 所有写入者切换、高水位一致且回滚演练通过后，才考虑冻结旧库写入。
 
 ## 14. 验收门槛
 
@@ -499,6 +502,7 @@ BakeryOps build、远端 migration/lint/健康、RAG 审阅不变量和三个知
 - 67 份审阅拒绝、45 份规则禁止、47 份同权限空间重复均未上传；其中全部 35 份 C3 因没有真实脱敏能力而保持拒绝。
 - RAG 已通过 C1/C2 三个应用级精确问题，尚未形成覆盖所有业务主题和权限角色的正式黄金问题集。
 - 应用配置、Vercel 变量、`DATABASE_URL` 和现网读写路径均未切换。
+- 新 PDF 的交互式自动 C1 CLI 已通过，但 LaunchAgent 无人值守运行仍缺 macOS TCC 授权。
 
 ## 15. 事实、推测、建议和暂无法验证项
 
@@ -530,4 +534,5 @@ BakeryOps build、远端 migration/lint/健康、RAG 审阅不变量和三个知
 
 - 未切换前无法证明所有旧库业务读写都可无缝迁往 R6。
 - 67 份人工拒绝文档和 45 份规则禁止文档没有进入 RAG；未来若内容或用途变化，必须生成新 manifest 并重新审阅，不能复用本次结论。
+- 完成长目标的逐项证据与剩余条件见 `docs/database/hotcrush-r6-completion-audit-2026-08-21.md`。
 - 财务网站的生产 Vercel secret 为不可回读配置；本阶段既不更改，也不假设其可直接切换。

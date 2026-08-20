@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.hotcrush.r6-brain-ingest</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/weiliangshao/hot/bakery-ops/services/data-platform/run-brain-auto-ingest.sh</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/weiliangshao/hot/bakery-ops/services/data-platform</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>StartInterval</key>
+  <integer>1800</integer>
+  <key>ThrottleInterval</key>
+  <integer>60</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>LowPriorityIO</key>
+  <true/>
+  <key>Nice</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>/Users/weiliangshao/Library/Logs/hotcrush-r6-brain-ingest.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/weiliangshao/Library/Logs/hotcrush-r6-brain-ingest.err.log</string>
+</dict>
+</plist>

@@ -18,6 +18,10 @@ uv run brainctl review /secure/path/brain-manifest.json /secure/path/brain-revie
 uv run brainctl batch "/path/to/Brain/raw" /secure/path/brain-manifest.json
 uv run brainctl batch "/path/to/Brain/raw" /secure/path/brain-manifest.json \
   --review-manifest /secure/path/brain-review.json --apply
+uv run brainctl auto "/path/to/Brain/raw" \
+  --state-file /secure/path/auto-state.json
+uv run brainctl auto "/path/to/Brain/raw" \
+  --state-file /secure/path/auto-state.json --apply
 uv run brainctl upload "/path/to/approved-c1.pdf"
 uv run brainctl search "opening checklist" --space-id 10000000-0000-7000-8000-000000000001
 uv run brainctl status --document-id DOCUMENT_UUID
@@ -50,6 +54,20 @@ to one knowledge-space boundary; identical bytes in different security spaces ne
 Raw object. `brainctl batch` is dry-run unless `--apply` is present and uploads only
 `AUTO_UPLOAD` plus explicitly approved C1/C2 review entries. RAG unpublish/restore commands are
 also dry-run unless `--apply` is explicit; they retain the original, review, chunks and vectors.
+
+`brainctl auto` is the unattended C1 entry point. It never consumes a review ledger, so C2/C3/C4
+cannot cross the automatic boundary. The last successful manifest is written atomically with 0600
+permissions under a 0700 directory. Identical scans do zero uploads; an upload failure does not
+advance state. A changed or removed source path fails closed because automatic code cannot infer
+whether to create a new logical version or unpublish the old document.
+
+On this Mac, `run-brain-auto-ingest.sh` reads only the R6 service credential already stored in
+Keychain and runs the command with a 300-second hard timeout. `install-brain-auto-ingest.sh install`
+installs the separate `com.hotcrush.r6-brain-ingest` LaunchAgent at a 30-minute interval;
+`uninstall` removes only the agent and retains state/R6 data. macOS Full Disk Access must first
+allow the background process to enumerate the iCloud Brain directory. The 2026-08-21 trial was
+uninstalled after TCC blocked `opendir`; do not claim unattended operation until one scheduled run
+exits 0.
 
 BakeryOps 已有只读 R6 适配代码，但现网不配置、不启用，仍使用旧生产库与旧
 LightRAG。未来切换时必须使用独立的 `R6_SUPABASE_*` 变量，不能复用历史

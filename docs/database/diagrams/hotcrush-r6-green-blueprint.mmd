@@ -33,7 +33,7 @@ flowchart TB
   WORKER["外部 Worker<br/>Tesseract OCR · POS 校验 · Embedding<br/>encrypted R6 credentials"]:::source
   USERS["Web · Lark · WhatsApp · AI Agent<br/>BakeryOps opt-in 已验收 · 现网未切换"]:::frozen
 
-  SOURCES -. "持续影子写入未启用" .-> STORAGE
+  SOURCES -. "POS 持续影子未启用 · PDF auto CLI 已通过 / 后台待 FDA" .-> STORAGE
   OLD -. "只读导出；不改旧库" .-> BACKFILL --> STORAGE
   STORAGE --> RAW --> RUN
   RUN <--> WORKER

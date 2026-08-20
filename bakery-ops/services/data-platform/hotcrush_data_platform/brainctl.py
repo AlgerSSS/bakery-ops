@@ -15,8 +15,10 @@ from .classification import Classification, classify_path
 from .config import Settings
 from .manifest import (
     apply_manifest,
+    auto_reconcile_manifest,
     brain_source_batch_key,
     build_manifest,
+    find_pdf_paths,
     record_manifest_review,
 )
 from .pdf_pipeline import DeterministicTestEmbedder, OpenRouterEmbedder
@@ -35,7 +37,7 @@ def inventory(root: Path, include_hash: bool = False) -> list[dict[str, Any]]:
     if not root.is_dir():
         raise ValueError(f"not a directory: {root}")
     entries: list[dict[str, Any]] = []
-    for path in sorted(root.rglob("*.pdf")):
+    for path in find_pdf_paths(root):
         classification = classify_path(path.relative_to(root))
         entry: dict[str, Any] = {
             "relative_path": str(path.relative_to(root)),
@@ -402,6 +404,18 @@ def main() -> None:
     )
     batch_parser.add_argument("--max-files", type=int)
 
+    auto_parser = subparsers.add_parser(
+        "auto",
+        help="discover Brain PDFs and automatically ingest new C1 files only",
+    )
+    auto_parser.add_argument("root", type=Path)
+    auto_parser.add_argument("--state-file", type=Path, required=True)
+    auto_parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="write new C1 files to R6; review-required and denied files remain local",
+    )
+
     upload_parser = subparsers.add_parser("upload", help="upload and finalize exactly one PDF")
     upload_parser.add_argument("pdf", type=Path)
     upload_parser.add_argument(
@@ -475,6 +489,20 @@ def main() -> None:
                     upload_fn=upload_one,
                     review_manifest=review_manifest,
                     approve_fn=approve_uploaded_document,
+                ),
+                None,
+            )
+            return
+
+        if args.command == "auto":
+            settings = Settings.from_env(require_embedding=False) if args.apply else None
+            _write_json(
+                auto_reconcile_manifest(
+                    args.root,
+                    args.state_file,
+                    apply=args.apply,
+                    settings=settings,
+                    upload_fn=upload_one,
                 ),
                 None,
             )

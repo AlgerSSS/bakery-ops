@@ -294,6 +294,34 @@ uv run brainctl search "问题" \
 当前 worker **没有真正的 PII 脱敏实现**，不能把 `is_redacted=true` 当作脱敏证据。数据库因此强制
 `ai_approve_document_review` 只接受 C1/C2；C3/C4 即使写入 review ledger，也不能进入 RAG。
 
+### 8.1 新 PDF 自动发现（仅 C1）
+
+一次性 dry-run / apply：
+
+```bash
+cd /Users/weiliangshao/hot/bakery-ops/services/data-platform
+uv run brainctl auto \
+  "/Users/weiliangshao/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain/raw" \
+  --state-file "/Users/weiliangshao/Library/Application Support/HotCrush/r6-rag/auto-ingest/state.json"
+
+./run-brain-auto-ingest.sh
+```
+
+真实首跑识别 165 个新路径，但只把 3 个 `AUTO_UPLOAD` C1 交给幂等上传；第二次为
+`NO_CHANGES / selected=0`。state 目录为 700、JSON/lock 为 600。新 C2/C3/C4 只增加待办计数；源路径
+内容改变或删除会停止并保留上一次成功 state，不自动创建错误版本或下架文档。
+
+30 分钟 LaunchAgent 已提供安装/回滚命令：
+
+```bash
+./install-brain-auto-ingest.sh install
+./install-brain-auto-ingest.sh uninstall
+```
+
+2026-08-21 的实际 LaunchAgent 首跑在 iCloud 目录 `opendir` 被 macOS TCC 挂起，已卸载，R6 与 state
+保留。用户在「隐私与安全性 → 完全磁盘访问权限」授权后台 Python/runner 后才可重新安装；runner 有
+300 秒硬超时。验收必须看到 `last exit code = 0` 且 stderr 为空，不能用交互式手跑成功替代后台证据。
+
 真实 Brain 盘点结果：165 份均完成哈希；manifest 中 3 份 `AUTO_UPLOAD`、70 份
 `REVIEW_REQUIRED`、45 份 `DENIED`、47 份同空间重复跳过。70 份待审项已记录 3 个
 `APPROVE_RAG` 与 67 个 `DENY_RAG`；所有 35 份 C3 因缺少真实脱敏能力而拒绝。R6 当前发布

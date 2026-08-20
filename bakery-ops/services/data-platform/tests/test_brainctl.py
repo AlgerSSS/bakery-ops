@@ -159,3 +159,61 @@ def test_review_approval_calls_only_the_controlled_rpc(monkeypatch: Any) -> None
             },
         )
     ]
+
+
+def test_auto_command_uses_r6_control_credentials_and_never_a_review_ledger(
+    monkeypatch: Any,
+    tmp_path: Path,
+    capsys: Any,
+) -> None:
+    brain = tmp_path / "brain"
+    brain.mkdir()
+    state_file = tmp_path / "state.json"
+    settings = _settings()
+    calls: list[dict[str, Any]] = []
+
+    def reconcile(
+        root: Path,
+        state: Path,
+        *,
+        apply: bool,
+        settings: Any,
+        upload_fn: Any,
+    ) -> dict[str, Any]:
+        calls.append(
+            {
+                "root": root,
+                "state": state,
+                "apply": apply,
+                "settings": settings,
+                "upload_fn": upload_fn,
+            }
+        )
+        return {"mode": "APPLY", "attention_required": 0}
+
+    monkeypatch.setattr(brainctl, "auto_reconcile_manifest", reconcile)
+    monkeypatch.setattr(brainctl.Settings, "from_env", lambda **_kwargs: settings)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "brainctl",
+            "auto",
+            str(brain),
+            "--state-file",
+            str(state_file),
+            "--apply",
+        ],
+    )
+
+    brainctl.main()
+
+    assert calls == [
+        {
+            "root": brain,
+            "state": state_file,
+            "apply": True,
+            "settings": settings,
+            "upload_fn": brainctl.upload_one,
+        }
+    ]
+    assert '"mode": "APPLY"' in capsys.readouterr().out

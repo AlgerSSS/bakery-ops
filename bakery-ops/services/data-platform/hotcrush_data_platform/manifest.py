@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
+import os
+import tempfile
 from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -13,10 +16,19 @@ from .classification import Classification, classify_path
 MANIFEST_SCHEMA_VERSION = "hotcrush-brain-manifest-v1"
 REVIEW_SCHEMA_VERSION = "hotcrush-brain-review-v1"
 REVIEW_DECISIONS = {"APPROVE_RAG", "DENY_RAG"}
+AUTO_STATE_SCHEMA_VERSION = "hotcrush-brain-auto-state-v1"
 
 
 def brain_source_batch_key(space_id: str, sha256: str) -> str:
     return f"brain:{space_id}:{sha256}"
+
+
+def find_pdf_paths(root: Path) -> list[Path]:
+    return sorted(
+        path
+        for path in root.rglob("*")
+        if path.is_file() and path.suffix.casefold() == ".pdf"
+    )
 
 
 def _sha256_file(path: Path) -> str:
@@ -70,7 +82,7 @@ def build_manifest(root: Path) -> dict[str, Any]:
 
     entries: list[dict[str, Any]] = []
     canonical_by_boundary: dict[tuple[str, str], str] = {}
-    for path in sorted(root.rglob("*.pdf")):
+    for path in find_pdf_paths(root):
         relative_path = path.relative_to(root)
         classification = classify_path(relative_path)
         sha256 = _sha256_file(path)
@@ -270,6 +282,7 @@ def apply_manifest(
     upload_fn: Callable[..., dict[str, Any]],
     review_manifest: dict[str, Any] | None = None,
     approve_fn: Callable[..., dict[str, Any]] | None = None,
+    include_paths: set[str] | None = None,
 ) -> dict[str, Any]:
     entries = _validate_manifest(manifest)
     reviewed_by_path = (
@@ -280,9 +293,12 @@ def apply_manifest(
     selected = [
         entry
         for entry in entries
-        if entry.get("disposition") == "AUTO_UPLOAD"
-        or reviewed_by_path.get(entry.get("relative_path"), {}).get("decision")
-        == "APPROVE_RAG"
+        if (
+            entry.get("disposition") == "AUTO_UPLOAD"
+            or reviewed_by_path.get(entry.get("relative_path"), {}).get("decision")
+            == "APPROVE_RAG"
+        )
+        and (include_paths is None or entry.get("relative_path") in include_paths)
     ]
     if max_files is not None:
         selected = selected[:max_files]
@@ -342,3 +358,176 @@ def apply_manifest(
         "succeeded": len(results),
         "results": results,
     }
+
+
+def _load_auto_state(state_file: Path) -> dict[str, Any] | None:
+    if not state_file.exists():
+        return None
+    value = json.loads(state_file.read_text(encoding="utf-8"))
+    if not isinstance(value, dict) or value.get("schema_version") != AUTO_STATE_SCHEMA_VERSION:
+        raise ValueError("unsupported Brain auto-ingest state")
+    manifest = value.get("manifest")
+    if not isinstance(manifest, dict):
+        raise TypeError("Brain auto-ingest state is missing its manifest")
+    _validate_manifest(manifest)
+    return value
+
+
+def _auto_entry_fingerprint(entry: dict[str, Any]) -> str:
+    stable_entry = {
+        key: value
+        for key, value in entry.items()
+        if key not in ("relative_path", "modified_at_ns")
+    }
+    return json.dumps(stable_entry, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def _manifest_delta(
+    previous_manifest: dict[str, Any] | None,
+    current_manifest: dict[str, Any],
+) -> tuple[dict[str, int], list[dict[str, Any]]]:
+    previous_entries = (
+        _manifest_entries_by_path(previous_manifest) if previous_manifest is not None else {}
+    )
+    current_entries = _manifest_entries_by_path(current_manifest)
+    new_or_changed: list[dict[str, Any]] = []
+    new_count = 0
+    changed_count = 0
+    for path, entry in current_entries.items():
+        previous = previous_entries.get(path)
+        if previous is None:
+            new_count += 1
+            new_or_changed.append(entry)
+        elif _auto_entry_fingerprint(previous) != _auto_entry_fingerprint(entry):
+            changed_count += 1
+            new_or_changed.append(entry)
+    removed_count = len(previous_entries.keys() - current_entries.keys())
+    return (
+        {"new": new_count, "changed": changed_count, "removed": removed_count},
+        new_or_changed,
+    )
+
+
+def _write_private_json_atomic(path: Path, value: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    path.parent.chmod(0o700)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        dir=path.parent,
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(value, handle, ensure_ascii=False, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+        path.chmod(0o600)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def _auto_batch_summary(batch: dict[str, Any]) -> dict[str, Any]:
+    keys = (
+        "mode",
+        "manifest_sha256",
+        "selected",
+        "auto_selected",
+        "review_approved_selected",
+        "succeeded",
+    )
+    return {key: batch[key] for key in keys if key in batch}
+
+
+def auto_reconcile_manifest(
+    root: Path,
+    state_file: Path,
+    *,
+    apply: bool,
+    settings: Any,
+    upload_fn: Callable[..., dict[str, Any]],
+) -> dict[str, Any]:
+    """Discover PDFs and automatically upload only new C1 content.
+
+    Changed or removed source paths stop the run because automatic publication cannot safely
+    infer document versioning or unpublication. Review-required and denied files are inventoried
+    but are never passed to the uploader.
+    """
+
+    def reconcile() -> tuple[dict[str, Any], dict[str, Any]]:
+        previous_state = _load_auto_state(state_file)
+        previous_manifest = previous_state["manifest"] if previous_state else None
+        current_manifest = build_manifest(root)
+        delta, new_or_changed = _manifest_delta(previous_manifest, current_manifest)
+        attention_required = sum(
+            entry.get("disposition") in ("REVIEW_REQUIRED", "DENIED")
+            for entry in new_or_changed
+        ) + delta["removed"]
+
+        if apply and previous_manifest is not None and (
+            delta["changed"] > 0 or delta["removed"] > 0
+        ):
+            raise ValueError(
+                "changed or removed Brain sources require explicit review; auto-ingest state was not advanced"
+            )
+
+        if apply and delta == {"new": 0, "changed": 0, "removed": 0}:
+            batch = {
+                "mode": "NO_CHANGES",
+                "manifest_sha256": current_manifest["manifest_sha256"],
+                "selected": 0,
+                "auto_selected": 0,
+                "review_approved_selected": 0,
+                "succeeded": 0,
+            }
+            mode = "NO_CHANGES"
+        else:
+            batch = apply_manifest(
+                root,
+                current_manifest,
+                apply=apply,
+                settings=settings,
+                upload_fn=upload_fn,
+                include_paths={entry["relative_path"] for entry in new_or_changed},
+            )
+            mode = "APPLY" if apply else "DRY_RUN"
+
+        report = {
+            "schema_version": "hotcrush-brain-auto-run-v1",
+            "mode": mode,
+            "manifest_sha256": current_manifest["manifest_sha256"],
+            "previous_manifest_sha256": (
+                previous_manifest.get("manifest_sha256") if previous_manifest else None
+            ),
+            "delta": delta,
+            "manifest_summary": current_manifest["summary"],
+            "attention_required": attention_required,
+            "batch": _auto_batch_summary(batch),
+        }
+        return current_manifest, report
+
+    if not apply:
+        _, report = reconcile()
+        return report
+
+    state_file.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    state_file.parent.chmod(0o700)
+    lock_file = state_file.with_suffix(f"{state_file.suffix}.lock")
+    with lock_file.open("a", encoding="utf-8") as lock_handle:
+        lock_file.chmod(0o600)
+        try:
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError("another Brain auto-ingest run is active") from exc
+        manifest, report = reconcile()
+        state = {
+            "schema_version": AUTO_STATE_SCHEMA_VERSION,
+            "updated_at": datetime.now(tz=UTC).isoformat(),
+            "manifest": manifest,
+            "last_result": report,
+        }
+        _write_private_json_atomic(state_file, state)
+        return report

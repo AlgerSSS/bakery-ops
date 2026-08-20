@@ -6,6 +6,42 @@
 
 ---
 
+## R6 Green 独立 Supabase 数据平台基座（2026-08-20，Codex，已实施/未切库）
+
+用户最终收紧本阶段边界：先重建独立的 `hotcrush-core-r6-green`
+（project ref `tmmkknnkcptunxbfjxqn`），不得修改旧应用的数据库连接或把现网切到新库。旧生产真源已纠正为
+`supabase-yellow-crystal`（project ref `ecsgqcmwtjmcpzqytdqw`），不是早期文档写的失活项目
+`txaawdpmyjnmhihjkpud`。本地 BakeryOps 与 `res_api` 的 `DATABASE_URL` 在收工时仍解析到
+`ecsgqcmwtjmcpzqytdqw`；此前也已在 tokyo-01 核验两个服务的旧库连接、无 R6 drop-in 且运行正常。
+最后一次 SSH 重试因本机当时无法解析 `tokyo-01` 而未重复取证，未据此改动任何配置。
+
+R6 Green 已用 16 个可重放 Supabase migration 重建，远端当前为 14 张平台/业务表、2 个 POS current
+view、28 个 `ops_*`/`ai_*` 受控函数、7 个私有 Storage bucket、7 个 NOLOGIN capability role、6 个
+pg_cron job；`vector` 位于 `extensions` schema，Realtime 只发布 3 张运行状态表。物理分层为：
+`ops_raw_batch/object` 原始证据与 `ops_processing_run` 租约队列 → 版本化 `pos_sales_day/hour` 与 RAG
+文档/chunk/vector → 追加式 Agent run/event → RPC/Realtime 交互契约。没有为单店阶段引入 Fabric、CDC、
+独立数仓或多项目同步。
+
+CLI 验收结果：本地与远端 migration 16/16 对齐；远程 `public,private` lint 无错误；
+`supabase db diff --linked --schema public,private` 返回 `No schema changes found`；5 个 pgTAP 文件共 47 项
+全部通过，提交前 `git diff --check` 也无格式错误。BakeryOps TypeScript、Vitest（45 files / 463 tests）与 Next build 均通过；`res_api` API 22/22、
+Node unit 121/121 通过；Python RAG worker Ruff 与 pytest 8/8 通过。Next build 仍有既存 Turbopack 动态文件
+追踪 warning；Python 仅有 PyMuPDF/SWIG 弃用 warning。
+
+PDF/RAG 已完成一份 3 页样本的真实远端闭环：私有 bucket → 文档登记 → worker 解析/切块 → 6 chunks →
+1536 维 embedding → 发布 READY → RPC 检索，精确页内问题能返回第 2 页。宽泛语义查询的排序尚未达到
+业务验收标准，因此只能确认技术链路可用，不能声称检索质量已完成。R6 独立 RAG worker 已部署，使用
+systemd encrypted credentials，只连接 R6；它不改变旧应用数据库配置。
+
+现网切换仍明确未做：`res_api` 中 R6 Raw shadow 代码默认关闭；BakeryOps knowledge adapter 默认仍选择
+LightRAG；仓库和服务器的旧应用配置均未留下 R6 启用项。R6 当前没有生产业务事实迁移，Processed POS
+为 0；仅保留 PDF 验收样本和此前的 Raw 示例。下一步必须另行批准后才可做“旧库只读导出 → R6 Raw
+影子写入 → Processed 对账”，更不能直接改 `DATABASE_URL`。实施与汇报主文档为
+`docs/database/hotcrush-r6-green-database-blueprint-v1.md`，PNG/SVG/Mermaid 图在
+`docs/database/diagrams/`；旧 v2 文档已标注为历史草案。
+
+---
+
 ## See You Often 会员体系接管与生产差距审计（2026-08-20，Codex，在途/只读）
 
 用户要求接管 WorkBuddy「查找关于H5页面制作的对话记录」，以 Lark《「See You Often」日常储值方案-

@@ -20,7 +20,11 @@ backups/
 
 # Python 生成缓存与 Supabase CLI 本地状态：可再生，不入库
 __pycache__/
+.venv/
+.pytest_cache/
+.ruff_cache/
 supabase/.temp/
+supabase/.branches/
 
 # output/ 下是含员工姓名与薪资的分析报告 PDF：个人数据只在本机交付，不进 git 历史
 output/

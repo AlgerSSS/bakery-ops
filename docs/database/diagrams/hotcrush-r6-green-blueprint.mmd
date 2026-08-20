@@ -1,0 +1,47 @@
+flowchart TB
+  classDef source fill:#fff7ed,stroke:#c2410c,color:#7c2d12
+  classDef raw fill:#f5f3ff,stroke:#7c3aed,color:#4c1d95
+  classDef processed fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef agent fill:#eff6ff,stroke:#2563eb,color:#1e3a8a
+  classDef ui fill:#fdf2f8,stroke:#db2777,color:#831843
+  classDef frozen fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray: 6 4
+
+  OLD["旧生产库<br/>ecsgqcmwtjmcpzqytdqw<br/>现在仍是唯一业务真源"]:::frozen
+  SOURCES["RES POS · Brain PDF · 财务/HR/SCM"]:::source
+
+  subgraph R6["Supabase R6 Green · tmmkknnkcptunxbfjxqn"]
+    direction TB
+    subgraph L1["1  Raw 证据层"]
+      STORAGE["7 个 Private Storage buckets"]:::raw
+      RAW["ops_raw_batch<br/>ops_raw_object"]:::raw
+    end
+    subgraph L2["2  预处理 / 事实 / RAG"]
+      RUN["ops_processing_run<br/>pipeline_health"]:::processed
+      POS["pos_sales_day<br/>pos_sales_hour<br/>v_pos_*_current"]:::processed
+      RAG["ai_raw_document<br/>ai_ingest_run<br/>ai_document_chunk<br/>ai_chunk_embedding vector(1536)"]:::processed
+    end
+    subgraph L3["3  Agent 层"]
+      AGENT["ops_agent_run<br/>ops_agent_event (只追加)"]:::agent
+    end
+    subgraph L4["4  交互契约层"]
+      API["受控 RPC · Realtime · RLS"]:::ui
+    end
+    CRON["6 个 Cron<br/>恢复 · 汇总 · 对账 · 清理"]:::agent
+  end
+
+  WORKER["外部 Worker<br/>OCR · 解析 · Embedding · 长任务"]:::source
+  USERS["Web · Lark · WhatsApp · AI Agent<br/>(现网尚未切换)"]:::frozen
+
+  SOURCES -. "现网写入未启用" .-> STORAGE
+  STORAGE --> RAW --> RUN
+  RUN <--> WORKER
+  RUN --> POS
+  RAW --> RAG
+  RAG <--> WORKER
+  POS --> AGENT
+  RAG --> AGENT
+  AGENT --> API --> USERS
+  CRON --> RUN
+  CRON --> RAG
+  CRON --> AGENT
+  OLD --> USERS

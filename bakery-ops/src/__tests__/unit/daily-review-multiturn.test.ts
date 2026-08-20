@@ -23,8 +23,8 @@ vi.mock("@/modules/shared/db/postgres", () => ({
   query: (...args: unknown[]) => query(...args),
 }));
 
-vi.mock("@/modules/domain/knowledge/lightrag-client", () => ({
-  lightragClient: {
+vi.mock("@/modules/domain/knowledge/knowledge-client", () => ({
+  knowledgeClient: {
     isAvailable: vi.fn().mockResolvedValue(false),
     query: vi.fn(),
     ingest: vi.fn(),

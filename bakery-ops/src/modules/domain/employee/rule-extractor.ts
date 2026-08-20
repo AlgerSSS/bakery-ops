@@ -2,7 +2,7 @@ import { z } from "zod";
 import { employeeRepository, type EmployeeRow } from "../../data/repositories/employee.repository";
 import { employeeEventRepository } from "../../data/repositories/employee-event.repository";
 import { screeningRuleRepository } from "../../data/repositories/screening-rule.repository";
-import { lightragClient } from "../knowledge/lightrag-client";
+import { knowledgeClient } from "../knowledge/knowledge-client";
 import { aiProvider } from "../ai/ai-provider";
 import { logger } from "../../shared/logger";
 
@@ -99,7 +99,7 @@ export async function extractRules(): Promise<{ rulesExtracted: number; error?: 
       const rulesText = rules
         .map((r) => `筛选规则: ${r.description}\n证据: ${r.evidence}\n置信度: ${r.confidence}`)
         .join("\n\n");
-      lightragClient.ingest(`筛选规则更新 (${new Date().toISOString()})\n\n${rulesText}`).catch(() => {});
+      knowledgeClient.ingest(`筛选规则更新 (${new Date().toISOString()})\n\n${rulesText}`).catch(() => {});
     }
 
     logger.info("Rule extraction completed", { extracted: rules.length, saved });

@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { lightragClient } from "../../domain/knowledge/lightrag-client";
+import { knowledgeClient } from "../../domain/knowledge/knowledge-client";
 import { aiProvider } from "../../domain/ai/ai-provider";
 import { query } from "../../shared/db/postgres";
 import { getProductForecast } from "../../domain/forecast/forecast.service";
@@ -383,8 +383,8 @@ export async function generateDailyReviewText(date: string, managerText = ""): P
 
   // RAG 只在有店长原话时检索（自动早报没有查询串）— naive 拿原始 chunks
   let ragContext = "";
-  if (!isAuto && (await lightragClient.isAvailable())) {
-    const ragResult = await lightragClient.query(managerText.slice(0, 100), "naive");
+  if (!isAuto && (await knowledgeClient.isAvailable())) {
+    const ragResult = await knowledgeClient.query(managerText.slice(0, 100), "naive");
     if (ragResult) ragContext = `\n【历史经验/SOP参考】\n${ragResult}\n（引用以上历史经验时必须注明具体日期）\n`;
   }
 
@@ -462,8 +462,8 @@ export class DailyReviewChatSkillHandler implements SkillHandler {
     const analysis = await generateDailyReviewText(date, rawText);
 
     // Ingest this review — fire-and-forget，不阻塞店长收到回复 — IMPROVEMENT-PLAN.md G4-①
-    if (await lightragClient.isAvailable()) {
-      void lightragClient.ingest(`[复盘 ${date}] ${rawText}`, { type: "daily_review", date })
+    if (await knowledgeClient.isAvailable()) {
+      void knowledgeClient.ingest(`[复盘 ${date}] ${rawText}`, { type: "daily_review", date })
         .catch((e) => logger.warn("LightRAG ingest failed (fire-and-forget)", { date, error: String(e) }));
     }
 
@@ -597,9 +597,9 @@ ${history}
     }
 
     // Write to RAG — fire-and-forget，不阻塞回复链路 — IMPROVEMENT-PLAN.md G4-①
-    const ragAvailable = await lightragClient.isAvailable();
+    const ragAvailable = await knowledgeClient.isAvailable();
     if (ragAvailable && extractedKnowledge) {
-      void lightragClient.ingest(
+      void knowledgeClient.ingest(
         `[复盘总结 ${date}] ${extractedKnowledge}`,
         { type: "review_insight", date, source: "daily_review_chat" },
       ).catch((e) => logger.warn("LightRAG ingest failed (fire-and-forget)", { date, error: String(e) }));

@@ -31,8 +31,8 @@ vi.mock("@/modules/data/repositories/screening-rule.repository", () => ({
   },
 }));
 
-vi.mock("@/modules/domain/knowledge/lightrag-client", () => ({
-  lightragClient: {
+vi.mock("@/modules/domain/knowledge/knowledge-client", () => ({
+  knowledgeClient: {
     ingest: vi.fn().mockResolvedValue(undefined),
   },
 }));

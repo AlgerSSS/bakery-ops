@@ -10,6 +10,7 @@ import {
 import { kualaLumpurDate, refreshBusinessDate } from './lib/business-date.js';
 import { loadDailySection } from './lib/daily-freshness.js';
 import { classifyBusinessDate, dailyWitnesses, PartialStepError } from './lib/zero-day.js';
+import { shadowPosRawIfEnabled } from './lib/r6-shadow.js';
 
 const args = Object.fromEntries(process.argv.slice(2).map(a => { const [k, v] = a.replace(/^--/, '').split('='); return [k, v]; }));
 
@@ -526,6 +527,24 @@ async function finish() {
     for (const f of deferredFailures) console.error(`  - ${f}`);
     await sql.end();
     process.exit(1);
+  }
+
+  try {
+    const shadow = await shadowPosRawIfEnabled({ businessDate: EXPECTED_DATE });
+    if (shadow) {
+      console.log(
+        `[sync-to-db] R6 Raw shadow READY batch=${shadow.batchId} ` +
+          `artifacts=${shadow.artifactCount} uploaded=${shadow.uploadedCount}`,
+      );
+    }
+  } catch (error) {
+    const message = `[sync-to-db] R6 Raw shadow FAILED: ${error.message}`;
+    if (process.env.R6_SHADOW_REQUIRED === '1') {
+      console.error(message);
+      await sql.end();
+      process.exit(1);
+    }
+    console.warn(`${message} (non-blocking shadow)`);
   }
 
   console.log('[sync-to-db] done');

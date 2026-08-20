@@ -1,10 +1,11 @@
 # HOT CRUSH Supabase 数据平台实施蓝图 v2
 
-> 本文是“当前生产数据库 → 单项目 Supabase 分层数据平台”的实施主文档。
+> 本文是 2026-08-20 实施前的设计草案，已被
+> `hotcrush-r6-green-database-blueprint-v1.md` 取代；不再作为实施依据。
 >
-> 状态：设计完成，尚未创建正式 migration、worker 或 Cron；未执行生产 DDL/DML，未上传 Brain PDF，未部署。
+> 状态：历史设计草案，其表数、bucket 数、项目边界与实际 R6 已不一致。
 >
-> 旧的 `hotcrush-supabase-internal-architecture-v1.md` 保留为概念背景；若两者冲突，以本文为准。
+> 旧的 `hotcrush-supabase-internal-architecture-v1.md` 保留为概念背景；若历史文档之间冲突，以新的 R6 Green 蓝图为准。
 
 ## 1. 最终结论
 

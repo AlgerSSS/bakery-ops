@@ -43,6 +43,7 @@ if [ "$TARGET" = "core" ] || [ "$TARGET" = "both" ]; then
   echo "==> rsync bakery-ops → tokyo-01（排除 .env / node_modules / 各类会话态）"
   rsync -az -e "$SSHC" \
     --exclude node_modules --exclude .next --exclude .git --exclude logs \
+    --exclude '.venv' --exclude '.pytest_cache' --exclude '__pycache__' \
     --exclude output --exclude .env --exclude 'storageState*.json' \
     --exclude '*.log' --exclude '.DS_Store' --exclude '/_*' \
     --exclude 'whatsapp-session' --exclude 'jobstreet-session' \

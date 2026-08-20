@@ -6,7 +6,7 @@
 // - F9b：knowledge_query 经营类分支——问题涉及销售/单品/时段时调共享 queryDataForQuestion。
 // - G3c：意图分类走 AI_SMALL_MODEL（chatCompletion 第三参）。
 // - G3f：错误文案固定中文，不透传原始异常。
-// - G4-①：lightragClient.ingest fire-and-forget，不 await（未 resolve 的 ingest 不阻塞回复）。
+// - G4-①：knowledgeClient.ingest fire-and-forget，不 await（未 resolve 的 ingest 不阻塞回复）。
 // - G4-⑤：daily-review 的 RAG 查询 mode=naive，查询串只用店长原文（无固定前缀）。
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -28,8 +28,8 @@ vi.mock("@/modules/shared/db/postgres", () => ({
 const ragIsAvailable = vi.fn();
 const ragQuery = vi.fn();
 const ragIngest = vi.fn();
-vi.mock("@/modules/domain/knowledge/lightrag-client", () => ({
-  lightragClient: {
+vi.mock("@/modules/domain/knowledge/knowledge-client", () => ({
+  knowledgeClient: {
     isAvailable: (...args: unknown[]) => ragIsAvailable(...args),
     query: (...args: unknown[]) => ragQuery(...args),
     ingest: (...args: unknown[]) => ragIngest(...args),

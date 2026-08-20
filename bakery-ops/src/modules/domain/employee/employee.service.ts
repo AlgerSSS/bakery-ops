@@ -1,7 +1,7 @@
 import { employeeRepository } from "../../data/repositories/employee.repository";
 import { employeeEventRepository } from "../../data/repositories/employee-event.repository";
 import { parseEmployeeEvent } from "./employee-event.parser";
-import { lightragClient } from "../knowledge/lightrag-client";
+import { knowledgeClient } from "../knowledge/knowledge-client";
 import { larkSyncService } from "../lark/lark-sync.service";
 import { extractRules } from "./rule-extractor";
 import { logger } from "../../shared/logger";
@@ -196,6 +196,6 @@ async function ingestToKnowledgeGraph(
 
   const text = lines.filter(Boolean).join("\n");
   if (text.length > 20) {
-    await lightragClient.ingest(text);
+    await knowledgeClient.ingest(text);
   }
 }

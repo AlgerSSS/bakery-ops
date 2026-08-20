@@ -28,7 +28,7 @@ import { runAppointmentReminder } from "./modules/domain/recruitment/appointment
 import { runProbationReminder } from "./modules/domain/recruitment/probation-reminder.service";
 import { syncLarkOrg } from "./modules/domain/lark/lark-org-sync.service";
 import { pullDailyApplicants } from "./modules/domain/recruitment/jobs/applicant-intake.service";
-import { lightragClient } from "./modules/domain/knowledge/lightrag-client";
+import { knowledgeClient } from "./modules/domain/knowledge/knowledge-client";
 import { larkInboundAdapter } from "./modules/channel/lark/lark-inbound";
 
 // 幂等守卫：`npm run dev` 下 server.ts 会直接调用 bootstrap()，而 Next.js 的
@@ -210,14 +210,14 @@ async function runBootstrap() {
   // 17. 每日 09:10 转正提醒（env 可选 PROBATION_DAYS，默认 90）
   if (onWa) cron.schedule("10 9 * * *", wrapCron("probation_reminder", runProbationReminder), TZ);
 
-  // 18. 一次性 LightRAG 健康探测（fire-and-forget）：不可用时只告警，不阻塞启动。
-  lightragClient
+  // 18. 一次性知识后端健康探测（fire-and-forget）：不可用时只告警，不阻塞启动。
+  knowledgeClient
     .isAvailable()
     .then((ok) => {
-      if (!ok) logger.warn("LightRAG 服务不可用——复盘知识索引降级，见 IMPROVEMENT-PLAN G4");
+      if (!ok) logger.warn("知识检索后端不可用——复盘知识索引降级，见 IMPROVEMENT-PLAN G4");
     })
     .catch(() => {
-      logger.warn("LightRAG 服务不可用——复盘知识索引降级，见 IMPROVEMENT-PLAN G4");
+      logger.warn("知识检索后端不可用——复盘知识索引降级，见 IMPROVEMENT-PLAN G4");
     });
 
   logger.info("System bootstrapped successfully");

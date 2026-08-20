@@ -58,7 +58,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return noStoreJson({ error: "LOGIN_REQUIRED" }, { status: 401 });
     }
 
-    const window = pickupWindow(config);
+    const window = pickupWindow(config, input.giftType);
     if (input.pickupDate < window.minDate || input.pickupDate > window.maxDate) {
       return noStoreJson(
         { error: "PICKUP_DATE_OUT_OF_RANGE", pickup: window },

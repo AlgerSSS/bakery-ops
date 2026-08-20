@@ -141,9 +141,10 @@ export function decideReservation(
   return { ok: true };
 }
 
-/** 可选取货日期窗口：提前 pickupLeadDays 天起，最长 pickupWindowDays 天。 */
+/** 可选取货日期窗口：巴斯克 T-2、积分定制蛋糕 T-5，最远仍是统一窗口。 */
 export function pickupWindow(
   config: BirthdayConfig,
+  giftType: "free_basque" | "points_450",
   now: Date = new Date(),
 ): { minDate: string; maxDate: string } {
   const fmt = new Intl.DateTimeFormat("en-CA", {
@@ -154,8 +155,9 @@ export function pickupWindow(
   });
   const dayMs = 24 * 60 * 60 * 1000;
   return {
-    minDate: fmt.format(new Date(now.getTime() + config.pickupLeadDays * dayMs)),
+    minDate: fmt.format(
+      new Date(now.getTime() + config.pickupLeadDaysByGift[giftType] * dayMs),
+    ),
     maxDate: fmt.format(new Date(now.getTime() + config.pickupWindowDays * dayMs)),
   };
 }
-

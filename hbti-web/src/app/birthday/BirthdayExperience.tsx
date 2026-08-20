@@ -20,6 +20,10 @@ import {
   preloadCaptcha,
   solveCaptcha,
 } from "@/lib/auth/tencent-captcha";
+import {
+  type BirthdayDeliveryMode,
+  deliveryModeGiftType,
+} from "@/lib/birthday/delivery-mode";
 
 import styles from "./birthday.module.css";
 
@@ -45,6 +49,7 @@ type Step =
   | "letter"
   | "year"
   | "benefit"
+  | "delivery"
   | "profile"
   | "reserve"
   | "confirm"
@@ -55,6 +60,7 @@ const STEP_BACK: Record<Step, Step | undefined> = {
   letter: "cover",
   year: "letter",
   benefit: "year",
+  delivery: undefined,
   profile: "benefit",
   reserve: "profile",
   confirm: "reserve",
@@ -64,6 +70,7 @@ const STEP_BACK: Record<Step, Step | undefined> = {
 const STEP_HINT: Partial<Record<Step, string>> = {
   letter: "一封短信",
   benefit: "生日这天的礼物",
+  delivery: "先把档期留出来",
   profile: "想记住的日子",
   reserve: "就差哪天来拿",
   confirm: "都好了，看一眼对不对",
@@ -151,7 +158,7 @@ interface BirthdayView {
   };
   stats: BirthdayStats | null;
   options: BirthdayOption[];
-  pickup: { minDate: string; maxDate: string };
+  pickupByGift: Record<GiftType, { minDate: string; maxDate: string }>;
   profile: BirthdayProfile | null;
   reservations: BirthdayReservation[];
   campaignYear: number;
@@ -255,7 +262,13 @@ function buildCalendar(minDate: string, maxDate: string): CalendarMonth[] {
 
 /* ══════════════════════════════════════════════════════════════ */
 
-export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
+export function BirthdayExperience({
+  linkToken,
+  deliveryMode = "card",
+}: {
+  linkToken?: string;
+  deliveryMode?: BirthdayDeliveryMode;
+}) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [view, setView] = useState<BirthdayView>();
   /** 链接无效 / 会话过期时带给登录屏的一句话。 */
@@ -304,12 +317,20 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
         setBirthdayDay(data.profile?.birthdayDay ?? null);
         setAllergies(data.profile?.allergies ?? "");
         setPreferences(data.profile?.preferences ?? "");
-        /* 默认选中第一个可选礼物（有积分就优先积分兑换，没有就免费巴斯克）。 */
-        const firstAvailable =
-          data.options?.find((option) => option.available) ?? data.options?.[0];
-        if (firstAvailable) {
-          setGiftType(firstAvailable.giftType);
+        const requestedGiftType = deliveryModeGiftType(deliveryMode);
+        const initialOption = requestedGiftType
+          ? data.options?.find(
+              (option) => option.giftType === requestedGiftType,
+            )
+          : (data.options?.find((option) => option.available) ??
+            data.options?.[0]);
+        if (requestedGiftType) {
+          /* 提前送达的两封预约信只能打开各自的礼物，不能静默换成另一项。 */
+          setGiftType(requestedGiftType);
+        } else if (initialOption) {
+          setGiftType(initialOption.giftType);
         }
+        setStep(deliveryMode === "card" ? "cover" : "delivery");
         setPhase("ready");
         return;
       }
@@ -332,7 +353,7 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
     } catch {
       setPhase("loadError");
     }
-  }, []);
+  }, [deliveryMode]);
 
   useEffect(() => {
     let alive = true;
@@ -566,8 +587,9 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
   );
   const selectedOption =
     view.options.find((option) => option.giftType === giftType) ??
-    view.options.find((option) => option.available) ??
-    view.options[0];
+    (deliveryMode === "card"
+      ? (view.options.find((option) => option.available) ?? view.options[0])
+      : undefined);
   const freeBasqueClaimed =
     selectedOption?.giftType === "free_basque" &&
     !selectedOption.available &&
@@ -614,6 +636,16 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
               onContinue={() => goTo("profile")}
             />
           )}
+          {step === "delivery" && deliveryMode !== "card" && (
+            <DeliveryIntroScreen
+              {...stepProps}
+              view={view}
+              deliveryMode={deliveryMode}
+              giftType={giftType}
+              onContinue={() => goTo("profile")}
+              onSeeReservations={() => goTo("done")}
+            />
+          )}
           {step === "profile" && (
             <ProfileScreen
               {...stepProps}
@@ -651,7 +683,9 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
                 setProfileSaved(false);
               }}
               onSave={() => void saveProfile()}
-              onBack={() => goTo("benefit")}
+              onBack={() =>
+                goTo(deliveryMode === "card" ? "benefit" : "delivery")
+              }
               onContinue={() => goTo("reserve")}
             />
           )}
@@ -716,7 +750,14 @@ export function BirthdayExperience({ linkToken }: { linkToken?: string }) {
               {...stepProps}
               view={view}
               confirmed={confirmed}
-              onBackToCard={() => goTo("cover")}
+              backLabel={
+                deliveryMode === "card"
+                  ? "← 回到我的卡片"
+                  : "← 回到预约入口"
+              }
+              onBack={() =>
+                goTo(deliveryMode === "card" ? "cover" : "delivery")
+              }
             />
           )}
         </div>
@@ -1308,10 +1349,10 @@ function CoverScreen({
         </p>
         <p className={styles.what}>
           {view.options.length === 0
-            ? "生日当月，一封贺卡，我们写。"
+            ? "生日当天，一封贺卡，我们写。"
             : view.options.some((option) => option.giftType === "points_450")
-              ? "生日当月，巴斯克或 450 积分蛋糕，随你选。"
-              : "生日当月，一份巴斯克，我们请。"}
+              ? "生日当天，巴斯克或 450 积分蛋糕，随你选。"
+              : "生日当天，一份巴斯克，我们请。"}
         </p>
         <button className={styles.btn} type="button" onClick={onOpenLetter}>
           打开你的生日信
@@ -1601,7 +1642,7 @@ function BenefitScreen({
           <>
             <p className={styles.what}>生日电子贺卡</p>
             <p className={styles.sub}>
-              Lv1 的生日礼就是这封贺卡——生日当月会自动送给你，不用预约。
+              Lv1 的生日礼就是这封贺卡——生日当天会自动送给你，不用预约。
               {member.level.next
                 ? `今年消费满 RM${member.level.next.threshold.toFixed(0)} 升到
                   ${member.level.next.nameZh}，就有一份免费巴斯克了。`
@@ -1674,6 +1715,101 @@ function BenefitScreen({
       <button className={styles.btn} type="button" onClick={onContinue}>
         继续
       </button>
+    </section>
+  );
+}
+
+/* ── 提前送达的预约信：T-5 定制蛋糕 / T-2 免费巴斯克 ── */
+function DeliveryIntroScreen({
+  headingRef,
+  view,
+  deliveryMode,
+  giftType,
+  onContinue,
+  onSeeReservations,
+}: ScreenProps & {
+  view: BirthdayView;
+  deliveryMode: Exclude<BirthdayDeliveryMode, "card">;
+  giftType: GiftType;
+  onContinue: () => void;
+  onSeeReservations: () => void;
+}) {
+  const option = view.options.find((item) => item.giftType === giftType);
+  const claimed =
+    giftType === "free_basque" &&
+    option?.deniedReason === "FREE_BASQUE_ALREADY_CLAIMED";
+  const notEnough = option?.deniedReason === "INSUFFICIENT_POINTS";
+  const unavailableCopy = claimed
+    ? "今年的免费巴斯克已经留过了，预约记录还在这里。"
+    : notEnough
+      ? `这次还差 ${Math.max(0, 450 - (view.member.pointBalance ?? 0))} 积分，攒够后再回来。`
+      : "这份生日礼现在还不能预约。";
+
+  return (
+    <section
+      className={`${styles.screen} ${styles.card}`}
+      data-delivery-mode={deliveryMode}
+    >
+      <div className={styles.brand}>
+        <span className={styles.logo} role="img" aria-label="Hot Crush" />
+        <span className={styles.rule} />
+        <span className={styles.sub2}>Pavilion KL</span>
+      </div>
+      <div className={styles.heroTxt}>
+        <p className={styles.tier}>
+          {view.member.level.nameZh} · {view.campaignYear}
+        </p>
+        <h1 ref={headingRef} tabIndex={-1} className={styles.nm}>
+          {deliveryMode === "cake"
+            ? "生日蛋糕，先替你留档期。"
+            : "巴斯克，提前两天给你留。"}
+        </h1>
+      </div>
+      <CakeSvg />
+      <div className={styles.gift}>
+        <p className={styles.what}>{option?.label ?? GIFT_TYPE_LABEL[giftType]}</p>
+        {option?.available ? (
+          <>
+            <p className={styles.body}>
+              {deliveryMode === "cake" ? (
+                <>
+                  定制蛋糕要<em>提前 5 天</em>备料。先告诉我们取货时间和口味，生日当天的贺卡会另外送到。
+                </>
+              ) : (
+                <>
+                  免费巴斯克要<em>提前 2 天</em>准备。先把取货时间留好，生日当天再收完整贺卡。
+                </>
+              )}
+            </p>
+            {giftType === "points_450" && (
+              <p className={styles.hintline}>
+                到店取货时在 POS 扣 450 积分；系统暂不设年度次数限制。
+              </p>
+            )}
+            <button className={styles.btn} type="button" onClick={onContinue}>
+              填写口味和取货时间
+            </button>
+          </>
+        ) : (
+          <>
+            <p className={styles.sub}>{unavailableCopy}</p>
+            {claimed ? (
+              <button
+                className={styles.btn}
+                type="button"
+                onClick={onSeeReservations}
+              >
+                看看我的预约
+              </button>
+            ) : (
+              <button className={styles.btn} type="button" disabled>
+                暂时不能预约
+              </button>
+            )}
+          </>
+        )}
+      </div>
+      <p className={styles.foot}>提前送达 · 只用于预约这一份生日礼</p>
     </section>
   );
 }
@@ -1877,7 +2013,7 @@ function ReserveScreen({
   onContinue: () => void;
   onSeeReservations: () => void;
 }) {
-  const { minDate, maxDate } = view.pickup;
+  const { minDate, maxDate } = view.pickupByGift[giftType];
   const months = buildCalendar(minDate, maxDate);
   const selectedOption =
     view.options.find((option) => option.giftType === giftType) ??
@@ -1905,7 +2041,7 @@ function ReserveScreen({
           贺卡已经送到。
         </h2>
         <p className={styles.sub}>
-          Lv1 的生日礼是电子贺卡，生日当月自动送达，不用预约。
+          Lv1 的生日礼是电子贺卡，生日当天自动送达，不用预约。
           今年消费满 RM250 升到 Lv2，就有一份免费巴斯克了。
         </p>
         <button className={styles.btn} type="button" onClick={onBack}>
@@ -2235,11 +2371,13 @@ function DoneScreen({
   headingRef,
   view,
   confirmed,
-  onBackToCard,
+  backLabel,
+  onBack,
 }: ScreenProps & {
   view: BirthdayView;
   confirmed?: BirthdayReservation;
-  onBackToCard: () => void;
+  backLabel: string;
+  onBack: () => void;
 }) {
   /* 刚提交的那条优先；否则找最近一条进行中的。 */
   const headline =
@@ -2289,9 +2427,9 @@ function DoneScreen({
       <button
         className={styles.backLink}
         type="button"
-        onClick={onBackToCard}
+        onClick={onBack}
       >
-        ← 回到我的卡片
+        {backLabel}
       </button>
     </section>
   );

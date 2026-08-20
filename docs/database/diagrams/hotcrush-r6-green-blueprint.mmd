@@ -8,9 +8,9 @@ flowchart TB
 
   OLD["旧生产库<br/>ecsgqcmwtjmcpzqytdqw<br/>现网唯一业务真源"]:::frozen
   BACKFILL["只读有界 POS 回填（截至 08-19）<br/>260 日：229 接纳 + 31 隔离<br/>2699 小时 · 逐字段零差异"]:::source
-  SOURCES["RES POS · Brain 165 PDF manifest · 财务/HR/SCM"]:::source
+  SOURCES["RES POS · Brain 165 PDF manifest<br/>70 待审：3 批准 + 67 拒绝 · 财务/HR/SCM"]:::source
 
-  subgraph R6["Supabase R6 Green · tmmkknnkcptunxbfjxqn · 24 migrations"]
+  subgraph R6["Supabase R6 Green · tmmkknnkcptunxbfjxqn · 25 migrations"]
     direction TB
     subgraph L1["1  Raw 证据层"]
       STORAGE["7 个 Private Storage buckets"]:::raw
@@ -19,7 +19,7 @@ flowchart TB
     subgraph L2["2  预处理 / 事实 / RAG"]
       RUN["ops_processing_run<br/>pipeline_health<br/>1–31 日范围对账"]:::processed
       POS["pos_sales_day<br/>pos_sales_hour<br/>v_pos_*_current"]:::processed
-      RAG["ai_raw_document / ai_ingest_run<br/>3 C1 · 29 pages · 32 chunks/vectors<br/>unpublish ↔ restore"]:::processed
+      RAG["ai_raw_document / ai_document_review / ai_ingest_run<br/>3 C1 + 3 C2 · 108 pages · 113 chunks/vectors<br/>C3/C4 fail-closed · unpublish ↔ restore"]:::processed
     end
     subgraph L3["3  Agent 层"]
       AGENT["ops_agent_run<br/>ops_agent_event (只追加)"]:::agent

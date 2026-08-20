@@ -13,7 +13,12 @@ from uuid import UUID
 
 from .classification import Classification, classify_path
 from .config import Settings
-from .manifest import apply_manifest, brain_source_batch_key, build_manifest
+from .manifest import (
+    apply_manifest,
+    brain_source_batch_key,
+    build_manifest,
+    record_manifest_review,
+)
 from .pdf_pipeline import DeterministicTestEmbedder, OpenRouterEmbedder
 from .supabase_client import SupabasePlatformClient
 
@@ -182,6 +187,44 @@ def upload_one(
     }
 
 
+def approve_uploaded_document(
+    upload_result: dict[str, Any],
+    settings: Settings,
+    *,
+    review_entry: dict[str, Any],
+    manifest_sha256: str,
+) -> dict[str, Any]:
+    if review_entry.get("decision") != "APPROVE_RAG":
+        raise ValueError("only APPROVE_RAG review entries can be queued")
+    document_id = str(UUID(str(upload_result.get("document_id"))))
+    with SupabasePlatformClient(
+        settings.supabase_url,
+        settings.supabase_service_key,
+        settings.request_timeout_seconds,
+    ) as client:
+        document = client.one(
+            client.rpc(
+                "ai_approve_document_review",
+                {
+                    "p_document_id": document_id,
+                    "p_reviewer": review_entry["reviewer"],
+                    "p_reason": review_entry["reason"],
+                    "p_manifest_sha256": manifest_sha256,
+                    "p_source_sha256": review_entry["sha256"],
+                    "p_pipeline_version": settings.pipeline_version,
+                    "p_embedding_model": settings.embedding_model,
+                },
+            )
+        )
+    if not document:
+        raise RuntimeError("document review approval returned no row")
+    return {
+        "document_id": document["document_id"],
+        "status": document["status"],
+        "rag_eligibility": document["rag_eligibility"],
+    }
+
+
 def search_knowledge(
     query: str,
     settings: Settings,
@@ -328,11 +371,30 @@ def main() -> None:
     plan_parser.add_argument("root", type=Path)
     plan_parser.add_argument("--output", type=Path, required=True)
 
+    review_parser = subparsers.add_parser(
+        "review", help="append one explicit decision to a manifest-bound review ledger"
+    )
+    review_parser.add_argument("manifest", type=Path)
+    review_parser.add_argument("review", type=Path)
+    review_parser.add_argument("--path", required=True, dest="relative_path")
+    review_parser.add_argument(
+        "--decision",
+        required=True,
+        choices=("APPROVE_RAG", "DENY_RAG"),
+    )
+    review_parser.add_argument("--reviewer", required=True)
+    review_parser.add_argument("--reason", required=True)
+
     batch_parser = subparsers.add_parser(
         "batch", help="verify and optionally apply AUTO_UPLOAD entries from a manifest"
     )
     batch_parser.add_argument("root", type=Path)
     batch_parser.add_argument("manifest", type=Path)
+    batch_parser.add_argument(
+        "--review-manifest",
+        type=Path,
+        help="optional manifest-bound review ledger; only APPROVE_RAG C1/C2 entries are added",
+    )
     batch_parser.add_argument(
         "--apply",
         action="store_true",
@@ -381,8 +443,27 @@ def main() -> None:
             _write_json(build_manifest(args.root), args.output)
             return
 
+        if args.command == "review":
+            manifest = _read_json_object(args.manifest)
+            existing_review = _read_json_object(args.review) if args.review.exists() else None
+            _write_json(
+                record_manifest_review(
+                    manifest,
+                    existing_review,
+                    relative_path=args.relative_path,
+                    decision=args.decision,
+                    reviewer=args.reviewer,
+                    reason=args.reason,
+                ),
+                args.review,
+            )
+            return
+
         if args.command == "batch":
             manifest = _read_json_object(args.manifest)
+            review_manifest = (
+                _read_json_object(args.review_manifest) if args.review_manifest else None
+            )
             settings = Settings.from_env(require_embedding=False) if args.apply else None
             _write_json(
                 apply_manifest(
@@ -392,6 +473,8 @@ def main() -> None:
                     settings=settings,
                     max_files=args.max_files,
                     upload_fn=upload_one,
+                    review_manifest=review_manifest,
+                    approve_fn=approve_uploaded_document,
                 ),
                 None,
             )

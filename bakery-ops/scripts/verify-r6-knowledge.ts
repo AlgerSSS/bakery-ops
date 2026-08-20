@@ -1,7 +1,10 @@
 import { SupabaseKnowledgeClient } from "../src/modules/domain/knowledge/knowledge-client";
 
-const EXPECTED_TITLE = "JobStreet_AJobThing_职位发布价格对比";
-const EXPECTED_PAGE = "第 1 页";
+const query =
+  process.env.R6_VERIFY_QUERY?.trim() || "JobStreet Advanced RM 975 posting price";
+const expectedTitle =
+  process.env.R6_VERIFY_EXPECTED_TITLE?.trim() || "JobStreet_AJobThing_职位发布价格对比";
+const expectedPage = process.env.R6_VERIFY_EXPECTED_PAGE?.trim() || "第 1 页";
 
 async function main(): Promise<void> {
   const client = new SupabaseKnowledgeClient();
@@ -9,13 +12,13 @@ async function main(): Promise<void> {
     throw new Error("R6 Supabase knowledge endpoint is unavailable or credentials are missing");
   }
 
-  const result = await client.query("JobStreet Advanced RM 975 posting price", "hybrid");
-  if (!result?.includes(EXPECTED_TITLE) || !result.includes(EXPECTED_PAGE)) {
+  const result = await client.query(query, "hybrid");
+  if (!result?.includes(expectedTitle) || !result.includes(expectedPage)) {
     throw new Error("R6 application query did not return the expected document and page citation");
   }
 
   process.stdout.write(
-    `${JSON.stringify({ ok: true, backend: "r6-supabase", title: EXPECTED_TITLE, page: 1 })}\n`,
+    `${JSON.stringify({ ok: true, backend: "r6-supabase", title: expectedTitle, page: expectedPage })}\n`,
   );
 }
 

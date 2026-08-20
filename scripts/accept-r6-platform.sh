@@ -109,6 +109,51 @@ run_remote() {
     and .cron.active_jobs == .cron.expected_jobs
   ' <<< "$health" >/dev/null
 
+  echo "remote: RAG publication and review invariants"
+  local rag_audit
+  rag_audit=$(cd "$ROOT" && "${SUPABASE[@]}" db query --linked --output-format json "
+    with current_documents as (
+      select *
+      from public.ai_raw_document
+      where status = 'READY' and is_current
+    ), current_chunks as (
+      select chunk.chunk_id
+      from public.ai_document_chunk as chunk
+      join current_documents as document
+        on document.document_id = chunk.document_id
+       and document.published_ingest_run_id = chunk.ingest_run_id
+    )
+    select
+      (select count(*)::integer from current_documents) as ready_documents,
+      (select coalesce(sum(page_count), 0)::integer from current_documents) as ready_pages,
+      (select count(*)::integer from current_chunks) as current_chunks,
+      (select count(*)::integer from public.ai_chunk_embedding as embedding
+       join current_chunks using (chunk_id)) as current_embeddings,
+      (select count(*)::integer from public.ai_ingest_run) as ingest_runs,
+      (select count(*)::integer from public.ai_document_review) as review_approvals,
+      (select count(*)::integer from public.ai_document_review
+       where length(manifest_sha256) = 64 and length(source_sha256) = 64) as manifest_bound_reviews,
+      (select count(*)::integer
+       from current_documents as document
+       left join public.ops_raw_object as raw_object
+         on raw_object.raw_object_id = document.raw_object_id
+       left join public.ai_document_review as review
+         on review.document_id = document.document_id
+        and review.source_sha256 = btrim(raw_object.sha256)
+       where document.data_class = 'C2' and review.review_id is null) as review_audit_gaps;
+  ")
+  jq -e '
+    .rows[0]
+    | .ready_documents == 6
+      and .ready_pages == 108
+      and .current_chunks == 113
+      and .current_embeddings == 113
+      and .ingest_runs == 6
+      and .review_approvals == 3
+      and .manifest_bound_reviews == 3
+      and .review_audit_gaps == 0
+  ' <<< "$rag_audit" >/dev/null
+
   echo "remote: full historical POS reconciliation"
   export R6_SUPABASE_SECRET_KEY="$r6_key"
   (cd "$ROOT/res_api" && node scripts/verify-r6-pos-history.js \
@@ -130,9 +175,8 @@ run_remote() {
       | {ok, sourceProjectRef, targetProjectRef, fromDate, toDate, totals}
     ')
 
-  echo "remote: BakeryOps R6 retrieval with page citation"
+  echo "remote: BakeryOps R6 retrieval with page citations"
   export R6_SUPABASE_SERVICE_KEY="$r6_key"
-  export R6_KNOWLEDGE_SPACE_IDS="10000000-0000-7000-8000-000000000001"
   local embed_key
   embed_key=$(read_secret AI_EMBED_API_KEY)
   if [[ -z "$embed_key" ]]; then
@@ -143,7 +187,44 @@ run_remote() {
     exit 65
   }
   export AI_EMBED_API_KEY="$embed_key"
-  (cd "$ROOT/bakery-ops" && npm run verify:r6-knowledge)
+  verify_knowledge() {
+    local space_id="$1"
+    local query="$2"
+    local expected_title="$3"
+    local expected_page="$4"
+    local attempt
+    for attempt in 1 2 3; do
+      if (cd "$ROOT/bakery-ops" && \
+        R6_KNOWLEDGE_SPACE_IDS="$space_id" \
+        R6_VERIFY_QUERY="$query" \
+        R6_VERIFY_EXPECTED_TITLE="$expected_title" \
+        R6_VERIFY_EXPECTED_PAGE="$expected_page" \
+        npm run verify:r6-knowledge); then
+        return 0
+      fi
+      if [[ "$attempt" -lt 3 ]]; then
+        echo "knowledge verification transient failure; retrying ($attempt/3)" >&2
+        sleep $((attempt * 2))
+      fi
+    done
+    return 1
+  }
+
+  verify_knowledge \
+    "10000000-0000-7000-8000-000000000001" \
+    "JobStreet Advanced RM 975 posting price" \
+    "JobStreet_AJobThing_职位发布价格对比" \
+    "第 1 页"
+  verify_knowledge \
+    "10000000-0000-7000-8000-000000000006" \
+    "L1-L4 与 L1-L5 会员方案成本和主要风险有什么差异" \
+    "会员L1-L4与L1-L5方案对比表-20260728" \
+    "第 2 页"
+  verify_knowledge \
+    "10000000-0000-7000-8000-000000000007" \
+    "试用期 7 天、30 天、60 天、90 天分别适用于什么员工" \
+    "HOT_CRUSH_人力资源制度文件" \
+    "第 11 页"
 
   if [[ "${R6_ACCEPTANCE_DEEP:-0}" == "1" ]]; then
     echo "remote: deep schema replay diff"

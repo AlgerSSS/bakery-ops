@@ -19,8 +19,8 @@
 2026-08-21 再查 tokyo-01 的 `hotcrush*` 服务只有 alert-relay、cn-worker、core、rag-worker 和
 res-api，不存在 POS/shadow 常驻服务；BakeryOps 与 `res_api` 的 `.env` 仍只含旧 project ref。
 
-R6 Green 现由 24 个可重放 Supabase migration 完整定义，远端为 14 张平台/业务表、2 个 POS current
-view、39 个 `ops_*`/`ai_*` 受控函数、7 个私有 Storage bucket、7 个 NOLOGIN capability role、6 个
+R6 Green 现由 25 个可重放 Supabase migration 完整定义，远端为 15 张平台/业务表、2 个 POS current
+view、40 个 `ops_*`/`ai_*` 受控函数、7 个私有 Storage bucket、7 个 NOLOGIN capability role、6 个
 pg_cron job；`vector` 位于 `extensions` schema，Realtime 只发布 3 张运行状态表。物理分层为：
 `ops_raw_batch/object` 原始证据与 `ops_processing_run` 租约队列 → 版本化 `pos_sales_day/hour` 与 RAG
 文档/chunk/vector → 追加式 Agent run/event → RPC/Realtime 用户交互契约。没有为单店阶段引入 Fabric、
@@ -58,44 +58,62 @@ R6 当前有 229 个 current 日、259 个日版本、2742 个小时版本。健
 `quarantined_unacknowledged=1`。处理、RAG、Agent 失败/过期租约及 Storage 血缘缺口均为 0，6 个 cron
 均活跃。不得为追求绿色状态恢复不完整半日快照。
 
-统一入口 `scripts/accept-r6-platform.sh [local|remote|all]` 已跑通完整验收：10 个 pgTAP
-文件/95 项断言、Python pytest 38/38 + Ruff、`res_api` unit 143/143 + API 22/22、BakeryOps TypeScript +
-45 files/463 Vitest + Next build；远端 24/24 migration、lint、健康不变量和真实带页码检索也均通过。脚本
+统一入口 `scripts/accept-r6-platform.sh [local|remote|all]` 已跑通完整验收：11 个 pgTAP
+文件/109 项断言、Python pytest 41/41 + Ruff、`res_api` unit 143/143 + API 22/22、BakeryOps TypeScript +
+45 files/463 Vitest + Next build；远端 25/25 migration、lint、健康不变量、RAG 审阅不变量和真实带页码检索也均通过。脚本
 先硬检查 linked ref 必须是 R6，且 BakeryOps/`res_api` 两份 `.env` 必须仍指向旧生产并且不得出现 R6 ref。
 2026-08-21 的最终 remote 门禁还强制执行全历史九窗对账，260/229/31、2699 小时与 0 mismatch
-不变量全部通过；BakeryOps 临时 opt-in 仍返回招聘价格文档第 1 页。
+不变量全部通过；BakeryOps 临时 opt-in 返回 C1 招聘价格文档第 1 页、C2 会员方案第 2 页、C2 HR 制度
+第 11 页。RAG 数据库门禁固定核验 6 个 READY/current 文档、108 页、113 个 current chunks/embeddings、
+6 个 ingest run、3 条 manifest/source SHA 绑定的批准证据和 0 个 C2 审计缺口。
 `supabase db diff --linked --schema public,private` 从空影子库重放后返回 `No schema changes found`；提交前
 `git diff --check` 和变更文件密钥/本机路径扫描均通过。Next build 既存 Turbopack warning、NFT 全项目
 追踪 warning 与 Python PyMuPDF/SWIG 弃用 warning 不影响本轮结果。
 
 桌面 Brain 根目录已完成 165 份 PDF 的本地哈希盘点，但 manifest 本体因包含相对文件名/潜在 PII 没有
 提交仓库。按同知识空间内去重后的决策为：3 `AUTO_UPLOAD`、70 `REVIEW_REQUIRED`、45 `DENIED`、47
-`DUPLICATE_SKIP`；跨安全空间的同哈希文件不会共用 Raw object。3 份 C1 文档经页面渲染人工检查后已
-真实导入 R6，当前共 3 个 READY/current 文档、29 页、32 chunks/embeddings。代表性检索分别命中技术
-文档第 2 页、招聘价格对比第 1 页和品牌册相关页面；这证明技术链路与代表性精确查询可用，不能外推成
-所有业务问题的检索质量已验收。
+`DUPLICATE_SKIP`；跨安全空间的同哈希文件不会共用 Raw object。70 个待审项已形成 3 `APPROVE_RAG` /
+67 `DENY_RAG` 的 manifest-bound review ledger；全部 35 份 C3 因 worker 没有真正 PII 脱敏而拒绝。
+批准的 C2 是会员 L1-L4/L1-L5 对比、HR 制度 V1.0 和 SeeYouOften 储值审阅报告。它们与既有 3 份 C1
+一起真实导入 R6，当前共 6 个 READY/current 文档、108 页、113 chunks/embeddings。完整受限账本位于
+`/Users/weiliangshao/Library/Application Support/HotCrush/r6-rag/brain-review-2026-08-21/`（目录 700，
+两个核心 JSON 600）；内部 manifest SHA 为 `9a30e2b7...a7c8049`，review SHA 为
+`8ee45bff...aec3de`。数据库只存真正上传的 3 条批准，不上传 67 条拒绝的敏感路径。
 
-Brain 批处理默认 dry-run，仅 `AUTO_UPLOAD` 可选中；执行时重验路径、大小、SHA-256、分类和 manifest
-digest。旧 batch-key 升级造成的同对象重放冲突已通过 migration 23 的 immutable-object resolve 与空
+Brain 批处理默认 dry-run，仅 `AUTO_UPLOAD` 与审阅账本明确批准的 C1/C2 可选中；执行时重验路径、
+大小、SHA-256、分类、source manifest digest 和 review digest。migration 25 新增不可变
+`ai_document_review` 与受控 `ai_approve_document_review`：批准会核对源 object SHA，原子写 reviewer/
+reason/manifest SHA/pipeline/model 并建立 ingest run；相同重放幂等，冲突重放失败，C3/C4 返回 42501。
+该迁移同时修复 migration 13 新增 `kb-restricted` bucket 却漏改 `ops_raw_object_bucket_ck`、导致 C2 Raw
+登记失败的真实 bug。service role 直接 REST 读取 review 底表为 403，空间成员/非成员 RLS 已由 pgTAP
+验证。旧 batch-key 升级造成的同对象重放冲突已通过 migration 23 的 immutable-object resolve 与空
 batch recovery 修复，远端遗留空 batch 已安全标记 FAILED。migration 24 新增精确 ingest status，以及
 保留 Raw/chunk/vector 的 `unpublish ↔ restore`；招聘价格文档已完成下架后检索消失、恢复后同页命中的
-回滚演练。`brainctl status/unpublish/restore/batch` 控制面只需 R6 凭据，search/worker 才要求 embedding
-凭据。远端 Worker 已补齐并启动 Tesseract 英文/简中 OCR，最终重部署状态为 active/running。
+回滚演练，人工批准的 C2 会员方案也已完成同样远端演练。`brainctl review` 追加不可覆盖的审阅决定，
+`brainctl batch --review-manifest` 才能选择批准项；status/unpublish/restore/batch 控制面只需 R6 凭据，
+search/worker 才要求 embedding 凭据。远端 Worker 已补齐并启动 Tesseract 英文/简中 OCR，最终重部署
+状态为 active/running。六文档完成态批处理复跑全部 `uploaded=false`，文档/review/run 数量不变。
 
 BakeryOps 新增 R6 Supabase knowledge backend 的真实验收脚本，并修复跨区域健康探测：现在调用
 `ops_get_platform_health`，超时 10 秒；知识空间环境变量隔离为 `R6_KNOWLEDGE_SPACE_IDS`。该 backend
 仍默认关闭（默认继续使用旧 `lightrag`），只在进程级显式 opt-in 时连接 R6；真实验收返回招聘价格文档
-第 1 页引用。本轮没有把 opt-in 写进任何旧应用配置。
+第 1 页及两份 C2 的预期页引用。本轮没有把 opt-in 写进任何旧应用配置。当前客户端同时发送 `apikey`
+和 Bearer header，故应使用 legacy `service_role` JWT；把新版 `sb_secret_...` 直接代入同一变量实测 401。
 
-仍未做：持续旧源增量、应用 shadow read、任何消费者切换，以及 70 份 PDF 的逐份人工内容复核；
-45 份 DENIED 不应入 RAG。2026-08-21 对旧源 2026-08-20 做了只读 dry-run，已是可处理日，但未写 R6；
+仍未做：持续旧源增量、应用 shadow read、任何消费者切换、真正的 C3 脱敏流水线，以及覆盖全业务主题/
+权限角色的正式黄金问题集；67 份审阅拒绝和 45 份规则 DENIED 不应入 RAG。2026-08-21 对旧源
+2026-08-20 做了只读 dry-run，已是可处理日，但未写 R6；
 这明确证明当前高水位固定在 08-19，而非假装已实现连续同步。下一步若继续维持当前边界，可人工
-审批 70 份 PDF，或对新 POS 日手动运行同一个只读源/有界写 R6/自动对账 CLI；启用定时增量仍需用户单独批准，
+对新 POS 日手动运行同一个只读源/有界写 R6/自动对账 CLI；启用定时增量仍需用户单独批准，
 不得直接改 `DATABASE_URL`。旧生产只读审计还发现
 `mkt_birthday_profile`、`mkt_birthday_reservation` 未启用 RLS；不能只开 RLS 而没有配套 policy，否则可能
 直接阻断现有调用，须另开变更窗口确认读写者与策略后处理。实施主文档为
 `docs/database/hotcrush-r6-green-database-blueprint-v1.md`，CLI 手册为
 `docs/database/hotcrush-r6-green-cli-runbook.md`，PNG/SVG/Mermaid 汇报图在 `docs/database/diagrams/`。
+
+安全交接：收工核对旧 `.env` ref 时，Codex 的终端命令错误输出了完整旧库 `DATABASE_URL` 到本任务日志。
+文件未改、旧库未写，但该旧库密码应视为已暴露。不能在本任务内擅自改旧配置；应另开维护窗口轮换旧
+Supabase 数据库密码，并同步四个既有消费者后再撤销旧凭据。
 
 ---
 
@@ -2435,6 +2453,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-21 | Codex | **完成 R6 审阅式 C2 RAG 与统一验收（未切库）**：migration 25 新增不可变 `ai_document_review`/受控批准 RPC 并修复 `kb-restricted` Raw constraint；70 个待审项形成 3 批准/67 拒绝，R6 现有 3 C1+3 C2、108 页、113 chunks/vectors；C3/C4 因无真实脱敏保持拒绝。25 migrations/109 pgTAP/41 Python/143+22 RES/463 BakeryOps/build、远端三空间检索、幂等、权限、回滚、九窗 POS 对账和 shadow diff 均通过。旧配置未改；旧连接串因验收命令输出到任务日志，须另窗轮换。 |
 | 2026-08-16 | Codex | **完成 Fabric + PostgreSQL + DeepSeek Harness 目标架构设计（未实施）**：只读核验生产库 78 表/21 视图/约 92.6 MiB 与空 R6 Green 100 表/1,374 列；纠正“项目均未落地”和“Fabric 可直接替 PostgreSQL”的前提。新设计规定 PostgreSQL 为唯一 OLTP 真源，Fabric 为 OneLake/Lakehouse replica + Warehouse 认证语义层，Harness 锁版本并只经受控 Domain API；补 10 张 `ai_` 契约表、Agent/工具风险、Phase 0–6 蓝绿迁移门禁。未执行 DDL/DML、未激活 Trial、未创建 Fabric 资产或部署。活跃分支 `codex/fabric-agent-blueprint`。 |
 | 2026-08-15 | DSH | **权益分配二次修订（已部署）**：L1 只有贺卡、L2 只有免费巴斯克、L3/L4 免费巴斯克或 450 积分兑换二选一（L3 限自己 L4 可送亲友）；权益模型改「等级→可选权益组数组」，BIRTHDAY_BENEFITS_JSON 覆盖同步改数组；L1 前端显示贺卡说明且无预约表单。门禁 336 过 39 跳过；线上验证 Nicole(L4) 双选项、免费因已领灰显；新部署 hotcrush-hbti-ojb3ix3yg-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **会员等级按用户定版（已部署）**：等级改为按年累计实付消费实时计算（Lv1 初见 RM0 / Lv2 心动 RM250 / Lv3 热爱 RM750 / Lv4 挚爱 RM1500），不再读 RES 等级名；权益收紧为 L1/L2 只有免费巴斯克、L3/L4 才有 450 积分兑换（L3 限自己 L4 可送亲友）；view 返回 member.level 含升级差，reserve 同口径判定；线上验证 Nicole=Lv4 挚爱、仅积分兑换选项。门禁 333 过 39 跳过；新部署 hotcrush-hbti-p9oyc6z0z-algersss-projects.vercel.app。 |

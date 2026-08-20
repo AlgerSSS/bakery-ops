@@ -7,6 +7,7 @@ from hotcrush_data_platform.manifest import (
     apply_manifest,
     brain_source_batch_key,
     build_manifest,
+    record_manifest_review,
 )
 
 
@@ -129,3 +130,92 @@ def test_manifest_apply_uploads_only_auto_entries_and_is_bounded(tmp_path: Path)
     assert result["mode"] == "APPLY"
     assert result["selected"] == 1
     assert result["succeeded"] == 1
+
+
+def test_reviewed_c2_entry_is_bound_to_manifest_and_approved_after_upload(
+    tmp_path: Path,
+) -> None:
+    _write(tmp_path, "HR/制度与手册/employee-handbook.pdf", b"reviewed-policy")
+    manifest = build_manifest(tmp_path)
+    review = record_manifest_review(
+        manifest,
+        None,
+        relative_path="HR/制度与手册/employee-handbook.pdf",
+        decision="APPROVE_RAG",
+        reviewer="codex-reviewer",
+        reason="Rendered every page and found no personal or payroll records.",
+    )
+    calls: list[tuple[str, str]] = []
+
+    def upload(
+        path: Path,
+        _settings: object,
+        *,
+        classification: Any,
+    ) -> dict[str, Any]:
+        calls.append(("upload", classification.data_class))
+        return {"path": str(path), "document_id": "document-reviewed"}
+
+    def approve(
+        result: dict[str, Any],
+        _settings: object,
+        *,
+        review_entry: dict[str, Any],
+        manifest_sha256: str,
+    ) -> dict[str, Any]:
+        assert result["document_id"] == "document-reviewed"
+        assert review_entry["decision"] == "APPROVE_RAG"
+        assert manifest_sha256 == manifest["manifest_sha256"]
+        calls.append(("approve", review_entry["reviewer"]))
+        return {"status": "QUEUED", "rag_eligibility": "ALLOWED"}
+
+    result = apply_manifest(
+        tmp_path,
+        manifest,
+        review_manifest=review,
+        apply=True,
+        settings=object(),
+        upload_fn=upload,
+        approve_fn=approve,
+    )
+
+    assert calls == [("upload", "C2"), ("approve", "codex-reviewer")]
+    assert result["selected"] == 1
+    assert result["auto_selected"] == 0
+    assert result["review_approved_selected"] == 1
+    assert result["results"][0]["review_approval"]["status"] == "QUEUED"
+
+
+def test_review_approval_rejects_c3_and_tampering(tmp_path: Path) -> None:
+    _write(tmp_path, "HR/CV/candidate-resume.pdf", b"private")
+    manifest = build_manifest(tmp_path)
+
+    with pytest.raises(ValueError, match="C1/C2"):
+        record_manifest_review(
+            manifest,
+            None,
+            relative_path="HR/CV/candidate-resume.pdf",
+            decision="APPROVE_RAG",
+            reviewer="reviewer",
+            reason="not sufficient",
+        )
+
+    review = record_manifest_review(
+        manifest,
+        None,
+        relative_path="HR/CV/candidate-resume.pdf",
+        decision="DENY_RAG",
+        reviewer="reviewer",
+        reason="contains recruiting PII",
+    )
+    review["entries"][0]["reason"] = "tampered"
+    with pytest.raises(ValueError, match="review digest"):
+        apply_manifest(
+            tmp_path,
+            manifest,
+            review_manifest=review,
+            apply=False,
+            settings=None,
+            upload_fn=lambda *_args, **_kwargs: {},
+            approve_fn=lambda *_args, **_kwargs: {},
+        )

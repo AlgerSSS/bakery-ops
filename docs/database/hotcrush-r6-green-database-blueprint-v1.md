@@ -2,7 +2,7 @@
 
 > 状态：R6 Green 数据库基座已实施；现网应用未切库。
 >
-> 核验时间：2026-08-20（Asia/Kuala_Lumpur）。
+> 核验时间：2026-08-21（Asia/Kuala_Lumpur）。
 >
 > R6 Green：`hotcrush-core-r6-green` / `tmmkknnkcptunxbfjxqn`。
 >
@@ -16,12 +16,12 @@ R6 Green 已建成一个适合单店阶段的 Supabase 分层数据平台：
 - 在同一个 Supabase Project 内使用 PostgreSQL、Storage、pgvector、RLS、RPC、Cron 和 Realtime。
 - Raw 原件放私有 Storage，PostgreSQL 只放元数据与处理状态。
 - Processed 层只建立已有明确粒度的结构化事实；目前已有 POS 日销售和小时销售版本表。
-- PDF RAG 已具备 manifest 分级、权限内去重、上传、解析/OCR、切块、embedding、发布、检索和可逆回滚。
+- PDF RAG 已具备 manifest 分级、逐文件审阅账本、源文件/manifest 哈希绑定、权限内去重、上传、解析/OCR、切块、embedding、发布、检索和可逆回滚。
 - POS 已具备 Raw 文件校验、日/小时交叉对账、有界范围回填、版本发布、隔离和恢复的结构化 worker。
 - Agent 层只保存运行账本和追加事件，不让 Agent 直接任意写业务表。
 - 现网 BakeryOps、res_api 仍使用旧生产库；没有替换 `DATABASE_URL`，没有开启双写或切读。
 
-这不等于“整个旧业务库已迁移”。当前完成的是新库物理基座、3 份已批准 C1 PDF 的真实 RAG、BakeryOps 显式 opt-in 检索验收，以及 POS 日/小时历史范围的完整只读迁移；持续影子写入、其余 PDF 人工审核、POS 更深粒度与其他业务域回填、应用切换仍需以后分别批准。
+这不等于“整个旧业务库已迁移”。当前完成的是新库物理基座、3 份 C1 与 3 份人工批准 C2 PDF 的真实 RAG、BakeryOps 显式 opt-in 检索验收，以及 POS 日/小时历史范围的完整只读迁移；持续影子写入、C3 真正脱敏、POS 更深粒度与其他业务域回填、应用切换仍需以后分别批准。
 
 ## 2. 前提检查
 
@@ -63,23 +63,23 @@ Cron 不应每天全量复制 Raw；它是补偿机制，不是主数据流。
 | 项目 | 已确认状态 |
 |---|---|
 | Supabase Project | `tmmkknnkcptunxbfjxqn`，ACTIVE_HEALTHY，us-east-1 |
-| CLI migrations | 24 个，本地与远程编号完全一致 |
-| 业务/平台表 | 14 张 |
+| CLI migrations | 25 个，本地与远程编号完全一致 |
+| 业务/平台表 | 15 张 |
 | views | 2 个 POS current views |
-| 受控 RPC | 39 个 `ops_*` / `ai_*` functions |
+| 受控 RPC | 40 个 `ops_*` / `ai_*` functions |
 | private Storage | 7 个 bucket，均 `public=false`，单文件限制 100 MiB |
 | extensions | `vector` 在 `extensions` schema；`pg_cron` 已安装 |
 | Cron | 6 个短任务 |
 | Realtime | 仅 `ops_agent_run`、`ops_agent_event`、`ai_ingest_run` |
 | machine roles | 7 个 NOLOGIN capability roles |
-| 本地数据库测试 | 10 个 pgTAP 文件，95 项通过 |
+| 本地数据库测试 | 11 个 pgTAP 文件，109 项通过 |
 | 远程 lint | `public` + `private` 无 schema error |
 | 远程 drift | `supabase db diff --linked --schema public,private` 无差异 |
-| Brain / RAG | 165 份完成哈希 manifest；仅 3 份 C1 发布，共 29 页、32 chunks / 32 个 1536 维 embedding，三类查询命中正确页码 |
+| Brain / RAG | 165 份完成哈希 manifest；70 份待审项已作 3 批准/67 拒绝；3 份 C1 + 3 份 C2 发布，共 108 页、113 chunks / 113 个 1536 维 embedding |
 | POS 历史迁移 | 260 个 legacy batch；229 日/2699 小时进入 current，31 日异常隔离；九窗独立自动对账 0 差异 |
-| 回滚演练 | POS 完成 quarantine→current 回退→restore；RAG 完成 unpublish→检索消失→restore→原页恢复 |
+| 回滚演练 | POS 完成 quarantine→current 回退→restore；C1 与人工批准 C2 均完成 RAG unpublish→检索消失→restore→原页恢复 |
 | 当前健康 | `degraded`：32 个隔离中 31 个是已确认源质量异常，另 1 个不完整快照仍未确认；无失败 run、过期 lease 或 Storage lineage 缺口 |
-| 应用接入 | BakeryOps R6 客户端已真实返回价格表第 1 页；默认 backend 和现网配置未切换，仍使用旧库/LightRAG |
+| 应用接入 | BakeryOps R6 客户端已真实返回 C1 价格表第 1 页、C2 会员方案第 2 页、C2 HR 制度第 11 页；默认 backend 和现网配置未切换，仍使用旧库/LightRAG |
 
 ## 4. 总体数据结构图
 
@@ -97,7 +97,7 @@ flowchart TB
     FILE[财务/HR/SCM 文件]
   end
 
-  subgraph R6[Supabase R6 Green · 同一 Project · 24 migrations]
+  subgraph R6[Supabase R6 Green · 同一 Project · 25 migrations]
     subgraph RAW[1 Raw 证据层]
       STORE[7 个 Private Storage buckets]
       RB[ops_raw_batch]
@@ -111,9 +111,10 @@ flowchart TB
       CV[v_pos_*_current]
       KS[ai_knowledge_space]
       DOC[ai_raw_document]
+      REV[ai_document_review<br/>不可变 C1/C2 批准证据]
       IR[ai_ingest_run]
-      CHUNK[3 C1 · 29 pages · 32 chunks]
-      VEC[32 embeddings vector\(1536\)<br/>unpublish ↔ restore]
+      CHUNK[6 docs · 108 pages · 113 chunks]
+      VEC[113 embeddings vector\(1536\)<br/>unpublish ↔ restore]
     end
 
     subgraph AGENT[3 Agent 层]
@@ -145,6 +146,8 @@ flowchart TB
   PD --> CV
   PH --> CV
   RO --> DOC
+  DOC --> REV
+  REV --> IR
   DOC --> IR
   IR <--> WK
   IR --> CHUNK
@@ -185,6 +188,7 @@ Table Editor → public
 │   ├── ai_knowledge_space
 │   ├── ai_space_member
 │   ├── ai_raw_document
+│   ├── ai_document_review
 │   ├── ai_ingest_run
 │   ├── ai_document_chunk
 │   └── ai_chunk_embedding
@@ -241,6 +245,7 @@ Database
 | `ai_knowledge_space` | 一个权限、bucket、分级和 RAG policy 边界 | `AUTO / REVIEW_REQUIRED / REDACTED_ONLY / DENY` 的物理依据 |
 | `ai_space_member` | 用户在空间中的角色 | 空间 + user 唯一，RLS 按成员判断 |
 | `ai_raw_document` | 一个文档版本 | `(space_id,document_key,version_no)` 唯一，只能发布已成功 run |
+| `ai_document_review` | 一个 C1/C2 文档版本的不可变批准证据 | 文档唯一；绑定 reviewer、reason、manifest/source SHA、pipeline/model；只由批准 RPC 写 |
 | `ai_ingest_run` | 一次解析/embedding 运行 | 租约、重试、阶段、期望 chunk/vector 数 |
 | `ai_document_chunk` | 可引用文本块 | 页码、section path、hash、token 数、脱敏标记、tsvector |
 | `ai_chunk_embedding` | chunk 在某模型版本下的向量 | PK `(chunk_id,model_version)`，`vector(1536)` |
@@ -301,6 +306,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
   participant C as brainctl / 文档入口
+  participant H as 人工审阅者
   participant DB as R6 RPC
   participant ST as Private Storage
   participant W as RAG worker
@@ -318,8 +324,13 @@ sequenceDiagram
     W->>DB: stage chunks + vectors in batches
     W->>DB: publish only after count checks
     DB->>V: current document becomes searchable
-  else C2/C3 review or redaction
-    DB->>DB: REVIEW_REQUIRED / REDACTED_ONLY
+  else C2 REVIEW_REQUIRED
+    DB->>DB: 保持不可检索
+    H->>C: 逐页审阅并记录 APPROVE_RAG / DENY_RAG
+    C->>DB: ai_approve_document_review(双 SHA + reviewer + reason)
+    DB->>DB: 原子写审阅证据并创建 PENDING run
+  else C3 review or redaction
+    DB->>DB: 保持不可检索；当前没有真正脱敏能力
   else C4
     DB->>DB: DENIED; no ingest run
   end
@@ -355,7 +366,7 @@ PENDING → RUNNING → SUCCEEDED
 |---|---|---|---|
 | C1 | 门店 SOP、公开/普通内部知识 | `kb-internal` | 允许 |
 | C2 | HR 制度、未分类内部文档 | `kb-restricted` | 需审核 |
-| C3 | 简历、合同、法务、财务明细 | 对应私有 bucket | 默认拒绝或仅脱敏 |
+| C3 | 简历、合同、法务、财务明细 | 对应私有 bucket | 当前全部拒绝；真实脱敏流水线完成后才可重新评估 |
 | C4 | 薪资、证件、密封资料 | `hr-payroll-private` | 拒绝，不建 chunk/vector |
 
 存储路径不得包含姓名、手机号、证件号或 Mac 本地绝对路径。原件 object 使用 hash 和 UUID 组成，并且 `x-upsert=false`。
@@ -386,7 +397,8 @@ hc_msg_worker
 
 ### 10.3 已知局限
 
-- 当前使用 Supabase secret key 调用 worker RPC，还不是每个 worker 独立可轮换 JWT。
+- 当前 worker 使用 R6 legacy `service_role` JWT 调用受控 RPC，还不是每个 worker 独立可轮换 JWT；新版 `sb_secret_...` 不能直接替换到当前同时发送 Bearer header 的客户端变量中。
+- 当前 RAG worker 没有真正的 PII 脱敏实现；`is_redacted=true` 不能作为安全证明。因此批准 RPC 强制只接受 C1/C2，C3/C4 保持 fail-closed。
 - tokyo-01 没有 TPM/磁盘加密；systemd encrypted credential 避免密钥出现在 env/unit 文本，但不能对抗已获得 root 或磁盘的攻击者。
 - 远程 `supabase test db --linked` 的 CLI 临时角色不具备 Storage/Auth 内部表权限，因此特权集成 pgTAP 以本地完整重放为权威验证；没有为让远程测试变绿而放宽生产权限。
 - 对旧生产库的只读 CLI 查询仍报告 `mkt_birthday_profile`、`mkt_birthday_reservation` 未启用 RLS。这是旧库既存 critical 风险，本阶段没有擅自执行 `ENABLE ROW LEVEL SECURITY`；如果没有先设计 policy，直接启用会阻断现有访问。
@@ -399,10 +411,10 @@ hc_msg_worker
 # 链接目标 Project（已完成）
 npx supabase link --project-ref tmmkknnkcptunxbfjxqn
 
-# 本地从零重放 24 个 migration
+# 本地从零重放 25 个 migration
 npx supabase db reset
 
-# 本地结构检查和 95 项 pgTAP
+# 本地结构检查和 109 项 pgTAP
 npx supabase db lint --local --schema public,private
 npx supabase test db
 
@@ -419,14 +431,14 @@ npx supabase db diff --linked --schema public,private
 npx supabase migration list --linked
 ```
 
-结果：24 个本地/远程 migration 一致，lint 无错，diff 为 `No schema changes found`。
+结果：25 个本地/远程 migration 一致，lint 无错；迁移 25 已实际推送到 R6。
 
 CLI 能完成 PostgreSQL objects、Storage bucket/policy、extensions、Cron、RLS、roles 和 publication 的创建。CLI 不会把 Playwright、PDF OCR、Tesseract 或 OpenRouter embedding 自动变成 PostgreSQL 内部计算；这些仍需外部 worker。
 
 POS 一次性迁移、处理和对账命令见 `docs/database/hotcrush-r6-green-cli-runbook.md`。这些命令使用独立的 `R6_SUPABASE_*` 凭据，不修改旧应用 `.env`。
 
-仓库根目录的 `scripts/accept-r6-platform.sh` 将本地迁移重放、95 项 pgTAP、Python/Node 测试、
-BakeryOps build、远端 migration/lint/健康和真实 R6 页码检索收敛为 `local|remote|all` 三种模式。
+仓库根目录的 `scripts/accept-r6-platform.sh` 将本地迁移重放、109 项 pgTAP、Python/Node 测试、
+BakeryOps build、远端 migration/lint/健康、RAG 审阅不变量和三个知识空间的真实页码检索收敛为 `local|remote|all` 三种模式。
 脚本会先阻断错误链接 ref 或旧应用 `.env` 中出现 R6 ref；远端凭据只从进程变量或仓库外 secret file 读取。
 
 ## 12. 目前不应创建的结构
@@ -454,22 +466,24 @@ BakeryOps build、远端 migration/lint/健康和真实 R6 页码检索收敛为
 6. 已完成全历史迁移：260 个日历日中 229 日发布为 current，31 日只保留隔离证据；R6 当前有 229 条日事实、2699 条小时事实、260 个 legacy batch。
 7. 已完成全历史独立验收：正式 `verify:r6-pos-history` 重新读取旧库与 R6，九窗 `mismatchCount=0`；完成态复跑对象全复用、Worker 处理数为 0。
 8. 已完成历史回滚抽样：2026-02-15 隔离时 current 229→228，259/2742 个日/小时版本保留，恢复后回到 229 并再次对账 0 差异。
-9. 已完成代表性 RAG 验收：技术论文、招聘价格表和品牌手册均命中正确标题/页码；价格表完成真实 unpublish/restore。
-10. 待完成：对 70 份 `REVIEW_REQUIRED` 文档逐份审核，并扩展正式业务黄金问题集；不以“向量有数据”代替质量验收。
-11. 单独批准后才开启一个项目的影子写入；后续再批准切读。
-12. 所有写入者切换、高水位一致且回滚演练通过后，才考虑冻结旧库写入。
+9. 已完成 70 份 `REVIEW_REQUIRED` 清单决策：3 份安全 C2 批准，67 份拒绝；数据库批准记录绑定原 manifest 与源文件 SHA，冲突重放会失败。
+10. 已完成代表性 RAG 验收：C1 价格表、C2 会员方案、C2 HR 制度均命中预期标题/页码；C1 与 C2 均完成真实 unpublish/restore。
+11. 待完成：实现可证明的 C3 脱敏流水线，并扩展正式业务黄金问题集；不以“向量有数据”或布尔标记代替质量/安全验收。
+12. 单独批准后才开启一个项目的影子写入；后续再批准切读。
+13. 所有写入者切换、高水位一致且回滚演练通过后，才考虑冻结旧库写入。
 
 ## 14. 验收门槛
 
 ### 已通过
 
 - 从空本地库重放所有 migrations。
-- 95 项数据库合同/安全/回滚测试通过。
+- 109 项数据库合同/安全/回滚测试通过。
 - RLS、Storage private、NOLOGIN roles、Realtime 最小集、Cron 数量均有断言。
-- Brain 165 份完成 SHA-256 manifest；3 份 C1 从 Storage 到 32 个 chunks/vectors 和页码引用检索通过。
+- Brain 165 份完成 SHA-256 manifest；70 份待审项已记录 3 批准/67 拒绝；6 份已批准文档从 Storage 到 113 个 chunks/vectors 和页码引用检索通过。
+- `ai_document_review`、`ai_approve_document_review`、C2 源哈希绑定、幂等/冲突重放、C3 拒绝与成员 RLS 均有 pgTAP 断言。
 - RAG Worker 在 tokyo-01 使用显式 R6 encrypted credentials，Tesseract 英文/简中依赖已安装并 fail-fast 检查。
-- RAG 价格表在远端完成 unpublish、检索消失、restore、同一页码恢复演练；chunks/vectors 未删除。
-- BakeryOps 的默认关闭 R6 客户端真实返回价格表第 1 页，现网 backend 未切换。
+- RAG 价格表和人工批准的 C2 会员方案均在远端完成 unpublish、检索消失、restore、同一页码恢复演练；chunks/vectors 未删除。
+- BakeryOps 的默认关闭 R6 客户端真实返回 C1/C2 三个预期标题与页码，现网 backend 未切换。
 - R6 远程 lint 无错，migration ledger 对齐，schema diff 无漂移。
 - POS 不完整快照在业务对账失败后被真实远端 quarantine，current view 归零且版本未删除。
 - POS 最终单日回填通过 1 个日事实 + 11 个小时事实自动对账，随后真实完成回滚与恢复演练。
@@ -482,17 +496,18 @@ BakeryOps build、远端 migration/lint/健康和真实 R6 页码检索收敛为
 
 - POS 日/小时历史已完整回填，但产品、单品、报废、会员、交易等更深事实尚未迁移；HR/SCM/Finance/Marketing 未逐域对账。
 - 尚未形成持续影子写入；2026-08-21 只读 dry-run 已确认旧源的 2026-08-20 数据可处理，但根据当前边界没有写入 R6。
-- Brain manifest 已完成，但 70 份待人工审核、45 份禁止、47 份同权限空间重复均未上传。
-- RAG 已通过三类代表性精确问题，尚未形成覆盖所有业务主题和权限角色的正式黄金问题集。
+- 67 份审阅拒绝、45 份规则禁止、47 份同权限空间重复均未上传；其中全部 35 份 C3 因没有真实脱敏能力而保持拒绝。
+- RAG 已通过 C1/C2 三个应用级精确问题，尚未形成覆盖所有业务主题和权限角色的正式黄金问题集。
 - 应用配置、Vercel 变量、`DATABASE_URL` 和现网读写路径均未切换。
 
 ## 15. 事实、推测、建议和暂无法验证项
 
 ### 已确认事实
 
-- R6 Green 当前结构可由 24 个 CLI migration 从零重建。
+- R6 Green 当前结构可由 25 个 CLI migration 从零重建。
 - 现网 BakeryOps/res_api 仍使用旧生产库。
-- 三份已批准 C1 PDF 共 29 页、32 个 chunks/vectors；精确查询能返回正确标题与页码。
+- 3 份 C1 与 3 份人工批准 C2 PDF 共 108 页、113 个 chunks/vectors；精确查询能返回正确标题与页码。
+- 数据库中有 3 条不可变 C2 批准证据，全部与源 SHA 和 manifest SHA 绑定，当前 C2 RAG 审计缺口为 0。
 - BakeryOps 应用客户端在不修改现网配置时通过显式 R6 CLI 验收。
 - 2026-07-26 最终 POS 日/小时事实从旧库只读导出后，与 R6 current 自动对账 0 差异。
 - 2026-04-09 至 04-14 的范围演练中，5 日事实与 57 条小时事实对账 0 差异，04-12 的来源不一致只进入隔离证据。
@@ -509,10 +524,10 @@ BakeryOps build、远端 migration/lint/健康和真实 R6 页码检索收敛为
 ### 建议
 
 - 先将 R6 作为独立验收环境，不动现网配置。
-- 下一步应优先审核 70 份待审 PDF，并在单独批准后设计 2026-08-20 之后的 POS 增量影子写入；不能把历史回填误当成持续同步。
+- 下一步应优先实现真正的 C3 脱敏/复核流水线，并在单独批准后设计 2026-08-20 之后的 POS 增量影子写入；不能把历史回填误当成持续同步。
 
 ### 暂无法验证
 
 - 未切换前无法证明所有旧库业务读写都可无缝迁往 R6。
-- 165 份 Brain PDF 已完成元数据与哈希盘点，但 70 份待审文档尚未逐页内容审核，无法证明它们可合规进入 RAG。
+- 67 份人工拒绝文档和 45 份规则禁止文档没有进入 RAG；未来若内容或用途变化，必须生成新 manifest 并重新审阅，不能复用本次结论。
 - 财务网站的生产 Vercel secret 为不可回读配置；本阶段既不更改，也不假设其可直接切换。

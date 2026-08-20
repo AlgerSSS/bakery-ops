@@ -108,3 +108,54 @@ def test_publication_state_change_is_dry_run_without_explicit_apply() -> None:
 def test_document_status_requires_a_bounded_explicit_id_list() -> None:
     with pytest.raises(ValueError, match="between 1 and 100"):
         brainctl.get_document_status([], _settings())
+
+
+def test_review_approval_calls_only_the_controlled_rpc(monkeypatch: Any) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    class FakeClient:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        def __enter__(self) -> Self:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            pass
+
+        @staticmethod
+        def one(value: Any) -> dict[str, Any] | None:
+            return value[0] if isinstance(value, list) and value else value
+
+        def rpc(self, name: str, payload: dict[str, Any]) -> Any:
+            calls.append((name, payload))
+            return [{"document_id": payload["p_document_id"], "status": "QUEUED", "rag_eligibility": "ALLOWED"}]
+
+    monkeypatch.setattr(brainctl, "SupabasePlatformClient", FakeClient)
+    result = brainctl.approve_uploaded_document(
+        {"document_id": "58856e6d-c102-4dcc-b6f5-d50026fb0afa"},
+        _settings(),
+        review_entry={
+            "sha256": "a" * 64,
+            "reviewer": "codex-reviewer",
+            "reason": "Rendered every page.",
+            "decision": "APPROVE_RAG",
+        },
+        manifest_sha256="b" * 64,
+    )
+
+    assert result["status"] == "QUEUED"
+    assert calls == [
+        (
+            "ai_approve_document_review",
+            {
+                "p_document_id": "58856e6d-c102-4dcc-b6f5-d50026fb0afa",
+                "p_reviewer": "codex-reviewer",
+                "p_reason": "Rendered every page.",
+                "p_manifest_sha256": "b" * 64,
+                "p_source_sha256": "a" * 64,
+                "p_pipeline_version": "rag-v1",
+                "p_embedding_model": "openai/text-embedding-3-small",
+            },
+        )
+    ]

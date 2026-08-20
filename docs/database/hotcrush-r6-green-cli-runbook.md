@@ -23,7 +23,7 @@ npx supabase test db
 npx supabase db lint --local --schema public,private
 ```
 
-已验证基线：24 个 migrations，10 个 pgTAP 文件、95 项断言。
+已验证基线：25 个 migrations，11 个 pgTAP 文件、109 项断言。
 
 远端发布与 drift：
 
@@ -34,7 +34,7 @@ npx supabase db diff --linked --schema public,private
 npx supabase migration list --linked
 ```
 
-验收要求：lint 无错误，diff 为 `No schema changes found`，24 个编号两侧一致。
+验收要求：lint 无错误，diff 为 `No schema changes found`，25 个编号两侧一致。
 
 完整门禁已收敛成一个可重放命令。`local` 只重建本地测试库；`remote` 只检查已链接 R6、健康和
 应用检索；`all` 依次执行两者：
@@ -64,6 +64,8 @@ export R6_SUPABASE_SECRET_KEY_FILE="/安全路径/r6-secret"
 export R6_SUPABASE_SERVICE_KEY_FILE="/安全路径/r6-secret"
 ```
 
+当前 Python/TypeScript 客户端会同时发送 `apikey` 和 `Authorization: Bearer`，因此这里的文件应存
+R6 legacy `service_role` JWT；2026-08-21 实测把新版 `sb_secret_...` 直接放入同一变量会返回 401。
 不要复用旧项目的 `SUPABASE_*`，不要把 secret 作为命令参数，不要提交 secret 文件。
 
 ## 4. POS 历史与范围回填（主路径）
@@ -262,7 +264,21 @@ cd /Users/weiliangshao/hot/bakery-ops/services/data-platform
 uv run brainctl inventory "/path/to/Brain/raw"
 uv run brainctl plan "/path/to/Brain/raw" --output /secure/path/brain-manifest.json
 uv run brainctl batch "/path/to/Brain/raw" /secure/path/brain-manifest.json
-uv run brainctl batch "/path/to/Brain/raw" /secure/path/brain-manifest.json --apply
+
+# REVIEW_REQUIRED 必须逐文件追加决定；review ledger 必须放仓库外并 chmod 600
+uv run brainctl review \
+  /secure/path/brain-manifest.json \
+  /secure/path/brain-review.json \
+  --path 'relative/path/to/document.pdf' \
+  --decision APPROVE_RAG \
+  --reviewer 'reviewer-id' \
+  --reason '逐页检查后的具体批准理由'
+
+uv run brainctl batch \
+  "/path/to/Brain/raw" \
+  /secure/path/brain-manifest.json \
+  --review-manifest /secure/path/brain-review.json \
+  --apply
 uv run hotcrush-rag-worker --drain --max-runs 100
 uv run brainctl status --document-id '<document-uuid>'
 uv run brainctl search "问题" \
@@ -270,14 +286,27 @@ uv run brainctl search "问题" \
 ```
 
 `plan` 会读取 SHA-256、按知识空间边界去重并生成带摘要的 manifest；`batch` 默认 dry-run，显式
-`--apply` 后也只处理 `AUTO_UPLOAD`。文件哈希、大小、分类或 manifest disposition 被修改都会拒绝。
-同一 PDF 跨权限空间不共用 Raw 对象。C3/C4 不得因命令行方便而绕过准入。
+`--apply` 后只处理 `AUTO_UPLOAD` 和审阅账本中明确 `APPROVE_RAG` 的 C1/C2。源 manifest、review ledger、
+文件哈希、大小、分类或 disposition 任何一个被修改都会拒绝。批准 RPC 会再次把 review manifest SHA、
+源文件 SHA、reviewer、reason、pipeline 和 embedding model 一起写入不可变数据库证据，并原子建队列。
+相同批准可幂等重放，内容冲突的重放会失败。同一 PDF 跨权限空间不共用 Raw 对象。
+
+当前 worker **没有真正的 PII 脱敏实现**，不能把 `is_redacted=true` 当作脱敏证据。数据库因此强制
+`ai_approve_document_review` 只接受 C1/C2；C3/C4 即使写入 review ledger，也不能进入 RAG。
 
 真实 Brain 盘点结果：165 份均完成哈希；manifest 中 3 份 `AUTO_UPLOAD`、70 份
-`REVIEW_REQUIRED`、45 份 `DENIED`、47 份同空间重复跳过。只有 3 份 C1 写入 R6；其余没有上传。
-三个已发布文档为 3 + 1 + 25 页，共 32 chunks / 32 embeddings。技术论文、招聘价格表和品牌手册的
-精确查询均命中正确标题和页码。远端 Worker 已安装 Tesseract 英文/简体中文语言包，启动前会 fail-fast
+`REVIEW_REQUIRED`、45 份 `DENIED`、47 份同空间重复跳过。70 份待审项已记录 3 个
+`APPROVE_RAG` 与 67 个 `DENY_RAG`；所有 35 份 C3 因缺少真实脱敏能力而拒绝。R6 当前发布
+3 份 C1 + 3 份 C2，共 108 页、113 chunks / 113 embeddings、6 个成功 ingest run。数据库有 3 条
+manifest/source SHA 绑定的批准证据，C2 current 文档审计缺口为 0。C1 招聘价格表、C2 会员方案、
+C2 HR 制度的应用级精确查询分别命中第 1、2、11 页。远端 Worker 已安装 Tesseract 英文/简体中文语言包，启动前会 fail-fast
 检查可执行文件，避免缺依赖时先消耗数据库重试次数。
+
+本次完整账本不提交 Git，保存在本机权限 700 的目录：
+`/Users/weiliangshao/Library/Application Support/HotCrush/r6-rag/brain-review-2026-08-21/`。
+其中 manifest 内部摘要为 `9a30e2b7...a7c8049`，review ledger 内部摘要为
+`8ee45bff...aec3de`；两个 JSON 文件权限均为 600。数据库只保存真正上传的 3 条批准证据，67 条拒绝
+继续留在受限 review ledger，避免为“记录拒绝”而把敏感文件路径或原件上传数据库。
 
 RAG publication 的回滚同样默认 dry-run：
 
@@ -290,8 +319,9 @@ uv run brainctl restore '<document-uuid>' \
   --reason '重新验收通过' --actor 'operator' --apply
 ```
 
-unpublish 只从检索中移除 current publication；Storage 原件、chunks、vectors 和成功 run 保留。远端
-已实测价格表 unpublish 后查询消失，restore 后相同 `document_id` / `ingest_run_id` 与第 1 页结果恢复。
+unpublish 只从检索中移除 current publication；Storage 原件、review、chunks、vectors 和成功 run 保留。
+远端已分别实测 C1 价格表与人工批准 C2 会员方案：unpublish 后查询消失，restore 后相同
+`document_id` / `ingest_run_id` 与原页结果恢复。
 
 应用侧验收不要求切换现网配置：
 
@@ -300,7 +330,10 @@ cd /Users/weiliangshao/hot/bakery-ops
 npm run verify:r6-knowledge
 ```
 
-该命令使用显式 R6 凭据和空间 ID 调用 BakeryOps 的 `SupabaseKnowledgeClient`，必须返回价格表第 1 页。
+统一远端验收脚本会用显式 R6 凭据和空间 ID 调用 BakeryOps 的 `SupabaseKnowledgeClient`，必须返回
+C1 价格表第 1 页、C2 会员方案第 2 页和 C2 HR 制度第 11 页；同时断言 6 文档、108 页、113
+chunks/vectors、3 条批准证据、0 个 C2 审计缺口。外部 embedding 请求最多重试 3 次，数据库或内容不变量
+失败不重试。
 现网 `KNOWLEDGE_BACKEND` 默认仍是 `lightrag`，没有修改。
 
 ## 9. 当前明确不执行
@@ -309,5 +342,5 @@ npm run verify:r6-knowledge
 - 不启用 `R6_SHADOW_ENABLED=1`。
 - 不把 POS worker 配成常驻服务。
 - 不切 BakeryOps 知识查询 backend。
-- 不上传 manifest 中 `REVIEW_REQUIRED` / `DENIED` 的 Brain PDF。
+- 不上传 review ledger 中 `DENY_RAG`、manifest 中 `DENIED` 或任何 C3/C4 Brain PDF。
 - 不因旧库 RLS advisory 直接执行 `ENABLE RLS`；先设计 policy 和兼容窗口。

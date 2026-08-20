@@ -117,21 +117,23 @@
 分别由 `BIRTHDAY_FREE_BASQUE_LEAD_DAYS` / `BIRTHDAY_POINTS_CAKE_LEAD_DAYS` 配置；最远仍为
 统一 T+30。view API 返回 `pickupByGift`，reserve API 按请求的 `giftType` 独立校验，避免前端绕过。
 
-验证：TypeScript、ESLint、全量 Vitest（339 过、39 跳过）、Next production build全绿；新增
+验证：TypeScript、ESLint、全量 Vitest（339 过、39 跳过）、Next production build 全绿；新增
 生日端到端在 320×740、375×812、430×932 三档共 9/9 通过。另以 375×812 实际渲染回读 T-5/T-2
 两页，首屏内权益、提前天数与 CTA 完整可见。本轮没有部署、发送会员消息、发券、改 RES 正式 H5
-或写生产数据库。下一项必须由用户逐项确认的是：三次会员触达的正式发送渠道（RES 短信、WhatsApp，
-或两者组合）；渠道确认前只做页面与规则，不臆造生产投递器。
+或写生产数据库。合并门禁时另把既有 HBTI 前端流程测试从逐键输入改成原子 change，并为 13 题长流程
+设置 15 秒预算；生产页面未改，修正了验证码探测/自动翻题计时与 `user.type` 之间的随机测试竞态。
 
-RES 官方 H5 的另一独立本地成果在 `/tmp/hot-see-you-often-h5`、分支
-`codex/see-you-often-h5`：顶部原生滚动海报位已保留，HBTI 弹窗图与跳转已写入未发布草稿；
+用户已确认正式三次触达全部走 RES 短信，但当前生产账户尚不能安全启用：流程管理接口 403、
+短信返回 `ErrMissingSignature`、生日事件触发器列表为空，余额仅 200 条，而 3,722 名会员每年三次
+触达的理论上限是 11,166 条。没有发送任何消息，也不接外部短信兜底；需 RES 侧先开权限、配置并
+审核短信签名/生日事件、补足额度。顶部轮播和 HBTI 弹窗成果已合入本分支，仍只在 RES Draft，
 正式首页未改、未发布。
 ---
 
 ## See You Often 顶部轮播 + HBTI 开屏弹窗草稿（2026-08-20，Codex，已保存草稿、未发布）
 
 用户要求在 RES 官方 H5 最上方预留滚动海报，并增加点击后进入现有 HBTI 页的测试弹窗。
-已在独立分支 `codex/see-you-often-h5` 完成并写入独立 RES Draft：
+原独立分支成果现已合入 `codex/see-you-often-loyalty-engine`，并已写入独立 RES Draft：
 
 - Draft 名称：`See You Often · HBTI 弹窗 · 2026-08-20`
 - Draft plan：`2090327910815711232`；首页 page：`2090327910819905566`；开屏 page：

@@ -34,6 +34,17 @@ import {
   rollingWindowForDate,
   summarizeCardReconciliation,
 } from "../lib/loyalty-reconciliation.js";
+import {
+  assertDowngradeLedgerSchema,
+  buildDowngradeLedgerClaim,
+  claimDowngradeLedger,
+  downgradeLedgerDecision,
+  markDowngradeLedgerAmbiguous,
+  markDowngradeLedgerApplied,
+  markDowngradeLedgerFailed,
+  reclaimDowngradeLedger,
+  reconcileObservedDowngradeApplied,
+} from "../lib/loyalty-downgrade-ledger.js";
 
 const DEFAULT_CORPORATION_ID = "450020844";
 const DEFAULT_ORG_PATH = "/1000833/1000835/900846";
@@ -351,11 +362,21 @@ async function applyReconciliation(plans, context) {
     warmupPath: "/card-management",
     log: () => {},
   });
+  const ledgerSql =
+    context.action === "downgrade"
+      ? postgres(context.databaseUrl, {
+          ssl: "require",
+          max: 1,
+          idle_timeout: 5,
+          connect_timeout: 15,
+        })
+      : null;
   let completed = 0;
   let growthAdjustments = 0;
   let directLevelChanges = 0;
   let monthlyDowngradesPrevented = 0;
   try {
+    if (ledgerSql) await assertDowngradeLedgerSchema(ledgerSql);
     const levelConfiguration = await fetchLevelAutomationConfiguration(session);
     assertManualDowngradeLevelConfiguration(levelConfiguration);
     for (const plan of batch) {
@@ -368,15 +389,63 @@ async function applyReconciliation(plans, context) {
       const downgradeAlreadyApplied =
         plan.policyAction === "downgrade_one_level" &&
         (await alreadyDowngradedThisMonth(session, plan, context));
-      const effectivePlan = downgradeAlreadyApplied
-        ? {
-            ...plan,
-            targetLevelId: plan.currentLevelId,
-            levelChangeNeeded: false,
-            policyAction: "hold_already_downgraded_this_month",
+      let downgradeLedgerClaim = null;
+      let downgradePreventedByLedger = false;
+      if (
+        plan.policyAction === "downgrade_one_level" &&
+        !downgradeAlreadyApplied
+      ) {
+        const claim = buildDowngradeLedgerClaim(plan, {
+          asOfDate: context.asOfDate,
+          windowFrom: context.windowFrom,
+          windowTo: context.windowTo,
+        });
+        const claimed = await claimDowngradeLedger(ledgerSql, claim);
+        if (claimed.acquired) {
+          downgradeLedgerClaim = { claim, entry: claimed.entry };
+        } else {
+          const decision = downgradeLedgerDecision(
+            claimed.entry,
+            effectiveCardLevelId(original),
+            claim,
+          );
+          if (decision.action === "finalize_and_prevent") {
+            await reconcileObservedDowngradeApplied(ledgerSql, claimed.entry);
+            downgradePreventedByLedger = true;
+          } else if (decision.action === "prevent") {
+            downgradePreventedByLedger = true;
+          } else if (decision.action === "reclaim") {
+            const reclaimed = await reclaimDowngradeLedger(
+              ledgerSql,
+              claimed.entry,
+              claim,
+            );
+            if (reclaimed) {
+              downgradeLedgerClaim = { claim, entry: reclaimed };
+            } else {
+              downgradePreventedByLedger = true;
+            }
+          } else if (decision.action === "mark_ambiguous") {
+            await markDowngradeLedgerAmbiguous(
+              ledgerSql,
+              claimed.entry,
+              decision.reason,
+            );
+            throw new Error(
+              "The downgrade ledger and live RES level disagree; marked ambiguous and stopped.",
+            );
+          } else {
+            throw new Error(
+              `The downgrade ledger conflicts with the live plan: ${decision.reason}.`,
+            );
           }
-        : plan;
-      if (downgradeAlreadyApplied) monthlyDowngradesPrevented += 1;
+        }
+      }
+      if (downgradeAlreadyApplied || downgradePreventedByLedger) {
+        monthlyDowngradesPrevented += 1;
+        continue;
+      }
+      const effectivePlan = plan;
       let mutated = false;
       try {
         let latest = original;
@@ -425,22 +494,110 @@ async function applyReconciliation(plans, context) {
         if (!cardMatchesReconciliationTarget(finalCard, effectivePlan)) {
           throw new Error("Card reconciliation readback did not match the target.");
         }
+        if (downgradeLedgerClaim) {
+          await markDowngradeLedgerApplied(
+            ledgerSql,
+            downgradeLedgerClaim.entry,
+            downgradeLedgerClaim.claim.claimToken,
+          );
+        }
         completed += 1;
       } catch (error) {
+        if (downgradeLedgerClaim) {
+          let observedAfterError;
+          try {
+            observedAfterError = await fetchCardDetails(
+              session,
+              plan.cardId,
+              context.corporationId,
+            );
+          } catch (readbackError) {
+            try {
+              await markDowngradeLedgerAmbiguous(
+                ledgerSql,
+                downgradeLedgerClaim.entry,
+                "post_error_readback_failed",
+                { claimToken: downgradeLedgerClaim.claim.claimToken },
+              );
+            } catch {
+              // The original error and failed readback are more useful than a
+              // third failure while recording the fail-closed state.
+            }
+            throw new Error(
+              `Downgrade failed and its final RES state could not be read back: ${readbackError.message}`,
+            );
+          }
+          if (cardMatchesReconciliationTarget(observedAfterError, effectivePlan)) {
+            await reconcileObservedDowngradeApplied(
+              ledgerSql,
+              downgradeLedgerClaim.entry,
+            );
+            completed += 1;
+            continue;
+          }
+          const observedLevelId = effectiveCardLevelId(observedAfterError);
+          const originalLevelId = effectiveCardLevelId(original);
+          if (
+            observedLevelId !== originalLevelId &&
+            observedLevelId !== effectivePlan.targetLevelId
+          ) {
+            await markDowngradeLedgerAmbiguous(
+              ledgerSql,
+              downgradeLedgerClaim.entry,
+              "unexpected_level_after_error",
+              { claimToken: downgradeLedgerClaim.claim.claimToken },
+            );
+            throw new Error(
+              "Downgrade failed with an unexpected live level; marked ambiguous and stopped.",
+            );
+          }
+          if (!cardMatchesOriginal(observedAfterError, original)) mutated = true;
+        }
+        let rollbackError = null;
         if (mutated) {
           try {
             await restoreCard(session, original, context, context.remark);
-          } catch (rollbackError) {
+          } catch (caught) {
+            rollbackError = caught;
+          }
+        }
+        if (downgradeLedgerClaim) {
+          try {
+            if (rollbackError) {
+              await markDowngradeLedgerAmbiguous(
+                ledgerSql,
+                downgradeLedgerClaim.entry,
+                "rollback_unverified",
+                { claimToken: downgradeLedgerClaim.claim.claimToken },
+              );
+            } else {
+              await markDowngradeLedgerFailed(
+                ledgerSql,
+                downgradeLedgerClaim.entry,
+                downgradeLedgerClaim.claim.claimToken,
+                "reconciliation_failed_restored_or_unchanged",
+              );
+            }
+          } catch (ledgerError) {
             throw new Error(
-              `Card reconciliation failed and rollback could not be verified: ${rollbackError.message}`,
+              `Card reconciliation failed and the downgrade ledger could not be finalized: ${ledgerError.message}`,
             );
           }
+        }
+        if (rollbackError) {
+          throw new Error(
+            `Card reconciliation failed and rollback could not be verified: ${rollbackError.message}`,
+          );
         }
         throw error;
       }
     }
   } finally {
-    await session.close();
+    try {
+      await session.close();
+    } finally {
+      if (ledgerSql) await ledgerSql.end({ timeout: 5 });
+    }
   }
   return {
     selectedCards: batch.length,
@@ -933,6 +1090,7 @@ async function main() {
 
   if (args.apply) {
     preview.applyResult = await applyReconciliation(reconciliationPlans, {
+      databaseUrl: process.env.DATABASE_URL,
       corporationId,
       cardProgramId,
       shopId,
@@ -943,6 +1101,8 @@ async function main() {
       limit: args.limit,
       action: args.action,
       asOfDate: args.asOfDate,
+      windowFrom: args.from,
+      windowTo: args.to,
       remark: `See You Often rolling 12m ${args.from}..${args.to}`,
     });
   }

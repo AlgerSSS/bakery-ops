@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
@@ -257,6 +258,27 @@ test("rejects an insecure HBTI popup target", () => {
       href: "http://hbti-test.hotcrush.net/",
     }),
     /HTTPS/,
+  );
+});
+
+test("H5 publication is confirmation-gated, reversible, and read-back verified", async () => {
+  const source = await readFile(
+    new URL("../tools/h5-design.mjs", import.meta.url),
+    "utf8",
+  );
+  const publishSource = source.slice(source.indexOf("async function publishDraft"));
+
+  assert.match(publishSource, /SEE_YOU_OFTEN_H5_V1/);
+  assert.match(publishSource, /Live draft no longer matches the reviewed design/);
+  assert.match(publishSource, /Rollback draft does not reproduce the current formal H5/);
+  assert.match(publishSource, /publishedReadbackVerified: true/);
+  assert.ok(
+    publishSource.indexOf("/ordering/config/decoration/saveDraft")
+      < publishSource.indexOf("const releaseResponse = await releaseApi"),
+  );
+  assert.ok(
+    publishSource.indexOf("const releaseResponse = await releaseApi")
+      < publishSource.indexOf("rollbackReleaseResponse = await releaseApi"),
   );
 });
 

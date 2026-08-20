@@ -56,7 +56,7 @@
 - 等级列表接口核验 L2/L3/L4 的门槛已经是 250/750/1500，名称正确；默认 L1 名称仍为
   `VIP1`。已新增 `lib/level-catalog-config.js` / `scripts/configure-level-catalog.mjs`，只保留
   原字段并正式改名为 `Lv1 初见会员 First Crush`；字段级回读一致，未触发回滚。
-- 本轮门禁：等级/回算专项 26/26；全量 `npm run test:unit` **156/156**；脚本语法与
+- 本轮门禁：等级/回算专项 26/26；全量 `npm run test:unit` **159/159**；脚本语法与
   `git diff --check` 通过。
 
 **RES 积分规则已正式改为 See You Often 口径**：
@@ -100,7 +100,7 @@
 经明确的上架门禁发布。
 ---
 
-## 生日 T-5 / T-2 / 当天三段式页面拆分（2026-08-20，Codex，本地完成/未部署）
+## 生日 T-5 / T-2 / 当天三段式页面拆分（2026-08-20，Codex，已部署）
 
 用户确认 450 积分定制蛋糕在系统中暂不设年度次数限制；`points_450.yearlyLimit` 继续为
 `null`。现有“每会员最多同时 3 个有效积分蛋糕预约”只保留为并发防滥用保险丝，不解释为
@@ -119,11 +119,16 @@
 
 验证：TypeScript、ESLint、全量 Vitest（339 过、39 跳过）、Next production build 全绿；新增
 生日端到端在 320×740、375×812、430×932 三档共 9/9 通过。另以 375×812 实际渲染回读 T-5/T-2
-两页，首屏内权益、提前天数与 CTA 完整可见。本轮没有部署、发送会员消息、发券、改 RES 正式 H5
-或写生产数据库。合并门禁时另把既有 HBTI 前端流程测试从逐键输入改成原子 change，并为 13 题长流程
+两页，首屏内权益、提前天数与 CTA 完整可见。2026-08-20 已部署到 Vercel production
+`dpl_6MFScVi7FWXqy8rviP3hAHV22vYw`，并把 `hbti-test.hotcrush.net` 与
+`birthday.hotcrush.net` 都指到该部署。两个域名的 `/api/health` 均回读 `status=ok`，
+数据库、RES、告警与登录依赖全绿；生日域名首页 HTTP 200，实际匹配 `/birthday`，
+`?mode=cake` 标题回读正常，CSP/HSTS/X-Frame-Options 与 no-store 缓存头均符合预期。
+本轮没有发送会员消息、发券、改 RES 正式 H5 或写生产数据库。合并门禁时另把既有 HBTI
+前端流程测试从逐键输入改成原子 change，并为 13 题长流程
 设置 15 秒预算；生产页面未改，修正了验证码探测/自动翻题计时与 `user.type` 之间的随机测试竞态。
 
-用户已确认正式三次触达全部走 RES 短信，但当前生产账户尚不能安全启用：流程管理接口 403、
+用户已确认正式三次触达全部走 RES 短信，但当前生产账户尚不能启用：流程管理接口 403、
 短信返回 `ErrMissingSignature`、生日事件触发器列表为空，余额仅 200 条，而 3,722 名会员每年三次
 触达的理论上限是 11,166 条。没有发送任何消息，也不接外部短信兜底；需 RES 侧先开权限、配置并
 审核短信签名/生日事件、补足额度。顶部轮播和 HBTI 弹窗成果已合入本分支，仍只在 RES Draft，
@@ -148,9 +153,18 @@
   `8161df6599a9f447152e90fac7900f5a982bb602636ef19bd4fc2349ad026bc9`。
 - 草稿回读：首页设计树/保存树 hash 一致，开屏设计树/保存树 hash 一致；HBTI 页与上传图片均 HTTP 200。
   中文官方编辑器长页预览 375×1293，顶部轮播位置和后续会员内容均正常。
+- 2026-08-20 重新拦截核对了发布契约：RES 发布会先保存草稿，再弹出“顾客端立即变化、尽量
+  避开营业时间”的二次确认；最终请求是 `/ordering/config/decoration/release`，载荷仅含
+  appId 与 draft plan id。测试拦截期间 UI 曾重序列化首页树，随后已用审阅过的设计重新覆盖
+  草稿；12:24 UTC 再次回读，首页与开屏组件树均恢复到审阅 hash，HBTI 链接存在，正式页
+  两个 hash 仍完全不变。
+- `tools/h5-design.mjs` 现支持外部只读登录状态路径、线上草稿检查和受保护发布：必须输入精确
+  确认 `SEE_YOU_OFTEN_H5_V1`，写前验证正式页未漂移与草稿树一致，先克隆当前正式页为独立
+  回滚 draft，再调用发布并轮询正式页内容回读；若发布后不一致会自动发布回滚 draft 并再次
+  核验。因 RES 明确提示避开营业时间，当前仍未确认发布，闭店后再执行该门禁命令。
 - 代码：`res_api/lib/h5-design-layout.mjs`、`res_api/tools/h5-design.mjs`、
   `res_api/test/h5-design-layout.test.js`，新增视觉资产 `res_api/assets/h5/hbti-popup-2026.png`；
-  `res_api` 单测 **121/121** 通过，`git diff --check` 通过。
+  当前 `res_api` 全量单测 **159/159** 通过，`git diff --check` 通过。
 
 用户已确认 450 积分升级定制蛋糕暂不设年度次数限制。生日时间链路是：Lv3/Lv4 定制蛋糕
 T-5 提醒，Lv2–Lv4 免费巴斯克 T-2 提醒，生日当天发送贺卡网页并发对应生日券。

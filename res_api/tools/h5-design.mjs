@@ -19,7 +19,8 @@ const APP_ID = "1991043406914285569";
 const APP_TYPE = 3;
 const FORMAL_SOURCE_TYPE = 1;
 const DRAFT_SOURCE_TYPE = 3;
-const STORAGE_STATE = path.join(RES_API_DIR, "storageState.json");
+const STORAGE_STATE = process.env.RES_STORAGE_STATE_PATH
+  || path.join(RES_API_DIR, "storageState.json");
 const OUTPUT_ROOT = path.join(RES_API_DIR, "output", "h5-design");
 const RELEASE_ENDPOINT = "/ordering/config/decoration/release";
 const UPLOAD_ENDPOINT = "/resource/management/file/uploadFile";
@@ -40,11 +41,15 @@ function sha256(value) {
   return createHash("sha256").update(stableJson(value)).digest("hex");
 }
 
+function sha256Text(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
+}
+
 function timestamp() {
   return new Date().toISOString().replaceAll(":", "-").replace(/\.\d{3}Z$/, "Z");
 }
 
-async function withAuthenticatedPage(callback) {
+async function withAuthenticatedPage(callback, { allowRelease = false } = {}) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ storageState: STORAGE_STATE });
   const page = await context.newPage();
@@ -72,8 +77,7 @@ async function withAuthenticatedPage(callback) {
       throw new Error("RES authenticated request headers were not available.");
     }
 
-    const api = async (endpoint, data) => {
-      assertSafeEndpoint(endpoint);
+    const requestJson = async (endpoint, data) => {
       const result = await page.evaluate(
         async ({ endpoint: requestEndpoint, data: requestData, originalHeaders }) => {
           const forbidden = new Set(["host", "connection", "content-length", "cookie"]);
@@ -113,7 +117,24 @@ async function withAuthenticatedPage(callback) {
       return result.body;
     };
 
-    return await callback({ page, api, requestHeaders: capturedHeaders });
+    const api = async (endpoint, data) => {
+      assertSafeEndpoint(endpoint);
+      return requestJson(endpoint, data);
+    };
+
+    const releaseApi = async (data) => {
+      if (!allowRelease) {
+        throw new Error("RES H5 release is not authorized for this operation");
+      }
+      return requestJson(RELEASE_ENDPOINT, data);
+    };
+
+    return await callback({
+      page,
+      api,
+      releaseApi,
+      requestHeaders: capturedHeaders,
+    });
   } finally {
     await browser.close();
   }
@@ -145,6 +166,18 @@ function findOpenScreenPage(listResponse) {
     throw new Error("Could not identify the RES H5 open-screen page");
   }
   return openScreen;
+}
+
+function pageContentHash(page) {
+  return sha256({
+    pageName: page.pageName,
+    pageNameML: page.pageNameML,
+    pageType: page.pageType,
+    pageData: page.pageData,
+    componentsTree: page.componentsTree,
+    componentsMap: page.componentsMap,
+    homePage: page.homePage,
+  });
 }
 
 async function saveSnapshot() {
@@ -684,6 +717,352 @@ async function updateExistingDraft(snapshotDir) {
   return updatedReceipt;
 }
 
+async function inspectLiveDraft(snapshotDir) {
+  const [receipt, { manifest }] = await Promise.all([
+    readFile(path.join(snapshotDir, "draft-receipt.json"), "utf8").then(JSON.parse),
+    readSnapshot(snapshotDir),
+  ]);
+  const draftPlanId = String(receipt.draftPlanId || "");
+  if (
+    !draftPlanId
+    || draftPlanId === String(manifest.decorationPlanId)
+    || Number(receipt.draftSourceType) !== DRAFT_SOURCE_TYPE
+  ) {
+    throw new Error("Receipt does not identify a safe, separate RES draft");
+  }
+
+  return withAuthenticatedPage(async ({ api }) => {
+    const formalResponse = await api(
+      "/ordering/config/decoration/listPage",
+      {
+        appId: APP_ID,
+        appType: APP_TYPE,
+        decorationPlanId: String(manifest.decorationPlanId),
+        sourceType: FORMAL_SOURCE_TYPE,
+        queryType: 1,
+      },
+    );
+    const draftResponse = await api(
+      "/ordering/config/decoration/listPage",
+      {
+        appId: APP_ID,
+        appType: APP_TYPE,
+        decorationPlanId: draftPlanId,
+        sourceType: DRAFT_SOURCE_TYPE,
+        queryType: 1,
+      },
+    );
+    const formalHome = findHomePage(formalResponse);
+    const formalOpenScreen = findOpenScreenPage(formalResponse);
+    const draftHome = findHomePage(draftResponse);
+    const draftOpenScreen = findOpenScreenPage(draftResponse);
+    const observed = {
+      formalHome: sha256(formalHome),
+      formalOpenScreen: sha256(formalOpenScreen),
+      draftHome: sha256(draftHome),
+      draftOpenScreen: sha256(draftOpenScreen),
+      draftHomeComponentsTree: sha256Text(draftHome.componentsTree),
+      draftOpenScreenComponentsTree: sha256Text(draftOpenScreen.componentsTree),
+    };
+    return {
+      inspectedAt: timestamp(),
+      appId: APP_ID,
+      formalPlanId: String(manifest.decorationPlanId),
+      draftPlanId,
+      observed,
+      verification: {
+        formalHomeUnchanged: observed.formalHome === manifest.hashes.home,
+        formalOpenScreenUnchanged:
+          observed.formalOpenScreen === manifest.hashes.openScreen,
+        draftHomeComponentsTreeMatches:
+          observed.draftHomeComponentsTree
+          === receipt.hashes.designedComponentsTree,
+        draftOpenScreenComponentsTreeMatches:
+          observed.draftOpenScreenComponentsTree
+          === receipt.hashes.designedOpenScreenComponentsTree,
+        hbtiUrlPresent: draftOpenScreen.componentsTree.includes(HBTI_URL),
+      },
+    };
+  });
+}
+
+async function publishDraft(snapshotDir, confirmation) {
+  const requiredConfirmation = "SEE_YOU_OFTEN_H5_V1";
+  if (confirmation !== requiredConfirmation) {
+    throw new Error(
+      `Publishing requires the exact confirmation ${requiredConfirmation}`,
+    );
+  }
+
+  const receiptPath = path.join(snapshotDir, "draft-receipt.json");
+  const [receipt, { manifest }] = await Promise.all([
+    readFile(receiptPath, "utf8").then(JSON.parse),
+    readSnapshot(snapshotDir),
+  ]);
+  const draftPlanId = String(receipt.draftPlanId || "");
+  if (
+    !draftPlanId
+    || draftPlanId === String(manifest.decorationPlanId)
+    || Number(receipt.draftSourceType) !== DRAFT_SOURCE_TYPE
+    || receipt.verification?.releaseCalled !== false
+  ) {
+    throw new Error("Receipt does not identify an unpublished, separate RES draft");
+  }
+
+  const publishReceipt = await withAuthenticatedPage(
+    async ({ api, releaseApi, page }) => {
+      const formalPayload = {
+        appId: APP_ID,
+        appType: APP_TYPE,
+        decorationPlanId: String(manifest.decorationPlanId),
+        sourceType: FORMAL_SOURCE_TYPE,
+        queryType: 1,
+      };
+      const formalBeforeResponse = await api(
+        "/ordering/config/decoration/listPage",
+        formalPayload,
+      );
+      const formalHomeBefore = findHomePage(formalBeforeResponse);
+      const formalOpenScreenBefore = findOpenScreenPage(formalBeforeResponse);
+      if (
+        sha256(formalHomeBefore) !== manifest.hashes.home
+        || sha256(formalOpenScreenBefore) !== manifest.hashes.openScreen
+      ) {
+        throw new Error("Formal H5 changed after snapshot; refusing to publish");
+      }
+
+      const draftResponse = await api(
+        "/ordering/config/decoration/listPage",
+        {
+          appId: APP_ID,
+          appType: APP_TYPE,
+          decorationPlanId: draftPlanId,
+          sourceType: DRAFT_SOURCE_TYPE,
+          queryType: 1,
+        },
+      );
+      const draftHome = findHomePage(draftResponse);
+      const draftOpenScreen = findOpenScreenPage(draftResponse);
+      if (
+        sha256Text(draftHome.componentsTree)
+          !== receipt.hashes.designedComponentsTree
+        || sha256Text(draftOpenScreen.componentsTree)
+          !== receipt.hashes.designedOpenScreenComponentsTree
+      ) {
+        throw new Error("Live draft no longer matches the reviewed design");
+      }
+      if (!draftOpenScreen.componentsTree.includes(HBTI_URL)) {
+        throw new Error("Live draft does not contain the approved HBTI URL");
+      }
+
+      const rollbackResponse = await api(
+        "/ordering/config/decoration/saveDraft",
+        {
+          appId: APP_ID,
+          decorationPlanId: String(manifest.decorationPlanId),
+          planName: `Rollback before See You Often · ${timestamp()}`,
+        },
+      );
+      const rollbackPlanId = String(
+        rollbackResponse.data?.decorationPlanId
+          || rollbackResponse.data?.id
+          || rollbackResponse.data
+          || "",
+      );
+      if (
+        !rollbackPlanId
+        || rollbackPlanId === String(manifest.decorationPlanId)
+        || rollbackPlanId === draftPlanId
+      ) {
+        throw new Error("RES did not create a distinct rollback draft");
+      }
+
+      const rollbackResponsePages = await api(
+        "/ordering/config/decoration/listPage",
+        {
+          appId: APP_ID,
+          appType: APP_TYPE,
+          decorationPlanId: rollbackPlanId,
+          sourceType: DRAFT_SOURCE_TYPE,
+          queryType: 1,
+        },
+      );
+      const rollbackHome = findHomePage(rollbackResponsePages);
+      const rollbackOpenScreen = findOpenScreenPage(rollbackResponsePages);
+      if (
+        pageContentHash(rollbackHome) !== pageContentHash(formalHomeBefore)
+        || pageContentHash(rollbackOpenScreen)
+          !== pageContentHash(formalOpenScreenBefore)
+      ) {
+        throw new Error("Rollback draft does not reproduce the current formal H5");
+      }
+
+      const inProgress = {
+        startedAt: timestamp(),
+        appId: APP_ID,
+        sourceFormalPlanId: String(manifest.decorationPlanId),
+        draftPlanId,
+        rollbackPlanId,
+        expected: {
+          formalHomeBefore: manifest.hashes.home,
+          formalOpenScreenBefore: manifest.hashes.openScreen,
+          draftHomeContent: pageContentHash(draftHome),
+          draftOpenScreenContent: pageContentHash(draftOpenScreen),
+        },
+        releaseCalled: false,
+      };
+      const inProgressPath = path.join(snapshotDir, "publish-in-progress.json");
+      await writeFile(inProgressPath, stableJson(inProgress));
+
+      const releaseResponse = await releaseApi({
+        appId: APP_ID,
+        decorationPlanId: draftPlanId,
+      });
+      inProgress.releaseCalled = true;
+      inProgress.releaseCalledAt = timestamp();
+      await writeFile(inProgressPath, stableJson(inProgress));
+
+      const readCurrentFormal = async () => {
+        const releaseInfo = await api(
+          "/ordering/config/decoration/getReleaseInfo",
+          { appId: APP_ID, appType: APP_TYPE },
+        );
+        const releasedPlanId = String(
+          releaseInfo.data?.decorationPlanId
+            || releaseInfo.data?.id
+            || "",
+        );
+        if (!releasedPlanId) {
+          throw new Error("RES release info did not return a formal plan id");
+        }
+        const pages = await api(
+          "/ordering/config/decoration/listPage",
+          {
+            appId: APP_ID,
+            appType: APP_TYPE,
+            decorationPlanId: releasedPlanId,
+            sourceType: FORMAL_SOURCE_TYPE,
+            queryType: 1,
+          },
+        );
+        return {
+          releaseInfo,
+          releasedPlanId,
+          home: findHomePage(pages),
+          openScreen: findOpenScreenPage(pages),
+        };
+      };
+
+      let observed = null;
+      for (let attempt = 0; attempt < 15; attempt += 1) {
+        observed = await readCurrentFormal();
+        if (
+          observed.releasedPlanId === draftPlanId
+          && pageContentHash(observed.home) === pageContentHash(draftHome)
+          && pageContentHash(observed.openScreen)
+            === pageContentHash(draftOpenScreen)
+        ) {
+          break;
+        }
+        await page.waitForTimeout(1_000);
+      }
+
+      const published = observed
+        && observed.releasedPlanId === draftPlanId
+        && pageContentHash(observed.home) === pageContentHash(draftHome)
+        && pageContentHash(observed.openScreen)
+          === pageContentHash(draftOpenScreen);
+      if (!published) {
+        const rollbackReleaseResponse = await releaseApi({
+          appId: APP_ID,
+          decorationPlanId: rollbackPlanId,
+        });
+        let rolledBack = null;
+        for (let attempt = 0; attempt < 15; attempt += 1) {
+          rolledBack = await readCurrentFormal();
+          if (
+            rolledBack.releasedPlanId === rollbackPlanId
+            && pageContentHash(rolledBack.home)
+              === pageContentHash(formalHomeBefore)
+            && pageContentHash(rolledBack.openScreen)
+              === pageContentHash(formalOpenScreenBefore)
+          ) {
+            break;
+          }
+          await page.waitForTimeout(1_000);
+        }
+        const rollbackVerified = rolledBack
+          && rolledBack.releasedPlanId === rollbackPlanId
+          && pageContentHash(rolledBack.home) === pageContentHash(formalHomeBefore)
+          && pageContentHash(rolledBack.openScreen)
+            === pageContentHash(formalOpenScreenBefore);
+        await writeFile(
+          path.join(snapshotDir, "publish-failed-rollback.json"),
+          stableJson({
+            failedAt: timestamp(),
+            draftPlanId,
+            rollbackPlanId,
+            rollbackVerified,
+            releaseResponse,
+            rollbackReleaseResponse,
+          }),
+        );
+        throw new Error(
+          rollbackVerified
+            ? "Published H5 failed verification and was rolled back"
+            : "CRITICAL: H5 publication and automatic rollback both failed verification",
+        );
+      }
+
+      return {
+        publishedAt: timestamp(),
+        appId: APP_ID,
+        previousFormalPlanId: String(manifest.decorationPlanId),
+        publishedPlanId: draftPlanId,
+        rollbackPlanId,
+        releaseResponse,
+        verification: {
+          releaseInfoMatchesDraft: observed.releasedPlanId === draftPlanId,
+          homeContentMatchesDraft:
+            pageContentHash(observed.home) === pageContentHash(draftHome),
+          openScreenContentMatchesDraft:
+            pageContentHash(observed.openScreen)
+            === pageContentHash(draftOpenScreen),
+          hbtiUrlPresent: observed.openScreen.componentsTree.includes(HBTI_URL),
+        },
+        hashes: {
+          previousFormalHome: sha256(formalHomeBefore),
+          previousFormalOpenScreen: sha256(formalOpenScreenBefore),
+          publishedHome: sha256(observed.home),
+          publishedOpenScreen: sha256(observed.openScreen),
+          publishedHomeContent: pageContentHash(observed.home),
+          publishedOpenScreenContent: pageContentHash(observed.openScreen),
+        },
+      };
+    },
+    { allowRelease: true },
+  );
+
+  const updatedReceipt = {
+    ...receipt,
+    publishedAt: publishReceipt.publishedAt,
+    rollbackPlanId: publishReceipt.rollbackPlanId,
+    verification: {
+      ...receipt.verification,
+      releaseCalled: true,
+      publishedReadbackVerified: true,
+    },
+  };
+  await Promise.all([
+    writeFile(
+      path.join(snapshotDir, "publish-receipt.json"),
+      stableJson(publishReceipt),
+    ),
+    writeFile(receiptPath, stableJson(updatedReceipt)),
+  ]);
+  return publishReceipt;
+}
+
 async function discoverLatestDraft() {
   return withAuthenticatedPage(async ({ api }) => {
     const history = await api("/ordering/config/decoration/listPageHistory", {
@@ -1028,6 +1407,10 @@ function usage() {
     "  node tools/h5-design.mjs save-draft <snapshot-directory> <draft-plan-name>",
   );
   console.error("  node tools/h5-design.mjs update-draft <snapshot-directory>");
+  console.error("  node tools/h5-design.mjs inspect-live-draft <snapshot-directory>");
+  console.error(
+    "  node tools/h5-design.mjs publish-draft <snapshot-directory> SEE_YOU_OFTEN_H5_V1",
+  );
   console.error("  node tools/h5-design.mjs discover-draft");
   console.error("  node tools/h5-design.mjs list-link-config");
   console.error("  node tools/h5-design.mjs upload-popup <image-path>");
@@ -1059,6 +1442,13 @@ if (command === "snapshot") {
   console.log(stableJson(result));
 } else if (command === "update-draft" && argument) {
   console.log(stableJson(await updateExistingDraft(path.resolve(argument))));
+} else if (command === "inspect-live-draft" && argument) {
+  console.log(stableJson(await inspectLiveDraft(path.resolve(argument))));
+} else if (command === "publish-draft" && argument && rest.length === 1) {
+  console.log(stableJson(await publishDraft(
+    path.resolve(argument),
+    rest[0],
+  )));
 } else if (command === "discover-draft") {
   console.log(stableJson(await discoverLatestDraft()));
 } else if (command === "list-link-config") {

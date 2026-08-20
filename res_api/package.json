@@ -15,8 +15,10 @@
     "sync-pnl": "node sync-pnl.js",
     "backfill:r6-pos-day": "node scripts/backfill-r6-pos-day.js",
     "backfill:r6-pos-range": "node scripts/backfill-r6-pos-range.js",
+    "backfill:r6-pos-history": "node scripts/backfill-r6-pos-history.js",
     "verify:r6-pos-day": "node scripts/verify-r6-pos-day.js",
     "verify:r6-pos-range": "node scripts/verify-r6-pos-range.js",
+    "verify:r6-pos-history": "node scripts/verify-r6-pos-history.js",
     "test:unit": "node --test test/*.test.js",
     "test": "node test-api.js"
   },

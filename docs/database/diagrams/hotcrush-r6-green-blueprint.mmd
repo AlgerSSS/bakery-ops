@@ -7,7 +7,7 @@ flowchart TB
   classDef frozen fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray: 6 4
 
   OLD["旧生产库<br/>ecsgqcmwtjmcpzqytdqw<br/>现网唯一业务真源"]:::frozen
-  BACKFILL["只读有界 POS 回填<br/>6 日范围：5 接纳 + 1 隔离<br/>逐字段零差异"]:::source
+  BACKFILL["只读有界 POS 回填（截至 08-19）<br/>260 日：229 接纳 + 31 隔离<br/>2699 小时 · 逐字段零差异"]:::source
   SOURCES["RES POS · Brain 165 PDF manifest · 财务/HR/SCM"]:::source
 
   subgraph R6["Supabase R6 Green · tmmkknnkcptunxbfjxqn · 24 migrations"]

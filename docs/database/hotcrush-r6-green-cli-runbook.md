@@ -51,7 +51,8 @@ export AI_EMBED_API_KEY_FILE="/安全路径/openrouter-secret"
 ```
 
 脚本先验证链接 ref 是 R6、BakeryOps 与 `res_api` 两份旧 `.env` 都仍含旧生产 ref 且没有 R6 ref，
-再执行门禁。`R6_ACCEPTANCE_DEEP=1` 会额外执行耗时较长的远端 shadow schema diff。
+再执行门禁。远端门禁包含完整九窗 POS 历史对账，不只检查数据库“有行”；`R6_ACCEPTANCE_DEEP=1`
+会额外执行耗时较长的远端 shadow schema diff。
 
 ## 3. R6 worker 凭据
 
@@ -65,7 +66,49 @@ export R6_SUPABASE_SERVICE_KEY_FILE="/安全路径/r6-secret"
 
 不要复用旧项目的 `SUPABASE_*`，不要把 secret 作为命令参数，不要提交 secret 文件。
 
-## 4. POS 范围回填（主路径）
+## 4. POS 历史与范围回填（主路径）
+
+### 4.1 全历史正式命令
+
+全历史 CLI 自动切成最多 31 天的窗口。它固定要求旧源 ref 为 `ecsgqcmwtjmcpzqytdqw`、目标 ref 为
+`tmmkknnkcptunxbfjxqn`；默认只读生成计划。显式 `--apply` 后，每窗严格按“登记 Raw → 有界 Worker
+drain → 独立范围 verify”串行执行，任何子进程或对账失败立即停止。TLS/网络瞬断只在当前 drain 内最多
+重试 3 次，数据、SHA 或解析错误不重试：
+
+```bash
+cd /Users/weiliangshao/hot/res_api
+npm run backfill:r6-pos-history -- \
+  --from=2025-12-03 \
+  --to=2026-08-19 \
+  '--old-store=吉隆坡Pavilion门店' \
+  --r6-store=HC001
+
+# 人工确认计划后才加 --apply
+npm run backfill:r6-pos-history -- \
+  --from=2025-12-03 \
+  --to=2026-08-19 \
+  '--old-store=吉隆坡Pavilion门店' \
+  --r6-store=HC001 \
+  --apply
+
+# 完全独立地重新读取旧库与 R6，验证九个窗口
+npm run verify:r6-pos-history -- \
+  --from=2025-12-03 \
+  --to=2026-08-19 \
+  '--old-store=吉隆坡Pavilion门店' \
+  --r6-store=HC001
+```
+
+中断时可把 `--from` 改为最后一个未完成窗口的起点；Raw 内容哈希和 batch key 保证原样重跑可复用。
+完成态 12 日窗口复跑已验证所有对象 `uploaded=false`、Worker `processed=0`、对账仍为 0。
+
+2026-08-21 复核结果：2025-12-03 至 2026-08-19 共 260 日，229 日进入 current、31 日只保留隔离
+证据；R6 为 229 条 current 日事实、2699 条 current 小时事实、260 个 legacy batch。31 个异常由 22 日
+无小时来源、7 日缺日汇总、2 日交叉对账失败组成；九窗独立 verify 的 `mismatchCount=0`。
+2026-08-21 对 2026-08-20 做了只读 dry-run，旧源已有 1 个可处理日；本次故意未写 R6，
+因此上述数字是“截至 08-19 的固定历史快照”，不是持续同步高水位。
+
+### 4.2 单个 1–31 日窗口
 
 每次最多 31 个自然日。默认只生成计划，不写 R6；计划会把每一天明确分成 `PROCESS` 或
 `QUARANTINE`，不会把缺少小时来源、缺少日来源或交叉对账失败的数据伪装成可信事实：
@@ -114,8 +157,7 @@ npm run verify:r6-pos-range -- \
 5 日进入 current（5 条日事实、57 条小时事实），2026-04-12 因来源账单数不一致只保留
 `LEGACY_POS_ANOMALY / QUARANTINED`；69 条旧库小时来源全部被处理或保存在异常证据中。
 
-全历史 dry-run 盘点为 2025-12-03 至 2026-08-19 共 260 日：229 日可处理、31 日须隔离，原因是
-22 日无小时来源、7 日缺日汇总、2 日交叉对账失败。该盘点没有批量写入 R6。
+该 6 日命令保留为诊断示例；全历史已由上面的正式命令完成，不再是仅 dry-run 的计划。
 
 ## 5. 单日 POS 诊断回填
 
@@ -176,8 +218,9 @@ npx supabase db query --linked \
 - `raw.acknowledged_source_quality` 单独统计已确认的历史源异常
 - 只有 `raw.quarantined_unacknowledged` 会把未解决隔离计为平台故障
 
-当前 `status=degraded` 是预期状态：2 个 quarantined batch 中，一个是已确认历史源质量异常，不触发
-平台故障；另一个是不完整的半日快照，仍是 `quarantined_unacknowledged=1`。不得为追求绿色状态把它恢复。
+当前 `status=degraded` 是预期状态：32 个 quarantined batch 中，31 个是已确认的历史源质量异常，
+不触发平台故障；另一个是不完整的半日快照，仍是 `quarantined_unacknowledged=1`。不得为追求绿色状态
+把它恢复。
 
 ## 7. 回滚与恢复
 
@@ -208,6 +251,9 @@ npx supabase db query --linked \
 
 恢复后必须再次执行单日或范围自动对账。2026-08-20 已在远端实测：隔离已接受 batch 后
 `current_days=0`，1 个日版本和 11 个小时版本仍保留；恢复后 `current_days=1`，再次对账 0 差异。
+全历史完成后又抽样 2026-02-15：隔离时全库 `current_days` 从 229 降为 228，`daily_versions=259`、
+`hourly_versions=2742` 保持不变；恢复后 current 回到 229，单日 verify 再次 0 差异。直接读取版本底表
+返回 403 是预期权限边界，运维验证应使用受控 RPC，不应扩大 service role 表权限。
 
 ## 8. PDF / RAG
 

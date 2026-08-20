@@ -6,7 +6,7 @@
 
 ---
 
-## R6 Green 独立 Supabase 数据平台基座（2026-08-20，Codex，已实施/未切库）
+## R6 Green 独立 Supabase 数据平台基座（2026-08-21，Codex，已实施/未切库）
 
 用户最终收紧本阶段边界：先重建独立的 `hotcrush-core-r6-green`
 （project ref `tmmkknnkcptunxbfjxqn`），不得修改旧应用数据库连接、启用持续 shadow/POS worker，或把现网
@@ -16,6 +16,8 @@
 一次性迁移/对账脚本对旧库的第一条事务语句固定为 `SET TRANSACTION READ ONLY`，只把结果写入 R6。
 本轮只在 tokyo-01 部署独立的 `hotcrush-rag-worker` systemd 服务，使用 systemd encrypted credentials
 且只接受 `R6_SUPABASE_*`；旧应用 systemd 配置未动，POS/shadow worker 未常驻、未切库。
+2026-08-21 再查 tokyo-01 的 `hotcrush*` 服务只有 alert-relay、cn-worker、core、rag-worker 和
+res-api，不存在 POS/shadow 常驻服务；BakeryOps 与 `res_api` 的 `.env` 仍只含旧 project ref。
 
 R6 Green 现由 24 个可重放 Supabase migration 完整定义，远端为 14 张平台/业务表、2 个 POS current
 view、39 个 `ops_*`/`ai_*` 受控函数、7 个私有 Storage bucket、7 个 NOLOGIN capability role、6 个
@@ -30,6 +32,10 @@ restore、平台健康快照、单日和 1–31 日范围对账。范围 CLI 默
 可一次性排空有界队列，不安装常驻服务；本轮真实演练还修复了“队列为空时 RPC 返回 null 复合行导致
 退出 1”的合同 bug。POS worker 只接受显式 `R6_SUPABASE_URL`/`R6_SUPABASE_SERVICE_KEY`，不会回退到旧
 `SUPABASE_*`。`res_api` 连续 Raw shadow 仍默认关闭；启用后会正确排入 `pos_daily_sales`。
+新增 `backfill:r6-pos-history` 与 `verify:r6-pos-history` 正式 CLI：最多 31 日一窗，默认 dry-run，
+只有 `--apply` 才会按“登记 Raw → 有界 drain → 独立对账”串行写 R6；网络/TLS 瞬断仅在同窗
+最多重试 3 次，数据、SHA、解析错误不重试。第二窗曾真实遇到 TLS EOF，在已登记 Raw 且无过期/失败
+租约的状态下续跑成功，不是只测了理想路径。
 
 真实远端演练包含一个反例和一个成功样本：此前 2026-07-26 RES Raw 抓取只覆盖半天，处理虽成功但净额
 38,021.26 与旧库最终日额 63,075.06 不符，已将 batch
@@ -39,22 +45,25 @@ restore、平台健康快照、单日和 1–31 日范围对账。范围 CLI 默
 该已接受 batch 的远端 quarantine → current 消失 → 历史保留 → restore → current 恢复演练也已通过，
 恢复后再次对账仍为 0 差异。
 
-本轮进一步完成真实 6 日范围演练（2026-04-09 至 04-14）：5 日由 worker 发布为 5 条日事实和 57 条小时
-事实，04-12 因来源账单数不一致只登记 `LEGACY_POS_ANOMALY / QUARANTINED`；范围自动对账对旧库 6 条日
-来源、69 条小时来源与 R6 current/隔离证据返回 0 差异。第一次 CLI 输出中断后原样重跑，6 个日期均复用
-同一 batch 且 Storage `uploaded=false`，证明恢复幂等。全历史只读 dry-run 盘点 2025-12-03 至
-2026-08-19 共 260 个日历日：229 日可严格处理，31 日必须隔离（22 日无小时来源、7 日缺日汇总、2 日
-交叉对账失败）；该盘点未批量写 R6。
+本轮已完成 2025-12-03 至 2026-08-19 的全历史日/小时迁移：260 个日历日全部有
+legacy batch，229 日严格通过后发布为 229 条 current 日事实和 2699 条 current 小时事实；
+31 日只保留隔离证据（22 日无小时来源、7 日缺日汇总、2 日交叉对账失败），没有伪造缺失事实。
+独立 verifier 重读旧库 253 条日源数据、2723 条小时源数据并遍历九窗，`mismatchCount=0`。
+完成态 2026-08-08 至 08-19 复跑时对象全为 `uploaded=false`、worker `processed=0`，证明幂等。
+2026-02-15 还完成真实 quarantine/restore 抽样：current 229→228→229，259/2742 个日/小时版本不删，
+恢复后再对账仍为 0。底表直读返回 403 是正确权限边界，未为验收扩大 grant。
 
-R6 当前有 6 个 current 日、36 个日版本、111 个小时版本。健康仍为 `degraded`：2 个 quarantine 中
-`LEGACY_POS_ANOMALY` 已标记 `acknowledged_source_quality=1`，不计平台故障；原半日快照仍是
+R6 当前有 229 个 current 日、259 个日版本、2742 个小时版本。健康仍为 `degraded`：32 个 quarantine 中
+31 个 `LEGACY_POS_ANOMALY` 已标记 `acknowledged_source_quality=1`，不计平台故障；原半日快照仍是
 `quarantined_unacknowledged=1`。处理、RAG、Agent 失败/过期租约及 Storage 血缘缺口均为 0，6 个 cron
 均活跃。不得为追求绿色状态恢复不完整半日快照。
 
 统一入口 `scripts/accept-r6-platform.sh [local|remote|all]` 已跑通完整验收：10 个 pgTAP
-文件/95 项断言、Python pytest 38/38 + Ruff、`res_api` unit 133/133 + API 22/22、BakeryOps TypeScript +
+文件/95 项断言、Python pytest 38/38 + Ruff、`res_api` unit 143/143 + API 22/22、BakeryOps TypeScript +
 45 files/463 Vitest + Next build；远端 24/24 migration、lint、健康不变量和真实带页码检索也均通过。脚本
 先硬检查 linked ref 必须是 R6，且 BakeryOps/`res_api` 两份 `.env` 必须仍指向旧生产并且不得出现 R6 ref。
+2026-08-21 的最终 remote 门禁还强制执行全历史九窗对账，260/229/31、2699 小时与 0 mismatch
+不变量全部通过；BakeryOps 临时 opt-in 仍返回招聘价格文档第 1 页。
 `supabase db diff --linked --schema public,private` 从空影子库重放后返回 `No schema changes found`；提交前
 `git diff --check` 和变更文件密钥/本机路径扫描均通过。Next build 既存 Turbopack warning、NFT 全项目
 追踪 warning 与 Python PyMuPDF/SWIG 弃用 warning 不影响本轮结果。
@@ -78,9 +87,10 @@ BakeryOps 新增 R6 Supabase knowledge backend 的真实验收脚本，并修复
 仍默认关闭（默认继续使用旧 `lightrag`），只在进程级显式 opt-in 时连接 R6；真实验收返回招聘价格文档
 第 1 页引用。本轮没有把 opt-in 写进任何旧应用配置。
 
-仍未做：把已盘点的 229 个可信历史 POS 日全部回填、持续旧源增量、应用 shadow read、任何消费者切换，
-以及 70 份 PDF 的逐份人工内容复核；45 份 DENIED 不应入 RAG。下一步若用户继续维持当前边界，可先人工
-审批 PDF 或按 31 日窗口执行“旧库只读 → R6 Raw → Processed → 自动对账”，31 个异常日只保留隔离证据；
+仍未做：持续旧源增量、应用 shadow read、任何消费者切换，以及 70 份 PDF 的逐份人工内容复核；
+45 份 DENIED 不应入 RAG。2026-08-21 对旧源 2026-08-20 做了只读 dry-run，已是可处理日，但未写 R6；
+这明确证明当前高水位固定在 08-19，而非假装已实现连续同步。下一步若继续维持当前边界，可人工
+审批 70 份 PDF，或对新 POS 日手动运行同一个只读源/有界写 R6/自动对账 CLI；启用定时增量仍需用户单独批准，
 不得直接改 `DATABASE_URL`。旧生产只读审计还发现
 `mkt_birthday_profile`、`mkt_birthday_reservation` 未启用 RLS；不能只开 RLS 而没有配套 policy，否则可能
 直接阻断现有调用，须另开变更窗口确认读写者与策略后处理。实施主文档为

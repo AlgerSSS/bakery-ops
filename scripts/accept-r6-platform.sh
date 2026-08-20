@@ -109,6 +109,27 @@ run_remote() {
     and .cron.active_jobs == .cron.expected_jobs
   ' <<< "$health" >/dev/null
 
+  echo "remote: full historical POS reconciliation"
+  export R6_SUPABASE_SECRET_KEY="$r6_key"
+  (cd "$ROOT/res_api" && node scripts/verify-r6-pos-history.js \
+    --from=2025-12-03 \
+    --to=2026-08-19 \
+    '--old-store=吉隆坡Pavilion门店' \
+    --r6-store=HC001 \
+    | jq -e '
+      select(
+        .ok
+        and .totals.requestedDays == 260
+        and .totals.processDays == 229
+        and .totals.quarantineDays == 31
+        and .totals.r6DailyRows == 229
+        and .totals.r6HourlyRows == 2699
+        and .totals.r6LegacyBatches == 260
+        and .totals.mismatchCount == 0
+      )
+      | {ok, sourceProjectRef, targetProjectRef, fromDate, toDate, totals}
+    ')
+
   echo "remote: BakeryOps R6 retrieval with page citation"
   export R6_SUPABASE_SERVICE_KEY="$r6_key"
   export R6_KNOWLEDGE_SPACE_IDS="10000000-0000-7000-8000-000000000001"

@@ -6,6 +6,34 @@
 
 ---
 
+## See You Often 顶部轮播 + HBTI 开屏弹窗草稿（2026-08-20，Codex，已保存草稿、未发布）
+
+用户要求在 RES 官方 H5 最上方预留滚动海报，并增加点击后进入现有 HBTI 页的测试弹窗。
+已在独立分支 `codex/see-you-often-h5` 完成并写入独立 RES Draft：
+
+- Draft 名称：`See You Often · HBTI 弹窗 · 2026-08-20`
+- Draft plan：`2090327910815711232`；首页 page：`2090327910819905566`；开屏 page：
+  `2090327910819905571`。`releaseCalled=false`，**没有发布正式 H5**。
+- 首页最上方使用 RES 原生 `FSwiper`，保留正式版现有 5 张图片作占位，375×220px、3 秒轮播；
+  后续换海报只需替换轮播图片，不改页面结构。
+- HBTI 弹窗使用 RES 原生 `POpenScreenPage`，新视觉为桃粉纸张、酒红字、面包指纹与红色烤炉箭头；
+  图片已上传 RES 自有存储，点击目标固定为 `https://hbti-test.hotcrush.net/`，外链配置回读一致。
+- 删除旧草稿中未经当前规则确认的“完善资料得 RM10”整块及登录按钮 RM10 文案，避免错误承诺。
+- 保存前后两次独立快照确认正式首页 hash 仍为
+  `0552ffb3da571f849f1dedabadece27cf86a7cf4506638612bd0a8602003c31c`，正式开屏 hash 仍为
+  `8161df6599a9f447152e90fac7900f5a982bb602636ef19bd4fc2349ad026bc9`。
+- 草稿回读：首页设计树/保存树 hash 一致，开屏设计树/保存树 hash 一致；HBTI 页与上传图片均 HTTP 200。
+  中文官方编辑器长页预览 375×1293，顶部轮播位置和后续会员内容均正常。
+- 代码：`res_api/lib/h5-design-layout.mjs`、`res_api/tools/h5-design.mjs`、
+  `res_api/test/h5-design-layout.test.js`，新增视觉资产 `res_api/assets/h5/hbti-popup-2026.png`；
+  `res_api` 单测 **121/121** 通过，`git diff --check` 通过。
+
+仍在等待用户逐项确认的当前问题：**450 积分升级定制蛋糕，Lv3 和 Lv4 是否都每个生日年度限一次？**
+未得到回答前，不要把该限制擅自写入生产。已确认的生日时间链路是：Lv3/Lv4 定制蛋糕 T-5 提醒，
+Lv2–Lv4 免费巴斯克 T-2 提醒，生日当天发送贺卡网页并发对应生日券。
+
+---
+
 ## 权益分配二次修订：L1 只有贺卡、L2 只有免费巴斯克、L3/L4 二选一（2026-08-15，DSH，已合入并部署）
 
 用户再次修订生日权益分配，已实现上线：
@@ -1881,6 +1909,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-20 | Codex | **See You Often 顶部轮播 + HBTI 弹窗（已保存独立草稿、未发布）**：Draft plan `2090327910815711232`；首页顶部复用 5 张正式图作 375×220、3 秒原生轮播占位；新 HBTI 桃粉/酒红“面包指纹”开屏图点击直达 `https://hbti-test.hotcrush.net/`；删除未经确认的 RM10 文案。首页/开屏双页回读 hash 一致，正式双页 hash 前后不变，releaseCalled=false；res_api 单测 121/121。 |
 | 2026-08-15 | DSH | **权益分配二次修订（已部署）**：L1 只有贺卡、L2 只有免费巴斯克、L3/L4 免费巴斯克或 450 积分兑换二选一（L3 限自己 L4 可送亲友）；权益模型改「等级→可选权益组数组」，BIRTHDAY_BENEFITS_JSON 覆盖同步改数组；L1 前端显示贺卡说明且无预约表单。门禁 336 过 39 跳过；线上验证 Nicole(L4) 双选项、免费因已领灰显；新部署 hotcrush-hbti-ojb3ix3yg-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **会员等级按用户定版（已部署）**：等级改为按年累计实付消费实时计算（Lv1 初见 RM0 / Lv2 心动 RM250 / Lv3 热爱 RM750 / Lv4 挚爱 RM1500），不再读 RES 等级名；权益收紧为 L1/L2 只有免费巴斯克、L3/L4 才有 450 积分兑换（L3 限自己 L4 可送亲友）；view 返回 member.level 含升级差，reserve 同口径判定；线上验证 Nicole=Lv4 挚爱、仅积分兑换选项。门禁 333 过 39 跳过；新部署 hotcrush-hbti-p9oyc6z0z-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **修复生日域名提交 403 INVALID_ORIGIN（已上线）**：Origin 白名单从单一 HBTI_LINK_BASE_URL 改为与 HBTI_EXTRA_ORIGINS 的并集（语义收紧为「主机 ∈ 名单 且 Origin===主机」）；Vercel 配 HBTI_EXTRA_ORIGINS=https://birthday.hotcrush.net；验证生日域名提交 403→400、hbti-test 不变、陌生 Origin 仍 403；新部署 hotcrush-hbti-fmwd9xk5x-algersss-projects.vercel.app。教训：应用加自有域名必须同步加白名单。 |

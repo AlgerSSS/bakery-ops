@@ -230,12 +230,69 @@ function internalLink({ key, label, h5Path, id }) {
   };
 }
 
+function assertHttpsUrl(value, label) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${label} must be a valid HTTPS URL`);
+  }
+  if (url.protocol !== "https:" || url.username || url.password) {
+    throw new Error(`${label} must be a valid HTTPS URL`);
+  }
+}
+
+function assertImageUrl(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("HBTI popup image URL is required");
+  }
+  const normalized = value.startsWith("//") ? `https:${value}` : value;
+  assertHttpsUrl(normalized, "HBTI popup image URL");
+}
+
+function buildHbtiOpenScreen(openScreenPage, { imageUrl, href }) {
+  assertImageUrl(imageUrl);
+  assertHttpsUrl(href, "HBTI popup target");
+
+  const tree = parseJsonField(openScreenPage.componentsTree, "componentsTree");
+  const popup = findPrototype(tree, "POpenScreenPage");
+  popup.props = popup.props || {};
+  popup.props.data = popup.props.data || {};
+  popup.props.data.setting = {
+    ...popup.props.data.setting,
+    open: true,
+    adUrl: imageUrl,
+    link: {
+      key: "customPageUrl",
+      id: "100",
+      label: "自定义页面路径",
+      miniPath: "",
+      h5Path: "",
+      appType: ["0", "1", "2", "3", "9"],
+      isCustomLink: true,
+      outLink: true,
+      modalType: "customeLink",
+      showType: ["inside"],
+      path: href,
+      checked: true,
+    },
+  };
+
+  validateComponentTree(tree);
+  return {
+    ...clone(openScreenPage),
+    componentsTree: JSON.stringify(tree),
+    componentsMap: openScreenPage.componentsMap || "{}",
+  };
+}
+
 function buildSeeYouOftenHome(homePage) {
   const sourceTree = parseJsonField(homePage.componentsTree, "componentsTree");
   const containerPrototype = findPrototype(sourceTree, "FContainer");
   const textPrototype = findPrototype(sourceTree, "FText");
   const imagePrototype = findPrototype(sourceTree, "FImage");
   const hotSpotPrototype = findPrototype(sourceTree, "FHotSpot");
+  const swiperPrototype = findPrototype(sourceTree, "FSwiper");
   const userInfoPrototype = findPrototype(sourceTree, "PUserInfo");
   const navPrototype = findPrototype(sourceTree, "FNav");
   const endPrototype = findPrototype(sourceTree, "FEndPlaceholder");
@@ -280,6 +337,31 @@ function buildSeeYouOftenHome(homePage) {
     fontSize: "14px",
   };
   tree.SYO_NAV = nav;
+
+  const posters = clone(swiperPrototype);
+  posters.parent = "ROOT";
+  posters.hidden = false;
+  posters.nodes = [];
+  posters.props.data = {
+    ...posters.props.data,
+    swiperTime: 3,
+  };
+  posters.props.styleProps = {
+    ...posters.props.styleProps,
+    width: "375px",
+    height: "220px",
+    objectFit: "cover",
+    objectPosition: "center",
+    marginTop: "0px",
+    marginBottom: "0px",
+    marginLeft: "0px",
+    marginRight: "0px",
+    borderTopLeftRadius: "0px",
+    borderTopRightRadius: "0px",
+    borderBottomRightRadius: "0px",
+    borderBottomLeftRadius: "0px",
+  };
+  tree.SYO_POSTERS = posters;
 
   const heroChildren = [
     "SYO_HERO_LOGO",
@@ -407,11 +489,11 @@ function buildSeeYouOftenHome(homePage) {
     darkProgressColor: PALETTE.cream,
     progressTextColor: PALETTE.cocoaDark,
     loginBtnBgText: {
-      value: "登录 / 注册 · 领取 RM10",
+      value: "登录 / 注册",
       valueML: {
-        en_US: "Join / Log in · Get RM10",
-        zh_CN: "登录 / 注册 · 领取 RM10",
-        ms_MY: "Daftar / Log masuk · Dapat RM10",
+        en_US: "Join / Log in",
+        zh_CN: "登录 / 注册",
+        ms_MY: "Daftar / Log masuk",
       },
     },
     loginBtnBgColor: PALETTE.pistachio,
@@ -573,110 +655,6 @@ function buildSeeYouOftenHome(homePage) {
     }));
   }
 
-  const rewardChildren = [
-    "SYO_REWARD_KICKER",
-    "SYO_REWARD_TITLE",
-    "SYO_REWARD_SUB",
-    "SYO_REWARD_STEP_1",
-    "SYO_REWARD_STEP_2",
-    "SYO_REWARD_STEP_3",
-    "SYO_REWARD_LINK",
-  ];
-  addNode(tree, makeContainer(containerPrototype, "SYO_REWARD", "ROOT", {
-    width: "343px",
-    height: "224px",
-    position: "relative",
-    overflow: "hidden",
-    marginLeft: "16px",
-    marginRight: "16px",
-    marginBottom: "18px",
-    backgroundColor: PALETTE.flesh,
-    borderTopLeftRadius: "22px",
-    borderTopRightRadius: "22px",
-    borderBottomRightRadius: "22px",
-    borderBottomLeftRadius: "22px",
-  }, rewardChildren));
-  addNode(tree, makeText(textPrototype, "SYO_REWARD_KICKER", "SYO_REWARD", {
-    en: "WELCOME REWARD",
-    zh: "新会员见面礼",
-    ms: "GANJARAN SELAMAT DATANG",
-    top: 22,
-    left: 20,
-    width: 180,
-    height: 18,
-    size: 10,
-    color: PALETTE.cocoaDark,
-    font: "NeutraTextDemiAlt",
-    zhFont: "OPPOSans",
-    bold: true,
-  }));
-  addNode(tree, makeText(textPrototype, "SYO_REWARD_TITLE", "SYO_REWARD", {
-    en: "Complete profile. Get RM10.",
-    zh: "完善资料，RM10 自动到账。",
-    ms: "Lengkapkan profil. Dapat RM10.",
-    top: 50,
-    left: 20,
-    width: 300,
-    height: 32,
-    size: 22,
-    color: PALETTE.cocoaDark,
-    font: "NeutraTextDemiAlt",
-    bold: true,
-  }));
-  addNode(tree, makeText(textPrototype, "SYO_REWARD_SUB", "SYO_REWARD", {
-    en: "No second account. Complete your profile here →",
-    zh: "不需要第二个账户，点这里完善资料 →",
-    ms: "Tiada akaun kedua. Lengkapkan profil di sini →",
-    top: 89,
-    left: 20,
-    width: 300,
-    height: 22,
-    size: 12,
-    color: PALETTE.cocoaDark,
-    font: "OPPOSans",
-    zhFont: "OPPOSans",
-  }));
-  const steps = [
-    ["SYO_REWARD_STEP_1", "01  Verify your mobile", "01  验证手机号", "01  Sahkan nombor telefon", 132],
-    ["SYO_REWARD_STEP_2", "02  Add name & birthday", "02  补充姓名与生日", "02  Tambah nama & tarikh lahir", 161],
-    ["SYO_REWARD_STEP_3", "03  Coupon arrives in account", "03  优惠券自动到账", "03  Kupon masuk ke akaun", 190],
-  ];
-  for (const [id, en, zh, ms, top] of steps) {
-    addNode(tree, makeText(textPrototype, id, "SYO_REWARD", {
-      en,
-      zh,
-      ms,
-      top,
-      left: 20,
-      width: 295,
-      height: 20,
-      size: 12,
-      color: PALETTE.cocoaDark,
-      font: "OPPOSans",
-      zhFont: "OPPOSans",
-      bold: true,
-    }));
-  }
-  addNode(tree, makeHotSpot(hotSpotPrototype, "SYO_REWARD_LINK", "SYO_REWARD", {
-    top: 0,
-    left: 0,
-    width: 343,
-    height: 224,
-    link: {
-      key: "userInfo",
-      label: "个人资料",
-      miniPath: "/subPackages/member/userInfo/index",
-      h5Path: "/editUserInfo",
-      appType: ["0", "1", "2", "3", "9"],
-      showType: ["inside"],
-      isSupportCopy: true,
-      isGoShareIndex: true,
-      loginType: "1",
-      checked: true,
-      path: "/editUserInfo",
-    },
-  }));
-
   const topupLink = assetLink(userInfo, "balance");
   const topupChildren = [
     "SYO_TOPUP_KICKER",
@@ -823,10 +801,10 @@ function buildSeeYouOftenHome(homePage) {
   tree.SYO_END = end;
 
   tree.ROOT.nodes = [
+    "SYO_POSTERS",
     "SYO_HERO",
     "SYO_MEMBER",
     "SYO_ACTIONS",
-    "SYO_REWARD",
     "SYO_TOPUP",
     "SYO_ORDER",
     "SYO_END",
@@ -887,6 +865,7 @@ function validateComponentTree(tree) {
 
 export {
   PALETTE,
+  buildHbtiOpenScreen,
   buildSeeYouOftenHome,
   parseJsonField,
   validateComponentTree,

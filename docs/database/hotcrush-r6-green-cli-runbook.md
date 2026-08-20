@@ -304,6 +304,9 @@ uv run brainctl auto \
   "/Users/weiliangshao/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain/raw" \
   --state-file "/Users/weiliangshao/Library/Application Support/HotCrush/r6-rag/auto-ingest/state.json"
 
+uv run brainctl probe \
+  "/Users/weiliangshao/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain/raw"
+
 ./run-brain-auto-ingest.sh
 ```
 
@@ -311,16 +314,23 @@ uv run brainctl auto \
 `NO_CHANGES / selected=0`。state 目录为 700、JSON/lock 为 600。新 C2/C3/C4 只增加待办计数；源路径
 内容改变或删除会停止并保留上一次成功 state，不自动创建错误版本或下架文档。
 
-30 分钟 LaunchAgent 已提供安装/回滚命令：
+30 分钟 LaunchAgent 已提供安装/回滚命令。installer 会先构建并 ad-hoc 签名专用的
+`~/Applications/HotCrush R6 Brain Ingest.app`，LaunchAgent 只启动这个 App；不要给整个 `/bin/bash`、
+Terminal 或 Python 完全磁盘访问权限。installer 必须等首跑退出 0 才保留 agent，任何非零退出或超时均
+自动 bootout，并把 plist 移到 Trash；专用 App、state、日志和 R6 数据保留：
 
 ```bash
 ./install-brain-auto-ingest.sh install
 ./install-brain-auto-ingest.sh uninstall
 ```
 
-2026-08-21 的实际 LaunchAgent 首跑在 iCloud 目录 `opendir` 被 macOS TCC 挂起，已卸载，R6 与 state
-保留。用户在「隐私与安全性 → 完全磁盘访问权限」授权后台 Python/runner 后才可重新安装；runner 有
-300 秒硬超时。验收必须看到 `last exit code = 0` 且 stderr 为空，不能用交互式手跑成功替代后台证据。
+2026-08-21 的新门禁实跑结果：交互式专用 App 读取 165 个 PDF 并返回 `NO_CHANGES`；相同 App 经
+LaunchAgent 启动时，20 秒访问探针返回 `77: EX_NOPERM`，installer 在约 21 秒内自动卸载且无残留进程。
+这证明阻塞是 macOS TCC，不是 Supabase/RAG。用户在「隐私与安全性 → 完全磁盘访问权限」只授权
+`HotCrush R6 Brain Ingest.app` 后重新执行 install；验收必须看到 installer 的
+`first background run exited 0`、`launchctl` 的 `last exit code = 0` 且 stderr 为空，不能用交互式成功
+代替后台证据。Apple 明确说明 iCloud Drive 属于受用户同意保护的文件位置：
+<https://support.apple.com/en-ca/guide/security/secddd1d86a6/web>。
 
 真实 Brain 盘点结果：165 份均完成哈希；manifest 中 3 份 `AUTO_UPLOAD`、70 份
 `REVIEW_REQUIRED`、45 份 `DENIED`、47 份同空间重复跳过。70 份待审项已记录 3 个

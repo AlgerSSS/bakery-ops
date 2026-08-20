@@ -57,6 +57,17 @@ def inventory(root: Path, include_hash: bool = False) -> list[dict[str, Any]]:
     return entries
 
 
+def probe_access(root: Path) -> dict[str, Any]:
+    """Verify that a background process can enumerate and read every PDF source."""
+    if not root.is_dir():
+        raise ValueError(f"not a directory: {root}")
+    paths = find_pdf_paths(root)
+    for path in paths:
+        with path.open("rb") as handle:
+            handle.read(1)
+    return {"mode": "ACCESS_OK", "pdf_count": len(paths)}
+
+
 def _safe_title(path: Path, classification: Classification, sha256: str) -> str:
     if classification.data_class in ("C1", "C2"):
         return path.stem[:160]
@@ -404,6 +415,12 @@ def main() -> None:
     )
     batch_parser.add_argument("--max-files", type=int)
 
+    probe_parser = subparsers.add_parser(
+        "probe",
+        help="verify that every Brain PDF can be enumerated and opened",
+    )
+    probe_parser.add_argument("root", type=Path)
+
     auto_parser = subparsers.add_parser(
         "auto",
         help="discover Brain PDFs and automatically ingest new C1 files only",
@@ -506,6 +523,10 @@ def main() -> None:
                 ),
                 None,
             )
+            return
+
+        if args.command == "probe":
+            _write_json(probe_access(args.root), None)
             return
 
         if args.command == "status":

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Any, Self
 
@@ -217,3 +218,22 @@ def test_auto_command_uses_r6_control_credentials_and_never_a_review_ledger(
         }
     ]
     assert '"mode": "APPLY"' in capsys.readouterr().out
+
+
+def test_probe_command_reads_pdf_sources_and_outputs_only_a_count(
+    monkeypatch: Any,
+    tmp_path: Path,
+    capsys: Any,
+) -> None:
+    brain = tmp_path / "brain"
+    (brain / "General").mkdir(parents=True)
+    (brain / "General" / "opening.pdf").write_bytes(b"pdf-one")
+    (brain / "General" / "closing.PDF").write_bytes(b"pdf-two")
+    monkeypatch.setattr("sys.argv", ["brainctl", "probe", str(brain)])
+
+    brainctl.main()
+
+    assert json.loads(capsys.readouterr().out) == {
+        "mode": "ACCESS_OK",
+        "pdf_count": 2,
+    }

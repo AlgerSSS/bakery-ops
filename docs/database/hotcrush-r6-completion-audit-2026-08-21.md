@@ -8,10 +8,11 @@
 数据库平台主体已经落地并有本地、远端和运行时证据，但完整长期目标**尚不能标为完成**。
 尚缺的不是另一批表，而是两个外部运行条件：
 
-1. Mac LaunchAgent 在后台读取 iCloud Brain `raw` 目录时被 macOS TCC 卡在 `opendir`；相同 R6-only
-   命令在当前交互会话 4 秒成功。为避免每 30 分钟产生挂起进程，LaunchAgent 已卸载，安装包与 300 秒
-   硬超时保留。用户授予 Full Disk Access 并重新安装、观察一次退出 0 之前，不能声称“新 PDF 无人值守
-   自动发现”已生产可用。
+1. Mac LaunchAgent 在后台读取 iCloud Brain `raw` 目录时被 macOS TCC 拒绝；相同 R6-only 专用 App
+   在交互会话读取 165 个 PDF 并完成 `NO_CHANGES`。现已增加 20 秒全量读取探针、专用 ad-hoc 签名 App
+   wrapper、首跑退出码门禁和失败自动 bootout：真实后台试验在约 21 秒返回 `77: EX_NOPERM`，agent、plist
+   和子进程均无残留。用户只给专用 App 授予 Full Disk Access 并重新安装、观察一次退出 0 之前，不能
+   声称“新 PDF 无人值守自动发现”已生产可用。
 2. 旧生产数据库连接串曾被输出到任务日志。旧库仍可用且配置未改，但密码必须视为已暴露。轮换需要
    同步四个既有消费者，属于用户明确禁止本轮修改的旧生产配置；完成协调轮换前，“不破坏旧生产”的
    功能条件成立，凭据安全闭环不成立。
@@ -30,10 +31,10 @@
 | Cron | 6/6 active；覆盖 lease recovery、health rollup、lineage reconcile、failed staging cleanup | 已证明 |
 | 结构化处理 | POS Raw→lease→SHA/业务对账→版本事实→current view 的 worker 与回滚均实跑 | 已证明 |
 | PDF/RAG worker | tokyo-01 `hotcrush-rag-worker` enabled/active；6 文档、108 页、113 chunks/vectors | 已证明 |
-| 新 PDF 自动发现 | `brainctl auto` 首次 165 文件/3 C1 成功，二次 `NO_CHANGES`；LaunchAgent 因 TCC 未能完成后台退出 0 | **部分完成** |
+| 新 PDF 自动发现 | 首次 165 文件/3 C1 成功、二次 `NO_CHANGES`；专用签名 App 交互式通过，LaunchAgent 返回 77 后自动回滚 | **部分完成** |
 | 应用接入 | BakeryOps `SupabaseKnowledgeClient` 在不改现网 backend 时，C1/C2 三空间返回预期标题与页码 | 已证明 |
 | 数据迁移演练 | 2025-12-03..2026-08-19：260 日、229 current、31 quarantine、2699 小时、九窗 mismatch 0 | 已证明 |
-| 端到端测试 | local：109 pgTAP、49 Python、143+22 RES、463 BakeryOps、Next build；remote acceptance 退出 0 | 已证明 |
+| 端到端测试 | local：109 pgTAP、56 Python、143+22 RES、463 BakeryOps、Next build；remote acceptance 退出 0 | 已证明 |
 | 监控 | `ops_get_platform_health`、`pipeline_health`、Cron、租约/失败/Storage/RAG 审计不变量 | 已证明 |
 | 回滚 | POS quarantine/restore；C1/C2 RAG unpublish/search-zero/restore/original-page | 已证明 |
 | 可复现 CLI | reset/test/lint/push/diff、backfill/verifier、brainctl/worker、`accept-r6-platform.sh` | 已证明 |
@@ -61,12 +62,15 @@ Brain/raw
 - 只有 `AUTO_UPLOAD` C1 会传给上传函数；
 - 完全相同目录二次执行为 `NO_CHANGES`，0 次上传；
 - 中途上传失败、源内容改变或删除均不推进最后成功 manifest；
-- LaunchAgent runner 有 300 秒硬超时；安装/卸载不会删除 R6 数据或本机审阅状态。
+- runner 先以 20 秒探针逐个打开所有 PDF，再读取 Keychain；auto 有 300 秒硬超时；
+- LaunchAgent 只启动专用签名 App，不要求给共享 shell/Python 放权；首跑非零或超时会自动卸载；
+- 安装/卸载不会删除专用 App、R6 数据或本机审阅状态。
 
 ## 解除剩余阻塞后的验收
 
-1. 在 macOS「隐私与安全性 → 完全磁盘访问权限」中授权实际后台责任进程读取 iCloud Brain；如果只授权
-   Python 仍失败，再授权 runner 使用的 `/bin/bash`。这是系统 UI 权限，不能由 CLI 静默绕过。
+1. 在 macOS「隐私与安全性 → 完全磁盘访问权限」中只添加并开启
+   `/Users/weiliangshao/Applications/HotCrush R6 Brain Ingest.app`。不要给共享的 `/bin/bash`、Terminal、
+   Codex 或 Python 放权。这是系统 UI 的用户同意，CLI 不能静默绕过。
 2. 执行：
 
    ```bash
@@ -74,7 +78,7 @@ Brain/raw
    ./install-brain-auto-ingest.sh install
    ```
 
-3. 等待一次运行结束；验收必须同时满足：
+3. installer 会等待首次运行；它必须打印 `first background run exited 0`，否则自动回滚。随后验收：
 
    ```bash
    launchctl print gui/$(id -u)/com.hotcrush.r6-brain-ingest

@@ -22,6 +22,7 @@ uv run brainctl auto "/path/to/Brain/raw" \
   --state-file /secure/path/auto-state.json
 uv run brainctl auto "/path/to/Brain/raw" \
   --state-file /secure/path/auto-state.json --apply
+uv run brainctl probe "/path/to/Brain/raw"
 uv run brainctl upload "/path/to/approved-c1.pdf"
 uv run brainctl search "opening checklist" --space-id 10000000-0000-7000-8000-000000000001
 uv run brainctl status --document-id DOCUMENT_UUID
@@ -61,13 +62,16 @@ permissions under a 0700 directory. Identical scans do zero uploads; an upload f
 advance state. A changed or removed source path fails closed because automatic code cannot infer
 whether to create a new logical version or unpublish the old document.
 
-On this Mac, `run-brain-auto-ingest.sh` reads only the R6 service credential already stored in
-Keychain and runs the command with a 300-second hard timeout. `install-brain-auto-ingest.sh install`
-installs the separate `com.hotcrush.r6-brain-ingest` LaunchAgent at a 30-minute interval;
-`uninstall` removes only the agent and retains state/R6 data. macOS Full Disk Access must first
-allow the background process to enumerate the iCloud Brain directory. The 2026-08-21 trial was
-uninstalled after TCC blocked `opendir`; do not claim unattended operation until one scheduled run
-exits 0.
+On this Mac, `run-brain-auto-ingest.sh` first runs a 20-second full PDF read probe, then reads only
+the R6 service credential already stored in Keychain and runs auto-ingest with a 300-second hard
+timeout. `build-brain-ingest-app.sh` wraps the runner in the dedicated, ad-hoc signed
+`~/Applications/HotCrush R6 Brain Ingest.app`; the LaunchAgent targets that app instead of granting
+broad Full Disk Access to `/bin/bash` or Python. `install-brain-auto-ingest.sh install` installs the
+30-minute agent, waits for the first run, and retains it only after exit 0. Any probe/run failure or
+timeout automatically unloads the agent and moves its plist to Trash while retaining the app,
+state, logs and R6 data. Grant iCloud/Full Disk Access only to the dedicated app, then rerun the
+installer. The 2026-08-21 background trial correctly returned `77/EX_NOPERM` and self-removed; do
+not claim unattended operation until one scheduled run exits 0.
 
 BakeryOps 已有只读 R6 适配代码，但现网不配置、不启用，仍使用旧生产库与旧
 LightRAG。未来切换时必须使用独立的 `R6_SUPABASE_*` 变量，不能复用历史

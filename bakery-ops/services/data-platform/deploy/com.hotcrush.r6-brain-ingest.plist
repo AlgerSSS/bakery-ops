@@ -6,8 +6,7 @@
   <string>com.hotcrush.r6-brain-ingest</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/bin/bash</string>
-    <string>/Users/weiliangshao/hot/bakery-ops/services/data-platform/run-brain-auto-ingest.sh</string>
+    <string>/Users/weiliangshao/Applications/HotCrush R6 Brain Ingest.app/Contents/MacOS/HotCrushR6BrainIngest</string>
   </array>
   <key>WorkingDirectory</key>
   <string>/Users/weiliangshao/hot/bakery-ops/services/data-platform</string>

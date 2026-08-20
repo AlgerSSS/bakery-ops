@@ -23,13 +23,17 @@ const context = (overrides = {}) => ({
 });
 
 function claim() {
-  return buildDowngradeLedgerClaim(plan(), context(), { claimToken: TOKEN });
+  return buildDowngradeLedgerClaim(plan(), context(), {
+    claimToken: TOKEN,
+    noticeId: 10,
+  });
 }
 
 function entry(overrides = {}) {
   const value = claim();
   return {
     ledger_id: 1,
+    notice_id: value.noticeId,
     card_id: value.cardId,
     recalculation_date: value.recalculationDate,
     action: value.action,
@@ -53,12 +57,14 @@ test("downgrade claims require month day 1 and exactly one known level step", ()
     windowTo: "2026-10-31",
     fromLevelId: "2090027045185888261",
     targetLevelId: "2090027043797577737",
+    noticeId: 10,
     claimToken: TOKEN,
   });
   assert.throws(
     () =>
       buildDowngradeLedgerClaim(plan(), context({ asOfDate: "2026-11-02" }), {
         claimToken: TOKEN,
+        noticeId: 10,
       }),
     /month day 1/i,
   );
@@ -70,6 +76,13 @@ test("downgrade claims require month day 1 and exactly one known level step", ()
         { claimToken: TOKEN },
       ),
     /exactly one known level step/i,
+  );
+});
+
+test("downgrade claims cannot exist without a delivered RES SMS notice ID", () => {
+  assert.throws(
+    () => buildDowngradeLedgerClaim(plan(), context(), { claimToken: TOKEN }),
+    /delivered RES SMS notice ID/i,
   );
 });
 
@@ -156,6 +169,23 @@ test("migration 112 enforces a monthly unique downgrade ledger without direct PI
   assert.doesNotMatch(source, /\b(card_no|member_id|phone|birthday)\b/);
 });
 
+test("migration 113 binds every downgrade to an exact seven-day RES SMS delivery", () => {
+  const source = fs.readFileSync(
+    new URL(
+      "../../bakery-ops/src/modules/data/migrations/113_loyalty_downgrade_notice_gate.sql",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+  assert.match(source, /delivery_channel\s+text\s+NOT NULL DEFAULT 'res_sms'/);
+  assert.match(source, /notice_date = recalculation_date - 7/);
+  assert.match(source, /status = 'delivered'/);
+  assert.match(source, /ALTER COLUMN notice_id SET NOT NULL/);
+  assert.match(source, /fk_mkt_loyalty_level_change_notice/);
+  assert.match(source, /VALUES \(113, 'loyalty_downgrade_notice_gate'\)/);
+  assert.doesNotMatch(source, /\b(card_no|member_id|phone|birthday)\b/);
+});
+
 test("apply path claims before changing RES and reconciles every terminal outcome", () => {
   const source = fs.readFileSync(
     new URL("../scripts/preview-loyalty-levels.mjs", import.meta.url),
@@ -170,5 +200,9 @@ test("apply path claims before changing RES and reconciles every terminal outcom
   assert.match(applySource, /markDowngradeLedgerFailed/);
   assert.match(applySource, /markDowngradeLedgerAmbiguous/);
   assert.match(applySource, /reconcileObservedDowngradeApplied/);
+  assert.ok(
+    applySource.indexOf("requireDeliveredDowngradeNotice(") <
+      applySource.indexOf("claimDowngradeLedger("),
+  );
   assert.match(applySource, /assertDowngradeLedgerSchema/);
 });

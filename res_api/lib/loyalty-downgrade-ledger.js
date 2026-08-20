@@ -39,7 +39,7 @@ function dateText(value) {
   return String(value ?? "").slice(0, 10);
 }
 
-export function buildDowngradeLedgerClaim(plan, context, { claimToken } = {}) {
+function downgradeLedgerFacts(plan, context) {
   const recalculationDate = plainDate(context?.asOfDate, "asOfDate");
   const windowFrom = plainDate(context?.windowFrom, "windowFrom");
   const windowTo = plainDate(context?.windowTo, "windowTo");
@@ -60,10 +60,6 @@ export function buildDowngradeLedgerClaim(plan, context, { claimToken } = {}) {
   if (!cardId || fromIndex === undefined || targetIndex !== fromIndex - 1) {
     throw new Error("The downgrade ledger accepts exactly one known level step.");
   }
-  const token = string(claimToken || randomUUID());
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)) {
-    throw new Error("The downgrade claim token must be a UUID v4.");
-  }
   return {
     cardId,
     recalculationDate,
@@ -72,13 +68,59 @@ export function buildDowngradeLedgerClaim(plan, context, { claimToken } = {}) {
     windowTo,
     fromLevelId,
     targetLevelId,
+  };
+}
+
+export function buildDowngradeLedgerClaim(
+  plan,
+  context,
+  { claimToken, noticeId } = {},
+) {
+  const facts = downgradeLedgerFacts(plan, context);
+  const token = string(claimToken || randomUUID());
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(token)) {
+    throw new Error("The downgrade claim token must be a UUID v4.");
+  }
+  const deliveredNoticeId = Number(noticeId);
+  if (!Number.isSafeInteger(deliveredNoticeId) || deliveredNoticeId < 1) {
+    throw new Error("A delivered RES SMS notice ID is required to claim a downgrade.");
+  }
+  return {
+    ...facts,
+    noticeId: deliveredNoticeId,
     claimToken: token,
   };
+}
+
+export async function requireDeliveredDowngradeNotice(sql, plan, context) {
+  const facts = downgradeLedgerFacts(plan, context);
+  const [notice] = await sql`
+    SELECT *
+    FROM public.mkt_loyalty_downgrade_notice
+    WHERE card_id = ${facts.cardId}
+      AND recalculation_date = ${facts.recalculationDate}::date
+      AND notice_date = ${facts.recalculationDate}::date - 7
+      AND action = ${facts.action}
+      AND from_level_id = ${facts.fromLevelId}
+      AND target_level_id = ${facts.targetLevelId}
+      AND delivery_channel = 'res_sms'
+      AND status = 'delivered'
+      AND provider_message_id IS NOT NULL
+      AND delivered_at IS NOT NULL
+      AND (delivered_at AT TIME ZONE 'Asia/Kuala_Lumpur')::date = notice_date
+  `;
+  if (!notice) {
+    throw new Error(
+      "Downgrade refused: no matching RES SMS notice was confirmed delivered exactly seven days earlier.",
+    );
+  }
+  return notice;
 }
 
 function sameClaimFacts(entry, claim) {
   return (
     string(entry?.card_id) === claim.cardId &&
+    Number(entry?.notice_id) === claim.noticeId &&
     dateText(entry?.recalculation_date) === claim.recalculationDate &&
     string(entry?.action) === claim.action &&
     dateText(entry?.window_from) === claim.windowFrom &&
@@ -135,25 +177,47 @@ export async function assertDowngradeLedgerSchema(sql) {
   const [row] = await sql`
     SELECT
       to_regclass('public.mkt_loyalty_level_change_ledger')::text AS table_name,
+      to_regclass('public.mkt_loyalty_downgrade_notice')::text AS notice_table_name,
       EXISTS (
         SELECT 1
         FROM public.schema_migrations
         WHERE version = 112 AND name = 'loyalty_level_change_ledger'
-      ) AS migration_recorded
+      ) AS migration_recorded,
+      EXISTS (
+        SELECT 1
+        FROM public.schema_migrations
+        WHERE version = 113 AND name = 'loyalty_downgrade_notice_gate'
+      ) AS notice_migration_recorded,
+      EXISTS (
+        SELECT 1
+        FROM pg_attribute
+        WHERE attrelid = 'public.mkt_loyalty_level_change_ledger'::regclass
+          AND attname = 'notice_id'
+          AND attnotnull
+          AND NOT attisdropped
+      ) AS notice_id_required
   `;
   if (
     !["mkt_loyalty_level_change_ledger", "public.mkt_loyalty_level_change_ledger"].includes(
       row?.table_name,
     ) ||
-    row?.migration_recorded !== true
+    !["mkt_loyalty_downgrade_notice", "public.mkt_loyalty_downgrade_notice"].includes(
+      row?.notice_table_name,
+    ) ||
+    row?.migration_recorded !== true ||
+    row?.notice_migration_recorded !== true ||
+    row?.notice_id_required !== true
   ) {
-    throw new Error("Loyalty downgrade ledger migration 112 is not installed.");
+    throw new Error(
+      "Loyalty downgrade ledger migrations 112 and 113 are not fully installed.",
+    );
   }
 }
 
 export async function claimDowngradeLedger(sql, claim) {
   const [inserted] = await sql`
     INSERT INTO public.mkt_loyalty_level_change_ledger (
+      notice_id,
       card_id,
       recalculation_date,
       action,
@@ -164,6 +228,7 @@ export async function claimDowngradeLedger(sql, claim) {
       status,
       claim_token
     ) VALUES (
+      ${claim.noticeId},
       ${claim.cardId},
       ${claim.recalculationDate}::date,
       ${claim.action},
@@ -212,6 +277,7 @@ export async function reclaimDowngradeLedger(
         status = 'failed'
         OR (status = 'claimed' AND updated_at <= ${staleBefore})
       )
+      AND notice_id = ${claim.noticeId}
       AND card_id = ${claim.cardId}
       AND recalculation_date = ${claim.recalculationDate}::date
       AND action = ${claim.action}

@@ -44,6 +44,7 @@ import {
   markDowngradeLedgerFailed,
   reclaimDowngradeLedger,
   reconcileObservedDowngradeApplied,
+  requireDeliveredDowngradeNotice,
 } from "../lib/loyalty-downgrade-ledger.js";
 
 const DEFAULT_CORPORATION_ID = "450020844";
@@ -395,10 +396,18 @@ async function applyReconciliation(plans, context) {
         plan.policyAction === "downgrade_one_level" &&
         !downgradeAlreadyApplied
       ) {
-        const claim = buildDowngradeLedgerClaim(plan, {
+        const claimContext = {
           asOfDate: context.asOfDate,
           windowFrom: context.windowFrom,
           windowTo: context.windowTo,
+        };
+        const deliveredNotice = await requireDeliveredDowngradeNotice(
+          ledgerSql,
+          plan,
+          claimContext,
+        );
+        const claim = buildDowngradeLedgerClaim(plan, claimContext, {
+          noticeId: deliveredNotice.notice_id,
         });
         const claimed = await claimDowngradeLedger(ledgerSql, claim);
         if (claimed.acquired) {

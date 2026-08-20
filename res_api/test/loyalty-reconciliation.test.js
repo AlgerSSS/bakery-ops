@@ -341,3 +341,18 @@ test("reconciliation CLI is preview-first with guarded apply and rollback", () =
   assert.match(source, /Apply mode requires an explicit --action/);
   assert.match(source, /assertManualDowngradeLevelConfiguration/);
 });
+
+test("daily loyalty runner is single-writer, date-locked, and uses explicit safe actions", () => {
+  const source = fs.readFileSync(
+    new URL("../loyalty-reconcile-daily.sh", import.meta.url),
+    "utf8",
+  );
+  assert.match(source, /TZ=Asia\/Kuala_Lumpur date \+%F/);
+  assert.match(source, /flock -n 9/);
+  assert.match(
+    source,
+    /aligned-growth held-downgrade-growth upgrade downgrade/,
+  );
+  assert.match(source, /--action=\$action/);
+  assert.doesNotMatch(source, /--action=any/);
+});

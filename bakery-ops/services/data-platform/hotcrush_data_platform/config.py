@@ -70,3 +70,30 @@ class Settings:
                 raise ValueError("OPENROUTER_API_KEY is required for production embeddings")
         else:
             raise ValueError(f"unsupported RAG_EMBEDDING_MODE: {self.embedding_mode}")
+
+
+@dataclass(frozen=True)
+class PosWorkerSettings:
+    supabase_url: str
+    supabase_service_key: str
+    worker_id: str
+    request_timeout_seconds: float
+
+    @classmethod
+    def from_env(cls) -> PosWorkerSettings:
+        settings = cls(
+            supabase_url=os.getenv("R6_SUPABASE_URL", "").rstrip("/"),
+            supabase_service_key=_secret_from_env("R6_SUPABASE_SERVICE_KEY"),
+            worker_id=os.getenv("POS_WORKER_ID", f"{socket.gethostname()}:{os.getpid()}"),
+            request_timeout_seconds=float(os.getenv("DATA_PLATFORM_HTTP_TIMEOUT", "60")),
+        )
+        settings.validate()
+        return settings
+
+    def validate(self) -> None:
+        if not self.supabase_url or not self.supabase_service_key:
+            raise ValueError(
+                "R6_SUPABASE_URL and R6_SUPABASE_SERVICE_KEY are required for the POS worker"
+            )
+        if not self.worker_id.strip():
+            raise ValueError("POS_WORKER_ID cannot be empty")

@@ -6,14 +6,15 @@ flowchart TB
   classDef ui fill:#fdf2f8,stroke:#db2777,color:#831843
   classDef frozen fill:#f8fafc,stroke:#64748b,color:#334155,stroke-dasharray: 6 4
 
-  OLD["旧生产库<br/>ecsgqcmwtjmcpzqytdqw<br/>现在仍是唯一业务真源"]:::frozen
+  OLD["旧生产库<br/>ecsgqcmwtjmcpzqytdqw<br/>现网唯一业务真源"]:::frozen
+  BACKFILL["只读一次性 POS 回填<br/>1 日已零差异验收"]:::source
   SOURCES["RES POS · Brain PDF · 财务/HR/SCM"]:::source
 
   subgraph R6["Supabase R6 Green · tmmkknnkcptunxbfjxqn"]
     direction TB
     subgraph L1["1  Raw 证据层"]
       STORAGE["7 个 Private Storage buckets"]:::raw
-      RAW["ops_raw_batch<br/>ops_raw_object"]:::raw
+      RAW["ops_raw_batch<br/>READY / QUARANTINED<br/>ops_raw_object"]:::raw
     end
     subgraph L2["2  预处理 / 事实 / RAG"]
       RUN["ops_processing_run<br/>pipeline_health"]:::processed
@@ -29,10 +30,11 @@ flowchart TB
     CRON["6 个 Cron<br/>恢复 · 汇总 · 对账 · 清理"]:::agent
   end
 
-  WORKER["外部 Worker<br/>OCR · 解析 · Embedding · 长任务"]:::source
+  WORKER["外部 Worker<br/>OCR · POS 校验 · Embedding · 长任务"]:::source
   USERS["Web · Lark · WhatsApp · AI Agent<br/>(现网尚未切换)"]:::frozen
 
-  SOURCES -. "现网写入未启用" .-> STORAGE
+  SOURCES -. "持续影子写入未启用" .-> STORAGE
+  OLD -. "只读导出；不改旧库" .-> BACKFILL --> STORAGE
   STORAGE --> RAW --> RUN
   RUN <--> WORKER
   RUN --> POS

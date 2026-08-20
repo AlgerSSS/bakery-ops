@@ -13,6 +13,8 @@
     "refresh": "node run-refresh.mjs",
     "start": "node server.js",
     "sync-pnl": "node sync-pnl.js",
+    "backfill:r6-pos-day": "node scripts/backfill-r6-pos-day.js",
+    "verify:r6-pos-day": "node scripts/verify-r6-pos-day.js",
     "test:unit": "node --test test/*.test.js",
     "test": "node test-api.js"
   },

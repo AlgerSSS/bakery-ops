@@ -13,6 +13,7 @@ dependencies = [
 [project.scripts]
 brainctl = "hotcrush_data_platform.brainctl:main"
 hotcrush-rag-worker = "hotcrush_data_platform.worker:main"
+hotcrush-pos-worker = "hotcrush_data_platform.pos_worker:main"
 
 [dependency-groups]
 dev = ["pytest>=8.4,<9", "ruff>=0.12,<1"]

@@ -8,6 +8,24 @@ function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
 }
 
+function number(value, field) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new Error(`${field} must be finite`);
+  return parsed;
+}
+
+function count(value, field) {
+  const parsed = number(value, field);
+  if (!Number.isInteger(parsed) || parsed < 0) throw new Error(`${field} must be a non-negative integer`);
+  return parsed;
+}
+
+function assertMoneyEqual(field, dailyValue, hourlyValue) {
+  if (Math.abs(dailyValue - hourlyValue) > 0.02) {
+    throw new Error(`${field} mismatch: daily=${dailyValue} hourly=${hourlyValue}`);
+  }
+}
+
 function secretFromEnv(env) {
   if (env.R6_SUPABASE_SECRET_KEY) return env.R6_SUPABASE_SECRET_KEY;
   if (!env.R6_SUPABASE_SECRET_KEY_FILE) return '';
@@ -156,8 +174,8 @@ export async function registerPosRawShadow({
     p_batch_id: batch.batch_id,
     p_accepted_count: inventory.length,
     p_rejected_count: 0,
-    p_pipeline_keys: [],
-    p_pipeline_version: 'shadow-v1',
+    p_pipeline_keys: ['pos_daily_sales'],
+    p_pipeline_version: 'pos-v1',
     p_error_summary: null,
   }), 'ops_complete_raw_batch');
 
@@ -174,4 +192,217 @@ export async function shadowPosRawIfEnabled({ businessDate, env = process.env, f
   if (env.R6_SHADOW_ENABLED !== '1') return null;
   const artifacts = loadPosRawArtifacts();
   return registerPosRawShadow({ businessDate, artifacts, env, fetchImpl });
+}
+
+export function buildLegacyPosExport({
+  businessDate,
+  storeId,
+  sourceProjectRef,
+  exportedAt,
+  daily,
+  hourly,
+}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) throw new Error('businessDate must be YYYY-MM-DD');
+  if (!storeId?.trim()) throw new Error('storeId is required');
+  if (!/^[a-z]{20}$/.test(sourceProjectRef)) throw new Error('sourceProjectRef is invalid');
+  const exportedAtIso = new Date(exportedAt).toISOString();
+  if (!daily || daily.date !== businessDate || !daily.store) throw new Error('one final daily source row is required');
+  if (!Array.isArray(hourly) || hourly.length < 1 || hourly.length > 24) {
+    throw new Error('1 to 24 final hourly source rows are required');
+  }
+
+  const seenHours = new Set();
+  const normalizedHours = hourly.map((row) => {
+    if (row.date !== businessDate) throw new Error('hourly date does not match businessDate');
+    const hour = count(row.hour, 'hour');
+    if (hour > 23 || seenHours.has(hour)) throw new Error(`invalid or duplicate hour ${hour}`);
+    seenHours.add(hour);
+    return {
+      sales_hour: hour,
+      bill_count: count(row.bill_count, 'hourly bill_count'),
+      guest_count: count(row.num_of_guests, 'hourly num_of_guests'),
+      gross_sales: number(row.gross_sales, 'hourly gross_sales'),
+      discount_amount: number(row.total_discount, 'hourly total_discount'),
+      net_sales: number(row.net_sales, 'hourly net_sales'),
+      raw_record: { source_table: 'hourly_sales_summary', row },
+    };
+  }).sort((a, b) => a.sales_hour - b.sales_hour);
+
+  const hourlyTotals = normalizedHours.reduce(
+    (total, row) => ({
+      billCount: total.billCount + row.bill_count,
+      guestCount: total.guestCount + row.guest_count,
+      grossSales: total.grossSales + row.gross_sales,
+      discountAmount: total.discountAmount + row.discount_amount,
+      netSales: total.netSales + row.net_sales,
+    }),
+    { billCount: 0, guestCount: 0, grossSales: 0, discountAmount: 0, netSales: 0 },
+  );
+  const dailyBillCount = count(daily.transaction_count, 'daily transaction_count');
+  if (dailyBillCount !== hourlyTotals.billCount) {
+    throw new Error(`bill_count mismatch: daily=${dailyBillCount} hourly=${hourlyTotals.billCount}`);
+  }
+  const dailyGrossSales = number(daily.gross_sales, 'daily gross_sales');
+  const dailyDiscount = number(daily.total_discount, 'daily total_discount');
+  const dailyNetSales = number(daily.revenue, 'daily revenue');
+  assertMoneyEqual('gross_sales', dailyGrossSales, hourlyTotals.grossSales);
+  assertMoneyEqual('discount_amount', dailyDiscount, hourlyTotals.discountAmount);
+  assertMoneyEqual('net_sales', dailyNetSales, hourlyTotals.netSales);
+
+  return Buffer.from(JSON.stringify({
+    schema_version: 'legacy-pos-export-v1',
+    source_project_ref: sourceProjectRef,
+    exported_at: exportedAtIso,
+    business_date: businessDate,
+    store_id: storeId.trim(),
+    daily: {
+      store_name_source: String(daily.store).trim(),
+      bill_count: dailyBillCount,
+      guest_count: hourlyTotals.guestCount,
+      gross_sales: dailyGrossSales,
+      discount_amount: dailyDiscount,
+      net_sales: dailyNetSales,
+      total_payment_received: null,
+      raw_record: {
+        source_table: 'daily_revenue',
+        guest_count_source: 'hourly_sales_summary_sum',
+        row: daily,
+      },
+    },
+    hourly: normalizedHours,
+  }));
+}
+
+export async function registerLegacyPosRawBackfill({
+  businessDate,
+  storeId,
+  sourceProjectRef,
+  exportedAt,
+  daily,
+  hourly,
+  env = process.env,
+  fetchImpl = fetch,
+}) {
+  const baseUrl = (env.R6_SUPABASE_URL || '').replace(/\/$/, '');
+  const key = secretFromEnv(env);
+  if (!baseUrl || !key) throw new Error('R6_SUPABASE_URL and R6_SUPABASE_SECRET_KEY(_FILE) are required');
+  const content = buildLegacyPosExport({
+    businessDate, storeId, sourceProjectRef, exportedAt, daily, hourly,
+  });
+  const contentSha256 = sha256(content);
+  const watermarkFrom = new Date(`${businessDate}T00:00:00+08:00`);
+  const watermarkTo = new Date(watermarkFrom.getTime() + 24 * 60 * 60 * 1000);
+  const sourceBatchKey = `legacy-pos:${businessDate}:${storeId}:${contentSha256.slice(0, 20)}`;
+  const batch = one(await rpc(fetchImpl, baseUrl, key, 'ops_register_raw_batch', {
+    p_source_system: 'LEGACY_POS_EXPORT',
+    p_source_batch_key: sourceBatchKey,
+    p_schema_version: 'legacy-pos-export-v1',
+    p_writer_id: 'res_api:legacy-pos-backfill',
+    p_store_id: storeId,
+    p_watermark_from: watermarkFrom.toISOString(),
+    p_watermark_to: watermarkTo.toISOString(),
+    p_expected_count: 1,
+    p_metadata: {
+      mode: 'one-shot-backfill',
+      business_date: businessDate,
+      source_project_ref: sourceProjectRef,
+      artifact_sha256: contentSha256,
+    },
+  }), 'ops_register_raw_batch');
+  const objectPath = `legacy_pos_export/${businessDate.slice(0, 4)}/${businessDate.slice(5, 7)}/${batch.batch_id}/${contentSha256}.json`;
+  const uploaded = await uploadObject(fetchImpl, baseUrl, key, objectPath, {
+    mimeType: 'application/json', content,
+  });
+  await rpc(fetchImpl, baseUrl, key, 'ops_register_raw_object', {
+    p_batch_id: batch.batch_id,
+    p_bucket_id: BUCKET_ID,
+    p_object_path: objectPath,
+    p_sha256: contentSha256,
+    p_size_bytes: content.length,
+    p_mime_type: 'application/json',
+    p_data_class: 'C1',
+    p_source_record_key: 'legacy_pos_export.json',
+    p_source_version: contentSha256,
+  });
+  const completed = one(await rpc(fetchImpl, baseUrl, key, 'ops_complete_raw_batch', {
+    p_batch_id: batch.batch_id,
+    p_accepted_count: 1,
+    p_rejected_count: 0,
+    p_pipeline_keys: ['pos_daily_sales'],
+    p_pipeline_version: 'pos-backfill-v1',
+    p_error_summary: null,
+  }), 'ops_complete_raw_batch');
+  return {
+    batchId: batch.batch_id,
+    status: completed.status,
+    objectPath,
+    contentSha256,
+    uploaded,
+    dailyRows: 1,
+    hourlyRows: hourly.length,
+  };
+}
+
+export function compareLegacyPosWithR6({
+  businessDate,
+  storeId,
+  sourceProjectRef,
+  exportedAt,
+  daily,
+  hourly,
+  r6,
+}) {
+  const expected = JSON.parse(buildLegacyPosExport({
+    businessDate, storeId, sourceProjectRef, exportedAt, daily, hourly,
+  }));
+  const mismatches = [];
+  const actualDaily = r6?.daily;
+  if (!actualDaily) {
+    mismatches.push('daily row missing');
+  } else {
+    for (const field of ['business_date', 'store_id', 'store_name_source']) {
+      const wanted = field === 'business_date'
+        ? expected.business_date
+        : field === 'store_id' ? expected.store_id : expected.daily[field];
+      if (actualDaily[field] !== wanted) {
+        mismatches.push(`daily ${field}: expected=${wanted} actual=${actualDaily[field]}`);
+      }
+    }
+    for (const field of ['bill_count', 'guest_count']) {
+      if (Number(actualDaily[field]) !== Number(expected.daily[field])) {
+        mismatches.push(`daily ${field}: expected=${expected.daily[field]} actual=${actualDaily[field]}`);
+      }
+    }
+    for (const field of ['gross_sales', 'discount_amount', 'net_sales']) {
+      if (Math.abs(Number(actualDaily[field]) - Number(expected.daily[field])) > 0.02) {
+        mismatches.push(`daily ${field}: expected=${expected.daily[field]} actual=${actualDaily[field]}`);
+      }
+    }
+    if (actualDaily.total_payment_received !== null) {
+      mismatches.push(`daily total_payment_received: expected=null actual=${actualDaily.total_payment_received}`);
+    }
+  }
+
+  const actualHours = new Map((r6?.hourly || []).map((row) => [Number(row.sales_hour), row]));
+  if (actualHours.size !== expected.hourly.length) {
+    mismatches.push(`hourly row count: expected=${expected.hourly.length} actual=${actualHours.size}`);
+  }
+  for (const wanted of expected.hourly) {
+    const actual = actualHours.get(wanted.sales_hour);
+    if (!actual) {
+      mismatches.push(`hour ${wanted.sales_hour} missing`);
+      continue;
+    }
+    for (const field of ['bill_count', 'guest_count']) {
+      if (Number(actual[field]) !== Number(wanted[field])) {
+        mismatches.push(`hour ${wanted.sales_hour} ${field}: expected=${wanted[field]} actual=${actual[field]}`);
+      }
+    }
+    for (const field of ['gross_sales', 'discount_amount', 'net_sales']) {
+      if (Math.abs(Number(actual[field]) - Number(wanted[field])) > 0.02) {
+        mismatches.push(`hour ${wanted.sales_hour} ${field}: expected=${wanted[field]} actual=${actual[field]}`);
+      }
+    }
+  }
+  return { ok: mismatches.length === 0, mismatchCount: mismatches.length, mismatches };
 }

@@ -40,6 +40,10 @@ test('POS Raw shadow uploads immutable artifacts and completes one idempotent ba
   assert.equal(batchPayload.p_source_system, 'RES_POS_DAILY');
   assert.equal(batchPayload.p_expected_count, 2);
   assert.match(batchPayload.p_source_batch_key, /^pos-daily:2026-08-20:[a-f0-9]{20}$/);
+  const completeCall = calls.find((call) => call.url.endsWith('/rpc/ops_complete_raw_batch'));
+  const completePayload = JSON.parse(completeCall.options.body);
+  assert.deepEqual(completePayload.p_pipeline_keys, ['pos_daily_sales']);
+  assert.equal(completePayload.p_pipeline_version, 'pos-v1');
   assert.ok(calls.every((call) => !call.url.includes('secret')));
 });
 

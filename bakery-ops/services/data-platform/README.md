@@ -13,6 +13,8 @@ uv run brainctl upload "/path/to/approved-c1.pdf"
 uv run brainctl search "opening checklist" --space-id 10000000-0000-7000-8000-000000000001
 uv run hotcrush-rag-worker
 uv run hotcrush-rag-worker --loop
+uv run hotcrush-pos-worker
+uv run hotcrush-pos-worker --loop
 uv run pytest
 uv run ruff check .
 ```
@@ -31,3 +33,8 @@ LightRAG。未来切换时必须使用独立的 `R6_SUPABASE_*` 变量，不能�
 LightRAG 暂保持旧行为；未来切换之前，再单独批准将
 `KNOWLEDGE_UNCLASSIFIED_INGEST_ENABLED=false` 作为过渡闸门。PDF 进 R6 必须使用
 `brainctl upload` 及 worker 的分级流水线。
+
+`hotcrush-pos-worker` 只领取 `pos_daily_sales` 队列，逐个下载并校验 Raw object 的
+size/SHA-256，再交叉核对日销售 CSV 与 `daily.json.hourlyByDate` 后，原子发布到
+`pos_sales_day` / `pos_sales_hour`。它在现网没有 service unit、不会自动运行；迁移
+演练应以一次性进程执行，确认对账和回滚以后才能申请常驻。

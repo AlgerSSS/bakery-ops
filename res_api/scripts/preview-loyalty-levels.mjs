@@ -9,6 +9,7 @@ import {
   openAuthedPage,
 } from "../lib/report-client.js";
 import {
+  buildLevelTransitionPreview,
   buildTierPreview,
   isActiveProgramCard,
   qualifyingActualPaid,
@@ -366,6 +367,7 @@ async function main() {
       commonReportNonActualPayment: round(commonReportNonActual),
     },
     tierPreview: buildTierPreview(activeMembers, spendByMember),
+    transitionPreview: buildLevelTransitionPreview(activeCards, spendByMember),
   };
 
   console.log(JSON.stringify(preview, null, 2));

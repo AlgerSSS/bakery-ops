@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildLevelTransitionPreview,
   buildTierPreview,
   isActiveProgramCard,
   qualifyingActualPaid,
@@ -130,5 +131,65 @@ test("tier preview includes active members without spend", () => {
     { tier: "L2 Sweet Crush", memberCount: 1 },
     { tier: "L3 Hot Crush", memberCount: 1 },
     { tier: "L4 Forever Crush", memberCount: 2 },
+  ]);
+});
+
+test("transition preview compares every active card with its member target", () => {
+  const preview = buildLevelTransitionPreview(
+    [
+      {
+        customerId: "a",
+        levelId: "1998685858403844100",
+        levelName: "VIP1",
+      },
+      {
+        customerId: "a",
+        levelId: "2090027041029333000",
+        levelName: "Lv2 心动会员 Sweet Crush",
+      },
+      {
+        customerId: "b",
+        levelId: "2090027043797577737",
+        levelName: "Lv3 热爱会员 Hot Crush",
+      },
+      {
+        customerId: "c",
+        levelId: "unexpected",
+        levelName: "Legacy",
+      },
+    ],
+    new Map([
+      ["a", 250],
+      ["b", 750],
+      ["c", 1500],
+    ]),
+  );
+
+  assert.deepEqual(
+    {
+      changedCards: preview.changedCards,
+      unchangedCards: preview.unchangedCards,
+      changedMembers: preview.changedMembers,
+      unchangedMembers: preview.unchangedMembers,
+      unknownCurrentLevelCards: preview.unknownCurrentLevelCards,
+      membersWithMultipleActiveCards: preview.membersWithMultipleActiveCards,
+      membersWithConflictingCurrentLevels:
+        preview.membersWithConflictingCurrentLevels,
+    },
+    {
+      changedCards: 2,
+      unchangedCards: 2,
+      changedMembers: 2,
+      unchangedMembers: 1,
+      unknownCurrentLevelCards: 1,
+      membersWithMultipleActiveCards: 1,
+      membersWithConflictingCurrentLevels: 1,
+    },
+  );
+  assert.deepEqual(preview.matrix, [
+    { from: "L1 First Crush", to: "L2 Sweet Crush", cardCount: 1 },
+    { from: "L2 Sweet Crush", to: "L2 Sweet Crush", cardCount: 1 },
+    { from: "L3 Hot Crush", to: "L3 Hot Crush", cardCount: 1 },
+    { from: "unknown:Legacy", to: "L4 Forever Crush", cardCount: 1 },
   ]);
 });

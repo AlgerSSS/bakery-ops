@@ -13,6 +13,7 @@
     "refresh": "node run-refresh.mjs",
     "start": "node server.js",
     "sync-pnl": "node sync-pnl.js",
+    "loyalty:preview": "node scripts/preview-loyalty-levels.mjs",
     "test:unit": "node --test test/*.test.js",
     "test": "node test-api.js"
   },

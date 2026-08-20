@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildLevelTransitionPreview,
   buildTierPreview,
+  effectiveCardLevelId,
   isActiveProgramCard,
   qualifyingActualPaid,
   resolveOrderMember,
@@ -59,6 +60,24 @@ test("level thresholds are inclusive and match See You Often", () => {
   assert.equal(tierForSpend(750).key, "L3");
   assert.equal(tierForSpend(1499.99).key, "L3");
   assert.equal(tierForSpend(1500).key, "L4");
+});
+
+test("blank or zero RES default-level projections resolve to L1", () => {
+  assert.equal(
+    effectiveCardLevelId({ levelId: "0", levelAccount: { levelId: "" } }),
+    "1998685858403844100",
+  );
+  assert.equal(
+    effectiveCardLevelId({
+      levelId: "",
+      levelAccount: { levelId: "2090027041029333000" },
+    }),
+    "2090027041029333000",
+  );
+  assert.equal(
+    effectiveCardLevelId({ levelId: "legacy", levelAccount: { levelId: "x" } }),
+    "legacy|x",
+  );
 });
 
 test("order attribution prefers the current card map", () => {
@@ -157,6 +176,11 @@ test("transition preview compares every active card with its member target", () 
         levelId: "unexpected",
         levelName: "Legacy",
       },
+      {
+        customerId: "d",
+        levelId: "0",
+        levelAccount: { levelId: "" },
+      },
     ],
     new Map([
       ["a", 250],
@@ -178,15 +202,16 @@ test("transition preview compares every active card with its member target", () 
     },
     {
       changedCards: 2,
-      unchangedCards: 2,
+      unchangedCards: 3,
       changedMembers: 2,
-      unchangedMembers: 1,
+      unchangedMembers: 2,
       unknownCurrentLevelCards: 1,
       membersWithMultipleActiveCards: 1,
       membersWithConflictingCurrentLevels: 1,
     },
   );
   assert.deepEqual(preview.matrix, [
+    { from: "L1 First Crush", to: "L1 First Crush", cardCount: 1 },
     { from: "L1 First Crush", to: "L2 Sweet Crush", cardCount: 1 },
     { from: "L2 Sweet Crush", to: "L2 Sweet Crush", cardCount: 1 },
     { from: "L3 Hot Crush", to: "L3 Hot Crush", cardCount: 1 },

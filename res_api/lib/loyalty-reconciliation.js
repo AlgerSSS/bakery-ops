@@ -1,4 +1,10 @@
-import { LOYALTY_LEVELS, tierForSpend } from "./loyalty-levels.js";
+import {
+  effectiveCardLevelId,
+  LOYALTY_LEVELS,
+  tierForSpend,
+} from "./loyalty-levels.js";
+
+export { effectiveCardLevelId } from "./loyalty-levels.js";
 
 const ACTIVE_CARD_STATUS = 10;
 export const FIRST_ROLLING_DOWNGRADE_DATE = "2026-11-01";
@@ -367,21 +373,6 @@ export function cardPlanHasRestorableLevel(plan) {
   return LOYALTY_LEVELS.some(
     (level) => level.resLevelId === String(plan.currentLevelId),
   );
-}
-
-function isUnassignedLevelId(value) {
-  const levelId = String(value ?? "").trim();
-  return levelId === "" || levelId === "0";
-}
-
-export function effectiveCardLevelId(card) {
-  const candidates = [card?.levelId, card?.levelAccount?.levelId].map((value) =>
-    String(value ?? "").trim(),
-  );
-  const meaningful = candidates.filter((value) => !isUnassignedLevelId(value));
-  if (meaningful.length === 0) return LOYALTY_LEVELS[0].resLevelId;
-  if (meaningful.every((value) => value === meaningful[0])) return meaningful[0];
-  return meaningful.join("|");
 }
 
 export function assertCardMatchesPlanBaseline(card, plan, cardProgramId) {

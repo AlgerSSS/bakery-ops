@@ -124,8 +124,23 @@ const levelById = new Map(
   LOYALTY_LEVELS.map((level) => [level.resLevelId, level]),
 );
 
+function isUnassignedLevelId(value) {
+  const levelId = String(value ?? "").trim();
+  return levelId === "" || levelId === "0";
+}
+
+export function effectiveCardLevelId(card) {
+  const candidates = [card?.levelId, card?.levelAccount?.levelId].map((value) =>
+    String(value ?? "").trim(),
+  );
+  const meaningful = candidates.filter((value) => !isUnassignedLevelId(value));
+  if (meaningful.length === 0) return LOYALTY_LEVELS[0].resLevelId;
+  if (meaningful.every((value) => value === meaningful[0])) return meaningful[0];
+  return meaningful.join("|");
+}
+
 function currentLevelLabel(card) {
-  const levelId = String(card?.levelId ?? card?.levelAccount?.levelId ?? "");
+  const levelId = effectiveCardLevelId(card);
   const configured = levelById.get(levelId);
   if (configured) return `${configured.key} ${configured.name}`;
   const rawName = String(card?.levelName ?? card?.levelAccount?.levelName ?? "").trim();
@@ -141,9 +156,7 @@ export function buildLevelTransitionPreview(activeCards, spendByMember) {
   for (const card of activeCards) {
     const memberId = String(card?.customerId ?? "").trim();
     if (!memberId) throw new Error("An active card is missing its member ID.");
-    const currentLevelId = String(
-      card?.levelId ?? card?.levelAccount?.levelId ?? "",
-    );
+    const currentLevelId = effectiveCardLevelId(card);
     const current = currentLevelLabel(card);
     const target = tierForSpend(spendByMember.get(memberId) || 0);
     const targetLabel = `${target.key} ${target.name}`;

@@ -258,7 +258,7 @@ function buildHbtiOpenScreen(openScreenPage, { imageUrl, href }) {
   const popup = findPrototype(tree, "POpenScreenPage");
   popup.props = popup.props || {};
   popup.props.data = popup.props.data || {};
-  popup.props.data.setting = {
+  const setting = {
     ...popup.props.data.setting,
     open: true,
     adUrl: imageUrl,
@@ -277,10 +277,19 @@ function buildHbtiOpenScreen(openScreenPage, { imageUrl, href }) {
       checked: true,
     },
   };
+  popup.props.data.setting = clone(setting);
+
+  const pageData = parseJsonField(openScreenPage.pageData, "pageData");
+  const runtimePopup = pageData.POpenScreenPage;
+  if (!runtimePopup?.data) {
+    throw new Error("Open-screen pageData does not contain runtime popup data");
+  }
+  runtimePopup.data.setting = clone(setting);
 
   validateComponentTree(tree);
   return {
     ...clone(openScreenPage),
+    pageData: JSON.stringify(pageData),
     componentsTree: JSON.stringify(tree),
     componentsMap: openScreenPage.componentsMap || "{}",
   };

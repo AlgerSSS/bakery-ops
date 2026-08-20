@@ -181,6 +181,20 @@ test("builds an HBTI open-screen popup with a safe external link", () => {
   const openScreenPage = {
     decorationPageId: "open-screen",
     pageType: "POpenScreenPage",
+    pageData: JSON.stringify({
+      POpenScreenPage: {
+        data: {
+          setting: {
+            open: true,
+            adUrl: "//img.example.com/old.png",
+            showTime: 1,
+            longTime: 3,
+            frequency: 2,
+            link: {},
+          },
+        },
+      },
+    }),
     componentsTree: JSON.stringify({
       ROOT: {
         type: { resolvedName: "Container" },
@@ -217,6 +231,10 @@ test("builds an HBTI open-screen popup with a safe external link", () => {
   });
   const tree = parseJsonField(designed.componentsTree, "componentsTree");
   const setting = tree.OPEN_SCREEN.props.data.setting;
+  const runtimeSetting = parseJsonField(
+    designed.pageData,
+    "pageData",
+  ).POpenScreenPage.data.setting;
 
   assert.equal(setting.open, true);
   assert.equal(setting.adUrl, "//img.sea.restosuite.ai/image/hbti-popup.png");
@@ -237,6 +255,7 @@ test("builds an HBTI open-screen popup with a safe external link", () => {
     path: "https://hbti-test.hotcrush.net/",
     checked: true,
   });
+  assert.deepEqual(runtimeSetting, setting);
   assert.equal(validateComponentTree(tree), true);
 });
 

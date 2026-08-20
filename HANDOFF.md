@@ -9,9 +9,10 @@
 ## See You Often 会员体系接管：历史等级回算 + RES 积分商城核验（2026-08-20，Codex，进行中）
 
 活跃实现分支：`codex/see-you-often-loyalty-engine`，独立 worktree
-`/private/tmp/hot-see-you-often-loyalty`。本节代码尚未部署、Supabase 未写入；但下述三项
+`/private/tmp/hot-see-you-often-loyalty`。本节代码尚未部署到服务器、Supabase 未写入；但下述三项
 已确认规则已经通过带基线/并发/回读/回滚门禁的脚本写入 RES 生产：积分规则、成长值
-倍率、L1 正式名称。会员卡历史成长值/等级仍只有只读预演，尚未批量写入。
+倍率、L1 正式名称。2026-08-20 闭店后已完成 1 张同级成长值 canary 与 1 张自动升级 canary，
+均回读成功且未回滚；历史会员仍未批量写入。
 
 **近 12 个月等级回算只读预演**：
 
@@ -32,7 +33,8 @@
 - 已从 RES 前端只读审计出单卡改级契约：`/crm/memberCard/web/card/modifyCard`，改级时
   `changeTypeList=["2"]`；也确认成长值调整契约
   `/crm/memberCard/web/card/adjustGrowth` 和批量成长值调整 type 24，官方导入模板只有
-  `Card number` / `Growth` 两列并带版本元数据。尚未对会员卡调用这些生产 mutation。
+  `Card number` / `Growth` 两列并带版本元数据。闭店后两个单卡 canary 已调用成长值 mutation；
+  未使用批量导入，也未直接调用改级 mutation。
 - 核验过程中 L4 卡数从 14 自动变为 15，证明 RES 仍会按不清零的累计成长值自动升级；
   它不能独立实现“近 12 个月滚动”。正式方案必须同时把成长值校准为滚动实付并按目标
   等级回写，之后持续周期性重算，否则一次回填后仍会再次漂移。
@@ -54,6 +56,13 @@
 - 已准备服务器单写者入口 `res_api/loyalty-reconcile-daily.sh` 与 cron 示例：锁定同一个 KL
   执行日，使用 `flock` 防重入，并按“同级成长值、锁级成长值、升级、月初降级”四类显式顺序
   执行。它尚未部署或安装 cron；必须先完成闭店后的真实单卡 canary，再允许自动全量。
+- 23:25 MYT 两类 canary 均成功：第一张只调成长值、等级改动 0；第二张调成长值后由 RES
+  原生阈值自动升级、无需直接改级。第二轮预览从 3,254 降到 3,253 张待变更、升级候选仍在
+  写前为 404；写后该批应剩 403。两次均逐卡回读成长值和等级，没有触发回滚。
+- 自动升级后 `/crm/datamanage/card/queryCardOperationLog` 的等级操作日志仍为 0，说明 RES
+  自动升级不留 type=2 记录。这不影响今晚两个 canary，但不能据此证明 2026-11 月初直接降级
+  的月内幂等；首次降级前必须增加自有持久化 ledger 或验证 direct modifyCard 确会留日志，
+  否则降级 action/cron 应继续 fail-closed。
 - 6 张旧卡在列表中 `levelId="0"`、详情中等级仍为空且成长值为 0；RES 尚无已验证的
   “恢复为未分配等级”契约。自动回算会明确跳过并报告它们，避免假装可回滚；全量安全批次
   完成后，再把这 6 张作为单独的 L1 补分配批次处理。
@@ -71,8 +80,7 @@
 - 本轮新增了自然月窗口、闰日、首降级日、单级降级、生日月锁级、月内幂等、7 天预警和线上
   升降配置护栏测试；最新只读实跑仍是 13,693 笔订单、RM483,434.26 实付，38 笔需历史钱包
   归因且最终仅 9 笔零金额未归因。`res_api` 全量单测 **172/172**、shell 语法和
-  `git diff --check` 通过；
-  会员卡 production mutation 仍为 0。
+  `git diff --check` 通过；已完成 2 张 canary，尚未批量 mutation。
 
 **RES 积分规则已正式改为 See You Often 口径**：
 
@@ -168,33 +176,33 @@
 `birthday.hotcrush.net` 都指到该部署。两个域名的 `/api/health` 均回读 `status=ok`，
 数据库、RES、告警与登录依赖全绿；生日域名首页 HTTP 200，实际匹配 `/birthday`，
 `?mode=cake` 标题回读正常，CSP/HSTS/X-Frame-Options 与 no-store 缓存头均符合预期。
-本轮没有发送会员消息、发券、改 RES 正式 H5 或写生产数据库。合并门禁时另把既有 HBTI
+生日页面部署本身没有发送会员消息、发券、改 RES 正式 H5 或写生产数据库。合并门禁时另把既有 HBTI
 前端流程测试从逐键输入改成原子 change，并为 13 题长流程
 设置 15 秒预算；生产页面未改，修正了验证码探测/自动翻题计时与 `user.type` 之间的随机测试竞态。
 
 用户已确认正式三次触达全部走 RES 短信，但当前生产账户尚不能启用：流程管理接口 403、
 短信返回 `ErrMissingSignature`、生日事件触发器列表为空，余额仅 200 条，而 3,722 名会员每年三次
 触达的理论上限是 11,166 条。没有发送任何消息，也不接外部短信兜底；需 RES 侧先开权限、配置并
-审核短信签名/生日事件、补足额度。顶部轮播和 HBTI 弹窗成果已合入本分支，仍只在 RES Draft，
-正式首页未改、未发布。
+审核短信签名/生日事件、补足额度。顶部轮播和 HBTI 弹窗后来已在闭店后正式发布并通过顾客端验收，
+详见下一节。
 ---
 
-## See You Often 顶部轮播 + HBTI 开屏弹窗草稿（2026-08-20，Codex，已保存草稿、未发布）
+## See You Often 顶部轮播 + HBTI 开屏弹窗（2026-08-20，Codex，已正式发布）
 
 用户要求在 RES 官方 H5 最上方预留滚动海报，并增加点击后进入现有 HBTI 页的测试弹窗。
-原独立分支成果现已合入 `codex/see-you-often-loyalty-engine`，并已写入独立 RES Draft：
+原独立分支成果现已合入 `codex/see-you-often-loyalty-engine`，并已正式发布到 RES 顾客 H5：
 
-- Draft 名称：`See You Often · HBTI 弹窗 · 2026-08-20`
-- Draft plan：`2090327910815711232`；首页 page：`2090327910819905566`；开屏 page：
-  `2090327910819905571`。`releaseCalled=false`，**没有发布正式 H5**。
+- 最终正式 plan：`2090459411142234119`，名称 `See You Often · HBTI optimized · 2026-08-20`；
+  发布 API `code=000`，release info、首页内容、开屏内容与 HBTI URL 四项回读一致。发布前的
+  正式版均各自克隆为独立 rollback plan，最后一份为 `2090459659960930308`。
 - 首页最上方使用 RES 原生 `FSwiper`，保留正式版现有 5 张图片作占位，375×220px、3 秒轮播；
   后续换海报只需替换轮播图片，不改页面结构。
 - HBTI 弹窗使用 RES 原生 `POpenScreenPage`，新视觉为桃粉纸张、酒红字、面包指纹与红色烤炉箭头；
   图片已上传 RES 自有存储，点击目标固定为 `https://hbti-test.hotcrush.net/`，外链配置回读一致。
 - 删除旧草稿中未经当前规则确认的“完善资料得 RM10”整块及登录按钮 RM10 文案，避免错误承诺。
-- 保存前后两次独立快照确认正式首页 hash 仍为
-  `0552ffb3da571f849f1dedabadece27cf86a7cf4506638612bd0a8602003c31c`，正式开屏 hash 仍为
-  `8161df6599a9f447152e90fac7900f5a982bb602636ef19bd4fc2349ad026bc9`。
+- 发布前两次独立快照确认旧正式首页 hash 为
+  `0552ffb3da571f849f1dedabadece27cf86a7cf4506638612bd0a8602003c31c`、旧正式开屏 hash 为
+  `8161df6599a9f447152e90fac7900f5a982bb602636ef19bd4fc2349ad026bc9`；未在草稿阶段误改正式页。
 - 草稿回读：首页设计树/保存树 hash 一致，开屏设计树/保存树 hash 一致；HBTI 页与上传图片均 HTTP 200。
   中文官方编辑器长页预览 375×1293，顶部轮播位置和后续会员内容均正常。
 - 2026-08-20 重新拦截核对了发布契约：RES 发布会先保存草稿，再弹出“顾客端立即变化、尽量
@@ -205,7 +213,14 @@
 - `tools/h5-design.mjs` 现支持外部只读登录状态路径、线上草稿检查和受保护发布：必须输入精确
   确认 `SEE_YOU_OFTEN_H5_V1`，写前验证正式页未漂移与草稿树一致，先克隆当前正式页为独立
   回滚 draft，再调用发布并轮询正式页内容回读；若发布后不一致会自动发布回滚 draft 并再次
-  核验。因 RES 明确提示避开营业时间，当前仍未确认发布，闭店后再执行该门禁命令。
+  核验。实际发布等到 23:00 nightly refresh 在 23:03:50 以 exit=0 完成后才执行，避免会话竞态。
+- 首次顾客端验收发现 RES 同一开屏页同时存 `componentsTree` 与运行时 `pageData`：旧门禁只校验
+  前者，导致配置看似有 HBTI、实际不开屏。现已让构建、保存、检查、发布四段同时写/验两份数据，
+  并重新发布。随后又发现 2.85 MB PNG 在 3 秒展示期内冷缓存可能来不及绘制；保持视觉不变压缩为
+  1000×1500、416 KB JPEG，上传为 `20260820-73306623.jpg` 后第三次受保护发布。
+- 最终顾客端 Playwright 冷缓存实测：375×812 开屏完整显示 HBTI 视觉与 `Skip 3s`，顶部轮播
+  正常显示；点击开屏后当前页实际到达 `https://hbti-test.hotcrush.net/`，标题
+  `HBTI — Hot Crush`。不是只做配置 hash 验收。
 - 代码：`res_api/lib/h5-design-layout.mjs`、`res_api/tools/h5-design.mjs`、
   `res_api/test/h5-design-layout.test.js`，新增视觉资产 `res_api/assets/h5/hbti-popup-2026.png`；
   当前 `res_api` 全量单测 **159/159** 通过，`git diff --check` 通过。

@@ -475,6 +475,9 @@ async function saveDesignAsDraft(snapshotDir, planName) {
     ) {
       throw new Error("Draft open-screen components did not match the saved design");
     }
+    if (savedDraftOpenScreen.pageData !== designedOpenScreen.pageData) {
+      throw new Error("Draft open-screen runtime data did not match the saved design");
+    }
     if (
       sha256(formalHomeAfter) !== sha256(formalHomeBefore)
       || sha256(formalOpenScreenAfter) !== sha256(formalOpenScreenBefore)
@@ -524,6 +527,8 @@ async function saveDesignAsDraft(snapshotDir, planName) {
       draftOpenScreenMatchesDesignedTree:
         result.savedDraftOpenScreen.componentsTree
           === designedOpenScreen.componentsTree,
+      draftOpenScreenRuntimeMatches:
+        result.savedDraftOpenScreen.pageData === designedOpenScreen.pageData,
       formalOpenScreenUnchanged:
         sha256(result.formalOpenScreenAfter) === manifest.hashes.openScreen,
       releaseCalled: false,
@@ -546,6 +551,12 @@ async function saveDesignAsDraft(snapshotDir, planName) {
         .digest("hex"),
       savedOpenScreenComponentsTree: createHash("sha256")
         .update(result.savedDraftOpenScreen.componentsTree)
+        .digest("hex"),
+      designedOpenScreenPageData: createHash("sha256")
+        .update(designedOpenScreen.pageData)
+        .digest("hex"),
+      savedOpenScreenPageData: createHash("sha256")
+        .update(result.savedDraftOpenScreen.pageData)
         .digest("hex"),
     },
   };
@@ -651,6 +662,9 @@ async function updateExistingDraft(snapshotDir) {
     ) {
       throw new Error("Updated draft open-screen does not match the design");
     }
+    if (savedDraftOpenScreen.pageData !== designedOpenScreen.pageData) {
+      throw new Error("Updated draft open-screen runtime data does not match the design");
+    }
     if (
       sha256(formalHomeAfter) !== manifest.hashes.home
       || sha256(formalOpenScreenAfter) !== manifest.hashes.openScreen
@@ -678,6 +692,8 @@ async function updateExistingDraft(snapshotDir) {
       draftOpenScreenMatchesDesignedTree:
         result.savedDraftOpenScreen.componentsTree
           === designedOpenScreen.componentsTree,
+      draftOpenScreenRuntimeMatches:
+        result.savedDraftOpenScreen.pageData === designedOpenScreen.pageData,
       formalOpenScreenUnchanged:
         sha256(result.formalOpenScreenAfter) === manifest.hashes.openScreen,
       releaseCalled: false,
@@ -700,6 +716,12 @@ async function updateExistingDraft(snapshotDir) {
         .digest("hex"),
       savedOpenScreenComponentsTree: createHash("sha256")
         .update(result.savedDraftOpenScreen.componentsTree)
+        .digest("hex"),
+      designedOpenScreenPageData: createHash("sha256")
+        .update(designedOpenScreen.pageData)
+        .digest("hex"),
+      savedOpenScreenPageData: createHash("sha256")
+        .update(result.savedDraftOpenScreen.pageData)
         .digest("hex"),
     },
   };
@@ -763,6 +785,7 @@ async function inspectLiveDraft(snapshotDir) {
       draftOpenScreen: sha256(draftOpenScreen),
       draftHomeComponentsTree: sha256Text(draftHome.componentsTree),
       draftOpenScreenComponentsTree: sha256Text(draftOpenScreen.componentsTree),
+      draftOpenScreenPageData: sha256Text(draftOpenScreen.pageData),
     };
     return {
       inspectedAt: timestamp(),
@@ -780,7 +803,12 @@ async function inspectLiveDraft(snapshotDir) {
         draftOpenScreenComponentsTreeMatches:
           observed.draftOpenScreenComponentsTree
           === receipt.hashes.designedOpenScreenComponentsTree,
-        hbtiUrlPresent: draftOpenScreen.componentsTree.includes(HBTI_URL),
+        draftOpenScreenPageDataMatches:
+          observed.draftOpenScreenPageData
+          === receipt.hashes.designedOpenScreenPageData,
+        hbtiUrlPresent:
+          draftOpenScreen.componentsTree.includes(HBTI_URL)
+          && draftOpenScreen.pageData.includes(HBTI_URL),
       },
     };
   });
@@ -848,10 +876,15 @@ async function publishDraft(snapshotDir, confirmation) {
           !== receipt.hashes.designedComponentsTree
         || sha256Text(draftOpenScreen.componentsTree)
           !== receipt.hashes.designedOpenScreenComponentsTree
+        || sha256Text(draftOpenScreen.pageData)
+          !== receipt.hashes.designedOpenScreenPageData
       ) {
         throw new Error("Live draft no longer matches the reviewed design");
       }
-      if (!draftOpenScreen.componentsTree.includes(HBTI_URL)) {
+      if (
+        !draftOpenScreen.componentsTree.includes(HBTI_URL)
+        || !draftOpenScreen.pageData.includes(HBTI_URL)
+      ) {
         throw new Error("Live draft does not contain the approved HBTI URL");
       }
 
@@ -1028,7 +1061,9 @@ async function publishDraft(snapshotDir, confirmation) {
           openScreenContentMatchesDraft:
             pageContentHash(observed.openScreen)
             === pageContentHash(draftOpenScreen),
-          hbtiUrlPresent: observed.openScreen.componentsTree.includes(HBTI_URL),
+          hbtiUrlPresent:
+            observed.openScreen.componentsTree.includes(HBTI_URL)
+            && observed.openScreen.pageData.includes(HBTI_URL),
         },
         hashes: {
           previousFormalHome: sha256(formalHomeBefore),

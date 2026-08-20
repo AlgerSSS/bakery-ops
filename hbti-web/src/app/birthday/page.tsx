@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
+import { parseBirthdayDeliveryMode } from "@/lib/birthday/delivery-mode";
+
 import { BirthdayExperience } from "./BirthdayExperience";
 
 export const metadata: Metadata = {
@@ -22,5 +24,8 @@ export default async function BirthdayPage({
   const params = await searchParams;
   const raw = params.t;
   const token = typeof raw === "string" && raw.length > 0 ? raw : undefined;
-  return <BirthdayExperience linkToken={token} />;
+  const deliveryMode = parseBirthdayDeliveryMode(params.mode);
+  return (
+    <BirthdayExperience linkToken={token} deliveryMode={deliveryMode} />
+  );
 }

@@ -13,7 +13,10 @@ function makeConfig(overrides: Partial<BirthdayConfig> = {}): BirthdayConfig {
     linkSecret: "x".repeat(32),
     campaignYear: 2026,
     linkTtlDays: 30,
-    pickupLeadDays: 2,
+    pickupLeadDaysByGift: {
+      free_basque: 2,
+      points_450: 5,
+    },
     pickupWindowDays: 30,
     maxActivePointsReservations: 3,
     benefitsByLevel: {
@@ -161,10 +164,13 @@ describe("decideReservation 预约资格", () => {
 });
 
 describe("pickupWindow 取货窗口", () => {
-  it("默认提前 2 天、最长 30 天（吉隆坡时区）", () => {
-    const w = pickupWindow(makeConfig(), new Date("2026-08-15T04:00:00.000Z"));
-    expect(w.minDate).toBe("2026-08-17");
-    expect(w.maxDate).toBe("2026-09-14");
+  it("免费巴斯克提前 2 天，450 积分定制蛋糕提前 5 天", () => {
+    const now = new Date("2026-08-15T04:00:00.000Z");
+    const basque = pickupWindow(makeConfig(), "free_basque", now);
+    const customCake = pickupWindow(makeConfig(), "points_450", now);
+    expect(basque.minDate).toBe("2026-08-17");
+    expect(customCake.minDate).toBe("2026-08-20");
+    expect(basque.maxDate).toBe("2026-09-14");
+    expect(customCake.maxDate).toBe("2026-09-14");
   });
 });
-

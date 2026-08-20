@@ -3,19 +3,28 @@ import fs from "node:fs";
 import test from "node:test";
 
 import {
+  LOYALTY_LEVELS,
+} from "../lib/loyalty-levels.js";
+import {
   assertCardMatchesPlanBaseline,
+  assertManualDowngradeLevelConfiguration,
+  birthdayMonthFromValue,
   buildCardReconciliationPlan,
   buildGrowthAdjustmentPayload,
   buildLevelChangePayload,
   cardPlanHasRestorableLevel,
   cardMatchesReconciliationTarget,
   createReferenceIdFactory,
+  downgradeRecalculationDateForNotice,
   growthForSpend,
+  levelOperationDirection,
+  rollingWindowForDate,
   summarizeCardReconciliation,
 } from "../lib/loyalty-reconciliation.js";
 
 const card = (overrides = {}) => ({
   id: "card-1",
+  cardNo: "number-1",
   customerId: "member-1",
   corporationId: "corp-1",
   cardProgramId: "program-1",
@@ -33,6 +42,57 @@ test("growth mirrors whole RM of rounded qualifying spend", () => {
   assert.equal(growthForSpend(-18.5), 0);
 });
 
+test("rolling window uses 12 natural months and only completed business days", () => {
+  assert.deepEqual(rollingWindowForDate("2026-08-20"), {
+    from: "2025-11-19",
+    to: "2026-08-19",
+  });
+  assert.deepEqual(rollingWindowForDate("2027-08-20"), {
+    from: "2026-08-20",
+    to: "2027-08-19",
+  });
+  assert.deepEqual(
+    rollingWindowForDate("2028-02-29", { historyStartDate: "2020-01-01" }),
+    { from: "2027-02-28", to: "2028-02-28" },
+  );
+});
+
+test("birthday parser returns only a valid Gregorian month without retaining PII", () => {
+  assert.equal(birthdayMonthFromValue("1990-11-23"), 11);
+  assert.equal(birthdayMonthFromValue("1990-99-23"), null);
+  assert.equal(birthdayMonthFromValue(""), null);
+});
+
+test("downgrade notice is due exactly seven days before an eligible month start", () => {
+  assert.equal(
+    downgradeRecalculationDateForNotice("2026-10-25"),
+    "2026-11-01",
+  );
+  assert.equal(downgradeRecalculationDateForNotice("2026-10-24"), null);
+  assert.equal(downgradeRecalculationDateForNotice("2026-09-24"), null);
+});
+
+test("manual rolling downgrade requires native downgrade disabled and audited upgrade thresholds", () => {
+  const levels = LOYALTY_LEVELS.map((level, index) => ({
+    id: level.resLevelId,
+    upgradeEnabled: index > 0,
+    upgradeGrowth: level.threshold,
+    degradeEnabled: false,
+  }));
+  assert.doesNotThrow(() =>
+    assertManualDowngradeLevelConfiguration(levels),
+  );
+  assert.throws(
+    () =>
+      assertManualDowngradeLevelConfiguration(
+        levels.map((level, index) =>
+          index === 2 ? { ...level, degradeEnabled: true } : level,
+        ),
+      ),
+    /native downgrade must stay disabled/,
+  );
+});
+
 test("RES reference IDs are 18 digits and collision-free within a second", () => {
   const referenceId = createReferenceIdFactory({
     clock: () => new Date("2026-08-20T11:12:13.000Z"),
@@ -48,12 +108,18 @@ test("card plans align growth and RES level IDs with rolling spend", () => {
       ["member-1", 250.4],
       ["member-2", 0],
     ]),
+    { asOfDate: "2026-08-20" },
   );
   assert.deepEqual(plans[0], {
     cardId: "card-1",
+    cardNo: "number-1",
     memberId: "member-1",
     currentLevelId: "1998685858403844100",
+    spendTargetLevelId: "2090027041029333000",
+    spendDirection: "upgrade",
     targetLevelId: "2090027041029333000",
+    policyAction: "upgrade",
+    keepLevelGap: 0,
     currentGrowth: 0,
     targetGrowth: 250,
     growthDelta: 250,
@@ -65,16 +131,96 @@ test("card plans align growth and RES level IDs with rolling spend", () => {
     cardsNeedingGrowthIncrease: 1,
     cardsNeedingGrowthDecrease: 0,
     cardsNeedingLevelChange: 1,
+    cardsEligibleForUpgrade: 1,
+    cardsEligibleForOneLevelDowngrade: 0,
+    cardsWithHeldDowngrade: 0,
     cardsWithUnrestorableLevelBaseline: 0,
     totalGrowthIncrease: 250,
     totalGrowthDecrease: 0,
   });
 });
 
+test("downgrades start in November 2026, run only on the first, and move one level", () => {
+  const current = card({
+    levelId: "2090027045185888261",
+    levelAccount: { levelId: "2090027045185888261", growth: 1500 },
+  });
+  const beforeStart = buildCardReconciliationPlan([current], new Map(), {
+    asOfDate: "2026-08-20",
+  })[0];
+  assert.equal(beforeStart.policyAction, "hold_before_first_downgrade");
+  assert.equal(beforeStart.targetLevelId, "2090027045185888261");
+
+  const outsideFirst = buildCardReconciliationPlan([current], new Map(), {
+    asOfDate: "2026-11-02",
+    birthdayMonthByMember: new Map([["member-1", 12]]),
+  })[0];
+  assert.equal(outsideFirst.policyAction, "hold_outside_monthly_recalculation");
+
+  const eligible = buildCardReconciliationPlan([current], new Map(), {
+    asOfDate: "2026-11-01",
+    birthdayMonthByMember: new Map([["member-1", 12]]),
+  })[0];
+  assert.equal(eligible.policyAction, "downgrade_one_level");
+  assert.equal(eligible.targetLevelId, "2090027043797577737");
+  assert.equal(eligible.keepLevelGap, 1500);
+});
+
+test("birthday month, missing birthday, and an earlier monthly downgrade all hold level", () => {
+  const current = card({
+    levelId: "2090027043797577737",
+    levelAccount: { levelId: "2090027043797577737", growth: 200 },
+  });
+  const missing = buildCardReconciliationPlan([current], new Map(), {
+    asOfDate: "2026-11-01",
+  })[0];
+  assert.equal(missing.policyAction, "hold_missing_birthday");
+
+  const birthday = buildCardReconciliationPlan([current], new Map(), {
+    asOfDate: "2026-11-01",
+    birthdayMonthByMember: new Map([["member-1", 11]]),
+  })[0];
+  assert.equal(birthday.policyAction, "hold_birthday_month");
+
+  const repeated = buildCardReconciliationPlan([current], new Map(), {
+    asOfDate: "2026-11-01",
+    birthdayMonthByMember: new Map([["member-1", 12]]),
+    downgradedCardNosThisMonth: new Set(["number-1"]),
+  })[0];
+  assert.equal(repeated.policyAction, "hold_already_downgraded_this_month");
+});
+
+test("RES level operation logs distinguish upgrades from downgrades", () => {
+  const record = (before, after) => ({
+    operationType: 2,
+    operationContent: { levelNameBefore: before, levelNameAfter: after },
+  });
+  assert.equal(
+    levelOperationDirection(
+      record(
+        "Lv3 热爱会员 Hot Crush",
+        "Lv2 心动会员 Sweet Crush",
+      ),
+    ),
+    "downgrade",
+  );
+  assert.equal(
+    levelOperationDirection(
+      record(
+        "Lv1 初见会员 First Crush",
+        "Lv2 心动会员 Sweet Crush",
+      ),
+    ),
+    "upgrade",
+  );
+  assert.equal(levelOperationDirection(record("legacy", "unknown")), "unknown");
+});
+
 test("unassigned legacy levels are reported and blocked from reversible apply", () => {
   const [plan] = buildCardReconciliationPlan(
     [card({ levelId: "0", levelAccount: { levelId: "", growth: 0 } })],
     new Map(),
+    { asOfDate: "2026-08-20" },
   );
   assert.equal(cardPlanHasRestorableLevel(plan), false);
   assert.equal(
@@ -91,6 +237,7 @@ test("baseline guard catches purchase or concurrent level drift", () => {
   const [plan] = buildCardReconciliationPlan(
     [card()],
     new Map([["member-1", 250]]),
+    { asOfDate: "2026-08-20" },
   );
   assert.doesNotThrow(() =>
     assertCardMatchesPlanBaseline(card(), plan, "program-1"),
@@ -160,6 +307,7 @@ test("target matcher requires both growth and level to agree", () => {
   const [plan] = buildCardReconciliationPlan(
     [card()],
     new Map([["member-1", 250]]),
+    { asOfDate: "2026-08-20" },
   );
   const target = card({
     levelId: plan.targetLevelId,
@@ -187,4 +335,9 @@ test("reconciliation CLI is preview-first with guarded apply and rollback", () =
   assert.match(source, /changed after the reconciliation snapshot/);
   assert.match(source, /restoreCard/);
   assert.match(source, /rollback could not be verified/);
+  assert.match(source, /WHERE store = \$\{memberStore\}/);
+  assert.match(source, /--as-of/);
+  assert.match(source, /hold_already_downgraded_this_month/);
+  assert.match(source, /Apply mode requires an explicit --action/);
+  assert.match(source, /assertManualDowngradeLevelConfiguration/);
 });

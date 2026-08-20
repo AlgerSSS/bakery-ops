@@ -64,9 +64,23 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   只读复核再次得到待变更 0、未知等级 0、不可恢复基线 0。
 - 自动升级后 `/crm/datamanage/card/queryCardOperationLog` 的等级操作日志仍为 0，说明 RES
   自动升级不留 type=2 记录。这不影响今晚两个 canary，但不能据此证明 2026-11 月初直接降级
-  的月内幂等；首次降级前必须增加自有持久化 ledger 或验证 direct modifyCard 确会留日志，
-  否则降级 action/cron 应继续 fail-closed。当前 cron 默认不含 `downgrade`；只有显式设置
-  `LOYALTY_DOWNGRADE_ENABLED=1` 才会加入，生产尚未设置该开关。
+  的月内幂等。现已新增并正式应用迁移
+  `112_loyalty_level_change_ledger.sql`：`mkt_loyalty_level_change_ledger` 以
+  `(card_id, recalculation_date, action)` 唯一键保证同一卡同月只有一个降级业务操作，并使用
+  `claimed/applied/failed/ambiguous` 状态机覆盖“RES 成功但响应丢失”和“RES 成功后进程崩溃”窗口。
+  表不存卡号、姓名、手机号或生日，`anon/authenticated` 权限为 0；生产约束 9/9，迁移记录 112，
+  当前正式行数 0。
+- 生产数据库事务探针（2099 虚拟卡 ID）验证：首 claim 成功、同月重复 claim 被阻止、置 applied
+  后再次执行返回 prevent、事务回滚后探针行 0。tokyo-01 已按文件白名单部署提交 `da3b089` 的
+  ledger library 与 CLI；远端 schema assertion 通过，随后用线上代码做 2026-08-21 全量只读预演，
+  4,862 张卡仍为待变更 0、未知等级 0、不可恢复基线 0。
+- 部署时预备的远端备份命令因本地 zsh 没拆分带空格的 SSH 变量而未创建备份目录；随后逐项核对
+  发现三个 rsync 文件都已成功且 SHA-256 与本地一致，再完成 owner/syntax/schema 验证。代码回滚
+  以父提交 `05a7c64` 为准；迁移 112 目前表为空，可按 SQL 尾部 down 方案回滚，但一旦产生正式
+  ledger 行就禁止删表。
+- 当前 cron 默认不含 `downgrade`；只有显式设置 `LOYALTY_DOWNGRADE_ENABLED=1` 才会加入，生产
+  cron 未设置该开关。账本已解决“每月最多一级”的幂等，但 7 天前 RES 短信预警仍没有可验证
+  送达链路；在该条件完成前继续 fail-closed，不能让有账本但没预警的降级自动发生。
 
 **RES 成长规则与等级目录已正式修正**：
 
@@ -80,7 +94,7 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   原字段并正式改名为 `Lv1 初见会员 First Crush`；字段级回读一致，未触发回滚。
 - 本轮新增了自然月窗口、闰日、首降级日、单级降级、生日月锁级、月内幂等、7 天预警和线上
   升降配置护栏测试；最新只读实跑仍是 13,693 笔订单、RM483,434.26 实付，38 笔需历史钱包
-  归因且最终仅 9 笔零金额未归因。最新 `res_api` 全量单测 **173/173**、shell 语法和
+  归因且最终仅 9 笔零金额未归因。最新 `res_api` 全量单测 **180/180**、shell 语法和
   `git diff --check` 通过；线上部署文件与本地 SHA-256 一致，cron 服务 active。
 
 **RES 积分规则已正式改为 See You Often 口径**：

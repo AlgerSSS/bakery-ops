@@ -6,6 +6,304 @@
 
 ---
 
+## See You Often 会员体系接管与生产差距审计（2026-08-20，Codex，在途/只读）
+
+用户要求接管 WorkBuddy「查找关于H5页面制作的对话记录」，以 Lark《「See You Often」日常储值方案-
+完整版》为权威方案，逐项确认歧义后完成 RES 等级/积分/储值/营销、RES 官方 H5、HBTI 发券和生日权益
+全部落地。本轮已读原会话与 Lark 当前修订、核对本仓库和 RES 生产后台；没有执行 RES 写入、发券、
+数据库 DDL/DML、部署或 H5 发布。Lark/RES 凭证只通过既有安全配置或临时进程使用，未写进仓库。
+
+已确认的生日触达时点：定制生日蛋糕预约提前 5 天；免费巴斯克预约提前 2 天；生日贺卡网页与对应
+生日券必须在生日当天发放。现有生日站点可复用，但当前只有手工签名链接生成、预约 API 与预约后 Lark
+门店通知，没有 T-5/T-2/当天三段式会员触达调度；页面的统一取货窗口默认为提前 2 天至未来 30 天，
+也尚未按蛋糕类型拆分。
+
+生日代码与现网存在必须按用户确认修正的旧规则：`points_450` 当前为年度不限次、最多同时 3 个有效
+预约；免费巴斯克与积分蛋糕互不排斥。生产表仅有“免费巴斯克每会员每年一次”的部分唯一索引，没有
+积分蛋糕年度上限或两类权益二选一约束。生产聚合回读为 2026 年 1 条 `points_450/reserved/sent` 预约、
+生日资料 0 条；未读取会员身份。当前待用户逐项确认的第一项仍是：Lv3/Lv4 的 450 积分升级是否都
+每年生日限一次，或 Lv4 不限次数；确认前不改代码或生产约束。
+
+HBTI 周边发券并非未实现：完成接口已接 9 种周边库存池，按实时剩余量加权随机抽取，再通过 RES 发
+对应实体券，并带幂等、发券前后回读和人工复核状态。生产奖池 9/9 品项启用，初始库存合计 1,376，
+当前 `issued_count` 合计 2；会员完成状态中本期有 4 条 `issued`。线上 `/api/health` 的 alert/db/res/
+signIn 四项均为 ok。后续仍需做“奖池扣减数、RES 实际券、完成终态”的正式对账验收，不能只凭健康
+检查宣称整条活动完成。
+
+RES 生产只读审计结论沿用：等级阈值已建但权益为空；RM1=1 只证实成长值，不等于积分规则；滚动前
+12 个自然月、降级、生日月锁级未配置；积分商城启用但 0 商品；相关券模板存在但营销触发链路缺失；
+RES 官方正式 H5 尚未展示 First/Sweet/Hot/Forever Crush 等级品牌。下一步在逐项业务确认并行期间，
+继续把 RES 原生能力与外接调度边界拆清，再按可回滚顺序实施。
+
+---
+
+## Supabase 企业数据架构与全代码访问审计（2026-08-20，Codex，只读/未实施）
+
+用户要求质疑附件 `hotcrush_supabase_enterprise_data_architecture_v1.md`，并结合所有本地可发现的数据库
+连接代码评估可行性、给出数据库重构方案。本轮读完附件、现有 R6/R6A1 设计与 gate，扫描
+BakeryOps、`res_api`、HBTI、财务网站、根目录脚本以及新发现的 `/Users/weiliangshao/hr-agent`，并只读
+查询 Source 生产库和 R6 Green；没有执行 DDL/DML、迁移、部署、环境变量修改或外部写入。
+
+现网于 `2026-08-20T05:24Z` 核验：PostgreSQL 17.6，约 97.2 MiB，`public` 为 130 表/21 视图/
+1,621 列；128 表启用 RLS、52 表 FORCE RLS、142 条 policy，缺 RLS 的是
+`mkt_birthday_profile` 与 `mkt_birthday_reservation`。7 表无主键：
+`app_user_role_pre083`、`cost_card_product_link_pre080`、`daily_revenue`、`finance_revenue_daily`、
+`pos_member`、`pos_member_card_txn`、`pos_member_daily`。声称存在的表所有权注册表实际不存在；
+`public.schema_migrations` 仍是全仓库共享整数版本，90 行、1–300，27 已被财务占用，且新 CN HR
+迁移没有进入这张账本。旧 R6 快照只有 76 表/21 视图/939 列；现网相对它新增 54 张表且无删除，
+正好是 52 张 `cn_hr_`/`cn_trn_` 加 2 张生日表，因此旧矩阵只覆盖 97/151 个当前对象。
+
+活跃度不是假设：POS/会员/预测事实已写到 2026-08-19；`item_hourly_sales` 86,327 行、
+`pos_member` 4,850 行、`pos_member_card_txn` 15,005 行、`forecast_snapshot` 2,304 行。CN HR/培训
+52 表共 148 行、35 表非空；Auth 1 个用户，三个私有 Storage bucket 共 10 个对象。未安装
+`vector`，`public` 无 publication table，故附件里的 pgvector/Realtime 目前只是愿景，不是现状。
+R6 Green 于 `2026-08-20T05:24Z` 再核验仍为约 18.8 MiB、100 表/1,374 列/0 视图、业务估算行为空；
+R6A1 gate 仍为 `BLOCKED / DESIGN_ONLY_NOT_COMPILED / NOT_APPLY_COMPATIBLE`，不能接管生产。
+
+代码证据中的主要风险：`daily_revenue` 仍有 POS 与财务旧客户端两条写路径；`pos_member` 由
+`res_api` 和 HBTI 靠“不相交列集”共同写；`daily_breakdown` 的 dining 数据把 30 日比例扇出成逐日行，
+不能迁成真正日事实；BakeryOps/`res_api`/财务的直连配置分散且本地连接均使用共享 `postgres` 身份。
+HR Agent 的通用 `supabaseAdmin` 在 65 个运行时文件出现，server context 默认注入 service-role，worker
+也直接使用 service-role；现网确认 `service_role` BYPASSRLS 且不是 `cn_hr_worker` 成员，所以已有
+`cn_hr_worker` 窄权限设计实际上没有约束当前 worker。商品身份并非全面失控：
+`v_product_identity` 211 个 listing 中仅 47 已映射，但排产所需 47/47 全部已映射；应优先解决
+25 个断货名差异，而不是立即创建通用 `mdm.item/product/sku` 大模型。
+
+审计结论：附件可保留单写者、稳定身份、Owner/Writer/Grain/Source/Retention/PII、AI 不直写事实、
+Batch 先于 CDC 等原则；但不能作为实施稿。`daily_revenue → mart_store_daily` 混淆来源事实与 Mart，
+`sales.order/payment/refund` 在缺少完整原子来源时不可从汇总反推；Phase 1 先拆十多个 schema 与当前
+`public` 前缀治理及所有调用方式冲突；Analytics 双项目、CDC、pgvector、Realtime 应按真实负载和用例
+触发，不应因 Supabase 提供就全开。建议继续把当前 Source 作为唯一 OLTP 真源，R6 Green 只作无真实
+PII 的迁移演练库，按“治理/权限 → POS 垂直切片 → 会员/HBTI 单写者 → 财务边界 → CN HR service-role
+收敛 → 可选分析副本”顺序 expand/verify/contract；不要部署旧 R6 的 100+ 表包。
+
+本轮仓库内只追加本交接节。开工时已有 `HANDOFF.md` 未提交改动且当前分支是既有活跃分支
+`codex/fabric-agent-blueprint`；未覆盖或拆分他人记录，本文件继续作为该分支已登记的唯一未提交变更。
+审计工具意外忽略 `--help` 并刷新过旧 `code-access-snapshot.json`，该本轮副作用已完整撤销，证据快照保持原状。
+
+---
+
+## 单店 Supabase 分级架构建议（2026-08-20，Codex，只读/未实施）
+
+用户进一步明确：重点不是照搬 Microsoft Fabric，而是保留截图中的分层思想，在目前仅一家店的规模下尽量
+统一使用 Supabase。建议采用“单一 Supabase 生产项目 + 外部轻量 worker”的模块化数据单体：Supabase
+统一承载 PostgreSQL 真源、Auth、Storage、短任务调度、认证指标视图与 Agent 状态；POS 爬虫、Playwright、
+长时间 AI/消息任务继续在 tokyo-01/Vercel worker 运行，只把状态、队列、审计与结果写回 Supabase。不能把
+“统一数据平台”误解为“全部计算都塞进 Edge Functions”。
+
+推荐的数据可信度分级为：L0 来源证据/批次，L1 经约束的业务事实，L2 认证指标视图/必要时物化视图，
+L3 预测、告警与建议，L4 经审批的动作和反馈；AI 只读 L2、写 L3/L4，不改 L1。当前先做治理与权限、
+POS 垂直切片、认证指标和 Agent 闭环，不建 Fabric、独立数仓/Analytics 项目、CDC、读副本、分区或通用
+MDM。第二家店仍应在同库用 `location_id` 扩展；只有分析负载实测干扰 OLTP、恢复/合规边界改变或团队需要
+独立发布节奏时，才拆分析库/数仓。
+
+本轮只查看用户截图、复用同日只读审计，并核对 Supabase 官方定价、Branching、Cron、Queues、Edge
+Functions、备份与物化视图文档；未执行数据库写入、文件代码修改、部署、分支切换或外部写入。仓库内只
+追加本交接节，既有 `HANDOFF.md` 未提交状态与 `codex/fabric-agent-blueprint` 活跃分支保持不变。
+
+---
+
+## Brain PDF / pgvector 知识库设计（2026-08-20，Codex，只读/未实施）
+
+用户确认大量未入库 PDF 位于桌面 Brain 文件夹。实际路径不是普通 Desktop 目录，而是 iCloud Obsidian
+仓库 `/Users/weiliangshao/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain/raw`。只读盘点到
+165 份 PDF、逻辑大小约 68.45 MiB：HR 114、General 42、Marketing 2、Supply_Chain 7。按路径关键词粗分：
+候选人/简历/Offer 49，薪酬/工资/绩效 27，财务凭证/报销 25，制度/手册/组织 46，合同/授权/入离职表单
+8，营销/品牌 2，知识库/技能资料 2，其他 6。基于同文件名+同逻辑大小识别 41 组/86 个重复候选；这只是
+候选，不是已确认重复，因为开始盘点时 161/165 个文件是未本地化的 iCloud placeholder，批量 SHA-256
+读取会等待云下载，已终止该只读进程，未伪称完成哈希去重。
+
+为验证管线差异，本轮仅请求 iCloud 下载 5 个代表样本到本机缓存，没有修改云端文件；连同原本本地化的
+4 个样本做 PDF 文本与页面渲染检查。确认至少有五种不同形态：67 页制度手册约 73,934 可提取字符；
+1 页简历样本仅 1 个可提取字符、必须 OCR；3 页工资汇总约 20,952 字符且为密集表格；25 页品牌手册约
+9,688 字符但图像主导；8 页组织架构约 11,647 字符且为关系图。另有 11 页文本合同、可提取文本的
+一页价格对比表及两份表单渲染版本。结论是不能统一走 `pdftotext -> 固定切块 -> embedding`：制度/SOP
+按标题切块；图像简历走 OCR 后抽取结构化候选人字段；工资/发票优先写受控业务事实而非全文 RAG；品牌
+手册逐页 OCR+视觉摘要；组织架构抽关系；合同按条款切块且仅限法务权限。
+
+推荐所有原件进 Supabase 私有 Storage，不把 PDF 二进制放 PostgreSQL；按权限边界分
+`kb-internal`、`hr-recruiting-private`、`hr-payroll-private`、`finance-private`、`legal-private` 五个 bucket，
+对象路径使用不含姓名的 `space_id/document_id/version/original.pdf`。数据库采用 `ai_` 写者域：
+`ai_knowledge_space`、`ai_space_member`、`ai_document`、`ai_document_version`、`ai_ingest_run`、
+`ai_document_page`、`ai_document_chunk`、`ai_embedding_model`、`ai_chunk_embedding`、
+`ai_retrieval_event`、`ai_retrieval_hit`。原件、版本、页、块、embedding 分离；只查询 current/published
+版本；同一安全空间内按 SHA-256 去重；跨权限空间不共用物理对象。检索采用权限/有效期过滤后的
+全文+向量混合检索，V1 建议评估 BGE-M3 1024 维；初期块数很小先精确向量扫描，不提前建 HNSW，达到
+约 100k 块或实测延迟不达标后再建。C3/C4 PII 文件默认不 embedding，或只对脱敏文本在受限空间建索引。
+
+本轮没有上传任何 PDF 到 Supabase、未启用 `vector` 扩展、未执行 DDL/DML、未创建迁移、未改业务代码、
+未部署。只追加本交接节；PDF 渲染中间文件在完成视觉检查后删除。最终答复提供可用于汇报的 Mermaid
+数据结构图。
+
+概念澄清：上述整体是“文档治理 + 多类型解析 + 权限感知的混合 RAG”平台；只有 chunk/全文索引、
+embedding、检索、上下文注入和带引用生成属于 RAG。Storage、版本、去重、RLS、OCR，以及工资/凭证/简历
+抽取到结构化业务表，分别属于文档管理、治理和 ETL，不应全部笼统称为 RAG。
+
+---
+
+## Supabase + PDF/RAG 架构蓝图与 CLI 可行性验证（2026-08-20，Codex，本地验证/未实施生产）
+
+用户要求开始设计单项目 Supabase 架构，并验证整条流程能否全部通过 CLI 完成。本轮完成两份正式设计稿：
+`docs/database/supabase-rag-v1/README.md` 与 `docs/database/supabase-rag-v1/CLI-RUNBOOK.md`。结论需要严格
+区分：整条流程可以由命令行组合自动化，但不能只依赖 Supabase 官方 CLI。Supabase CLI 负责本地栈、迁移、
+测试、类型、函数、密钥和 Storage；PDF 盘点、人工分级、OCR、版面/表格解析、切块和 embedding 仍需计划中的
+`brainctl` 与外部受控 worker。Supabase 是统一数据/治理平面，不是长耗时计算容器。
+
+蓝图采用一个生产 Supabase 项目、`public` schema 前缀治理和 L0 来源证据/L1 业务事实/L2 认证指标与知识检索/
+L3 AI 建议/L4 审批动作分级。PDF 按 C1 内部、C2 受限、C3 个人机密、C4 密封分级，继续使用五个私有 bucket；
+设计了 12 张 `ai_` 表，覆盖知识空间、成员、文档、来源、版本、摄取运行、页、chunk、embedding 模型/向量及
+检索事件/命中。C4 禁止 chunk/embedding，C3 默认禁止；检索必须先过滤调用者可访问的 space，再做全文与
+pgvector 排名并保留页码引用。初期 exact vector scan，不提前建 HNSW。
+
+发现并纳入重构的现有冲突：`bakery-ops/services/lightrag` 已有 LightRAG，但 21 份 full docs 和图/向量均存在
+本机忽略目录的 JSON/GraphML 中，使用 OpenRouter 1536 维 embedding；不能和 Supabase pgvector 同时作为知识
+真源。方案把它定义为待迁移派生索引：先审查 C1/C3 内容，只重嵌合规材料，BakeryOps 切换到 Supabase RPC 后
+再停写和清理。
+
+平台原语在完全隔离的 `/tmp` Supabase 项目中实测，未连接生产：Docker 默认 54322 被现有 `aural` 本地项目
+占用，因此改用 55320–55329 端口，未停止或修改 `aural`。Supabase CLI 2.115.0 下，Postgres 17、Storage/API、
+`vector` 扩展、`tsvector`+GIN、cosine 查询、RLS enable、完整 `db diff`、`db reset --local`、`db lint`、
+security advisor、TypeScript 类型生成和 pgTAP 均跑通；私有 `kb-internal` bucket 也成功用仓库内非敏感架构
+PDF完成本地上传/列举/`storage.objects` 回读。隔离容器已停止，临时目录已删除。
+
+两个 CLI 限制已实证：① `db diff --schema cli_validation,extensions` 会漏掉 `vector` 扩展依赖并失败，完整 diff
+才成功，因此 pgvector 扩展迁移必须手写并用 reset/test 验证；② `storage cp/ls` 在 2.115.0 仍强制要求
+`--experimental`，正式 Brain 导入不应直接递归复制，而应使用有 manifest、hash、分类阻断和幂等补偿的
+`brainctl`。另一个小坑是 `supabase test new` 生成的 pgTAP 模板只有 `plan(1)` 没有断言，直接运行必失败；
+加入真实断言后才通过。
+
+当前仅创建设计文档并更新本交接，没有创建正式 migration/worker、没有上传 Brain 文件、没有执行生产 DDL/DML、
+没有重链 CLI 项目或部署。根目录 `supabase/.temp/linked-project.json` 仍指向 `hotcrush-core-r6-green`，任何远程
+命令前必须核对目标。当前活跃分支仍是 `codex/fabric-agent-blueprint`；`HANDOFF.md` 的既有未提交审计记录和本轮
+两份新文档继续作为同一设计工作在途，未提交是为了避免把多个尚待用户确认的架构主题打包成一个提交。
+
+---
+
+## 五层 Supabase 内部总体架构收敛（2026-08-20，Codex，设计完成/未实施）
+
+用户指出上一版把主架构与 RAG 表级治理混在一起，正确主线应是“统一写入入口 → Raw → 预处理/RAG → Agent
+→ 用户交互”。该批评成立；但“一个写入源”已校正为逻辑统一入口与每表唯一写者，而不是所有程序共享一个
+超级账号或单进程。新主文档为 `docs/database/hotcrush-supabase-internal-architecture-v1.md`，原
+`docs/database/supabase-rag-v1/README.md` 已明确降为 PDF/RAG 详细附录。
+
+新架构把 Auth、RLS、Storage policy、审计、迁移和备份作为贯穿能力，不再画成业务层。Supabase 内部只保留
+一条数据链：外部来源经 Ingestion Gateway 进入 Raw；Raw 包含 Storage 原始对象、批次/hash 元数据和与来源
+同粒度的关系事实；预处理层只产出业务域事实、认证指标 view 与 RAG 知识；Agent 只读预处理层、写运行与
+追加事件；Web/Lark/WhatsApp/报表通过 RLS/RPC 交互。tokyo-01/Vercel/Mac 只是计算或交互节点，Supabase 是
+唯一数据真源。
+
+V1 新增表从上一版 12 张 RAG 表收敛为总共 10 张：Raw 控制的 `ops_raw_batch`/`ops_raw_object`；RAG 的
+`ai_knowledge_space`、`ai_space_member`、`ai_raw_document`、`ai_ingest_run`、`ai_document_chunk`、
+`ai_chunk_embedding`；Agent 的 `ops_agent_run`/`ops_agent_event`。结构化处理结果写回既有 `pos_`、`ops_`、
+`hr_`、`scm_`、`mkt_`、`finance_` 等域，不建通用 `processed_data`；指标优先建 view；现有 `ai_call_log`、
+`pipeline_health` 和消息状态表复用，不造重复表。RAG V1 不拆 document/version/page/retrieval-hit 表，逐页 OCR
+产物进 Storage，chunk 直接存页码；只有真实需求出现才拆。
+
+文档同时给出完整 Supabase 组件映射、六个预计私有 bucket、统一写入契约、角色/RLS 矩阵、RPC 边界、任务
+租约、索引策略、审计/恢复、部署拓扑、POS/PDF/工资三条端到端数据流、五阶段实施顺序和明确不建设清单。
+本轮没有执行工具能力复测、正式 migration、生产 DDL/DML、文件上传、CLI 重链或部署。当前工作树的两份
+RAG 文档、新总体架构与 HANDOFF 仍属同一尚待用户确认的设计工作，继续保留未提交状态并已登记。
+
+后续向用户澄清了 Supabase Dashboard 中的物理呈现：五层不是五个 schema 或五组可折叠目录；在继续采用
+单一 `public` schema 的前提下，Table Editor 会把现有表与 V1 的 10 张新增表按前缀/名称展示。Raw、RAG、
+Agent 主要落为 `ops_`/`ai_` 表，业务处理结果继续落在现有域表，认证指标落为 view/materialized view；PDF
+原件在 Storage 的私有 bucket，RPC 在 Database Functions，`vector` 在 Extensions，RLS 在各表 Policies，
+Edge Functions 与 Realtime 分别在控制台对应页面。若现网 130 张表不先清理，V1 单纯新增 10 张后约为
+140 张表；该数字是基于当前快照的实施估算，并非已落地事实。已用 Supabase 官方 Dashboard/Table Editor、
+Storage bucket、Database Functions、RLS/Data API 文档复核上述控制台映射；未执行任何生产写入或迁移。
+
+进一步澄清了层间自动交互：不采用“定期把 Raw 全量复制到上一层”，而采用“写入完成即建立 PENDING 任务、
+外部 worker 增量领取并幂等发布、Supabase Cron 定时唤醒/回收过期租约/补漏对账”的混合模式。普通 view 无需
+刷新，materialized view 才需在上游成功后或 Cron 中刷新；Agent run 由业务计划或用户动作创建，审批/反馈以
+`ops_agent_event` 追加并通过 Realtime 回显。PDF 上传后由 `ai_ingest_run` 记录完整状态机，OCR/版面解析/
+embedding 继续由 tokyo-01 worker 执行，不放进受运行时限制的 Edge Function。
+
+该问题暴露了当前 10 表蓝图的一个边界：`ai_ingest_run` 足以追踪 RAG，但 `ops_raw_batch` 只能粗略表示结构化
+导入状态；当一个非文档 Raw 批次会扇出多个 processor 时，需要逐处理器的运行/租约/重试记录。实施前应先
+审计现有 `pipeline_health` 是否可兼容承担运行账本；若不能，建议新增第 11 张 `ops_processing_run`，一行代表
+`raw_batch × pipeline_key × pipeline_version`。单店 V1 不建议同时再启用 PGMQ 队列，避免任务表和消息队列
+双重状态；只有并发和吞吐实测需要时再引入 Supabase Queues。已复核官方 Cron、Queues、Database Webhooks、
+Edge Function 调度/限制文档；本轮未改正式架构文档、未创建迁移、未执行生产写入或部署。
+
+## Supabase 数据平台实施蓝图 v2（2026-08-20，Codex，设计完成/未实施）
+
+用户要求把前述概念收敛为“当前生产库到目标蓝图”的详细修改方案，包含新数据如何自动进入上层、新 PDF
+如何自动 RAG、定时任务、表结构、代码改造和迁移顺序。新的实施主文档为
+`docs/database/hotcrush-supabase-implementation-blueprint-v2.md`（1,265 行）；旧
+`hotcrush-supabase-internal-architecture-v1.md` 已标为概念背景，RAG README 已标为早期 12 表历史，CLI
+RUNBOOK 只保留已实测能力和门禁。若文档冲突，以 v2 为准。
+
+关键结构决定已经从“10 张核心表”正式更新为 11 张：`ops_raw_batch`、`ops_raw_object`、
+`ops_processing_run`；六张 RAG 表 `ai_knowledge_space`、`ai_space_member`、`ai_raw_document`、
+`ai_ingest_run`、`ai_document_chunk`、`ai_chunk_embedding`；两张 Agent 表 `ops_agent_run`、
+`ops_agent_event`。本轮读到 `pipeline_health` 的真实 DDL：它是空表、没有消费者/写入方，只能按
+`source_key` 保存最近一次状态，无法表示逐批次 processor、版本、租约、重试和输出水位，因此不能复用为
+运行账本；v2 将其扩展为由 run 汇总的健康摘要。若当前 130 张表不先清理，单纯新增 11 张后约为 141 张；
+这是基于 2026-08-20 快照的估算，实施前必须重查。
+
+自动化主模式为“完成 Raw 批次/受控 PDF 上传时幂等创建 PENDING run；tokyo-01 worker 用 RPC +
+`FOR UPDATE SKIP LOCKED` 和租约增量领取；输出按自然键 UPSERT/分批暂存；最后短事务原子发布；Supabase
+Cron 每 5 分钟回收过期租约和补漏、每 10 分钟汇总健康、每日 00:30 KL 对账血缘”。普通 view 不刷新，
+物化 view 才在上游成功后刷新并由 Cron 兜底。当前不启用 PGMQ，避免任务表和队列双重状态。
+
+PDF 新流程是“签名路径 → private Storage → `ai_finalize_document_upload` → 分类策略 → `ai_ingest_run` →
+外部 worker OCR/版面解析/切块/embedding → 50–100 chunk 分批 stage → `ai_publish_ingest_run` 原子切换”。
+只有已批准 C1/C2 自动 RAG；C3 默认复核/只允许脱敏文本，C4 禁止 chunk/embedding。Dashboard 随手上传不
+视为正式入口，初始 Brain 必须走计划中的 `brainctl inventory/classify/review/upload/validate`。向量列 v2
+暂定沿用现有可用的 1536 维模型以减少实施变量，但中文/英文/马来文仍必须通过 30–50 个真实问题 golden set；
+未通过时必须在正式向量 migration 前换模型，不能把暂定值冒充最佳模型。
+
+v2 同时列明当前库修改：独立修复两张生日表 RLS；让 `res_api` 成为 `daily_revenue` 唯一写者，财务站停止
+写；把 HBTI 状态从 `pos_member` 移回现有营销事实；给首批 POS 活跃链加 nullable batch/run 血缘；扩展
+`ai_call_log` 做 Agent 引用、脱敏和保留；验证后补五张活跃无 PK 表，两个 `_pre*` 历史表另行处置；冻结多
+仓库整数 migration，采用根目录 Supabase 官方迁移账本。代码改造按 `res_api`、BakeryOps、财务站、HBTI、
+HR Agent、brainctl/AI worker 分责，并以 Phase 0 治理 → 控制表 → POS 垂直切片 → C1 RAG → Agent闭环 →
+Cron/LightRAG切换 → 权限收紧顺序 expand/verify/contract。
+
+文档已检查 11/11 表名、40 个 Markdown fence 和 tracked diff，均通过；没有创建正式 migration/RPC/Cron/
+worker，没有安装生产扩展，没有连接或修改生产库、R6 Green、Storage、Brain 文件或部署。当前仍在既有
+`codex/fabric-agent-blueprint` 分支；`HANDOFF.md` 与 `docs/database/` 下三组未提交设计文档属于同一持续
+架构主题，已登记但未提交，避免在用户尚未批准实施前把设计稿误作生产变更。
+
+---
+
+## 海外业务运营与招聘复盘周会纪要（2026-08-17，Codex，已发布到 Lark）
+
+用户提供一份将多人语音合并到 Kevin 名下的会议摘要，并给出 7 个 Lark 链接（其中财务周报
+`Sr1vwBjTQixNLjkIrdXj8i2xpZg` 重复，实际为 6 份唯一材料），要求根据每个人的真实工作重新归属，
+生成可直接提交的正式会议纪要。本轮使用 `hot-crush-weekly-report` 技能，通过 Lark API 实时读取并
+锁定六份来源修订：牛梦珊/营运、Kevin Liu/人事招聘与工签、黄婧雯/培训、张雅楠/财务与公司注册、
+邵伟亮/技术与数据架构、邵雨珠/市场投放；没有沿用错误的 Kevin 单一发言人标签。
+
+成品已发布：`https://fjpks7iroa9l.jp.larksuite.com/docx/FhxTdghSkokHQzxxDGfjTxiNpyb`。文档标题为
+“8.17 海外业务运营与招聘复盘周会纪要”，使用 68 个原生 Lark 文档块，包含会议核心结论、六位负责人
+复盘、13 项行动项与截止时间、风险管理要求及六份依据材料。指定用户已获 `full_access`，组织内链接
+权限为 `tenant_editable`；发布后回读 revision 5，标题、六位发言人、关键事项、来源修订和权限检查
+全部通过，且成品不含“确认/推断/待确认”等内部判断标签。
+
+用户随后反馈正文全是文字、阅读负担高，要求提供一个清晰表格。本轮先重新读取在线 revision 5，确认
+用户尚未做新的人工修改；随后在文档最前面新增“快速阅读版 → 负责人工作总表”，表格为 `7×5`：
+表头是负责人、职责领域、关键进展、下一步、截止，六位发言人各占一行。原会议基本信息与提示仍在
+最上方，原 68 个详细正文块整体后移且内容、顺序、来源链接均未改变；最终回读 revision 15，表格
+逐格与预期完全一致且只出现一次。第一次尝试批量创建三张表时 Lark 返回
+`1770001 invalid param`，该失败调用没有写入；按官方表格创建规则改为单表、逐行扩展后成功，没有
+盲目重试失败请求。成品链接保持不变：
+`https://fjpks7iroa9l.jp.larksuite.com/docx/FhxTdghSkokHQzxxDGfjTxiNpyb`。
+
+事实修正：市场原摘要混用了不同截止口径。按 8/3、8/6、8/10、8/13 四个投放节点明细相加，统一写为
+投入 RM11,526、目标曝光 500 万、实际约 713 万、达成率约 142.6%，没有继续使用互不匹配的
+“RM9,300/目标400万/实际714万”。同时将“工程方责任、门店不承担费用”改为顾客处理、证据固定、
+工程追偿并行，最终责任以合同、调查和法律意见为准；工签过渡方案增加持牌服务商/当地律师审核条件，
+没有把未经核验的签证操作写成既定合规方案。
+
+本轮没有修改业务代码、数据库或部署。辅助读取/发布脚本放在既有 Lark 任务目录
+`/Users/weiliangshao/Documents/Codex/2026-08-03/lark-lark-cli-appid-cli-aa82af2c7878de17/`，凭证仅通过
+无回显交互输入进入临时进程，未写入脚本、命令参数、产物或交接文件。开工时仓库位于既有活跃分支
+`codex/fabric-agent-blueprint` 且工作区干净；本轮仓库内只更新本交接文件，故不把非代码 Lark 任务
+提交混入该主题分支，`HANDOFF.md` 将作为已登记的唯一未提交变更保留。
+
+---
+
 ## AI 招聘流程图纵向极简版（2026-08-16，Codex，已生成/未部署）
 
 用户提供参考截图，明确要纵向黑白极简流程而非横向信息图。已查看参考图并重绘 9:21（1152×2688）

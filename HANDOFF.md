@@ -81,6 +81,18 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
 - 当前 cron 默认不含 `downgrade`；只有显式设置 `LOYALTY_DOWNGRADE_ENABLED=1` 才会加入，生产
   cron 未设置该开关。账本已解决“每月最多一级”的幂等，但 7 天前 RES 短信预警仍没有可验证
   送达链路；在该条件完成前继续 fail-closed，不能让有账本但没预警的降级自动发生。
+- 进一步新增并正式应用迁移 `113_loyalty_downgrade_notice_gate.sql`：
+  `mkt_loyalty_downgrade_notice` 只接受 `delivery_channel=res_sms`，强制
+  `notice_date=recalculation_date-7`，`delivered` 必须同时有 RES provider message ID，且
+  `delivered_at` 的 KL 日期必须正好是 notice_date。112 ledger 的 `notice_id` 已为 NOT NULL，
+  并通过复合外键绑定同一卡、同月、同 from/target 等级；预警窗口截至 T-8、最终降级窗口截至
+  T-1，二者本就相差 7 天，因此窗口字段刻意不做外键相等。
+- 113 生产事务探针验证：没有 notice 时 claim 明确拒绝；插入提前 7 天的 RES SMS delivered
+  后 claim/applied 成功；ledger 引用后把 notice 改为 failed 会被触发器拒绝；两轮探针事务最终
+  均回滚，正式 notice/ledger 行数仍为 0。`anon/authenticated` 两表权限均为 0，远端部署文件
+  SHA-256 与本地一致，备份目录为
+  `/opt/hotcrush/backups/loyalty-notice-gate-20260821-0202`。这只建送达事实门禁，不伪造任何
+  短信送达；RES SMS 权限/签名未解决前表会保持空，降级因此在结构上无法执行。
 
 **RES 成长规则与等级目录已正式修正**：
 
@@ -94,7 +106,7 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   原字段并正式改名为 `Lv1 初见会员 First Crush`；字段级回读一致，未触发回滚。
 - 本轮新增了自然月窗口、闰日、首降级日、单级降级、生日月锁级、月内幂等、7 天预警和线上
   升降配置护栏测试；最新只读实跑仍是 13,693 笔订单、RM483,434.26 实付，38 笔需历史钱包
-  归因且最终仅 9 笔零金额未归因。最新 `res_api` 全量单测 **180/180**、shell 语法和
+  归因且最终仅 9 笔零金额未归因。最新 `res_api` 全量单测 **182/182**、shell 语法和
   `git diff --check` 通过；线上部署文件与本地 SHA-256 一致，cron 服务 active。
 
 **RES 积分规则已正式改为 See You Often 口径**：

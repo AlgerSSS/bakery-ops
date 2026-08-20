@@ -359,6 +359,9 @@ test("daily loyalty runner is single-writer, date-locked, and uses explicit safe
   );
   assert.match(source, /TZ=Asia\/Kuala_Lumpur date \+%F/);
   assert.match(source, /flock -n 9/);
+  assert.match(source, /node login\.js/);
+  assert.ok(source.indexOf("node login.js") < source.indexOf("for action in"));
+  assert.match(source, /FAILED login/);
   assert.match(source, /ACTIONS="aligned-growth held-downgrade-growth upgrade"/);
   assert.match(source, /LOYALTY_DOWNGRADE_ENABLED:-0/);
   assert.match(source, /ACTIONS="\$ACTIONS downgrade"/);

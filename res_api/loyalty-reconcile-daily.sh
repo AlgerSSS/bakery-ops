@@ -32,6 +32,15 @@ run_action() {
   return "$code"
 }
 
+echo "========== $(date '+%F %T') RES login as-of=$AS_OF_DATE START ==========" >> "$LOG"
+node login.js >> "$LOG" 2>&1
+LOGIN_CODE=$?
+echo "========== $(date '+%F %T') RES login exit=$LOGIN_CODE ==========" >> "$LOG"
+if [ "$LOGIN_CODE" -ne 0 ]; then
+  echo "$(date '+%F %T') FAILED login exit=$LOGIN_CODE log=$LOG" > "$LOG_DIR/LOYALTY_LAST_FAILURE"
+  exit "$LOGIN_CODE"
+fi
+
 CODE=0
 ACTIONS="aligned-growth held-downgrade-growth upgrade"
 if [ "${LOYALTY_DOWNGRADE_ENABLED:-0}" = "1" ]; then

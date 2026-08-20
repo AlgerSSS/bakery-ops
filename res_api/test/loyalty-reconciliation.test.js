@@ -8,7 +8,6 @@ import {
 import {
   assertCardMatchesPlanBaseline,
   assertManualDowngradeLevelConfiguration,
-  assertUnassignedL1AssignmentBaseline,
   birthdayMonthFromValue,
   buildCardReconciliationPlan,
   buildGrowthAdjustmentPayload,
@@ -17,8 +16,8 @@ import {
   cardMatchesReconciliationTarget,
   createReferenceIdFactory,
   downgradeRecalculationDateForNotice,
+  effectiveCardLevelId,
   growthForSpend,
-  isSafeUnassignedL1AssignmentPlan,
   levelOperationDirection,
   rollingWindowForDate,
   summarizeCardReconciliation,
@@ -218,53 +217,30 @@ test("RES level operation logs distinguish upgrades from downgrades", () => {
   assert.equal(levelOperationDirection(record("legacy", "unknown")), "unknown");
 });
 
-test("unassigned legacy levels are reported and blocked from reversible apply", () => {
+test("RES blank and zero default-level projections normalize to L1", () => {
   const [plan] = buildCardReconciliationPlan(
     [card({ levelId: "0", levelAccount: { levelId: "", growth: 0 } })],
     new Map(),
     { asOfDate: "2026-08-20" },
   );
-  assert.equal(cardPlanHasRestorableLevel(plan), false);
+  assert.equal(plan.currentLevelId, LOYALTY_LEVELS[0].resLevelId);
+  assert.equal(plan.policyAction, "aligned");
+  assert.equal(cardPlanHasRestorableLevel(plan), true);
   assert.equal(
     summarizeCardReconciliation([plan]).cardsWithUnrestorableLevelBaseline,
-    1,
+    0,
   );
-  assert.throws(
-    () => assertCardMatchesPlanBaseline(card(), plan, "program-1"),
-    /cannot be restored safely/i,
+  assert.equal(
+    effectiveCardLevelId({ levelId: "", levelAccount: { levelId: "0" } }),
+    LOYALTY_LEVELS[0].resLevelId,
   );
-});
-
-test("one-way L1 assignment accepts only an unchanged unassigned card with an L1 spend target", () => {
-  const unassigned = card({
-    levelId: "0",
-    levelAccount: { levelId: "", growth: 9 },
-  });
-  const [plan] = buildCardReconciliationPlan(
-    [unassigned],
-    new Map([["member-1", 9.5]]),
-    { asOfDate: "2026-08-20" },
-  );
-  assert.equal(isSafeUnassignedL1AssignmentPlan(plan), true);
   assert.doesNotThrow(() =>
-    assertUnassignedL1AssignmentBaseline(unassigned, plan, "program-1"),
+    assertCardMatchesPlanBaseline(
+      card({ levelId: "", levelAccount: { levelId: "0", growth: 0 } }),
+      plan,
+      "program-1",
+    ),
   );
-  assert.throws(
-    () =>
-      assertUnassignedL1AssignmentBaseline(
-        { ...unassigned, levelId: LOYALTY_LEVELS[0].resLevelId },
-        plan,
-        "program-1",
-      ),
-    /changed after/i,
-  );
-
-  const aboveL1 = buildCardReconciliationPlan(
-    [unassigned],
-    new Map([["member-1", 250]]),
-    { asOfDate: "2026-08-20" },
-  )[0];
-  assert.equal(isSafeUnassignedL1AssignmentPlan(aboveL1), false);
 });
 
 test("baseline guard catches purchase or concurrent level drift", () => {
@@ -365,7 +341,6 @@ test("reconciliation CLI is preview-first with guarded apply and rollback", () =
     .map((path) => fs.readFileSync(new URL(path, import.meta.url), "utf8"))
     .join("\n");
   assert.match(source, /SEE_YOU_OFTEN_LEVELS_V1/);
-  assert.match(source, /SEE_YOU_OFTEN_ASSIGN_L1_V1/);
   assert.match(source, /if \(args\.apply\)/);
   assert.match(source, /changed after the reconciliation snapshot/);
   assert.match(source, /restoreCard/);

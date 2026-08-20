@@ -266,9 +266,7 @@ export function buildCardReconciliationPlan(
     const cardId = String(card?.id ?? "").trim();
     const cardNo = String(card?.cardNo ?? "").trim();
     const memberId = String(card?.customerId ?? "").trim();
-    const currentLevelId = String(
-      card?.levelId ?? card?.levelAccount?.levelId ?? "",
-    );
+    const currentLevelId = effectiveCardLevelId(card);
     if (!cardId || !cardNo || !memberId) {
       throw new Error(
         "An active card is missing its card number, card ID, or member ID.",
@@ -376,51 +374,14 @@ function isUnassignedLevelId(value) {
   return levelId === "" || levelId === "0";
 }
 
-export function isSafeUnassignedL1AssignmentPlan(plan) {
-  return (
-    isUnassignedLevelId(plan?.currentLevelId) &&
-    String(plan?.spendTargetLevelId ?? "") === LOYALTY_LEVELS[0].resLevelId &&
-    plan?.policyAction === "hold_unknown_level" &&
-    Number(plan?.targetGrowth) >= 0 &&
-    Number(plan?.targetGrowth) < LOYALTY_LEVELS[1].threshold
+export function effectiveCardLevelId(card) {
+  const candidates = [card?.levelId, card?.levelAccount?.levelId].map((value) =>
+    String(value ?? "").trim(),
   );
-}
-
-export function assertUnassignedL1AssignmentBaseline(
-  card,
-  plan,
-  cardProgramId,
-) {
-  if (!isSafeUnassignedL1AssignmentPlan(plan)) {
-    throw new Error(
-      "Only an unassigned card whose rolling-spend target is L1 may use the one-way L1 assignment action.",
-    );
-  }
-  const current = {
-    cardId: String(card?.id ?? ""),
-    cardNo: String(card?.cardNo ?? ""),
-    memberId: String(card?.customerId ?? ""),
-    cardProgramId: String(card?.cardProgramId ?? ""),
-    status: Number(card?.status),
-    unassignedLevel:
-      isUnassignedLevelId(card?.levelId) &&
-      isUnassignedLevelId(card?.levelAccount?.levelId),
-    growth: finiteNumber(card?.levelAccount?.growth ?? 0, "Current growth"),
-  };
-  const expected = {
-    cardId: String(plan.cardId),
-    cardNo: String(plan.cardNo),
-    memberId: String(plan.memberId),
-    cardProgramId: String(cardProgramId),
-    status: ACTIVE_CARD_STATUS,
-    unassignedLevel: true,
-    growth: Number(plan.currentGrowth),
-  };
-  if (JSON.stringify(current) !== JSON.stringify(expected)) {
-    throw new Error(
-      "Unassigned card changed after the reconciliation snapshot; refusing mutation.",
-    );
-  }
+  const meaningful = candidates.filter((value) => !isUnassignedLevelId(value));
+  if (meaningful.length === 0) return LOYALTY_LEVELS[0].resLevelId;
+  if (meaningful.every((value) => value === meaningful[0])) return meaningful[0];
+  return meaningful.join("|");
 }
 
 export function assertCardMatchesPlanBaseline(card, plan, cardProgramId) {
@@ -434,7 +395,7 @@ export function assertCardMatchesPlanBaseline(card, plan, cardProgramId) {
     memberId: String(card?.customerId ?? ""),
     cardProgramId: String(card?.cardProgramId ?? ""),
     status: Number(card?.status),
-    levelId: String(card?.levelId ?? card?.levelAccount?.levelId ?? ""),
+    levelId: effectiveCardLevelId(card),
     growth: finiteNumber(card?.levelAccount?.growth ?? 0, "Current growth"),
   };
   const expected = {
@@ -455,8 +416,7 @@ export function cardMatchesReconciliationTarget(card, plan) {
     String(card?.id ?? "") === String(plan.cardId) &&
     String(card?.customerId ?? "") === String(plan.memberId) &&
     Number(card?.status) === ACTIVE_CARD_STATUS &&
-    String(card?.levelId ?? card?.levelAccount?.levelId ?? "") ===
-      String(plan.targetLevelId) &&
+    effectiveCardLevelId(card) === String(plan.targetLevelId) &&
     finiteNumber(card?.levelAccount?.growth ?? 0, "Current growth") ===
       Number(plan.targetGrowth)
   );

@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
 import {
+  buildHbtiOpenScreen,
   buildSeeYouOftenHome,
   parseJsonField,
   validateComponentTree,
@@ -21,6 +22,9 @@ const DRAFT_SOURCE_TYPE = 3;
 const STORAGE_STATE = path.join(RES_API_DIR, "storageState.json");
 const OUTPUT_ROOT = path.join(RES_API_DIR, "output", "h5-design");
 const RELEASE_ENDPOINT = "/ordering/config/decoration/release";
+const UPLOAD_ENDPOINT = "/resource/management/file/uploadFile";
+const HBTI_URL = "https://hbti-test.hotcrush.net/";
+const SEA_UPLOAD_KEY = "o9j8d9n2p3p4m3b2";
 
 function assertSafeEndpoint(endpoint) {
   if (endpoint === RELEASE_ENDPOINT || endpoint.endsWith("/release")) {
@@ -109,22 +113,38 @@ async function withAuthenticatedPage(callback) {
       return result.body;
     };
 
-    return await callback({ page, api });
+    return await callback({ page, api, requestHeaders: capturedHeaders });
   } finally {
     await browser.close();
   }
 }
 
-function findHomePage(listResponse) {
+function decorationPages(listResponse) {
   const pages = listResponse?.data?.decorationPageCOS;
   if (!Array.isArray(pages)) {
     throw new Error("listPage response did not include data.decorationPageCOS");
   }
-  const home = pages.find((page) => page.homePage === true || page.pageType === "homePage");
+  return pages;
+}
+
+function findHomePage(listResponse) {
+  const home = decorationPages(listResponse).find(
+    (page) => page.homePage === true || page.pageType === "homePage",
+  );
   if (!home) {
     throw new Error("Could not identify the formal H5 home page");
   }
   return home;
+}
+
+function findOpenScreenPage(listResponse) {
+  const openScreen = decorationPages(listResponse).find(
+    (page) => page.pageType === "POpenScreenPage",
+  );
+  if (!openScreen) {
+    throw new Error("Could not identify the RES H5 open-screen page");
+  }
+  return openScreen;
 }
 
 async function saveSnapshot() {
@@ -148,7 +168,8 @@ async function saveSnapshot() {
     };
     const pages = await api("/ordering/config/decoration/listPage", listPayload);
     const home = findHomePage(pages);
-    return { releaseInfo, pages, home, listPayload };
+    const openScreen = findOpenScreenPage(pages);
+    return { releaseInfo, pages, home, openScreen, listPayload };
   });
 
   const manifest = {
@@ -158,10 +179,12 @@ async function saveSnapshot() {
     sourceType: FORMAL_SOURCE_TYPE,
     decorationPlanId: String(result.listPayload.decorationPlanId),
     homePageId: String(result.home.decorationPageId),
+    openScreenPageId: String(result.openScreen.decorationPageId),
     hashes: {
       releaseInfo: sha256(result.releaseInfo),
       pages: sha256(result.pages),
       home: sha256(result.home),
+      openScreen: sha256(result.openScreen),
     },
   };
 
@@ -169,6 +192,10 @@ async function saveSnapshot() {
     writeFile(path.join(outputDir, "release-info.json"), stableJson(result.releaseInfo)),
     writeFile(path.join(outputDir, "pages.json"), stableJson(result.pages)),
     writeFile(path.join(outputDir, "home-page.json"), stableJson(result.home)),
+    writeFile(
+      path.join(outputDir, "open-screen-page.json"),
+      stableJson(result.openScreen),
+    ),
     writeFile(path.join(outputDir, "manifest.json"), stableJson(manifest)),
   ]);
 
@@ -176,9 +203,10 @@ async function saveSnapshot() {
 }
 
 async function inspectSnapshot(snapshotDir) {
-  const [manifest, home] = await Promise.all([
+  const [manifest, home, openScreen] = await Promise.all([
     readFile(path.join(snapshotDir, "manifest.json"), "utf8").then(JSON.parse),
     readFile(path.join(snapshotDir, "home-page.json"), "utf8").then(JSON.parse),
+    readFile(path.join(snapshotDir, "open-screen-page.json"), "utf8").then(JSON.parse),
   ]);
   const tree = typeof home.componentsTree === "string"
     ? JSON.parse(home.componentsTree)
@@ -199,6 +227,12 @@ async function inspectSnapshot(snapshotDir) {
       componentsTreeType: typeof home.componentsTree,
       componentsMapType: typeof home.componentsMap,
     },
+    openScreen: {
+      decorationPageId: openScreen.decorationPageId,
+      pageName: openScreen.pageName,
+      pageType: openScreen.pageType,
+      homePage: openScreen.homePage,
+    },
     tree,
     mapKeys: map && typeof map === "object" ? Object.keys(map) : [],
     map,
@@ -206,9 +240,10 @@ async function inspectSnapshot(snapshotDir) {
 }
 
 async function readSnapshot(snapshotDir) {
-  const [manifest, home] = await Promise.all([
+  const [manifest, home, openScreen] = await Promise.all([
     readFile(path.join(snapshotDir, "manifest.json"), "utf8").then(JSON.parse),
     readFile(path.join(snapshotDir, "home-page.json"), "utf8").then(JSON.parse),
+    readFile(path.join(snapshotDir, "open-screen-page.json"), "utf8").then(JSON.parse),
   ]);
   if (String(manifest.appId) !== APP_ID || Number(manifest.sourceType) !== FORMAL_SOURCE_TYPE) {
     throw new Error("Snapshot is not the expected formal RES H5 application");
@@ -216,14 +251,32 @@ async function readSnapshot(snapshotDir) {
   if (sha256(home) !== manifest.hashes.home) {
     throw new Error("Snapshot home-page.json does not match its manifest hash");
   }
-  return { manifest, home };
+  if (sha256(openScreen) !== manifest.hashes.openScreen) {
+    throw new Error("Snapshot open-screen-page.json does not match its manifest hash");
+  }
+  return { manifest, home, openScreen };
 }
 
-async function buildDesign(snapshotDir) {
-  const { manifest, home } = await readSnapshot(snapshotDir);
+async function buildDesign(
+  snapshotDir,
+  popupImageUrl = process.env.HBTI_POPUP_IMAGE_URL,
+) {
+  if (!popupImageUrl) {
+    throw new Error("HBTI_POPUP_IMAGE_URL is required to build the H5 design");
+  }
+  const { manifest, home, openScreen } = await readSnapshot(snapshotDir);
   const designedHome = buildSeeYouOftenHome(home);
+  const designedOpenScreen = buildHbtiOpenScreen(openScreen, {
+    imageUrl: popupImageUrl,
+    href: HBTI_URL,
+  });
   const tree = parseJsonField(designedHome.componentsTree, "componentsTree");
+  const openScreenTree = parseJsonField(
+    designedOpenScreen.componentsTree,
+    "componentsTree",
+  );
   validateComponentTree(tree);
+  validateComponentTree(openScreenTree);
 
   const designManifest = {
     builtAt: timestamp(),
@@ -231,8 +284,15 @@ async function buildDesign(snapshotDir) {
     sourceDecorationPlanId: String(manifest.decorationPlanId),
     sourceHomePageId: String(manifest.homePageId),
     sourceHomeHash: manifest.hashes.home,
+    sourceOpenScreenHash: manifest.hashes.openScreen,
     designedHomeHash: sha256(designedHome),
-    componentCount: Object.keys(tree).length,
+    designedOpenScreenHash: sha256(designedOpenScreen),
+    popupImageUrl,
+    hbtiUrl: HBTI_URL,
+    componentCount: {
+      home: Object.keys(tree).length,
+      openScreen: Object.keys(openScreenTree).length,
+    },
     publishEndpointIncluded: false,
   };
 
@@ -242,19 +302,49 @@ async function buildDesign(snapshotDir) {
       stableJson(designedHome),
     ),
     writeFile(
+      path.join(snapshotDir, "designed-open-screen-page.json"),
+      stableJson(designedOpenScreen),
+    ),
+    writeFile(
       path.join(snapshotDir, "design-manifest.json"),
       stableJson(designManifest),
     ),
   ]);
-  return { designedHome, designManifest };
+  return { designedHome, designedOpenScreen, designManifest };
+}
+
+function decorateSavePayload(designedPage, draftPage, draftPlanId) {
+  return {
+    pageName: designedPage.pageName,
+    pageNameML: designedPage.pageNameML,
+    appId: APP_ID,
+    decorationPlanId: draftPlanId,
+    decorationPageId: String(draftPage.decorationPageId),
+    operationType: "1",
+    sourceType: DRAFT_SOURCE_TYPE,
+    pageType: designedPage.pageType,
+    pageData: designedPage.pageData,
+    componentsTree: designedPage.componentsTree,
+    componentsMap: designedPage.componentsMap,
+    homePage: designedPage.homePage === true,
+    thumbnailUrl: designedPage.thumbnailUrl || "",
+  };
 }
 
 async function saveDesignAsDraft(snapshotDir, planName) {
   if (!planName?.trim()) {
     throw new Error("A non-empty draft plan name is required");
   }
-  const { manifest, home: snapshotHome } = await readSnapshot(snapshotDir);
-  const { designedHome, designManifest } = await buildDesign(snapshotDir);
+  const {
+    manifest,
+    home: snapshotHome,
+    openScreen: snapshotOpenScreen,
+  } = await readSnapshot(snapshotDir);
+  const {
+    designedHome,
+    designedOpenScreen,
+    designManifest,
+  } = await buildDesign(snapshotDir);
 
   const result = await withAuthenticatedPage(async ({ api }) => {
     const formalPayload = {
@@ -269,7 +359,11 @@ async function saveDesignAsDraft(snapshotDir, planName) {
       formalPayload,
     );
     const formalHomeBefore = findHomePage(formalBefore);
-    if (sha256(formalHomeBefore) !== manifest.hashes.home) {
+    const formalOpenScreenBefore = findOpenScreenPage(formalBefore);
+    if (
+      sha256(formalHomeBefore) !== manifest.hashes.home
+      || sha256(formalOpenScreenBefore) !== manifest.hashes.openScreen
+    ) {
       throw new Error(
         "Formal H5 changed after the snapshot; refusing to create a draft from stale data.",
       );
@@ -310,24 +404,18 @@ async function saveDesignAsDraft(snapshotDir, planName) {
       draftPayload,
     );
     const clonedDraftHome = findHomePage(clonedDraft);
-    const savePayload = {
-      pageName: designedHome.pageName,
-      pageNameML: designedHome.pageNameML,
-      appId: APP_ID,
-      decorationPlanId: draftPlanId,
-      decorationPageId: String(clonedDraftHome.decorationPageId),
-      operationType: "1",
-      sourceType: DRAFT_SOURCE_TYPE,
-      pageType: "homePage",
-      pageData: designedHome.pageData,
-      componentsTree: designedHome.componentsTree,
-      componentsMap: designedHome.componentsMap,
-      homePage: true,
-      thumbnailUrl: "",
-    };
-    const saveResponse = await api(
+    const clonedDraftOpenScreen = findOpenScreenPage(clonedDraft);
+    const saveHomeResponse = await api(
       "/ordering/config/decoration/saveDecorate",
-      savePayload,
+      decorateSavePayload(designedHome, clonedDraftHome, draftPlanId),
+    );
+    const saveOpenScreenResponse = await api(
+      "/ordering/config/decoration/saveDecorate",
+      decorateSavePayload(
+        designedOpenScreen,
+        clonedDraftOpenScreen,
+        draftPlanId,
+      ),
     );
 
     const draftAfter = await api(
@@ -335,11 +423,13 @@ async function saveDesignAsDraft(snapshotDir, planName) {
       draftPayload,
     );
     const savedDraftHome = findHomePage(draftAfter);
+    const savedDraftOpenScreen = findOpenScreenPage(draftAfter);
     const formalAfter = await api(
       "/ordering/config/decoration/listPage",
       formalPayload,
     );
     const formalHomeAfter = findHomePage(formalAfter);
+    const formalOpenScreenAfter = findOpenScreenPage(formalAfter);
 
     if (String(savedDraftHome.decorationPlanId) !== draftPlanId) {
       throw new Error("Saved home page was not read back from the new draft plan");
@@ -347,20 +437,36 @@ async function saveDesignAsDraft(snapshotDir, planName) {
     if (savedDraftHome.componentsTree !== designedHome.componentsTree) {
       throw new Error("Draft home page components did not match the saved design");
     }
-    if (sha256(formalHomeAfter) !== sha256(formalHomeBefore)) {
+    if (
+      savedDraftOpenScreen.componentsTree !== designedOpenScreen.componentsTree
+    ) {
+      throw new Error("Draft open-screen components did not match the saved design");
+    }
+    if (
+      sha256(formalHomeAfter) !== sha256(formalHomeBefore)
+      || sha256(formalOpenScreenAfter) !== sha256(formalOpenScreenBefore)
+    ) {
       throw new Error("Formal H5 changed while saving the draft");
     }
-    if (sha256(formalHomeAfter) !== manifest.hashes.home) {
+    if (
+      sha256(formalHomeAfter) !== manifest.hashes.home
+      || sha256(formalOpenScreenAfter) !== manifest.hashes.openScreen
+    ) {
       throw new Error("Formal H5 no longer matches the original snapshot");
     }
 
     return {
       draftPlanId,
       draftHomePageId: String(savedDraftHome.decorationPageId),
+      draftOpenScreenPageId: String(savedDraftOpenScreen.decorationPageId),
       formalHomeBefore,
       formalHomeAfter,
+      formalOpenScreenBefore,
+      formalOpenScreenAfter,
       savedDraftHome,
-      saveResponse,
+      savedDraftOpenScreen,
+      saveHomeResponse,
+      saveOpenScreenResponse,
     };
   });
 
@@ -373,24 +479,40 @@ async function saveDesignAsDraft(snapshotDir, planName) {
     draftSourceType: DRAFT_SOURCE_TYPE,
     draftPlanId: result.draftPlanId,
     draftHomePageId: result.draftHomePageId,
+    draftOpenScreenPageId: result.draftOpenScreenPageId,
     sourceFormalPlanId: String(manifest.decorationPlanId),
     sourceFormalHomePageId: String(snapshotHome.decorationPageId),
+    sourceFormalOpenScreenPageId: String(snapshotOpenScreen.decorationPageId),
     verification: {
       draftMatchesDesignedTree:
         result.savedDraftHome.componentsTree === designedHome.componentsTree,
       formalHomeUnchanged:
         sha256(result.formalHomeAfter) === manifest.hashes.home,
+      draftOpenScreenMatchesDesignedTree:
+        result.savedDraftOpenScreen.componentsTree
+          === designedOpenScreen.componentsTree,
+      formalOpenScreenUnchanged:
+        sha256(result.formalOpenScreenAfter) === manifest.hashes.openScreen,
       releaseCalled: false,
     },
     hashes: {
       formalHome: sha256(result.formalHomeAfter),
+      formalOpenScreen: sha256(result.formalOpenScreenAfter),
       draftHome: sha256(result.savedDraftHome),
+      draftOpenScreen: sha256(result.savedDraftOpenScreen),
       designedHome: designManifest.designedHomeHash,
+      designedOpenScreen: designManifest.designedOpenScreenHash,
       designedComponentsTree: createHash("sha256")
         .update(designedHome.componentsTree)
         .digest("hex"),
       savedComponentsTree: createHash("sha256")
         .update(result.savedDraftHome.componentsTree)
+        .digest("hex"),
+      designedOpenScreenComponentsTree: createHash("sha256")
+        .update(designedOpenScreen.componentsTree)
+        .digest("hex"),
+      savedOpenScreenComponentsTree: createHash("sha256")
+        .update(result.savedDraftOpenScreen.componentsTree)
         .digest("hex"),
     },
   };
@@ -398,6 +520,10 @@ async function saveDesignAsDraft(snapshotDir, planName) {
     writeFile(
       path.join(snapshotDir, "saved-draft-home-page.json"),
       stableJson(result.savedDraftHome),
+    ),
+    writeFile(
+      path.join(snapshotDir, "saved-draft-open-screen-page.json"),
+      stableJson(result.savedDraftOpenScreen),
     ),
     writeFile(
       path.join(snapshotDir, "draft-receipt.json"),
@@ -411,7 +537,11 @@ async function updateExistingDraft(snapshotDir) {
   const receiptPath = path.join(snapshotDir, "draft-receipt.json");
   const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
   const { manifest } = await readSnapshot(snapshotDir);
-  const { designedHome, designManifest } = await buildDesign(snapshotDir);
+  const {
+    designedHome,
+    designedOpenScreen,
+    designManifest,
+  } = await buildDesign(snapshotDir);
   const draftPlanId = String(receipt.draftPlanId || "");
   if (
     !draftPlanId
@@ -434,7 +564,11 @@ async function updateExistingDraft(snapshotDir) {
       formalPayload,
     );
     const formalHomeBefore = findHomePage(formalBefore);
-    if (sha256(formalHomeBefore) !== manifest.hashes.home) {
+    const formalOpenScreenBefore = findOpenScreenPage(formalBefore);
+    if (
+      sha256(formalHomeBefore) !== manifest.hashes.home
+      || sha256(formalOpenScreenBefore) !== manifest.hashes.openScreen
+    ) {
       throw new Error("Formal H5 changed; refusing to update the existing draft");
     }
 
@@ -450,61 +584,89 @@ async function updateExistingDraft(snapshotDir) {
       draftPayload,
     );
     const draftHomeBefore = findHomePage(draftBefore);
-    await api("/ordering/config/decoration/saveDecorate", {
-      pageName: designedHome.pageName,
-      pageNameML: designedHome.pageNameML,
-      appId: APP_ID,
-      decorationPlanId: draftPlanId,
-      decorationPageId: String(draftHomeBefore.decorationPageId),
-      operationType: "1",
-      sourceType: DRAFT_SOURCE_TYPE,
-      pageType: "homePage",
-      pageData: designedHome.pageData,
-      componentsTree: designedHome.componentsTree,
-      componentsMap: designedHome.componentsMap,
-      homePage: true,
-      thumbnailUrl: "",
-    });
+    const draftOpenScreenBefore = findOpenScreenPage(draftBefore);
+    await api(
+      "/ordering/config/decoration/saveDecorate",
+      decorateSavePayload(designedHome, draftHomeBefore, draftPlanId),
+    );
+    await api(
+      "/ordering/config/decoration/saveDecorate",
+      decorateSavePayload(
+        designedOpenScreen,
+        draftOpenScreenBefore,
+        draftPlanId,
+      ),
+    );
     const draftAfter = await api(
       "/ordering/config/decoration/listPage",
       draftPayload,
     );
     const savedDraftHome = findHomePage(draftAfter);
+    const savedDraftOpenScreen = findOpenScreenPage(draftAfter);
     const formalAfter = await api(
       "/ordering/config/decoration/listPage",
       formalPayload,
     );
     const formalHomeAfter = findHomePage(formalAfter);
+    const formalOpenScreenAfter = findOpenScreenPage(formalAfter);
 
     if (savedDraftHome.componentsTree !== designedHome.componentsTree) {
       throw new Error("Updated draft does not match the designed component tree");
     }
-    if (sha256(formalHomeAfter) !== manifest.hashes.home) {
+    if (
+      savedDraftOpenScreen.componentsTree !== designedOpenScreen.componentsTree
+    ) {
+      throw new Error("Updated draft open-screen does not match the design");
+    }
+    if (
+      sha256(formalHomeAfter) !== manifest.hashes.home
+      || sha256(formalOpenScreenAfter) !== manifest.hashes.openScreen
+    ) {
       throw new Error("Formal H5 changed while updating the draft");
     }
-    return { savedDraftHome, formalHomeAfter };
+    return {
+      savedDraftHome,
+      savedDraftOpenScreen,
+      formalHomeAfter,
+      formalOpenScreenAfter,
+    };
   });
 
   const updatedReceipt = {
     ...receipt,
     updatedAt: timestamp(),
     draftHomePageId: String(result.savedDraftHome.decorationPageId),
+    draftOpenScreenPageId: String(result.savedDraftOpenScreen.decorationPageId),
     verification: {
       draftMatchesDesignedTree:
         result.savedDraftHome.componentsTree === designedHome.componentsTree,
       formalHomeUnchanged:
         sha256(result.formalHomeAfter) === manifest.hashes.home,
+      draftOpenScreenMatchesDesignedTree:
+        result.savedDraftOpenScreen.componentsTree
+          === designedOpenScreen.componentsTree,
+      formalOpenScreenUnchanged:
+        sha256(result.formalOpenScreenAfter) === manifest.hashes.openScreen,
       releaseCalled: false,
     },
     hashes: {
       formalHome: sha256(result.formalHomeAfter),
+      formalOpenScreen: sha256(result.formalOpenScreenAfter),
       draftHome: sha256(result.savedDraftHome),
+      draftOpenScreen: sha256(result.savedDraftOpenScreen),
       designedHome: designManifest.designedHomeHash,
+      designedOpenScreen: designManifest.designedOpenScreenHash,
       designedComponentsTree: createHash("sha256")
         .update(designedHome.componentsTree)
         .digest("hex"),
       savedComponentsTree: createHash("sha256")
         .update(result.savedDraftHome.componentsTree)
+        .digest("hex"),
+      designedOpenScreenComponentsTree: createHash("sha256")
+        .update(designedOpenScreen.componentsTree)
+        .digest("hex"),
+      savedOpenScreenComponentsTree: createHash("sha256")
+        .update(result.savedDraftOpenScreen.componentsTree)
         .digest("hex"),
     },
   };
@@ -512,6 +674,10 @@ async function updateExistingDraft(snapshotDir) {
     writeFile(
       path.join(snapshotDir, "saved-draft-home-page.json"),
       stableJson(result.savedDraftHome),
+    ),
+    writeFile(
+      path.join(snapshotDir, "saved-draft-open-screen-page.json"),
+      stableJson(result.savedDraftOpenScreen),
     ),
     writeFile(receiptPath, stableJson(updatedReceipt)),
   ]);
@@ -547,6 +713,83 @@ async function listLinkConfig() {
       appType: APP_TYPE,
     },
   ));
+}
+
+async function uploadPopupAsset(imagePath) {
+  const resolvedPath = path.resolve(imagePath);
+  const extension = path.extname(resolvedPath).toLowerCase();
+  const mimeTypes = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+  };
+  const mimeType = mimeTypes[extension];
+  if (!mimeType) {
+    throw new Error("Popup artwork must be PNG, JPEG, or WebP");
+  }
+  const buffer = await readFile(resolvedPath);
+  if (buffer.length === 0 || buffer.length > 10 * 1024 * 1024) {
+    throw new Error("Popup artwork must be between 1 byte and 10 MB");
+  }
+
+  assertSafeEndpoint(UPLOAD_ENDPOINT);
+  const result = await withAuthenticatedPage(
+    async ({ page, requestHeaders }) => {
+      const forbidden = new Set([
+        "host",
+        "connection",
+        "content-length",
+        "content-type",
+        "cookie",
+      ]);
+      const headers = {};
+      for (const [key, value] of Object.entries(requestHeaders || {})) {
+        if (!forbidden.has(key.toLowerCase())) {
+          headers[key] = value;
+        }
+      }
+      const response = await page.request.post(`${BASE_URL}${UPLOAD_ENDPOINT}`, {
+        headers,
+        multipart: {
+          file: {
+            name: path.basename(resolvedPath),
+            mimeType,
+            buffer,
+          },
+          uniqueKey: SEA_UPLOAD_KEY,
+        },
+      });
+      const body = await response.json().catch(async () => ({
+        raw: await response.text(),
+      }));
+      if (!response.ok() || body?.code !== "000") {
+        throw new Error(`Popup upload failed: ${stableJson({
+          status: response.status(),
+          body,
+        })}`);
+      }
+      const fileLink = body?.data?.fileLink;
+      if (typeof fileLink !== "string" || !fileLink) {
+        throw new Error("Popup upload did not return data.fileLink");
+      }
+      const imageResponse = await page.request.get(
+        fileLink.startsWith("//") ? `https:${fileLink}` : fileLink,
+      );
+      if (!imageResponse.ok()) {
+        throw new Error("Uploaded popup image could not be read back");
+      }
+      return { fileLink, responseBody: body };
+    },
+  );
+
+  return {
+    uploadedAt: timestamp(),
+    sourcePath: resolvedPath,
+    fileLink: result.fileLink,
+    byteLength: buffer.length,
+    sha256: createHash("sha256").update(buffer).digest("hex"),
+  };
 }
 
 async function inspectCustomLinkSupport() {
@@ -787,6 +1030,7 @@ function usage() {
   console.error("  node tools/h5-design.mjs update-draft <snapshot-directory>");
   console.error("  node tools/h5-design.mjs discover-draft");
   console.error("  node tools/h5-design.mjs list-link-config");
+  console.error("  node tools/h5-design.mjs upload-popup <image-path>");
   console.error("  node tools/h5-design.mjs inspect-custom-link");
   console.error("  node tools/h5-design.mjs inspect-runtime-custom-link");
   console.error(
@@ -819,6 +1063,8 @@ if (command === "snapshot") {
   console.log(stableJson(await discoverLatestDraft()));
 } else if (command === "list-link-config") {
   console.log(stableJson(await listLinkConfig()));
+} else if (command === "upload-popup" && argument) {
+  console.log(stableJson(await uploadPopupAsset(path.resolve(argument))));
 } else if (command === "inspect-custom-link") {
   console.log(stableJson(await inspectCustomLinkSupport()));
 } else if (command === "inspect-runtime-custom-link") {
@@ -845,9 +1091,12 @@ export {
   DRAFT_SOURCE_TYPE,
   FORMAL_SOURCE_TYPE,
   RELEASE_ENDPOINT,
+  UPLOAD_ENDPOINT,
   assertSafeEndpoint,
   buildDesign,
   findHomePage,
+  findOpenScreenPage,
   saveDesignAsDraft,
   sha256,
+  uploadPopupAsset,
 };

@@ -8,6 +8,7 @@ import {
 import {
   assertCardMatchesPlanBaseline,
   assertManualDowngradeLevelConfiguration,
+  assertUnassignedL1AssignmentBaseline,
   birthdayMonthFromValue,
   buildCardReconciliationPlan,
   buildGrowthAdjustmentPayload,
@@ -17,6 +18,7 @@ import {
   createReferenceIdFactory,
   downgradeRecalculationDateForNotice,
   growthForSpend,
+  isSafeUnassignedL1AssignmentPlan,
   levelOperationDirection,
   rollingWindowForDate,
   summarizeCardReconciliation,
@@ -233,6 +235,38 @@ test("unassigned legacy levels are reported and blocked from reversible apply", 
   );
 });
 
+test("one-way L1 assignment accepts only an unchanged unassigned card with an L1 spend target", () => {
+  const unassigned = card({
+    levelId: "0",
+    levelAccount: { levelId: "", growth: 9 },
+  });
+  const [plan] = buildCardReconciliationPlan(
+    [unassigned],
+    new Map([["member-1", 9.5]]),
+    { asOfDate: "2026-08-20" },
+  );
+  assert.equal(isSafeUnassignedL1AssignmentPlan(plan), true);
+  assert.doesNotThrow(() =>
+    assertUnassignedL1AssignmentBaseline(unassigned, plan, "program-1"),
+  );
+  assert.throws(
+    () =>
+      assertUnassignedL1AssignmentBaseline(
+        { ...unassigned, levelId: LOYALTY_LEVELS[0].resLevelId },
+        plan,
+        "program-1",
+      ),
+    /changed after/i,
+  );
+
+  const aboveL1 = buildCardReconciliationPlan(
+    [unassigned],
+    new Map([["member-1", 250]]),
+    { asOfDate: "2026-08-20" },
+  )[0];
+  assert.equal(isSafeUnassignedL1AssignmentPlan(aboveL1), false);
+});
+
 test("baseline guard catches purchase or concurrent level drift", () => {
   const [plan] = buildCardReconciliationPlan(
     [card()],
@@ -331,6 +365,7 @@ test("reconciliation CLI is preview-first with guarded apply and rollback", () =
     .map((path) => fs.readFileSync(new URL(path, import.meta.url), "utf8"))
     .join("\n");
   assert.match(source, /SEE_YOU_OFTEN_LEVELS_V1/);
+  assert.match(source, /SEE_YOU_OFTEN_ASSIGN_L1_V1/);
   assert.match(source, /if \(args\.apply\)/);
   assert.match(source, /changed after the reconciliation snapshot/);
   assert.match(source, /restoreCard/);
@@ -349,10 +384,9 @@ test("daily loyalty runner is single-writer, date-locked, and uses explicit safe
   );
   assert.match(source, /TZ=Asia\/Kuala_Lumpur date \+%F/);
   assert.match(source, /flock -n 9/);
-  assert.match(
-    source,
-    /aligned-growth held-downgrade-growth upgrade downgrade/,
-  );
+  assert.match(source, /ACTIONS="aligned-growth held-downgrade-growth upgrade"/);
+  assert.match(source, /LOYALTY_DOWNGRADE_ENABLED:-0/);
+  assert.match(source, /ACTIONS="\$ACTIONS downgrade"/);
   assert.match(source, /--action=\$action/);
   assert.doesNotMatch(source, /--action=any/);
 });

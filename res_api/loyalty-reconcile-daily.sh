@@ -33,7 +33,11 @@ run_action() {
 }
 
 CODE=0
-for action in aligned-growth held-downgrade-growth upgrade downgrade; do
+ACTIONS="aligned-growth held-downgrade-growth upgrade"
+if [ "${LOYALTY_DOWNGRADE_ENABLED:-0}" = "1" ]; then
+  ACTIONS="$ACTIONS downgrade"
+fi
+for action in $ACTIONS; do
   run_action "$action"
   CODE=$?
   [ "$CODE" -eq 0 ] || break

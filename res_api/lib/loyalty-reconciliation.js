@@ -371,6 +371,58 @@ export function cardPlanHasRestorableLevel(plan) {
   );
 }
 
+function isUnassignedLevelId(value) {
+  const levelId = String(value ?? "").trim();
+  return levelId === "" || levelId === "0";
+}
+
+export function isSafeUnassignedL1AssignmentPlan(plan) {
+  return (
+    isUnassignedLevelId(plan?.currentLevelId) &&
+    String(plan?.spendTargetLevelId ?? "") === LOYALTY_LEVELS[0].resLevelId &&
+    plan?.policyAction === "hold_unknown_level" &&
+    Number(plan?.targetGrowth) >= 0 &&
+    Number(plan?.targetGrowth) < LOYALTY_LEVELS[1].threshold
+  );
+}
+
+export function assertUnassignedL1AssignmentBaseline(
+  card,
+  plan,
+  cardProgramId,
+) {
+  if (!isSafeUnassignedL1AssignmentPlan(plan)) {
+    throw new Error(
+      "Only an unassigned card whose rolling-spend target is L1 may use the one-way L1 assignment action.",
+    );
+  }
+  const current = {
+    cardId: String(card?.id ?? ""),
+    cardNo: String(card?.cardNo ?? ""),
+    memberId: String(card?.customerId ?? ""),
+    cardProgramId: String(card?.cardProgramId ?? ""),
+    status: Number(card?.status),
+    unassignedLevel:
+      isUnassignedLevelId(card?.levelId) &&
+      isUnassignedLevelId(card?.levelAccount?.levelId),
+    growth: finiteNumber(card?.levelAccount?.growth ?? 0, "Current growth"),
+  };
+  const expected = {
+    cardId: String(plan.cardId),
+    cardNo: String(plan.cardNo),
+    memberId: String(plan.memberId),
+    cardProgramId: String(cardProgramId),
+    status: ACTIVE_CARD_STATUS,
+    unassignedLevel: true,
+    growth: Number(plan.currentGrowth),
+  };
+  if (JSON.stringify(current) !== JSON.stringify(expected)) {
+    throw new Error(
+      "Unassigned card changed after the reconciliation snapshot; refusing mutation.",
+    );
+  }
+}
+
 export function assertCardMatchesPlanBaseline(card, plan, cardProgramId) {
   if (!cardPlanHasRestorableLevel(plan)) {
     throw new Error(

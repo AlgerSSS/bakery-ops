@@ -21,6 +21,7 @@ import {
 import {
   assertCardMatchesPlanBaseline,
   assertManualDowngradeLevelConfiguration,
+  assertUnassignedL1AssignmentBaseline,
   buildCardReconciliationPlan,
   buildGrowthAdjustmentPayload,
   buildLevelChangePayload,
@@ -29,6 +30,7 @@ import {
   cardMatchesReconciliationTarget,
   createReferenceIdFactory,
   downgradeRecalculationDateForNotice,
+  isSafeUnassignedL1AssignmentPlan,
   levelOperationDirection,
   rollingWindowForDate,
   summarizeCardReconciliation,
@@ -42,6 +44,7 @@ const DEFAULT_OWNER_ORG_ID = "1991027325256417283";
 const DEFAULT_OWNER_ORG_TYPE = "7";
 const DEFAULT_MEMBER_STORE = "吉隆坡Pavilion门店";
 const CONFIRMATION = "SEE_YOU_OFTEN_LEVELS_V1";
+const ASSIGN_L1_CONFIRMATION = "SEE_YOU_OFTEN_ASSIGN_L1_V1";
 const CARD_DETAILS_PATH = "/crm/datamanage/card/details";
 const ADJUST_GROWTH_PATH = "/crm/memberCard/web/card/adjustGrowth";
 const MODIFY_CARD_PATH = "/crm/memberCard/web/card/modifyCard";
@@ -53,6 +56,7 @@ const APPLY_ACTIONS = new Set([
   "upgrade",
   "held-downgrade-growth",
   "downgrade",
+  "assign-l1",
 ]);
 
 function usage() {
@@ -60,6 +64,7 @@ function usage() {
     "Usage:",
     "  npm run loyalty:preview -- --as-of=YYYY-MM-DD",
     `  npm run loyalty:reconcile -- --as-of=YYYY-MM-DD --apply --action=aligned-growth --limit=1 --confirm=${CONFIRMATION}`,
+    `  npm run loyalty:reconcile -- --as-of=YYYY-MM-DD --apply --action=assign-l1 --limit=1 --confirm=${ASSIGN_L1_CONFIRMATION}`,
     "",
     "Default mode is read-only. Apply mode requires the exact confirmation",
     "phrase. --as-of calculates the completed rolling window ending the day",
@@ -105,9 +110,6 @@ function parseArgs(argv) {
   const from = explicitWindow ? args.from : rollingWindow.from;
   const to = explicitWindow ? args.to : rollingWindow.to;
   const apply = args.apply === true;
-  if (apply && args.confirm !== CONFIRMATION) {
-    throw new Error("Apply mode requires the exact confirmation phrase.");
-  }
   if (apply && args.action === undefined) {
     throw new Error("Apply mode requires an explicit --action.");
   }
@@ -124,6 +126,11 @@ function parseArgs(argv) {
   const action = apply ? String(args.action) : "preview-only";
   if (apply && !APPLY_ACTIONS.has(action)) {
     throw new Error(`--action must be one of: ${[...APPLY_ACTIONS].join(", ")}.`);
+  }
+  const expectedConfirmation =
+    action === "assign-l1" ? ASSIGN_L1_CONFIRMATION : CONFIRMATION;
+  if (apply && args.confirm !== expectedConfirmation) {
+    throw new Error("Apply mode requires the exact confirmation phrase.");
   }
   return {
     from,
@@ -214,6 +221,9 @@ async function alreadyDowngradedThisMonth(session, plan, context) {
 }
 
 function planMatchesApplyAction(plan, action) {
+  if (action === "assign-l1") {
+    return isSafeUnassignedL1AssignmentPlan(plan);
+  }
   if (action === "aligned-growth") {
     return plan.policyAction === "aligned" && plan.growthDelta !== 0;
   }
@@ -335,14 +345,21 @@ async function restoreCard(session, original, context, remark) {
 async function applyReconciliation(plans, context) {
   const actionable = plans.filter(
     (plan) =>
-      (plan.growthDelta !== 0 || plan.levelChangeNeeded) &&
+      (context.action === "assign-l1" ||
+        plan.growthDelta !== 0 ||
+        plan.levelChangeNeeded) &&
       planMatchesApplyAction(plan, context.action),
   );
-  const skippedUnknownLevelCards = actionable.filter(
-    (plan) => !cardPlanHasRestorableLevel(plan),
-  ).length;
+  const oneWayL1Assignment = context.action === "assign-l1";
+  const skippedUnknownLevelCards = oneWayL1Assignment
+    ? 0
+    : actionable.filter((plan) => !cardPlanHasRestorableLevel(plan)).length;
   const selected = actionable
-    .filter(cardPlanHasRestorableLevel)
+    .filter((plan) =>
+      oneWayL1Assignment
+        ? isSafeUnassignedL1AssignmentPlan(plan)
+        : cardPlanHasRestorableLevel(plan),
+    )
     .sort(
       (a, b) =>
         Number(a.levelChangeNeeded) - Number(b.levelChangeNeeded) ||
@@ -368,25 +385,65 @@ async function applyReconciliation(plans, context) {
         plan.cardId,
         context.corporationId,
       );
-      assertCardMatchesPlanBaseline(original, plan, context.cardProgramId);
+      if (oneWayL1Assignment) {
+        assertUnassignedL1AssignmentBaseline(
+          original,
+          plan,
+          context.cardProgramId,
+        );
+      } else {
+        assertCardMatchesPlanBaseline(original, plan, context.cardProgramId);
+      }
       const downgradeAlreadyApplied =
         plan.policyAction === "downgrade_one_level" &&
         (await alreadyDowngradedThisMonth(session, plan, context));
-      const effectivePlan = downgradeAlreadyApplied
+      const effectivePlan = oneWayL1Assignment
         ? {
+            ...plan,
+            targetLevelId: LOYALTY_LEVELS[0].resLevelId,
+            levelChangeNeeded: true,
+            policyAction: "assign_unassigned_l1",
+          }
+        : downgradeAlreadyApplied
+          ? {
             ...plan,
             targetLevelId: plan.currentLevelId,
             levelChangeNeeded: false,
             policyAction: "hold_already_downgraded_this_month",
           }
-        : plan;
+          : plan;
       if (downgradeAlreadyApplied) monthlyDowngradesPrevented += 1;
       let mutated = false;
       try {
+        let latest = original;
+        if (oneWayL1Assignment) {
+          await changeLevel(
+            session,
+            original,
+            effectivePlan.targetLevelId,
+            context,
+          );
+          mutated = true;
+          directLevelChanges += 1;
+          latest = await readbackCard(
+            session,
+            plan.cardId,
+            context.corporationId,
+            (card) =>
+              String(card?.levelId ?? card?.levelAccount?.levelId ?? "") ===
+              effectivePlan.targetLevelId,
+          );
+          if (
+            String(latest?.levelId ?? latest?.levelAccount?.levelId ?? "") !==
+            effectivePlan.targetLevelId
+          ) {
+            throw new Error("One-way L1 assignment readback did not match L1.");
+          }
+        }
         if (effectivePlan.growthDelta) {
           await adjustGrowth(
             session,
-            original,
+            latest,
             effectivePlan.growthDelta,
             context,
             context.remark,
@@ -394,7 +451,7 @@ async function applyReconciliation(plans, context) {
           mutated = true;
           growthAdjustments += 1;
         }
-        let latest = await readbackCard(
+        latest = await readbackCard(
           session,
           plan.cardId,
           context.corporationId,
@@ -411,7 +468,7 @@ async function applyReconciliation(plans, context) {
         const latestLevelId = String(
           latest?.levelId ?? latest?.levelAccount?.levelId ?? "",
         );
-        if (latestLevelId !== effectivePlan.targetLevelId) {
+        if (!oneWayL1Assignment && latestLevelId !== effectivePlan.targetLevelId) {
           await changeLevel(
             session,
             latest,
@@ -432,6 +489,11 @@ async function applyReconciliation(plans, context) {
         }
         completed += 1;
       } catch (error) {
+        if (mutated && oneWayL1Assignment) {
+          throw new Error(
+            `One-way L1 assignment failed after mutation; the card was not reverted to an unassigned state: ${error.message}`,
+          );
+        }
         if (mutated) {
           try {
             await restoreCard(session, original, context, context.remark);

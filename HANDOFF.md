@@ -138,6 +138,14 @@ LaunchAgent 当前明确为未安装状态，专用签名 App 已留在 `~/Appli
 acceptance 为 109 pgTAP / 56 Python / 143+22 RES / 463 BakeryOps / Next build，remote acceptance 的
 25 migrations、健康/RAG、九窗 POS 对账和三空间检索也再次退出 0。
 
+2026-08-21 自动续跑第三次复核用户授权状态：`./install-brain-auto-ingest.sh install` 仍在约 21 秒后返回
+`77/EX_NOPERM`，失败回滚后再次确认 LaunchAgent、安装 plist 和 `brainctl probe/auto` 子进程均不存在；
+专用 App 的 code signature 仍有效，仓库工作树开工时干净。此时同一 macOS TCC 用户授权条件已连续三轮
+重复，代码侧没有剩余的安全绕过方式，因此长期目标按严格阻塞规则标记 `blocked`。在用户明确回复已经
+为 `~/Applications/HotCrush R6 Brain Ingest.app` 开启 Full Disk Access 前，不再自动重试 installer。
+用户授权后重新恢复目标，第一步只需重跑 installer 并保存 `first background run exited 0`、launchctl
+`last exit code = 0` 和空 stderr 证据；旧生产配置仍禁止修改。
+
 ---
 
 ## See You Often 会员体系接管与生产差距审计（2026-08-20，Codex，在途/只读）

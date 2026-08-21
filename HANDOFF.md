@@ -115,6 +115,32 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   滚动 12 个月、降级每月 1 日一次最多一级、生日月不降级、积分永久有效、已领权益不追回。
   写入用的是 app `cli_aa82af2c7878de17` 的 tenant token；此前写返回 91403，是用户把该应用加为
   该 Base 协作者后才生效——换台机器操作前先确认这个协作者关系还在。
+- **积分商城线上只读实测（2026-08-21，Claude Code）**：SSH 恢复后用 `/tmp` 下的一次性只读脚本
+  （引生产 `lib/report-client.js` 绝对路径，未向 `/opt/hotcrush` 写入任何文件）实测：
+  - 商城 `1998965779072061445`，owner `1990706730765467654`，enable=true。
+  - **在售商品只有 2 个**：`蝴蝶耳机包` id `1998965516164698119`，redeemPoints=**100**、
+    totalInventoryQty=100、**availableInventoryQty=98**、status=2，modifiedBy=邵伟亮
+    modifyTime=2026-08-21T04:44:19Z —— 即**已按 100 分被真实兑走 2 个**，与计划的 900 分差 800 分/个；
+    另一个是 `450积分兑换生日蛋糕` id `2090037406790119431`，450 分、库存 99999、status=2，已上线。
+  - 券模板 38 个。**13 个商品里 12 个的券都存在且 status=1**；唯一真缺券的是 `cold-brew-cup-sleeve`。
+    注意 `bow-earphone-pouch` 的券是存在的（`1998965051872153608`「蝴蝶结耳机包【商城】」），
+    早前一次用英文关键词过滤的核对把它误报成"线上找不到"，不要据那次结论去重建券。
+  - `item/list` 必须走 `fetchCrmList`（它补 `page` 字段）；直接传 `pageNo` 会返回
+    `UNI-00-0101 page must not be null`。返回行里**不含 `picUrl`**，商品图要另找详情接口。
+  - 商品图托管在 `resto-images-uat.s3.us-west-2.amazonaws.com`，因此必须走 RES 自己的上传接口。
+    只读扫 `/pointsMall` 页面的 36 个 JS 包，grep 到上传端点 **`/resource/management/file/upload`**（出现 21 次）；
+    另有 `/ai-assistant/api/v1/ai/image/upload`、`/resource/management/media/space/uploadMedia`。
+    **上架/改价端点没扫到** —— 创建表单的 JS 是按需加载的，没打开表单抓不到。
+    `buildPointsMallCouponPayload` 的载荷结构至今仍是上一个 agent 的推测，从未与 RES 验证过；
+    上传端点同样未调用验证。批量上架脚本尚不能安全实现。
+- **13 张商品图已备好（2026-08-21）**：源图在 `~/Desktop/周边png/`，成品在
+  `~/Desktop/周边png/_上架用/`，按 SKU 命名、1000×1000 白底。用户确认的品类映射：
+  **带 HOT CRUSH 织带吊绳的一组是纸香卡**（心=heart、玫瑰=rose、蝴蝶结=butterfly），
+  **粉色卡纸包装的一组是冰箱贴**（玫瑰=rose、蝴蝶结=bow、双子塔=kl）；卡纸组里那张"心"
+  （`周边_0009_图层-3.png`）没有对应商品，弃用。三支铅笔原本在同一张图里，已按 `-crop 3x1@`
+  切成黑/红/白三张。`overseas-square-cushion` 与 `cold-brew-cup-sleeve` 无实拍图，
+  用户同意**先用品牌占位图上架**，占位图为粉底＋品牌字＋品名，之后须换成真实产品图。
+
 - **接管时发现的三处待决（2026-08-21，未处理）**：
   1. **积分商城口径已定案（2026-08-21）**：方案原文写「8.29 首发不启动积分兑换周边」，与用户 08-20
      「把 13 个周边加进积分兑换」冲突。用户 08-21 明确选定 **上架全部 13 个**，即 08-20 的指令覆盖

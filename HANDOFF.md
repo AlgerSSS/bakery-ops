@@ -116,10 +116,18 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   写入用的是 app `cli_aa82af2c7878de17` 的 tenant token；此前写返回 91403，是用户把该应用加为
   该 Base 协作者后才生效——换台机器操作前先确认这个协作者关系还在。
 - **接管时发现的三处待决（2026-08-21，未处理）**：
-  1. **积分商城与 Lark 原方案冲突**：方案原文写「8.29 首发不启动积分兑换周边」，小件改作 HBTI 资料礼品；
-     但用户 2026-08-20 曾指示把 13 个周边加进积分兑换。用户 08-21 回复「按照我的 lark 文件去走」，
-     字面结论是**线上现有 2 个商品应下架**而非改价上架，但用户尚未在两种读法之间明确选边，
-     **不要凭这条就去改 RES**。
+  1. **积分商城口径已定案（2026-08-21）**：方案原文写「8.29 首发不启动积分兑换周边」，与用户 08-20
+     「把 13 个周边加进积分兑换」冲突。用户 08-21 明确选定 **上架全部 13 个**，即 08-20 的指令覆盖
+     方案原文这一条；耳机包按 900 分（线上误设为 100 分／库存 100，必须修正）。
+     **但上架不只缺 SSH。** 本地跑 `catalogReadiness(POINTS_MALL_PRODUCTS, {})` 的阻塞项为：
+     `image_missing` **13/13**（`product()` 工厂把 `imageUrl` 默认成 null，13 个商品一张图都没有，
+     而 `buildPointsMallCouponPayload` 硬要求 `validImageUrl`）、
+     `coupon_missing` 1（`cold-brew-cup-sleeve` 冷萃杯＋杯套没有券模板 ID，其余 12 个都有）、
+     `inventory_unconfirmed` 1（`bow-earphone-pouch` 库存仍为 null，门店称 6 个全新待盘点）、
+     `coupon_validity_unconfirmed` 1 与 `redemption_limit_unconfirmed` 1（券有效期天数与
+     `redemptionLimit="unlimited"` 都还没有确认值）。另外仓库里**没有**积分商城写入脚本，
+     只有只读的 `preview-points-mall.mjs`，且 `test/points-mall-catalog.test.js:150` 专门断言该脚本
+     不含任何 `pointsmall/item/save|update|onsale|...` 变更端点——写入契约尚未实现也未从 RES 审计出来。
   2. **450 积分**在方案里仍标【待定·成本核算中】，且方案要求印刷物料不印该数字；本次仍写进了
      T-5 蛋糕邮件（预约邮件不写价格无法转化）。若定价变动必须同步改这一行。
   3. **降级结构性阻塞**：`bakery-ops/src/modules/data/migrations/113_loyalty_downgrade_notice_gate.sql:53`

@@ -156,15 +156,17 @@ Raw 制品的 size / sha256 校验原先只存在于 `pos_worker.py` 内部，�
 
 1. **迁移未推送到 R6 线上。** `supabase db push --linked` 被权限拦截。
    在推送之前，R6 线上不存在这 6 张表，数据迁移也无法执行。
-2. **数据未装载到 R6 线上。** 整条链路已在本地 Supabase 用真实生产数据跑通并对账通过，
-   推送后对着 R6 重复同样三步即可：
+2. **数据未装载到 R6 线上。** 整条链路已在本地 Supabase 用真实生产数据跑通并对账通过。
+   推送与迁移已合并成一条命令：
 
    ```
-   node res_api/scripts/backfill-r6-finance.js --r6-store=HC001
-   uv run python -m hotcrush_data_platform.finance_worker --max-runs 5
-   node res_api/scripts/verify-r6-finance.js
+   ./scripts/deploy-r6-finance.sh --dry-run   # 只看不动
+   ./scripts/deploy-r6-finance.sh             # 部署 + 迁移 + 对账
    ```
 
-   第三步必须返回 `ok: true`；它同时比对行数和金额，任何一项不符都会以非零码退出。
+   脚本先做隔离守卫（linked 必须是 R6、两个旧应用 .env 必须仍指向旧库且不含 R6 ref），
+   再依次执行迁移推送、Raw 批次注册、租约装载、对账。
+   最后一步必须返回 `ok: true`；它同时比对行数和金额，任何一项不符都会以非零码退出。
+   旧库全程在显式只读事务内读取。
 3. **财务站仍连旧库。** 本轮不改 `DATABASE_URL`、不改 Vercel 变量 —— 与既有约束一致。
 4. **2026-04-12 旧库修正未执行**（见第一节）。

@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import pytest
@@ -7,6 +8,7 @@ from hotcrush_data_platform.pdf_pipeline import (
     DeterministicTestEmbedder,
     PageText,
     chunk_pages,
+    extract_lark_doc_chunks,
 )
 
 
@@ -33,3 +35,22 @@ def test_ocr_runtime_fails_before_claiming_work_when_tesseract_is_missing(
 
     with pytest.raises(RuntimeError, match="tesseract executable is required"):
         pdf_pipeline.verify_ocr_runtime()
+
+
+def test_lark_doc_chunks_use_document_citations_not_fake_pdf_pages() -> None:
+    raw = json.dumps(
+        {
+            "schema_version": "lark-docx-raw-v1",
+            "title": "Opening SOP",
+            "node_token": "node-1",
+            "content": "First paragraph.\nSecond paragraph.",
+        }
+    ).encode()
+
+    chunks = extract_lark_doc_chunks(raw)
+
+    assert len(chunks) == 1
+    assert chunks[0].page_from is None
+    assert chunks[0].page_to is None
+    assert chunks[0].section_path == ["Opening SOP"]
+    assert chunks[0].content == "First paragraph.\nSecond paragraph."

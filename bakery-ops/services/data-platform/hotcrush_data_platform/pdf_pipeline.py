@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import shutil
 import subprocess
@@ -23,8 +24,8 @@ class PageText:
 @dataclass(frozen=True)
 class TextChunk:
     chunk_no: int
-    page_from: int
-    page_to: int
+    page_from: int | None
+    page_to: int | None
     section_path: list[str]
     content: str
     content_sha256: str
@@ -172,4 +173,57 @@ def chunk_pages(
             start = max(end - overlap_characters, start + 1)
     if not chunks:
         raise ValueError("document produced no chunks")
+    return chunks
+
+
+def extract_lark_doc_chunks(
+    raw_bytes: bytes,
+    *,
+    target_characters: int = 2400,
+    overlap_characters: int = 240,
+) -> list[TextChunk]:
+    try:
+        payload = json.loads(raw_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError("invalid Lark Docx raw payload") from exc
+    if not isinstance(payload, dict) or payload.get("schema_version") != "lark-docx-raw-v1":
+        raise ValueError("unsupported Lark Docx raw schema")
+    title = str(payload.get("title", "")).strip() or "Lark document"
+    content = _normalize_text(str(payload.get("content", "")))
+    if not content:
+        raise ValueError("Lark Docx raw payload contains no text")
+    if target_characters < 400 or overlap_characters < 0 or overlap_characters >= target_characters:
+        raise ValueError("invalid chunk size or overlap")
+
+    chunks: list[TextChunk] = []
+    start = 0
+    while start < len(content):
+        hard_end = min(start + target_characters, len(content))
+        end = hard_end
+        if hard_end < len(content):
+            split_at = max(
+                content.rfind("\n", start + target_characters // 2, hard_end),
+                content.rfind("。", start + target_characters // 2, hard_end),
+                content.rfind(". ", start + target_characters // 2, hard_end),
+            )
+            if split_at > start:
+                end = split_at + 1
+        chunk_content = content[start:end].strip()
+        if chunk_content:
+            chunks.append(
+                TextChunk(
+                    chunk_no=len(chunks),
+                    page_from=None,
+                    page_to=None,
+                    section_path=[title[:160]],
+                    content=chunk_content,
+                    content_sha256=hashlib.sha256(chunk_content.encode()).hexdigest(),
+                    token_count=max(1, math.ceil(len(chunk_content) / 4)),
+                )
+            )
+        if end >= len(content):
+            break
+        start = max(end - overlap_characters, start + 1)
+    if not chunks:
+        raise ValueError("Lark document produced no chunks")
     return chunks

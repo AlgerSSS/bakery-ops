@@ -16,13 +16,13 @@ R6 Green 已建成一个适合单店阶段的 Supabase 分层数据平台：
 - 在同一个 Supabase Project 内使用 PostgreSQL、Storage、pgvector、RLS、RPC、Cron 和 Realtime。
 - Raw 原件放私有 Storage，PostgreSQL 只放元数据与处理状态。
 - Processed 层只建立已有明确粒度的结构化事实；目前已有 POS 日销售和小时销售版本表。
-- PDF RAG 已具备 manifest 分级、逐文件审阅账本、源文件/manifest 哈希绑定、权限内去重、上传、解析/OCR、切块、embedding、发布、检索和可逆回滚。
-- 新 PDF 的 `brainctl auto` 与专用签名 App 已实跑；LaunchAgent 会在权限不足时 20 秒探针失败并自动卸载。macOS iCloud Full Disk Access 尚未由用户授予，不能把交互式成功写成无人值守已上线。
+- Lark 已成为权威知识入口：tokyo-01 每 30 分钟遍历 8 个显式 allowlist 团队空间，保存不可变 Raw、来源血缘和同步状态；C1 自动进入 RAG，C2 等待审阅，C3/C4 不自动发布。
+- 历史 PDF RAG 仍保留 manifest 分级、逐文件审阅账本、源文件/manifest 哈希绑定、权限内去重、解析/OCR、切块、embedding、发布、检索和可逆回滚。Mac Brain 自动发现已退出主流程，不再要求 Full Disk Access。
 - POS 已具备 Raw 文件校验、日/小时交叉对账、有界范围回填、版本发布、隔离和恢复的结构化 worker。
 - Agent 层只保存运行账本和追加事件，不让 Agent 直接任意写业务表。
 - 现网 BakeryOps、res_api 仍使用旧生产库；没有替换 `DATABASE_URL`，没有开启双写或切读。
 
-这不等于“整个旧业务库已迁移”。当前完成的是新库物理基座、3 份 C1 与 3 份人工批准 C2 PDF 的真实 RAG、BakeryOps 显式 opt-in 检索验收，以及 POS 日/小时历史范围的完整只读迁移；持续影子写入、C3 真正脱敏、POS 更深粒度与其他业务域回填、应用切换仍需以后分别批准。
+这不等于“整个旧业务库已迁移”。当前完成的是新库物理基座、6 份历史 PDF、8 份 Lark C1 在线文档的真实 RAG、BakeryOps 显式 opt-in 检索验收，以及 POS 日/小时历史范围的完整只读迁移；持续 POS 影子写入、C3 真正脱敏、POS 更深粒度与其他业务域回填、应用切换仍需以后分别批准。
 
 ## 2. 前提检查
 
@@ -55,7 +55,7 @@ Cron 不应每天全量复制 Raw；它是补偿机制，不是主数据流。
 - OCR/解析运行：`ai_ingest_run`。
 - 可引用文本：`ai_document_chunk`。
 - 向量：`ai_chunk_embedding`。
-- 检索：`ai_search_knowledge(...)`。
+- 检索：`ai_search_knowledge_v2(...)`（复用权限内混合检索并补充来源引用）。
 
 只有这条链全部成功且文档发布为 `READY`，才是可用 RAG。
 
@@ -64,24 +64,25 @@ Cron 不应每天全量复制 Raw；它是补偿机制，不是主数据流。
 | 项目 | 已确认状态 |
 |---|---|
 | Supabase Project | `tmmkknnkcptunxbfjxqn`，ACTIVE_HEALTHY，us-east-1 |
-| CLI migrations | 25 个，本地与远程编号完全一致 |
-| 业务/平台表 | 15 张 |
+| CLI migrations | 28 个，本地与远程编号完全一致 |
+| 业务/平台表 | 18 张 |
 | views | 2 个 POS current views |
-| 受控 RPC | 40 个 `ops_*` / `ai_*` functions |
+| 受控 RPC | 47 个 `ops_*` / `ai_*` functions |
 | private Storage | 7 个 bucket，均 `public=false`，单文件限制 100 MiB |
 | extensions | `vector` 在 `extensions` schema；`pg_cron` 已安装 |
 | Cron | 6 个短任务 |
 | Realtime | 仅 `ops_agent_run`、`ops_agent_event`、`ai_ingest_run` |
 | machine roles | 7 个 NOLOGIN capability roles |
-| 本地数据库测试 | 11 个 pgTAP 文件，109 项通过 |
+| 本地数据库测试 | 13 个 pgTAP 文件，135 项通过 |
 | 远程 lint | `public` + `private` 无 schema error |
 | 远程 drift | `supabase db diff --linked --schema public,private` 无差异 |
-| Brain / RAG | 165 份完成哈希 manifest；70 份待审项已作 3 批准/67 拒绝；3 份 C1 + 3 份 C2 发布，共 108 页、113 chunks / 113 个 1536 维 embedding |
+| 历史 PDF / RAG | 3 份 C1 + 3 份人工批准 C2 发布，共 108 页、113 chunks / 113 个 1536 维 embedding；原 Brain manifest/审阅账本仅作历史证据 |
+| Lark / RAG | 8 个团队空间、24 个当前节点；8 个 C1 自动发布，16 个 C2/C3 保持审阅或阻止状态；8 chunks / 8 embeddings，在线文档引用直接回到 Lark URI，不伪造页码 |
 | POS 历史迁移 | 260 个 legacy batch；229 日/2699 小时进入 current，31 日异常隔离；九窗独立自动对账 0 差异 |
 | 回滚演练 | POS 完成 quarantine→current 回退→restore；C1 与人工批准 C2 均完成 RAG unpublish→检索消失→restore→原页恢复 |
 | 当前健康 | `degraded`：32 个隔离中 31 个是已确认源质量异常，另 1 个不完整快照仍未确认；无失败 run、过期 lease 或 Storage lineage 缺口 |
-| 应用接入 | BakeryOps R6 客户端已真实返回 C1 价格表第 1 页、C2 会员方案第 2 页、C2 HR 制度第 11 页；默认 backend 和现网配置未切换，仍使用旧库/LightRAG |
-| PDF 自动发现 | 首跑 165 文件只上传 3 C1，二次 `NO_CHANGES`；专用签名 App 交互式通过，LaunchAgent 返回 `77/EX_NOPERM` 后自动回滚，待只授权该 App 后重验 |
+| 应用接入 | BakeryOps R6 客户端使用 citation-aware RPC；历史 PDF 返回页码，Lark 在线文档返回原始 URI；默认 backend 和现网配置未切换，仍使用旧库/LightRAG |
+| 自动发现 | `hotcrush-lark-wiki-sync.timer` 在 tokyo-01 active/enabled；首轮 24 节点成功、第二轮 24 unchanged，0 failed；Mac LaunchAgent 不再是权威入口 |
 
 ## 4. 总体数据结构图
 
@@ -90,33 +91,31 @@ Cron 不应每天全量复制 Raw；它是补偿机制，不是主数据流。
 - PNG：`docs/database/diagrams/hotcrush-r6-green-blueprint.png`
 - SVG：`docs/database/diagrams/hotcrush-r6-green-blueprint.svg`
 - 可编辑 Mermaid 源码：`docs/database/diagrams/hotcrush-r6-green-blueprint.mmd`
+- 当前详细汇报 PNG：`docs/database/diagrams/hotcrush-r6-current-architecture-detailed-v2.png`
+- 当前详细汇报 SVG：`docs/database/diagrams/hotcrush-r6-current-architecture-detailed-v2.svg`
 
 ```mermaid
 flowchart TB
   subgraph S[写入源]
-    POS[RES POS / 旧库只读回填]
-    PDF[Brain PDF]
-    FILE[财务/HR/SCM 文件]
+    LARK[Lark 8 个团队知识空间<br/>tokyo-01 每 30 分钟扫描]
+    POS[RES POS / 旧库只读历史回填]
+    PDF[历史 Brain PDF<br/>不再作为自动入口]
   end
 
-  subgraph R6[Supabase R6 Green · 同一 Project · 25 migrations]
+  subgraph R6[Supabase R6 Green · 同一 Project · 28 migrations]
     subgraph RAW[1 Raw 证据层]
       STORE[7 个 Private Storage buckets]
       RB[ops_raw_batch]
       RO[ops_raw_object]
+      SRC[ai_source_connector<br/>ai_source_sync_run<br/>ai_source_item]
     end
 
-    subgraph PROC[2 预处理/事实层]
+    subgraph PROC[2 预处理 / 可信数据 / RAG]
       PR[ops_processing_run]
-      PD[pos_sales_day]
-      PH[pos_sales_hour]
-      CV[v_pos_*_current]
-      KS[ai_knowledge_space]
-      DOC[ai_raw_document]
-      REV[ai_document_review<br/>不可变 C1/C2 批准证据]
-      IR[ai_ingest_run]
-      CHUNK[6 docs · 108 pages · 113 chunks]
-      VEC[113 embeddings vector\(1536\)<br/>unpublish ↔ restore]
+      POSFACT[pos_sales_day / hour<br/>v_pos_*_current]
+      DOC[ai_raw_document / review / ingest_run]
+      CHUNK[14 current docs<br/>116 page_count · 121 chunks]
+      VEC[121 embeddings vector\(1536\)<br/>PDF 页码 / Lark URI 引用]
     end
 
     subgraph AGENT[3 Agent 层]
@@ -129,32 +128,28 @@ flowchart TB
       RT[Realtime 状态]
     end
 
-    CRON[6 个 Cron<br/>恢复·汇总·对账·清理]
+    CRON[6 个 Postgres Cron<br/>恢复·汇总·对账·清理]
     GOV[RLS · Grants · Roles · Audit]
   end
 
-  WK[外部 worker<br/>Tesseract OCR · 解析 · embedding · 长任务]
-  USERS[Web / Lark / WhatsApp / Agent<br/>BakeryOps opt-in 已验收 · 现网未切换]
+  WK[东京 Worker<br/>Lark 抓取 · PDF OCR · 分块 · embedding]
+  USERS[Web / Lark / WhatsApp / Agent<br/>R6 客户端已验收 · 现网未切换]
   OLD[旧生产库<br/>ecsg...<br/>现在仍是唯一业务真源]
 
+  LARK --> WK
+  WK --> SRC
+  SRC --> STORE
   POS -. 持续影子写入未启用；260 日历史回填已验收 .-> RB
-  PDF -. auto + 专用 App 已通过；后台待 App FDA .-> STORE
-  FILE -. 未迁移 .-> STORE
+  PDF -. 仅保留历史已审阅样本 .-> STORE
   RB --> RO
   RO --> PR
   PR <--> WK
-  PR --> PD
-  PR --> PH
-  PD --> CV
-  PH --> CV
+  PR --> POSFACT
   RO --> DOC
-  DOC --> REV
-  REV --> IR
-  DOC --> IR
-  IR <--> WK
-  IR --> CHUNK
+  DOC <--> WK
+  DOC --> CHUNK
   CHUNK --> VEC
-  CV --> AR
+  POSFACT --> AR
   VEC --> AR
   AR --> AE
   AR --> RPC
@@ -162,7 +157,7 @@ flowchart TB
   RPC --> USERS
   RT --> USERS
   CRON --> PR
-  CRON --> IR
+  CRON --> DOC
   CRON --> AR
   GOV --- RAW
   GOV --- PROC
@@ -193,7 +188,10 @@ Table Editor → public
 │   ├── ai_document_review
 │   ├── ai_ingest_run
 │   ├── ai_document_chunk
-│   └── ai_chunk_embedding
+│   ├── ai_chunk_embedding
+│   ├── ai_source_connector
+│   ├── ai_source_sync_run
+│   └── ai_source_item
 └── Agent
     ├── ops_agent_run
     └── ops_agent_event
@@ -266,7 +264,17 @@ Database
 
 完整 UUID 格式为 `10000000-0000-7000-8000-00000000000N`。
 
-### 6.4 Agent
+### 6.4 Lark 来源控制面
+
+| 表 | 一行代表 | 重要约束 |
+|---|---|---|
+| `ai_source_connector` | 一个显式 allowlist 的 Lark 团队知识空间 | 唯一映射一个 `ai_knowledge_space`；分类和 bucket 由数据库决定，不信任 Worker 自报 |
+| `ai_source_sync_run` | 一次完整或部分的空间遍历 | 同一 connector 同时最多一个 `RUNNING`；保存发现、同步、未变、失败计数 |
+| `ai_source_item` | 一个当前 Wiki 节点 | 保存节点/对象 token、revision、SHA-256、Lark URI、当前文档、状态及连续缺失次数 |
+
+`ai_list_source_connectors()` 只返回启用的 8 个连接器；Worker 无权自由选择空间或数据级别。节点连续两次完整扫描缺失后才标记 `MISSING`，并通过受控 RPC 可逆下架当前 RAG 文档；失败扫描不会推进缺失计数。
+
+### 6.5 Agent
 
 | 表 | 一行代表 | 安全边界 |
 |---|---|---|
@@ -303,7 +311,41 @@ sequenceDiagram
 
 当前状态：一次性旧库只读回填与 POS processor 已在 R6 演练通过；根据用户边界，现网 writer 不配置、POS processor 不常驻，因此不会持续自动写 R6。
 
-### 7.2 新 PDF
+### 7.2 Lark 新文档或 PDF（当前权威入口）
+
+```mermaid
+sequenceDiagram
+  participant T as systemd timer
+  participant L as Lark Wiki
+  participant S as Lark sync worker
+  participant DB as R6 RPC
+  participant ST as Private Storage
+  participant W as RAG worker
+
+  T->>S: 每 30 分钟启动一次
+  S->>DB: ai_list_source_connectors()
+  loop 8 个 allowlist 空间
+    S->>L: 完整遍历节点
+    S->>L: 读取 Docx raw content / 下载 PDF
+    S->>ST: x-upsert=false 保存不可变原件
+    S->>DB: Raw batch/object + source item 血缘
+    alt C1 AUTO
+      DB->>DB: 创建 PENDING ingest run
+      W->>ST: 下载原件
+      W->>W: 文档解析或 PDF OCR → chunk → embedding
+      W->>DB: 原子发布 chunks / vectors
+    else C2
+      DB->>DB: REVIEW_REQUIRED，不进入检索
+    else C3/C4
+      DB->>DB: 保留受限 Raw，不自动发布
+    end
+  end
+  S->>DB: 完成 sync run；连续两次缺失才可逆下架
+```
+
+Docx 在线文档的 chunk 使用 `page_from/page_to = null`，检索结果返回 `citation_uri` 回跳 Lark；上传 PDF 继续保留真实页码。首轮 24 个节点同步成功，完成态复跑 24 个均 `unchanged`，没有重复 Storage 对象或 ingest run。
+
+### 7.3 历史 / 本地 PDF 手工入口
 
 ```mermaid
 sequenceDiagram
@@ -338,7 +380,9 @@ sequenceDiagram
   end
 ```
 
-### 7.3 Agent
+该入口用于已经审阅的历史样本或灾备手工导入，不再承担新文件的定时发现；新知识应先进入 Lark 团队知识空间。
+
+### 7.4 Agent
 
 ```text
 PENDING → RUNNING → SUCCEEDED
@@ -350,6 +394,16 @@ PENDING → RUNNING → SUCCEEDED
 所有 claim 都使用 `FOR UPDATE SKIP LOCKED` 的数据库租约语义；超时任务由 Cron 恢复，避免一个 worker 死亡后永久卡住。
 
 ## 8. 定时任务
+
+数据库外的主入口任务：
+
+| unit | 频率 | 作用 |
+|---|---:|---|
+| `hotcrush-lark-wiki-sync.timer` | 每 30 分钟，最多 2 分钟随机延迟 | 遍历 8 个 Lark 空间、登记 Raw 和来源血缘；active/enabled |
+| `hotcrush-lark-wiki-sync.service` | oneshot，20 分钟上限 | 使用 systemd encrypted credentials 执行一次有界同步 |
+| `hotcrush-rag-worker.service` | 常驻 | 领取 C1 ingest run，执行解析/OCR、分块、embedding 和原子发布 |
+
+Supabase 内部的 6 个 `pg_cron` 补偿/治理任务：
 
 | job | 频率 | 作用 | 不做什么 |
 |---|---:|---|---|
@@ -413,10 +467,10 @@ hc_msg_worker
 # 链接目标 Project（已完成）
 npx supabase link --project-ref tmmkknnkcptunxbfjxqn
 
-# 本地从零重放 25 个 migration
+# 本地从零重放 28 个 migration
 npx supabase db reset
 
-# 本地结构检查和 109 项 pgTAP
+# 本地结构检查和 135 项 pgTAP
 npx supabase db lint --local --schema public,private
 npx supabase test db
 
@@ -433,14 +487,14 @@ npx supabase db diff --linked --schema public,private
 npx supabase migration list --linked
 ```
 
-结果：25 个本地/远程 migration 一致，lint 无错；迁移 25 已实际推送到 R6。
+结果：28 个本地/远程 migration 一致，lint 无错；Lark source/citation/index migrations 26–28 已实际推送到 R6。
 
 CLI 能完成 PostgreSQL objects、Storage bucket/policy、extensions、Cron、RLS、roles 和 publication 的创建。CLI 不会把 Playwright、PDF OCR、Tesseract 或 OpenRouter embedding 自动变成 PostgreSQL 内部计算；这些仍需外部 worker。
 
 POS 一次性迁移、处理和对账命令见 `docs/database/hotcrush-r6-green-cli-runbook.md`。这些命令使用独立的 `R6_SUPABASE_*` 凭据，不修改旧应用 `.env`。
 
-仓库根目录的 `scripts/accept-r6-platform.sh` 将本地迁移重放、109 项 pgTAP、Python/Node 测试、
-BakeryOps build、远端 migration/lint/健康、RAG 审阅不变量和三个知识空间的真实页码检索收敛为 `local|remote|all` 三种模式。
+仓库根目录的 `scripts/accept-r6-platform.sh` 将本地迁移重放、135 项 pgTAP、Python/Node 测试、
+BakeryOps build、远端 migration/lint/来源新鲜度、稳定 PDF 基线、动态 Lark RAG 不变量、东京 timer/worker 和 PDF/Lark 真实引用检索收敛为 `local|remote|all` 三种模式。
 脚本会先阻断错误链接 ref 或旧应用 `.env` 中出现 R6 ref；远端凭据只从进程变量或仓库外 secret file 读取。
 
 ## 12. 目前不应创建的结构
@@ -470,9 +524,9 @@ BakeryOps build、远端 migration/lint/健康、RAG 审阅不变量和三个知
 8. 已完成历史回滚抽样：2026-02-15 隔离时 current 229→228，259/2742 个日/小时版本保留，恢复后回到 229 并再次对账 0 差异。
 9. 已完成 70 份 `REVIEW_REQUIRED` 清单决策：3 份安全 C2 批准，67 份拒绝；数据库批准记录绑定原 manifest 与源文件 SHA，冲突重放会失败。
 10. 已完成代表性 RAG 验收：C1 价格表、C2 会员方案、C2 HR 制度均命中预期标题/页码；C1 与 C2 均完成真实 unpublish/restore。
-11. 待完成：实现可证明的 C3 脱敏流水线，并扩展正式业务黄金问题集；不以“向量有数据”或布尔标记代替质量/安全验收。
-12. 待完成：只为专用 `HotCrush R6 Brain Ingest.app` 授予 iCloud Brain 所需的 macOS Full Disk Access，并留下后台退出 0 证据。
-13. 单独批准后才开启一个项目的影子写入；后续再批准切读。
+11. 已完成 Lark 权威入口：8 个团队空间 allowlist、24 节点首轮同步、幂等复跑、C1 自动 RAG、C2/C3 阻断、Lark URI 引用和 30 分钟 timer 均有远端证据。
+12. 待完成：实现可证明的 C3 脱敏流水线，并扩展正式业务黄金问题集；不以“向量有数据”或布尔标记代替质量/安全验收。
+13. 单独批准后才开启一个项目的 POS 影子写入；后续再批准切读。
 14. 所有写入者切换、高水位一致且回滚演练通过后，才考虑冻结旧库写入。
 
 ## 14. 验收门槛
@@ -480,13 +534,14 @@ BakeryOps build、远端 migration/lint/健康、RAG 审阅不变量和三个知
 ### 已通过
 
 - 从空本地库重放所有 migrations。
-- 109 项数据库合同/安全/回滚测试通过。
+- 135 项数据库合同/安全/回滚测试通过。
 - RLS、Storage private、NOLOGIN roles、Realtime 最小集、Cron 数量均有断言。
 - Brain 165 份完成 SHA-256 manifest；70 份待审项已记录 3 批准/67 拒绝；6 份已批准文档从 Storage 到 113 个 chunks/vectors 和页码引用检索通过。
+- Lark 8 个团队空间和 24 个节点完成首轮/幂等复跑；8 个 C1 在线文档形成 8 chunks/vectors，16 个 C2/C3 文档没有越过发布门，来源健康无 stale/failed/missing。
 - `ai_document_review`、`ai_approve_document_review`、C2 源哈希绑定、幂等/冲突重放、C3 拒绝与成员 RLS 均有 pgTAP 断言。
 - RAG Worker 在 tokyo-01 使用显式 R6 encrypted credentials，Tesseract 英文/简中依赖已安装并 fail-fast 检查。
 - RAG 价格表和人工批准的 C2 会员方案均在远端完成 unpublish、检索消失、restore、同一页码恢复演练；chunks/vectors 未删除。
-- BakeryOps 的默认关闭 R6 客户端真实返回 C1/C2 三个预期标题与页码，现网 backend 未切换。
+- BakeryOps 的默认关闭 R6 客户端真实返回 C1/C2 三个预期标题与页码，并通过 citation-aware RPC 返回 Lark 原始 URI；现网 backend 未切换。
 - R6 远程 lint 无错，migration ledger 对齐，schema diff 无漂移。
 - POS 不完整快照在业务对账失败后被真实远端 quarantine，current view 归零且版本未删除。
 - POS 最终单日回填通过 1 个日事实 + 11 个小时事实自动对账，随后真实完成回滚与恢复演练。
@@ -502,15 +557,16 @@ BakeryOps build、远端 migration/lint/健康、RAG 审阅不变量和三个知
 - 67 份审阅拒绝、45 份规则禁止、47 份同权限空间重复均未上传；其中全部 35 份 C3 因没有真实脱敏能力而保持拒绝。
 - RAG 已通过 C1/C2 三个应用级精确问题，尚未形成覆盖所有业务主题和权限角色的正式黄金问题集。
 - 应用配置、Vercel 变量、`DATABASE_URL` 和现网读写路径均未切换。
-- 新 PDF 的交互式自动 C1 与专用签名 App 已通过，失败安装可自动回滚；LaunchAgent 无人值守运行仍缺该 App 的 macOS TCC 授权。
+- Mac Brain LaunchAgent 已退出权威入口，不再把 Full Disk Access 当作完成条件；新知识的自动入口是 tokyo-01 Lark timer。
 
 ## 15. 事实、推测、建议和暂无法验证项
 
 ### 已确认事实
 
-- R6 Green 当前结构可由 25 个 CLI migration 从零重建。
+- R6 Green 当前结构可由 28 个 CLI migration 从零重建。
 - 现网 BakeryOps/res_api 仍使用旧生产库。
 - 3 份 C1 与 3 份人工批准 C2 PDF 共 108 页、113 个 chunks/vectors；精确查询能返回正确标题与页码。
+- Lark 当前 24 个节点中 8 个 C1 已发布，形成 8 个无伪造页码的 chunks/vectors；检索返回原始 Lark URI。其余 16 个处于 C2/C3 审阅或阻止边界，没有自动发布。
 - 数据库中有 3 条不可变 C2 批准证据，全部与源 SHA 和 manifest SHA 绑定，当前 C2 RAG 审计缺口为 0。
 - BakeryOps 应用客户端在不修改现网配置时通过显式 R6 CLI 验收。
 - 2026-07-26 最终 POS 日/小时事实从旧库只读导出后，与 R6 current 自动对账 0 差异。

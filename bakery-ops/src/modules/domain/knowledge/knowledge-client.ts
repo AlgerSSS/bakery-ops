@@ -31,6 +31,8 @@ interface KnowledgeChunk {
   section_path: string[] | null;
   content: string;
   hybrid_score: number;
+  citation_uri: string | null;
+  citation_label: string;
 }
 
 const DEFAULT_INTERNAL_SPACE_ID = "10000000-0000-7000-8000-000000000001";
@@ -62,13 +64,16 @@ function formatChunks(rows: KnowledgeChunk[]): string | null {
 
   return rows
     .map((row, index) => {
-      const page = row.page_from
+      const page = row.page_from !== null
         ? row.page_to && row.page_to !== row.page_from
           ? `第 ${row.page_from}-${row.page_to} 页`
           : `第 ${row.page_from} 页`
-        : "页码未知";
+        : row.citation_uri
+          ? "在线文档"
+          : "页码未知";
       const section = row.section_path?.length ? `，${row.section_path.join(" / ")}` : "";
-      return `[资料 ${index + 1}｜${row.title}｜${page}${section}]\n${row.content.slice(0, 1800)}`;
+      const source = row.citation_uri ? `\n来源：${row.citation_uri}` : "";
+      return `[资料 ${index + 1}｜${row.title}｜${page}${section}]\n${row.content.slice(0, 1800)}${source}`;
     })
     .join("\n\n");
 }
@@ -120,7 +125,7 @@ export class SupabaseKnowledgeClient implements KnowledgeBackend {
 
     try {
       const embedding = await this.embed(cleanQuestion);
-      const response = await this.fetchFn(`${this.baseUrl}/rest/v1/rpc/ai_search_knowledge`, {
+      const response = await this.fetchFn(`${this.baseUrl}/rest/v1/rpc/ai_search_knowledge_v2`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...this.headers() },
         body: JSON.stringify({

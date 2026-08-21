@@ -237,3 +237,42 @@ def test_probe_command_reads_pdf_sources_and_outputs_only_a_count(
         "mode": "ACCESS_OK",
         "pdf_count": 2,
     }
+
+
+def test_search_uses_citation_aware_rpc_for_lark_source_links(monkeypatch: Any) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    class FakeEmbedder:
+        def __init__(self, *_args: Any) -> None:
+            pass
+
+        def embed(self, texts: list[str]) -> list[list[float]]:
+            assert texts == ["opening"]
+            return [[0.0] * 1536]
+
+    class FakeClient:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+        def __enter__(self) -> Self:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            pass
+
+        def rpc(self, name: str, payload: dict[str, Any]) -> Any:
+            calls.append((name, payload))
+            return [{"title": "Opening", "citation_uri": "https://example/wiki/node"}]
+
+    monkeypatch.setattr(brainctl, "OpenRouterEmbedder", FakeEmbedder)
+    monkeypatch.setattr(brainctl, "SupabasePlatformClient", FakeClient)
+
+    result = brainctl.search_knowledge(
+        "opening",
+        _settings(),
+        space_ids=["10000000-0000-7000-8000-000000000001"],
+        limit=3,
+    )
+
+    assert result[0]["citation_uri"] == "https://example/wiki/node"
+    assert calls[0][0] == "ai_search_knowledge_v2"

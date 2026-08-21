@@ -19,8 +19,8 @@
 2026-08-21 再查 tokyo-01 的 `hotcrush*` 服务只有 alert-relay、cn-worker、core、rag-worker 和
 res-api，不存在 POS/shadow 常驻服务；BakeryOps 与 `res_api` 的 `.env` 仍只含旧 project ref。
 
-R6 Green 现由 25 个可重放 Supabase migration 完整定义，远端为 15 张平台/业务表、2 个 POS current
-view、40 个 `ops_*`/`ai_*` 受控函数、7 个私有 Storage bucket、7 个 NOLOGIN capability role、6 个
+R6 Green 现由 28 个可重放 Supabase migration 完整定义，远端为 18 张平台/业务表、2 个 POS current
+view、47 个 `ops_*`/`ai_*` 受控函数、7 个私有 Storage bucket、7 个 NOLOGIN capability role、6 个
 pg_cron job；`vector` 位于 `extensions` schema，Realtime 只发布 3 张运行状态表。物理分层为：
 `ops_raw_batch/object` 原始证据与 `ops_processing_run` 租约队列 → 版本化 `pos_sales_day/hour` 与 RAG
 文档/chunk/vector → 追加式 Agent run/event → RPC/Realtime 用户交互契约。没有为单店阶段引入 Fabric、
@@ -58,14 +58,15 @@ R6 当前有 229 个 current 日、259 个日版本、2742 个小时版本。健
 `quarantined_unacknowledged=1`。处理、RAG、Agent 失败/过期租约及 Storage 血缘缺口均为 0，6 个 cron
 均活跃。不得为追求绿色状态恢复不完整半日快照。
 
-统一入口 `scripts/accept-r6-platform.sh [local|remote|all]` 已跑通完整验收：11 个 pgTAP
-文件/109 项断言、Python pytest 56/56 + Ruff、`res_api` unit 143/143 + API 22/22、BakeryOps TypeScript +
-45 files/463 Vitest + Next build；远端 25/25 migration、lint、健康不变量、RAG 审阅不变量和真实带页码检索也均通过。脚本
+统一入口 `scripts/accept-r6-platform.sh [local|remote|all]` 已跑通完整验收：13 个 pgTAP
+文件/135 项断言、Python pytest 65/65 + Ruff、`res_api` unit 143/143 + API 22/22、BakeryOps TypeScript +
+45 files/464 Vitest + Next build；远端 28/28 migration、lint、来源/健康不变量、RAG 审阅不变量和真实 PDF/Lark 引用检索也均通过。脚本
 先硬检查 linked ref 必须是 R6，且 BakeryOps/`res_api` 两份 `.env` 必须仍指向旧生产并且不得出现 R6 ref。
 2026-08-21 的最终 remote 门禁还强制执行全历史九窗对账，260/229/31、2699 小时与 0 mismatch
 不变量全部通过；BakeryOps 临时 opt-in 返回 C1 招聘价格文档第 1 页、C2 会员方案第 2 页、C2 HR 制度
-第 11 页。RAG 数据库门禁固定核验 6 个 READY/current 文档、108 页、113 个 current chunks/embeddings、
-6 个 ingest run、3 条 manifest/source SHA 绑定的批准证据和 0 个 C2 审计缺口。
+第 11 页和 Lark Pavilion 在线文档 URI。RAG 数据库门禁固定核验历史 6 个 READY/current 文档、108 页、
+113 个 chunks/embeddings，并按 Lark source inventory 动态核验当前 8 个 C1 文档/向量、3 条
+manifest/source SHA 绑定的批准证据和 0 个 C2 审计缺口。
 `supabase db diff --linked --schema public,private` 从空影子库重放后返回 `No schema changes found`；提交前
 `git diff --check` 和变更文件密钥/本机路径扫描均通过。Next build 既存 Turbopack warning、NFT 全项目
 追踪 warning 与 Python PyMuPDF/SWIG 弃用 warning 不影响本轮结果。
@@ -108,9 +109,9 @@ search/worker 才要求 embedding 凭据。远端 Worker 已补齐并启动 Tess
 ad-hoc 签名的 `/Users/weiliangshao/Applications/HotCrush R6 Brain Ingest.app`；wrapper 不接受外部命令
 参数，只运行签名 bundle 内的 runner。LaunchAgent 已改为只启动该 App。签名/Bundle ID/嵌入 runner
 已验证，交互式 App 真实读取 165 个 PDF 并返回 `NO_CHANGES/selected=0`；相同构建二次运行复用原 bundle，
-CDHash 不变。用户必须在 macOS UI 中只为该专用 App 授予 iCloud/Full Disk Access，然后重新执行 installer
-并取得 `first background run exited 0`；在此之前不能声称无人值守自动发现已上线。完整证据矩阵见
-`docs/database/hotcrush-r6-completion-audit-2026-08-21.md`。
+CDHash 不变。这是已经退出主路径的历史 Brain 方案。只有未来明确恢复本地 Brain 作为入口时，才需要在
+macOS UI 中为该专用 App 授予 iCloud/Full Disk Access 并重验 installer；当前 Lark 权威入口的完成状态
+不依赖该授权。完整证据矩阵见 `docs/database/hotcrush-r6-completion-audit-2026-08-21.md`。
 
 BakeryOps 新增 R6 Supabase knowledge backend 的真实验收脚本，并修复跨区域健康探测：现在调用
 `ops_get_platform_health`，超时 10 秒；知识空间环境变量隔离为 `R6_KNOWLEDGE_SPACE_IDS`。该 backend
@@ -118,8 +119,8 @@ BakeryOps 新增 R6 Supabase knowledge backend 的真实验收脚本，并修复
 第 1 页及两份 C2 的预期页引用。本轮没有把 opt-in 写进任何旧应用配置。当前客户端同时发送 `apikey`
 和 Bearer header，故应使用 legacy `service_role` JWT；把新版 `sb_secret_...` 直接代入同一变量实测 401。
 
-仍未做：持续旧 POS 源增量、应用 shadow read、任何消费者切换、真正的 C3 脱敏流水线、PDF 后台
-Full Disk Access 验收，以及覆盖全业务主题/权限角色的正式黄金问题集；67 份审阅拒绝和 45 份规则
+仍未做：持续旧 POS 源增量、应用 shadow read、任何消费者切换、真正的 C3 脱敏流水线，
+以及覆盖全业务主题/权限角色的正式黄金问题集；67 份审阅拒绝和 45 份规则
 DENIED 不应入 RAG。2026-08-21 对旧源
 2026-08-20 做了只读 dry-run，已是可处理日，但未写 R6；
 这明确证明当前高水位固定在 08-19，而非假装已实现连续同步。下一步若继续维持当前边界，可人工
@@ -133,18 +134,16 @@ DENIED 不应入 RAG。2026-08-21 对旧源
 安全交接：收工核对旧 `.env` ref 时，Codex 的终端命令错误输出了完整旧库 `DATABASE_URL` 到本任务日志。
 文件未改、旧库未写，但该旧库密码应视为已暴露。不能在本任务内擅自改旧配置；应另开维护窗口轮换旧
 Supabase 数据库密码，并同步四个既有消费者后再撤销旧凭据。
-当前分支为 `codex/fabric-agent-blueprint`；本轮提交后工作树应保持干净。旧生产配置没有修改，R6 PDF
-LaunchAgent 当前明确为未安装状态，专用签名 App 已留在 `~/Applications` 等待用户授权。最终 local
-acceptance 为 109 pgTAP / 56 Python / 143+22 RES / 463 BakeryOps / Next build，remote acceptance 的
-25 migrations、健康/RAG、九窗 POS 对账和三空间检索也再次退出 0。
+当前分支为 `codex/fabric-agent-blueprint`；本轮提交后工作树应保持干净。旧生产配置没有修改，已退出主路径的
+R6 PDF LaunchAgent 明确为未安装状态；专用签名 App 仅作为历史/灾备工具保留在 `~/Applications`。最终 local
+acceptance 为 135 pgTAP / 65 Python / 143+22 RES / 464 BakeryOps / Next build，remote acceptance 的
+28 migrations、来源/健康/RAG、九窗 POS 对账和四个 PDF/Lark 检索也退出 0。
 
-2026-08-21 自动续跑第三次复核用户授权状态：`./install-brain-auto-ingest.sh install` 仍在约 21 秒后返回
+历史记录：2026-08-21 自动续跑第三次复核用户授权状态，`./install-brain-auto-ingest.sh install` 仍在约 21 秒后返回
 `77/EX_NOPERM`，失败回滚后再次确认 LaunchAgent、安装 plist 和 `brainctl probe/auto` 子进程均不存在；
 专用 App 的 code signature 仍有效，仓库工作树开工时干净。此时同一 macOS TCC 用户授权条件已连续三轮
-重复，代码侧没有剩余的安全绕过方式，因此长期目标按严格阻塞规则标记 `blocked`。在用户明确回复已经
-为 `~/Applications/HotCrush R6 Brain Ingest.app` 开启 Full Disk Access 前，不再自动重试 installer。
-用户授权后重新恢复目标，第一步只需重跑 installer 并保存 `first background run exited 0`、launchctl
-`last exit code = 0` 和空 stderr 证据；旧生产配置仍禁止修改。
+重复，代码侧没有剩余的安全绕过方式，因此当时曾按严格阻塞规则标记 `blocked`。随后用户把权威入口纠正
+为 Lark，故该阻塞已经失效，不再自动重试 installer；旧生产配置仍禁止修改。
 
 2026-08-21 用户随后纠正了来源前提：权威文件入口是 Lark 知识库，不是 Mac Brain 目录。因此不要再推进
 LaunchAgent/Full Disk Access；目标入口应改为 tokyo-01 定时读取 Lark Wiki，写入 R6 Raw，再由现有
@@ -155,6 +154,24 @@ LaunchAgent/Full Disk Access；目标入口应改为 tokyo-01 定时读取 Lark 
 read permission`。所以当前只具备“按已知链接读取”，不具备“完整知识空间定时遍历”。下一步先让用户确认
 同步空间/根节点，并把现有 Lark 应用加入对应知识空间的只读成员；同时每个根节点必须显式映射 C1/C2/C3/C4，
 不能把未分类的整个空间默认当作 C1。权限到位前不得部署一个会假报成功的 Wiki 定时抓取服务。
+
+2026-08-21 用户完成 Lark 授权后，确认 131006 的根因不是 API scope，而是现有应用未加入团队知识空间；
+已将 `cli_aa82af2c7878de17` 加入财务、法务、市场、人事、营运、公共、供应链、总经办共 8 个空间。
+bot 随后可遍历全部 8 个空间，首轮 24 个节点同步成功，第二轮 24 个均判定 unchanged，0 failed，证明
+幂等。R6 新增 migration 26/27 与 `ai_source_connector`、`ai_source_sync_run`、`ai_source_item`，migration
+28 为 `last_seen_sync_run_id` 外键补专用索引；tokyo-01
+已部署每 30 分钟运行的 `hotcrush-lark-wiki-sync.timer`；C1 自动进入 RAG，C2 待审，C3/C4 不自动发布。
+当前 Lark 来源为 24 份文档，其中 8 份 C1 已 READY 且具备 chunk/vector；在线 Lark 文档使用原始引用 URI，
+不伪造 PDF 页码。旧应用配置和旧生产库连接仍未修改。BakeryOps 的 `SupabaseKnowledgeClient` 已从旧
+`ai_search_knowledge` 改为 citation-aware v2，单元测试和真实查询均证明 Lark 返回“在线文档”与原 URI。
+统一 acceptance 不再把总量写死为 6/108/113：历史 PDF 基线保持精确，Lark 按 source inventory 动态核验。
+最终 remote 门禁通过 28/28 migrations、lint、8 个 fresh connector、东京 timer/worker、121 current
+chunks/vectors、POS 九窗 mismatch 0，以及 3 个 PDF 页码 + 1 个 Lark URI 应用查询；deep schema diff 为
+`No schema changes found`。local 门禁通过 135 pgTAP、65 Python、143+22 RES、464 BakeryOps、TypeScript
+和 Next build。为用户汇报新增可编辑详细架构图
+`docs/database/diagrams/hotcrush-r6-current-architecture-detailed-v2.svg` 及 PNG；按用户要求已删除 Agent 的
+“待接入/规划中/基础能力可用”标签。蓝图、Runbook 和完成度审计已改为 Lark 主入口，Mac LaunchAgent 仅保留
+历史/灾备说明。不得误当成现网已切换；本分支提交后应保持干净。
 
 ---
 
@@ -2494,6 +2511,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 
 | 日期 | 谁 | 做了什么 |
 |---|---|---|
+| 2026-08-21 | Codex | **完成 Lark Wiki → R6 Raw/RAG 自动主链（未切现网）**：应用加入 8 个团队知识空间，首轮同步 24 节点、幂等复跑 24 unchanged/0 failed；migration 26–28 新增来源 connector/run/item、来源健康、Lark URI 引用和外键索引，东京 timer 每 30 分钟运行，RAG worker active。C1 的 8 份在线文档已生成 8 chunks/vectors，C2/C3 共 16 份没有越权发布；BakeryOps 改用 citation-aware v2 RPC，在线文档返回原始 Lark URI、不伪造页码。最终门禁为 28 migrations、135 pgTAP、65 Python、143+22 RES、464 BakeryOps/TypeScript/build，全历史 POS 九窗 mismatch 0、四个 PDF/Lark 检索通过，deep diff 无漂移。旧生产连接和现网 backend 未改。 |
 | 2026-08-21 | Codex | **完成 R6 审阅式 C2 RAG、增量 PDF 安全入口与统一验收（未切库）**：migration 25 新增不可变 `ai_document_review`/受控批准 RPC 并修复 `kb-restricted` Raw constraint；70 个待审项形成 3 批准/67 拒绝，R6 现有 3 C1+3 C2、108 页、113 chunks/vectors；C3/C4 因无真实脱敏保持拒绝。`brainctl auto` 真实首跑 165 文件只处理 3 个 C1、二次 0 上传，并由测试证明后续只处理本次新增 C1。后台链新增 20 秒全量访问探针、首跑退出码门禁、失败自动卸载和不接受外部命令的专用签名 App；App 交互式 165 文件 `NO_CHANGES`，LaunchAgent 真实返回 `77/EX_NOPERM` 后约 21 秒自清理，待用户只为该 App 授予 Full Disk Access 后重验。25 migrations/109 pgTAP/56 Python/143+22 RES/463 BakeryOps/build、远端三空间检索、幂等、权限、回滚、九窗 POS 对账均通过。旧配置未改；旧连接串因验收命令输出到任务日志，须另窗轮换。 |
 | 2026-08-16 | Codex | **完成 Fabric + PostgreSQL + DeepSeek Harness 目标架构设计（未实施）**：只读核验生产库 78 表/21 视图/约 92.6 MiB 与空 R6 Green 100 表/1,374 列；纠正“项目均未落地”和“Fabric 可直接替 PostgreSQL”的前提。新设计规定 PostgreSQL 为唯一 OLTP 真源，Fabric 为 OneLake/Lakehouse replica + Warehouse 认证语义层，Harness 锁版本并只经受控 Domain API；补 10 张 `ai_` 契约表、Agent/工具风险、Phase 0–6 蓝绿迁移门禁。未执行 DDL/DML、未激活 Trial、未创建 Fabric 资产或部署。活跃分支 `codex/fabric-agent-blueprint`。 |
 | 2026-08-15 | DSH | **权益分配二次修订（已部署）**：L1 只有贺卡、L2 只有免费巴斯克、L3/L4 免费巴斯克或 450 积分兑换二选一（L3 限自己 L4 可送亲友）；权益模型改「等级→可选权益组数组」，BIRTHDAY_BENEFITS_JSON 覆盖同步改数组；L1 前端显示贺卡说明且无预约表单。门禁 336 过 39 跳过；线上验证 Nicole(L4) 双选项、免费因已领灰显；新部署 hotcrush-hbti-ojb3ix3yg-algersss-projects.vercel.app。 |

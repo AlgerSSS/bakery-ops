@@ -106,6 +106,8 @@ select extensions.is(
   200.00::numeric, 'restore makes the verified batch current again without reloading facts'
 );
 
+update public.ai_source_connector
+set last_successful_scan_at = now(), last_error = null;
 select public.ops_rollup_pipeline_health();
 select extensions.is(
   public.ops_get_platform_health()->>'status', 'healthy',

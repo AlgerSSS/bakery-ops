@@ -107,17 +107,28 @@ run_remote() {
     and .storage.registered_missing_object == 0
     and .storage.object_missing_registration == 0
     and .cron.active_jobs == .cron.expected_jobs
+    and .sources.enabled_connectors == 8
+    and .sources.stale_connectors == 0
+    and .sources.failed_connectors == 0
+    and .sources.running_scans <= 1
+    and .sources.stale_running_scans == 0
+    and .sources.failed_items == 0
+    and .sources.missing_items == 0
   ' <<< "$health" >/dev/null
 
-  echo "remote: RAG publication and review invariants"
+  echo "remote: stable PDF baseline plus dynamic Lark RAG invariants"
   local rag_audit
   rag_audit=$(cd "$ROOT" && "${SUPABASE[@]}" db query --linked --output-format json "
     with current_documents as (
       select *
       from public.ai_raw_document
       where status = 'READY' and is_current
+    ), lark_documents as (
+      select distinct item.current_document_id as document_id
+      from public.ai_source_item as item
+      where item.current_document_id is not null
     ), current_chunks as (
-      select chunk.chunk_id
+      select chunk.chunk_id, chunk.document_id, chunk.page_from, chunk.page_to
       from public.ai_document_chunk as chunk
       join current_documents as document
         on document.document_id = chunk.document_id
@@ -129,7 +140,60 @@ run_remote() {
       (select count(*)::integer from current_chunks) as current_chunks,
       (select count(*)::integer from public.ai_chunk_embedding as embedding
        join current_chunks using (chunk_id)) as current_embeddings,
-      (select count(*)::integer from public.ai_ingest_run) as ingest_runs,
+      (select count(*)::integer
+       from current_documents as document
+       where not exists (
+         select 1 from lark_documents where document_id = document.document_id
+       )) as non_lark_ready_documents,
+      (select coalesce(sum(document.page_count), 0)::integer
+       from current_documents as document
+       where not exists (
+         select 1 from lark_documents where document_id = document.document_id
+       )) as non_lark_ready_pages,
+      (select count(*)::integer
+       from current_chunks as chunk
+       where not exists (
+         select 1 from lark_documents where document_id = chunk.document_id
+       )) as non_lark_current_chunks,
+      (select count(*)::integer
+       from public.ai_chunk_embedding as embedding
+       join current_chunks as chunk using (chunk_id)
+       where not exists (
+         select 1 from lark_documents where document_id = chunk.document_id
+       )) as non_lark_current_embeddings,
+      (select count(*)::integer
+       from public.ai_source_item where status = 'SYNCED') as lark_synced_items,
+      (select count(*)::integer
+       from public.ai_source_item as item
+       join current_documents as document on document.document_id = item.current_document_id
+       where item.status = 'SYNCED') as lark_ready_documents,
+      (select count(*)::integer
+       from current_chunks as chunk
+       join public.ai_source_item as item on item.current_document_id = chunk.document_id
+       where item.status = 'SYNCED') as lark_current_chunks,
+      (select count(*)::integer
+       from public.ai_chunk_embedding as embedding
+       join current_chunks as chunk using (chunk_id)
+       join public.ai_source_item as item on item.current_document_id = chunk.document_id
+       where item.status = 'SYNCED') as lark_current_embeddings,
+      (select count(*)::integer
+       from current_chunks as chunk
+       join current_documents as document on document.document_id = chunk.document_id
+       join public.ai_source_item as item on item.current_document_id = chunk.document_id
+       where item.status = 'SYNCED'
+         and document.document_type = 'LARK_DOCX'
+         and (chunk.page_from is not null or chunk.page_to is not null)) as lark_docx_page_gaps,
+      (select count(*)::integer
+       from public.ai_source_item as item
+       left join current_documents as document on document.document_id = item.current_document_id
+       where item.status = 'SYNCED' and document.document_id is null) as lark_ready_gaps,
+      (select count(*)::integer
+       from public.ai_source_item
+       where missing_scan_count > 0 or status in ('FAILED', 'MISSING')) as lark_source_gaps,
+      (select count(*)::integer
+       from public.ai_source_item as item
+       where item.status = 'SYNCED'
+         and (item.source_uri is null or item.source_uri !~ '^https://')) as lark_citation_gaps,
       (select count(*)::integer from public.ai_document_review) as review_approvals,
       (select count(*)::integer from public.ai_document_review
        where length(manifest_sha256) = 64 and length(source_sha256) = 64) as manifest_bound_reviews,
@@ -143,16 +207,39 @@ run_remote() {
        where document.data_class = 'C2' and review.review_id is null) as review_audit_gaps;
   ")
   jq -e '
-    .rows[0]
-    | .ready_documents == 6
-      and .ready_pages == 108
-      and .current_chunks == 113
-      and .current_embeddings == 113
-      and .ingest_runs == 6
-      and .review_approvals == 3
-      and .manifest_bound_reviews == 3
-      and .review_audit_gaps == 0
+    .rows[0] as $row
+    | $row.ready_documents == ($row.non_lark_ready_documents + $row.lark_ready_documents)
+      and $row.current_chunks == ($row.non_lark_current_chunks + $row.lark_current_chunks)
+      and $row.current_embeddings == ($row.non_lark_current_embeddings + $row.lark_current_embeddings)
+      and $row.non_lark_ready_documents == 6
+      and $row.non_lark_ready_pages == 108
+      and $row.non_lark_current_chunks == 113
+      and $row.non_lark_current_embeddings == 113
+      and $row.lark_synced_items > 0
+      and $row.lark_ready_documents == $row.lark_synced_items
+      and $row.lark_current_chunks >= $row.lark_ready_documents
+      and $row.lark_current_embeddings == $row.lark_current_chunks
+      and $row.lark_docx_page_gaps == 0
+      and $row.lark_ready_gaps == 0
+      and $row.lark_source_gaps == 0
+      and $row.lark_citation_gaps == 0
+      and $row.review_approvals >= 3
+      and $row.manifest_bound_reviews == $row.review_approvals
+      and $row.review_audit_gaps == 0
   ' <<< "$rag_audit" >/dev/null
+
+  echo "remote: Tokyo Lark timer and RAG worker"
+  ssh -i "/Users/weiliangshao/.ssh/xray_tokyo" \
+    -o BatchMode=yes -o ConnectTimeout=15 \
+    -o PreferredAuthentications=publickey -o PasswordAuthentication=no \
+    root@45.77.12.118 '
+      set -e
+      test "$(systemctl is-active hotcrush-lark-wiki-sync.timer)" = active
+      test "$(systemctl is-enabled hotcrush-lark-wiki-sync.timer)" = enabled
+      test "$(systemctl show hotcrush-lark-wiki-sync.service -p Result --value)" = success
+      test "$(systemctl show hotcrush-lark-wiki-sync.service -p ExecMainStatus --value)" = 0
+      test "$(systemctl is-active hotcrush-rag-worker)" = active
+    '
 
   echo "remote: full historical POS reconciliation"
   export R6_SUPABASE_SECRET_KEY="$r6_key"
@@ -225,6 +312,11 @@ run_remote() {
     "试用期 7 天、30 天、60 天、90 天分别适用于什么员工" \
     "HOT_CRUSH_人力资源制度文件" \
     "第 11 页"
+  verify_knowledge \
+    "10000000-0000-7000-8000-000000000001" \
+    "吉隆坡 Pavilion 门店营业资料" \
+    "🏬 吉隆坡Pavilion店" \
+    "在线文档"
 
   if [[ "${R6_ACCEPTANCE_DEEP:-0}" == "1" ]]; then
     echo "remote: deep schema replay diff"

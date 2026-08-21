@@ -266,7 +266,7 @@ def search_knowledge(
         settings.request_timeout_seconds,
     ) as client:
         result = client.rpc(
-            "ai_search_knowledge",
+            "ai_search_knowledge_v2",
             {
                 "p_query": query,
                 "p_query_embedding": query_embedding,

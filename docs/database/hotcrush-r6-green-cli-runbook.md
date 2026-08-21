@@ -23,7 +23,7 @@ npx supabase test db
 npx supabase db lint --local --schema public,private
 ```
 
-已验证基线：25 个 migrations，11 个 pgTAP 文件、109 项断言。
+已验证基线：28 个 migrations，13 个 pgTAP 文件、135 项断言。
 
 远端发布与 drift：
 
@@ -34,7 +34,7 @@ npx supabase db diff --linked --schema public,private
 npx supabase migration list --linked
 ```
 
-验收要求：lint 无错误，diff 为 `No schema changes found`，25 个编号两侧一致。
+验收要求：lint 无错误，diff 为 `No schema changes found`，28 个编号两侧一致。
 
 完整门禁已收敛成一个可重放命令。`local` 只重建本地测试库；`remote` 只检查已链接 R6、健康和
 应用检索；`all` 依次执行两者：
@@ -51,7 +51,8 @@ export AI_EMBED_API_KEY_FILE="/安全路径/openrouter-secret"
 ```
 
 脚本先验证链接 ref 是 R6、BakeryOps 与 `res_api` 两份旧 `.env` 都仍含旧生产 ref 且没有 R6 ref，
-再执行门禁。远端门禁包含完整九窗 POS 历史对账，不只检查数据库“有行”；`R6_ACCEPTANCE_DEEP=1`
+再执行门禁。远端门禁包含完整九窗 POS 历史对账、Lark 来源新鲜度、稳定 PDF 基线、动态 Lark RAG
+完整性、东京 timer/worker 状态和四个真实知识检索，不只检查数据库“有行”；`R6_ACCEPTANCE_DEEP=1`
 会额外执行耗时较长的远端 shadow schema diff。
 
 ## 3. R6 worker 凭据
@@ -217,6 +218,9 @@ npx supabase db query --linked \
 - `storage.registered_missing_object = 0`
 - `storage.object_missing_registration = 0`
 - `cron.active_jobs = 6`
+- `sources.enabled_connectors = 8`
+- `sources.stale_connectors/failed_connectors/failed_items/missing_items = 0`
+- 正常定时扫描时 `sources.running_scans` 允许暂时为 1，但 `stale_running_scans` 必须为 0
 - `raw.acknowledged_source_quality` 单独统计已确认的历史源异常
 - 只有 `raw.quarantined_unacknowledged` 会把未解决隔离计为平台故障
 
@@ -259,6 +263,60 @@ npx supabase db query --linked \
 
 ## 8. PDF / RAG
 
+### 8.1 Lark Wiki 自动入口（当前主路径）
+
+部署脚本会先停止 timer、oneshot 和 RAG worker，再重建 venv，避免运行中的进程持有被清空的解释器；
+随后重新启用 timer 并立即执行一次同步。Lark app id/secret、R6 key 和 embedding key 均以 systemd
+encrypted credential 提供，不写进 unit 或仓库 `.env`：
+
+```bash
+cd /Users/weiliangshao/hot/bakery-ops/services/data-platform
+./deploy-rag-worker.sh
+```
+
+只核验远端状态：
+
+```bash
+ssh -i /Users/weiliangshao/.ssh/xray_tokyo root@45.77.12.118 '
+  systemctl is-active hotcrush-lark-wiki-sync.timer
+  systemctl is-enabled hotcrush-lark-wiki-sync.timer
+  systemctl show hotcrush-lark-wiki-sync.service -p Result -p ExecMainStatus
+  systemctl is-active hotcrush-rag-worker
+  systemctl list-timers hotcrush-lark-wiki-sync.timer --no-pager
+'
+```
+
+手工触发一次有界扫描并读取无 secret 日志：
+
+```bash
+ssh -i /Users/weiliangshao/.ssh/xray_tokyo root@45.77.12.118 '
+  systemctl start hotcrush-lark-wiki-sync.service
+  systemctl show hotcrush-lark-wiki-sync.service -p Result -p ExecMainStatus
+  journalctl -u hotcrush-lark-wiki-sync.service -n 30 --no-pager
+'
+```
+
+数据库侧来源健康只返回聚合计数，不暴露标题、token 或正文：
+
+```bash
+cd /Users/weiliangshao/hot
+npx supabase db query --linked --output-format json \
+  "select public.ai_get_source_sync_health() as sources;"
+```
+
+当前 allowlist 与默认发布边界：
+
+| Lark 空间 | R6 分级 | 自动处理 |
+|---|---|---|
+| 公共、营运部、市场部 | C1 | 自动 Raw → chunk → pgvector |
+| 供应链部、总经办、人事部 | C2 | 保存 Raw，人工审阅后才可发布 |
+| 财务部、法务 | C3 | 保存到对应私有 bucket，不自动发布；没有真实脱敏就不进入 RAG |
+
+首轮证据为 8 个空间、24 节点、0 failed；完成态复跑为 24 unchanged、0 uploaded。Docx 检索必须显示
+`在线文档` 和原始 Lark URI，不得伪造“第 1 页”；Lark 中真正上传的 PDF 才返回页码。
+
+### 8.2 历史 PDF 手工导入
+
 ```bash
 cd /Users/weiliangshao/hot/bakery-ops/services/data-platform
 uv run brainctl inventory "/path/to/Brain/raw"
@@ -294,7 +352,10 @@ uv run brainctl search "问题" \
 当前 worker **没有真正的 PII 脱敏实现**，不能把 `is_redacted=true` 当作脱敏证据。数据库因此强制
 `ai_approve_document_review` 只接受 C1/C2；C3/C4 即使写入 review ledger，也不能进入 RAG。
 
-### 8.1 新 PDF 自动发现（仅 C1）
+### 8.3 旧 Mac Brain 自动发现（已退出主流程）
+
+以下命令只为保留历史重现和本机灾备，不再是权威新文件入口，也不需要继续申请 Full Disk Access。
+新知识必须先进入上面的 Lark 团队知识空间，由东京 timer 自动抓取。
 
 一次性 dry-run / apply：
 
@@ -314,7 +375,7 @@ uv run brainctl probe \
 `NO_CHANGES / selected=0`。state 目录为 700、JSON/lock 为 600。新 C2/C3/C4 只增加待办计数；源路径
 内容改变或删除会停止并保留上一次成功 state，不自动创建错误版本或下架文档。
 
-30 分钟 LaunchAgent 已提供安装/回滚命令。installer 会先构建并 ad-hoc 签名专用的
+历史上曾提供 30 分钟 LaunchAgent 安装/回滚命令。installer 会先构建并 ad-hoc 签名专用的
 `~/Applications/HotCrush R6 Brain Ingest.app`，LaunchAgent 只启动这个 App；不要给整个 `/bin/bash`、
 Terminal 或 Python 完全磁盘访问权限。installer 必须等首跑退出 0 才保留 agent，任何非零退出或超时均
 自动 bootout，并把 plist 移到 Trash；专用 App、state、日志和 R6 数据保留：
@@ -324,13 +385,10 @@ Terminal 或 Python 完全磁盘访问权限。installer 必须等首跑退出 0
 ./install-brain-auto-ingest.sh uninstall
 ```
 
-2026-08-21 的新门禁实跑结果：交互式专用 App 读取 165 个 PDF 并返回 `NO_CHANGES`；相同 App 经
+2026-08-21 的历史门禁实跑结果：交互式专用 App 读取 165 个 PDF 并返回 `NO_CHANGES`；相同 App 经
 LaunchAgent 启动时，20 秒访问探针返回 `77: EX_NOPERM`，installer 在约 21 秒内自动卸载且无残留进程。
-这证明阻塞是 macOS TCC，不是 Supabase/RAG。用户在「隐私与安全性 → 完全磁盘访问权限」只授权
-`HotCrush R6 Brain Ingest.app` 后重新执行 install；验收必须看到 installer 的
-`first background run exited 0`、`launchctl` 的 `last exit code = 0` 且 stderr 为空，不能用交互式成功
-代替后台证据。Apple 明确说明 iCloud Drive 属于受用户同意保护的文件位置：
-<https://support.apple.com/en-ca/guide/security/secddd1d86a6/web>。
+这证明当时的失败是 macOS TCC，不是 Supabase/RAG；由于入口已改为 Lark，不再要求用户为该 App 授权，
+也不要重新安装 LaunchAgent。
 
 真实 Brain 盘点结果：165 份均完成哈希；manifest 中 3 份 `AUTO_UPLOAD`、70 份
 `REVIEW_REQUIRED`、45 份 `DENIED`、47 份同空间重复跳过。70 份待审项已记录 3 个
@@ -369,9 +427,9 @@ npm run verify:r6-knowledge
 ```
 
 统一远端验收脚本会用显式 R6 凭据和空间 ID 调用 BakeryOps 的 `SupabaseKnowledgeClient`，必须返回
-C1 价格表第 1 页、C2 会员方案第 2 页和 C2 HR 制度第 11 页；同时断言 6 文档、108 页、113
-chunks/vectors、3 条批准证据、0 个 C2 审计缺口。外部 embedding 请求最多重试 3 次，数据库或内容不变量
-失败不重试。
+C1 价格表第 1 页、C2 会员方案第 2 页、C2 HR 制度第 11 页，以及 Lark 门店在线文档与原始 URI；历史
+PDF 基线固定核验 6 文档、108 页、113 chunks/vectors，Lark 部分按当前 source inventory 动态核验，
+不会因为合法新增文档而误报。外部 embedding 请求最多重试 3 次，数据库或内容不变量失败不重试。
 现网 `KNOWLEDGE_BACKEND` 默认仍是 `lightrag`，没有修改。
 
 ## 9. 当前明确不执行

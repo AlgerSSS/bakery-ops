@@ -10,6 +10,9 @@ RUNNER = SERVICE_DIR / "run-brain-auto-ingest.sh"
 INSTALLER = SERVICE_DIR / "install-brain-auto-ingest.sh"
 APP_BUILDER = SERVICE_DIR / "build-brain-ingest-app.sh"
 PLIST = SERVICE_DIR / "deploy" / "com.hotcrush.r6-brain-ingest.plist"
+LARK_SERVICE = SERVICE_DIR / "deploy" / "hotcrush-lark-wiki-sync.service"
+LARK_TIMER = SERVICE_DIR / "deploy" / "hotcrush-lark-wiki-sync.timer"
+DEPLOYER = SERVICE_DIR / "deploy-rag-worker.sh"
 
 
 def _executable(path: Path, source: str) -> Path:
@@ -254,3 +257,33 @@ def test_installer_keeps_agent_only_after_first_run_exits_zero(tmp_path: Path) -
     assert (log_dir / "hotcrush-r6-brain-ingest.err.log").read_text(encoding="utf-8") == ""
     assert len(list(log_dir.glob("hotcrush-r6-brain-ingest.out.log.*"))) == 1
     assert len(list(log_dir.glob("hotcrush-r6-brain-ingest.err.log.*"))) == 1
+
+
+def test_lark_sync_service_uses_only_encrypted_machine_credentials() -> None:
+    unit = LARK_SERVICE.read_text(encoding="utf-8")
+
+    assert "DynamicUser=yes" in unit
+    assert "LoadCredentialEncrypted=r6_secret:" in unit
+    assert "LoadCredentialEncrypted=lark_app_id:" in unit
+    assert "LoadCredentialEncrypted=lark_app_secret:" in unit
+    assert "LARK_APP_ID_FILE=%d/lark_app_id" in unit
+    assert "LARK_APP_SECRET_FILE=%d/lark_app_secret" in unit
+    assert "/opt/hotcrush/scripts/lark_app.json" not in unit
+    assert "ProtectSystem=strict" in unit
+
+
+def test_lark_sync_timer_is_persistent_and_bounded_to_thirty_minutes() -> None:
+    timer = LARK_TIMER.read_text(encoding="utf-8")
+
+    assert "OnUnitActiveSec=30min" in timer
+    assert "RandomizedDelaySec=2min" in timer
+    assert "Persistent=true" in timer
+    assert "Unit=hotcrush-lark-wiki-sync.service" in timer
+
+
+def test_worker_is_stopped_before_the_deployer_rebuilds_its_virtualenv() -> None:
+    deployer = DEPLOYER.read_text(encoding="utf-8")
+
+    assert deployer.index("systemctl stop hotcrush-rag-worker") < deployer.index(
+        "python3 -m venv --clear .venv"
+    )

@@ -34,7 +34,9 @@ scp -O \
   -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=15 \
   -o PreferredAuthentications=publickey -o PasswordAuthentication=no \
   "$SERVICE_DIR/deploy/hotcrush-rag-worker.service" \
-  "$REMOTE:/etc/systemd/system/hotcrush-rag-worker.service"
+  "$SERVICE_DIR/deploy/hotcrush-lark-wiki-sync.service" \
+  "$SERVICE_DIR/deploy/hotcrush-lark-wiki-sync.timer" \
+  "$REMOTE:/etc/systemd/system/"
 
 echo "==> install encrypted systemd credentials"
 "${SSH[@]}" "$REMOTE" \
@@ -45,9 +47,28 @@ printf '%s' "$openrouter_secret" | "${SSH[@]}" "$REMOTE" \
   'systemd-creds encrypt --with-key=host --newline=no --name=openrouter_api_key - /etc/credstore.encrypted/hotcrush-openrouter-api-key.cred.new >/dev/null && chmod 0600 /etc/credstore.encrypted/hotcrush-openrouter-api-key.cred.new && mv /etc/credstore.encrypted/hotcrush-openrouter-api-key.cred.new /etc/credstore.encrypted/hotcrush-openrouter-api-key.cred'
 unset r6_secret openrouter_secret
 
+echo "==> copy existing Lark app identity into encrypted systemd credentials"
+"${SSH[@]}" "$REMOTE" '
+  set -e
+  config=/opt/hotcrush/scripts/lark_app.json
+  test -r "$config"
+  test "$(stat -c %a "$config")" = 600
+  jq -e '\''(.app_id | type == "string" and length > 0) and (.app_secret | type == "string" and length > 0)'\'' "$config" >/dev/null
+  jq -r '\''.app_id'\'' "$config" \
+    | systemd-creds encrypt --with-key=host --newline=no --name=lark_app_id - /etc/credstore.encrypted/hotcrush-lark-app-id.cred.new >/dev/null
+  jq -r '\''.app_secret'\'' "$config" \
+    | systemd-creds encrypt --with-key=host --newline=no --name=lark_app_secret - /etc/credstore.encrypted/hotcrush-lark-app-secret.cred.new >/dev/null
+  chmod 0600 /etc/credstore.encrypted/hotcrush-lark-app-id.cred.new /etc/credstore.encrypted/hotcrush-lark-app-secret.cred.new
+  mv /etc/credstore.encrypted/hotcrush-lark-app-id.cred.new /etc/credstore.encrypted/hotcrush-lark-app-id.cred
+  mv /etc/credstore.encrypted/hotcrush-lark-app-secret.cred.new /etc/credstore.encrypted/hotcrush-lark-app-secret.cred
+'
+
 echo "==> build venv and start worker"
 "${SSH[@]}" "$REMOTE" '
   set -e
+  systemctl stop hotcrush-lark-wiki-sync.timer 2>/dev/null || true
+  systemctl stop hotcrush-lark-wiki-sync.service 2>/dev/null || true
+  systemctl stop hotcrush-rag-worker 2>/dev/null || true
   cd /opt/hotcrush/bakery-ops/services/data-platform
   if ! python3 -c "import ensurepip" >/dev/null 2>&1 \
      || ! command -v tesseract >/dev/null 2>&1 \
@@ -61,7 +82,11 @@ echo "==> build venv and start worker"
   .venv/bin/pip install --disable-pip-version-check --no-cache-dir --no-deps . >/dev/null
   systemctl daemon-reload
   systemctl enable --now hotcrush-rag-worker
+  systemctl enable --now hotcrush-lark-wiki-sync.timer
+  systemctl start hotcrush-lark-wiki-sync.service
   systemctl is-active hotcrush-rag-worker
+  systemctl is-active hotcrush-lark-wiki-sync.timer
+  systemctl show hotcrush-lark-wiki-sync.service -p Result -p ExecMainStatus --no-pager
   systemctl show hotcrush-rag-worker -p MainPID -p ActiveState -p SubState --no-pager
 '
 

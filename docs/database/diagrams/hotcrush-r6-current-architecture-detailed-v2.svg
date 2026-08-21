@@ -1,0 +1,355 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2560" height="1900" viewBox="0 0 2560 1900">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#3A2415" flood-opacity="0.10"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#A85B21"/>
+    </marker>
+    <style>
+      .title { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 52px; font-weight: 800; fill: #321A0D; }
+      .subtitle { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 24px; font-weight: 500; fill: #7E4A27; }
+      .layer-name { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 31px; font-weight: 800; fill: #FFFFFF; }
+      .layer-note { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 19px; font-weight: 500; fill: #FFF8EF; }
+      .card-title { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 25px; font-weight: 750; fill: #312219; }
+      .card-title-light { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 25px; font-weight: 750; fill: #FFFFFF; }
+      .card-body { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 19px; font-weight: 450; fill: #4F433A; }
+      .card-small { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 17px; font-weight: 450; fill: #65584E; }
+      .mono { font-family: "SFMono-Regular", Menlo, Consolas, monospace; font-size: 16px; font-weight: 600; fill: #7A3D14; }
+      .badge { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 15px; font-weight: 750; }
+      .rail-title { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 25px; font-weight: 800; fill: #315B43; }
+      .rail-body { font-family: "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif; font-size: 17px; font-weight: 500; fill: #3C4E42; }
+      .num { font-family: Arial, sans-serif; font-size: 24px; font-weight: 800; fill: #FFFFFF; }
+    </style>
+  </defs>
+
+  <rect width="2560" height="1900" fill="#FBF8F2"/>
+  <circle cx="2440" cy="85" r="170" fill="#F5E4CF" opacity="0.55"/>
+  <circle cx="120" cy="1840" r="220" fill="#E9F0E7" opacity="0.70"/>
+
+  <!-- Header -->
+  <text x="70" y="82" class="title">HOT CRUSH 当前 Supabase 数据架构</text>
+  <text x="72" y="126" class="subtitle">详细蓝图 v2 · 单店阶段 · 一个 Supabase Project 内的五层逻辑架构</text>
+  <rect x="70" y="151" width="2415" height="46" rx="14" fill="#FFF3E2" stroke="#E6B376"/>
+  <text x="1278" y="181" text-anchor="middle" class="card-body" fill="#6D3B18">读图方式：数据从下往上流动；Raw 保存证据，可信层负责加工，Agent 只读取可信结果，不直接改原始数据。</text>
+
+  <!-- Layer 5: User interaction -->
+  <rect x="50" y="225" width="2130" height="225" rx="24" fill="#F4EEE8" stroke="#D7C6B7" stroke-width="2"/>
+  <rect x="50" y="225" width="280" height="225" rx="24" fill="#50301F"/>
+  <circle cx="105" cy="276" r="27" fill="#B66C35"/>
+  <text x="105" y="284" text-anchor="middle" class="num">5</text>
+  <text x="150" y="282" class="layer-name">用户交互层</text>
+  <text x="78" y="330" class="layer-note">把结果交给人使用</text>
+  <text x="78" y="361" class="layer-note">展示、问答、提醒、审批</text>
+  <text x="78" y="408" class="layer-note">不直接读取 Raw</text>
+
+  <g filter="url(#shadow)">
+    <rect x="355" y="253" width="420" height="168" rx="18" fill="#FFFFFF"/>
+    <rect x="355" y="253" width="420" height="46" rx="18" fill="#5A3928"/>
+    <text x="380" y="284" class="card-title-light">门店经营网页</text>
+    <text x="380" y="330" class="card-body">店长 / 运营 / 财务 / 管理层</text>
+    <text x="380" y="365" class="card-small">看报表 · 看异常 · 确认建议</text>
+    <rect x="380" y="383" width="124" height="25" rx="12" fill="#E9E7E4"/>
+    <text x="442" y="401" text-anchor="middle" class="badge" fill="#5F5B57">仍连旧生产库</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="795" y="253" width="420" height="168" rx="18" fill="#FFFFFF"/>
+    <rect x="795" y="253" width="420" height="46" rx="18" fill="#5A3928"/>
+    <text x="820" y="284" class="card-title-light">Lark 入口</text>
+    <text x="820" y="330" class="card-body">知识库 · 消息 · 业务协作</text>
+    <text x="820" y="365" class="card-small">文档来源、引用回跳、后续提醒</text>
+    <rect x="820" y="383" width="94" height="25" rx="12" fill="#E0EFE4"/>
+    <text x="867" y="401" text-anchor="middle" class="badge" fill="#2D6945">来源已接通</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1235" y="253" width="420" height="168" rx="18" fill="#FFFFFF"/>
+    <rect x="1235" y="253" width="420" height="46" rx="18" fill="#5A3928"/>
+    <text x="1260" y="284" class="card-title-light">WhatsApp / 推送</text>
+    <text x="1260" y="330" class="card-body">员工通知 · 告警 · 待办</text>
+    <text x="1260" y="365" class="card-small">把 Agent 结果推送给执行人</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1675" y="253" width="470" height="168" rx="18" fill="#FFFFFF"/>
+    <rect x="1675" y="253" width="470" height="46" rx="18" fill="#5A3928"/>
+    <text x="1700" y="284" class="card-title-light">AI 对话入口</text>
+    <text x="1700" y="330" class="card-body">自然语言提问 · 带来源回答</text>
+    <text x="1700" y="365" class="card-small">按用户权限检索，不越权返回文档</text>
+    <rect x="1700" y="383" width="112" height="25" rx="12" fill="#FFF0D8"/>
+    <text x="1756" y="401" text-anchor="middle" class="badge" fill="#98601A">前端尚未切换</text>
+  </g>
+
+  <!-- Flow arrow -->
+  <line x1="1115" y1="477" x2="1115" y2="459" stroke="#A85B21" stroke-width="5" marker-end="url(#arrow)"/>
+
+  <!-- Layer 4: Agents -->
+  <rect x="50" y="485" width="2130" height="300" rx="24" fill="#FFF4E5" stroke="#E5B878" stroke-width="2"/>
+  <rect x="50" y="485" width="280" height="300" rx="24" fill="#B56629"/>
+  <circle cx="105" cy="537" r="27" fill="#713A16"/>
+  <text x="105" y="545" text-anchor="middle" class="num">4</text>
+  <text x="150" y="543" class="layer-name">Agent 层</text>
+  <text x="78" y="591" class="layer-note">读取可信数据与 RAG</text>
+  <text x="78" y="622" class="layer-note">推理、解释、生成建议</text>
+  <text x="78" y="669" class="layer-note">每次运行留日志与引用</text>
+  <text x="78" y="700" class="layer-note">动作需权限与审批</text>
+  <rect x="78" y="728" width="210" height="34" rx="9" fill="#8B4A1D"/>
+  <text x="183" y="751" text-anchor="middle" class="mono" fill="#FFF5E9">ops_agent_run / event</text>
+
+  <g filter="url(#shadow)">
+    <rect x="355" y="520" width="335" height="225" rx="18" fill="#FFFFFF"/>
+    <rect x="355" y="520" width="335" height="51" rx="18" fill="#D67A2D"/>
+    <text x="380" y="554" class="card-title-light">知识问答 Agent</text>
+    <text x="380" y="607" class="card-body">RAG 检索</text>
+    <text x="380" y="639" class="card-body">权限过滤</text>
+    <text x="380" y="671" class="card-body">附 Lark 来源引用</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="710" y="520" width="335" height="225" rx="18" fill="#FFFFFF"/>
+    <rect x="710" y="520" width="335" height="51" rx="18" fill="#D67A2D"/>
+    <text x="735" y="554" class="card-title-light">经营分析 Agent</text>
+    <text x="735" y="607" class="card-body">营收 / 客流趋势</text>
+    <text x="735" y="639" class="card-body">同比环比解释</text>
+    <text x="735" y="671" class="card-body">经营异常归因</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1065" y="520" width="335" height="225" rx="18" fill="#FFFFFF"/>
+    <rect x="1065" y="520" width="335" height="51" rx="18" fill="#D67A2D"/>
+    <text x="1090" y="554" class="card-title-light">排产建议 Agent</text>
+    <text x="1090" y="607" class="card-body">销量预测</text>
+    <text x="1090" y="639" class="card-body">建议生产数量</text>
+    <text x="1090" y="671" class="card-body">损耗与缺货平衡</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1420" y="520" width="335" height="225" rx="18" fill="#FFFFFF"/>
+    <rect x="1420" y="520" width="335" height="51" rx="18" fill="#D67A2D"/>
+    <text x="1445" y="554" class="card-title-light">数据质量 Agent</text>
+    <text x="1445" y="607" class="card-body">缺失 / 重复检测</text>
+    <text x="1445" y="639" class="card-body">同步延迟监控</text>
+    <text x="1445" y="671" class="card-body">失败任务告警</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1775" y="520" width="370" height="225" rx="18" fill="#FFF9F0" stroke="#EBCDA7" stroke-dasharray="9 8" stroke-width="2"/>
+    <text x="1960" y="626" text-anchor="middle" style="font-family:Arial,sans-serif;font-size:64px;font-weight:800;fill:#B97742">……</text>
+    <text x="1960" y="680" text-anchor="middle" class="card-body">会员运营 · 巡店 · 财务</text>
+    <text x="1960" y="713" text-anchor="middle" class="card-small">按业务价值逐步增加</text>
+  </g>
+
+  <!-- Flow arrow -->
+  <line x1="1115" y1="817" x2="1115" y2="799" stroke="#A85B21" stroke-width="5" marker-end="url(#arrow)"/>
+
+  <!-- Layer 3: Trusted/RAG -->
+  <rect x="50" y="825" width="2130" height="410" rx="24" fill="#EEF5EC" stroke="#AFC9B3" stroke-width="2"/>
+  <rect x="50" y="825" width="280" height="410" rx="24" fill="#4F795B"/>
+  <circle cx="105" cy="877" r="27" fill="#31533D"/>
+  <text x="105" y="885" text-anchor="middle" class="num">3</text>
+  <text x="150" y="883" class="layer-name">可信数据层</text>
+  <text x="78" y="928" class="layer-note">Raw 的可重放加工结果</text>
+  <text x="78" y="959" class="layer-note">统一口径、解析、分块</text>
+  <text x="78" y="1006" class="layer-note">同时承载结构化数据</text>
+  <text x="78" y="1037" class="layer-note">和 PDF / 文档 RAG</text>
+  <text x="78" y="1084" class="layer-note">只发布通过分级的数据</text>
+  <rect x="78" y="1137" width="205" height="58" rx="10" fill="#3F664A"/>
+  <text x="180" y="1161" text-anchor="middle" class="card-small" fill="#FFFFFF">作用：变成可查询、</text>
+  <text x="180" y="1184" text-anchor="middle" class="card-small" fill="#FFFFFF">可比较、可引用的数据</text>
+
+  <g filter="url(#shadow)">
+    <rect x="355" y="865" width="425" height="325" rx="18" fill="#FFFFFF"/>
+    <rect x="355" y="865" width="425" height="54" rx="18" fill="#4D8B62"/>
+    <text x="380" y="901" class="card-title-light">结构化 POS 处理</text>
+    <text x="380" y="955" class="card-body">日事实、小时事实、当前视图</text>
+    <text x="380" y="991" class="card-small">统一门店 / SKU / 日期口径</text>
+    <text x="380" y="1023" class="card-small">支持营收、时段、趋势分析</text>
+    <rect x="380" y="1051" width="365" height="104" rx="12" fill="#F1F6F1"/>
+    <text x="398" y="1079" class="mono">ops_processing_run</text>
+    <text x="398" y="1108" class="mono">pos_sales_day / hour</text>
+    <text x="398" y="1137" class="mono">*_current views</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="800" y="865" width="425" height="325" rx="18" fill="#FFFFFF"/>
+    <rect x="800" y="865" width="425" height="54" rx="18" fill="#4D8B62"/>
+    <text x="825" y="901" class="card-title-light">文档解析与分块</text>
+    <text x="825" y="955" class="card-body">PDF / Lark 文档 → 可检索片段</text>
+    <text x="825" y="991" class="card-small">文本提取 · OCR · 清洗 · Chunk</text>
+    <text x="825" y="1023" class="card-small">保留文档、页码或 Lark 引用</text>
+    <rect x="825" y="1051" width="365" height="104" rx="12" fill="#F1F6F1"/>
+    <text x="843" y="1079" class="mono">ai_ingest_run</text>
+    <text x="843" y="1108" class="mono">ai_raw_document</text>
+    <text x="843" y="1137" class="mono">ai_document_chunk</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1245" y="865" width="425" height="325" rx="18" fill="#FFFFFF"/>
+    <rect x="1245" y="865" width="425" height="54" rx="18" fill="#4D8B62"/>
+    <text x="1270" y="901" class="card-title-light">向量检索与引用</text>
+    <text x="1270" y="955" class="card-body">pgvector 语义检索</text>
+    <text x="1270" y="991" class="card-small">查询 → 相似片段 → 来源引用</text>
+    <text x="1270" y="1023" class="card-small">RPC 内执行权限与分级过滤</text>
+    <rect x="1270" y="1051" width="365" height="104" rx="12" fill="#F1F6F1"/>
+    <text x="1288" y="1079" class="mono">ai_chunk_embedding</text>
+    <text x="1288" y="1108" class="mono">pgvector / HNSW</text>
+    <text x="1288" y="1137" class="mono">ai_search_knowledge_v2()</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1690" y="865" width="455" height="325" rx="18" fill="#FFFFFF"/>
+    <rect x="1690" y="865" width="455" height="54" rx="18" fill="#4D8B62"/>
+    <text x="1715" y="901" class="card-title-light">数据分级发布门</text>
+    <text x="1715" y="955" class="card-body">决定什么数据可以进入 RAG</text>
+    <rect x="1715" y="987" width="385" height="45" rx="12" fill="#E0EFE4"/>
+    <text x="1735" y="1016" class="card-body" fill="#2D6945">C1：自动发布到 RAG</text>
+    <rect x="1715" y="1042" width="385" height="45" rx="12" fill="#FFF0D8"/>
+    <text x="1735" y="1071" class="card-body" fill="#98601A">C2：人工审阅后发布</text>
+    <rect x="1715" y="1097" width="385" height="58" rx="12" fill="#FCE8E4"/>
+    <text x="1735" y="1122" class="card-small" fill="#A33C2E">C3 / C4：禁止自动发布</text>
+    <text x="1735" y="1145" class="card-small" fill="#A33C2E">除非存在真实脱敏版本</text>
+  </g>
+
+  <!-- Flow arrow -->
+  <line x1="1115" y1="1257" x2="1115" y2="1239" stroke="#A85B21" stroke-width="5" marker-end="url(#arrow)"/>
+
+  <!-- Layer 2: Raw -->
+  <rect x="50" y="1265" width="2130" height="300" rx="24" fill="#FFF2E8" stroke="#E1A978" stroke-width="2"/>
+  <rect x="50" y="1265" width="280" height="300" rx="24" fill="#C7682E"/>
+  <circle cx="105" cy="1317" r="27" fill="#8C3F18"/>
+  <text x="105" y="1325" text-anchor="middle" class="num">2</text>
+  <text x="150" y="1323" class="layer-name">Raw 原始层</text>
+  <text x="78" y="1368" class="layer-note">所有数据的第一落点</text>
+  <text x="78" y="1399" class="layer-note">保留来源、批次和原文</text>
+  <text x="78" y="1446" class="layer-note">只追加、不覆盖</text>
+  <text x="78" y="1477" class="layer-note">失败后可重新加工</text>
+  <text x="78" y="1524" class="layer-note">Agent 不直接查询</text>
+
+  <g filter="url(#shadow)">
+    <rect x="355" y="1303" width="555" height="224" rx="18" fill="#FFFFFF"/>
+    <rect x="355" y="1303" width="555" height="51" rx="18" fill="#D96F31"/>
+    <text x="380" y="1337" class="card-title-light">Private Storage：原始文件证据</text>
+    <text x="380" y="1393" class="card-body">Lark 文档 / PDF 原文件或原始 JSON</text>
+    <text x="380" y="1429" class="card-small">私有桶 · 版本化路径 · 不允许公网直读</text>
+    <text x="380" y="1461" class="card-small">用途：以后可重新 OCR、重新切块、重新建向量</text>
+    <text x="380" y="1495" class="mono">7 private buckets</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="930" y="1303" width="555" height="224" rx="18" fill="#FFFFFF"/>
+    <rect x="930" y="1303" width="555" height="51" rx="18" fill="#D96F31"/>
+    <text x="955" y="1337" class="card-title-light">批次、对象与完整性</text>
+    <text x="955" y="1393" class="card-body">记录何时抓、从哪来、抓到了什么</text>
+    <text x="955" y="1429" class="card-small">SHA-256 防重复、防静默篡改</text>
+    <text x="955" y="1461" class="card-small">每次处理都能追溯到具体 Raw 对象</text>
+    <text x="955" y="1495" class="mono">ops_raw_batch / ops_raw_object</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1505" y="1303" width="640" height="224" rx="18" fill="#FFFFFF"/>
+    <rect x="1505" y="1303" width="640" height="51" rx="18" fill="#D96F31"/>
+    <text x="1530" y="1337" class="card-title-light">Lark 来源与同步血缘</text>
+    <text x="1530" y="1393" class="card-body">空间 → 节点 → 文档 → Raw 对象</text>
+    <text x="1530" y="1429" class="card-small">记录新增、变更、未变化、失败与不支持格式</text>
+    <text x="1530" y="1461" class="card-small">用途：回答“这份知识来自哪里、何时更新”</text>
+    <text x="1530" y="1492" class="mono">ai_source_connector / sync_run</text>
+    <text x="1530" y="1516" class="mono">ai_source_item</text>
+  </g>
+
+  <!-- Flow arrow -->
+  <line x1="1115" y1="1587" x2="1115" y2="1569" stroke="#A85B21" stroke-width="5" marker-end="url(#arrow)"/>
+
+  <!-- Layer 1: Sources -->
+  <rect x="50" y="1595" width="2130" height="255" rx="24" fill="#EEE9E4" stroke="#B8AAA0" stroke-width="2"/>
+  <rect x="50" y="1595" width="280" height="255" rx="24" fill="#4A4039"/>
+  <circle cx="105" cy="1647" r="27" fill="#28211D"/>
+  <text x="105" y="1655" text-anchor="middle" class="num">1</text>
+  <text x="150" y="1653" class="layer-name">写入源</text>
+  <text x="78" y="1698" class="layer-note">Supabase 外部的源系统</text>
+  <text x="78" y="1729" class="layer-note">统一经连接器进入 Raw</text>
+  <text x="78" y="1776" class="layer-note">不直接写可信层</text>
+  <text x="78" y="1807" class="layer-note">不直接生成 Agent 答案</text>
+
+  <g filter="url(#shadow)">
+    <rect x="355" y="1632" width="420" height="180" rx="18" fill="#FFFFFF"/>
+    <rect x="355" y="1632" width="420" height="51" rx="18" fill="#5B5049"/>
+    <text x="380" y="1666" class="card-title-light">Lark 8 个团队知识库</text>
+    <text x="380" y="1721" class="card-body">财务、法务、市场、人事、营运、</text>
+    <text x="380" y="1752" class="card-body">公共、供应链、总经办</text>
+    <rect x="380" y="1771" width="170" height="27" rx="13" fill="#E0EFE4"/>
+    <text x="465" y="1790" text-anchor="middle" class="badge" fill="#2D6945">每 30 分钟自动扫描</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="795" y="1632" width="420" height="180" rx="18" fill="#FFFFFF"/>
+    <rect x="795" y="1632" width="420" height="51" rx="18" fill="#5B5049"/>
+    <text x="820" y="1666" class="card-title-light">RES POS / 旧生产库</text>
+    <text x="820" y="1721" class="card-body">营收、订单、单品、时段等事实</text>
+    <text x="820" y="1752" class="card-small">R6 目前有历史快照，尚未完成生产切换</text>
+    <rect x="820" y="1771" width="140" height="27" rx="13" fill="#E9E7E4"/>
+    <text x="890" y="1790" text-anchor="middle" class="badge" fill="#5F5B57">旧库继续生产使用</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1235" y="1632" width="420" height="180" rx="18" fill="#FFFFFF"/>
+    <rect x="1235" y="1632" width="420" height="51" rx="18" fill="#5B5049"/>
+    <text x="1260" y="1666" class="card-title-light">历史 PDF / Brain 文件</text>
+    <text x="1260" y="1721" class="card-body">制度、手册、报告等历史资料</text>
+    <text x="1260" y="1752" class="card-small">已有样本导入；未来以 Lark 知识库为主入口</text>
+    <rect x="1260" y="1771" width="112" height="27" rx="13" fill="#E0EFE4"/>
+    <text x="1316" y="1790" text-anchor="middle" class="badge" fill="#2D6945">样本已入 RAG</text>
+  </g>
+  <g filter="url(#shadow)">
+    <rect x="1675" y="1632" width="470" height="180" rx="18" fill="#FFF9F0" stroke="#D5A36F" stroke-width="2"/>
+    <rect x="1675" y="1632" width="470" height="51" rx="18" fill="#A85B21"/>
+    <text x="1700" y="1666" class="card-title-light">东京 Worker（外部连接器）</text>
+    <text x="1700" y="1721" class="card-body">抓取 · 下载 · OCR · Embedding</text>
+    <text x="1700" y="1752" class="card-small">systemd 定时运行，把外部数据送进 R6</text>
+    <rect x="1700" y="1771" width="89" height="27" rx="13" fill="#E0EFE4"/>
+    <text x="1744" y="1790" text-anchor="middle" class="badge" fill="#2D6945">已运行</text>
+  </g>
+
+  <!-- Right rail: automation and governance -->
+  <rect x="2210" y="225" width="300" height="1625" rx="24" fill="#F2F7F1" stroke="#9EB8A4" stroke-width="2"/>
+  <text x="2360" y="275" text-anchor="middle" class="rail-title">自动化与治理</text>
+  <line x1="2250" y1="296" x2="2470" y2="296" stroke="#BCD0BF" stroke-width="2"/>
+
+  <rect x="2245" y="330" width="230" height="94" rx="15" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="2360" y="363" text-anchor="middle" class="card-title">① 定时发现</text>
+  <text x="2360" y="397" text-anchor="middle" class="rail-body">Lark 每 30 分钟扫描</text>
+  <line x1="2360" y1="427" x2="2360" y2="464" stroke="#4F795B" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="2245" y="470" width="230" height="106" rx="15" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="2360" y="503" text-anchor="middle" class="card-title">② Raw 落库</text>
+  <text x="2360" y="535" text-anchor="middle" class="rail-body">版本 + SHA-256</text>
+  <text x="2360" y="558" text-anchor="middle" class="rail-body">记录来源血缘</text>
+  <line x1="2360" y1="579" x2="2360" y2="616" stroke="#4F795B" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="2245" y="622" width="230" height="106" rx="15" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="2360" y="655" text-anchor="middle" class="card-title">③ 分级判断</text>
+  <text x="2360" y="687" text-anchor="middle" class="rail-body">C1 自动；C2 审阅</text>
+  <text x="2360" y="710" text-anchor="middle" class="rail-body">C3/C4 阻止发布</text>
+  <line x1="2360" y1="731" x2="2360" y2="768" stroke="#4F795B" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="2245" y="774" width="230" height="106" rx="15" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="2360" y="807" text-anchor="middle" class="card-title">④ 加工与 RAG</text>
+  <text x="2360" y="839" text-anchor="middle" class="rail-body">解析 · 分块 · 向量</text>
+  <text x="2360" y="862" text-anchor="middle" class="rail-body">失败可从 Raw 重跑</text>
+  <line x1="2360" y1="883" x2="2360" y2="920" stroke="#4F795B" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="2245" y="926" width="230" height="106" rx="15" fill="#FFFFFF" filter="url(#shadow)"/>
+  <text x="2360" y="959" text-anchor="middle" class="card-title">⑤ Agent 使用</text>
+  <text x="2360" y="991" text-anchor="middle" class="rail-body">权限检索 + 引用</text>
+  <text x="2360" y="1014" text-anchor="middle" class="rail-body">运行与动作全审计</text>
+
+  <line x1="2250" y1="1080" x2="2470" y2="1080" stroke="#BCD0BF" stroke-width="2"/>
+  <text x="2360" y="1120" text-anchor="middle" class="rail-title">贯穿所有层</text>
+  <rect x="2245" y="1147" width="230" height="64" rx="14" fill="#DDEBE0"/>
+  <text x="2360" y="1187" text-anchor="middle" class="card-body" fill="#315B43">Supabase Auth + RLS</text>
+  <rect x="2245" y="1227" width="230" height="64" rx="14" fill="#DDEBE0"/>
+  <text x="2360" y="1267" text-anchor="middle" class="card-body" fill="#315B43">Private Storage Policy</text>
+  <rect x="2245" y="1307" width="230" height="64" rx="14" fill="#DDEBE0"/>
+  <text x="2360" y="1347" text-anchor="middle" class="card-body" fill="#315B43">迁移 · 回滚 · 备份</text>
+  <rect x="2245" y="1387" width="230" height="64" rx="14" fill="#DDEBE0"/>
+  <text x="2360" y="1427" text-anchor="middle" class="card-body" fill="#315B43">任务状态 · 失败告警</text>
+  <rect x="2245" y="1467" width="230" height="64" rx="14" fill="#DDEBE0"/>
+  <text x="2360" y="1507" text-anchor="middle" class="card-body" fill="#315B43">数据血缘 · 调用审计</text>
+
+  <rect x="2245" y="1585" width="230" height="102" rx="16" fill="#DDEBE0" stroke="#7BA188"/>
+  <text x="2360" y="1620" text-anchor="middle" class="card-title" fill="#315B43">当前已闭环</text>
+  <text x="2360" y="1653" text-anchor="middle" class="rail-body">Lark → Raw → C1 RAG</text>
+  <text x="2360" y="1677" text-anchor="middle" class="rail-body">同步与引用已验证</text>
+  <rect x="2245" y="1705" width="230" height="102" rx="16" fill="#ECE9E6" stroke="#AAA19A"/>
+  <text x="2360" y="1740" text-anchor="middle" class="card-title" fill="#5F5B57">尚未完成</text>
+  <text x="2360" y="1773" text-anchor="middle" class="rail-body">业务前端与 POS</text>
+  <text x="2360" y="1797" text-anchor="middle" class="rail-body">仍未切换到 R6</text>
+
+  <text x="70" y="1880" class="card-small">说明：东京 Worker 在 Supabase 外部，其余数据库对象位于同一个 hotcrush-core-r6-green Project 内。</text>
+</svg>

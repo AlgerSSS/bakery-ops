@@ -12,6 +12,7 @@ from .pdf_pipeline import (
     DeterministicTestEmbedder,
     OpenRouterEmbedder,
     chunk_pages,
+    extract_lark_doc_chunks,
     extract_pdf_pages,
     verify_ocr_runtime,
 )
@@ -47,7 +48,7 @@ def process_one(settings: Settings) -> bool:
 
         run_id = int(claim["ingest_run_id"])
         try:
-            pdf_bytes = client.download_object(claim["bucket_id"], claim["object_path"])
+            source_bytes = client.download_object(claim["bucket_id"], claim["object_path"])
             client.rpc(
                 "ai_heartbeat_ingest_run",
                 {
@@ -55,14 +56,23 @@ def process_one(settings: Settings) -> bool:
                     "p_worker_id": settings.worker_id,
                     "p_stage": "OCR",
                     "p_lease_seconds": 1800,
-                    "p_metrics": {"download_bytes": len(pdf_bytes)},
+                    "p_metrics": {"download_bytes": len(source_bytes)},
                 },
             )
-            pages = extract_pdf_pages(pdf_bytes)
-            chunks = chunk_pages(
-                pages,
-                is_redacted=claim["rag_eligibility"] == "REDACTED_ONLY",
-            )
+            if claim["object_path"].endswith("/raw.json"):
+                chunks = extract_lark_doc_chunks(source_bytes)
+                page_count = 1
+                ocr_page_count = 0
+                extractor = "lark-docx-raw-v1"
+            else:
+                pages = extract_pdf_pages(source_bytes)
+                chunks = chunk_pages(
+                    pages,
+                    is_redacted=claim["rag_eligibility"] == "REDACTED_ONLY",
+                )
+                page_count = len(pages)
+                ocr_page_count = sum(page.used_ocr for page in pages)
+                extractor = "pymupdf+tesseract"
             client.rpc(
                 "ai_heartbeat_ingest_run",
                 {
@@ -71,8 +81,8 @@ def process_one(settings: Settings) -> bool:
                     "p_stage": "EMBED",
                     "p_lease_seconds": 1800,
                     "p_metrics": {
-                        "page_count": len(pages),
-                        "ocr_page_count": sum(page.used_ocr for page in pages),
+                        "page_count": page_count,
+                        "ocr_page_count": ocr_page_count,
                     },
                 },
             )
@@ -90,7 +100,7 @@ def process_one(settings: Settings) -> bool:
                     strict=True,
                 ):
                     payload = asdict(chunk)
-                    payload["metadata"] = {"extractor": "pymupdf+tesseract"}
+                    payload["metadata"] = {"extractor": extractor}
                     payload["embedding"] = embedding
                     batch.append(payload)
                 client.rpc(
@@ -108,7 +118,7 @@ def process_one(settings: Settings) -> bool:
                 {
                     "p_ingest_run_id": run_id,
                     "p_worker_id": settings.worker_id,
-                    "p_page_count": len(pages),
+                    "p_page_count": page_count,
                     "p_expected_chunk_count": len(chunks),
                     "p_expected_embedding_count": len(embeddings),
                     "p_metrics": {
@@ -117,7 +127,7 @@ def process_one(settings: Settings) -> bool:
                     },
                 },
             )
-            LOGGER.info("published ingest_run=%s pages=%s chunks=%s", run_id, len(pages), len(chunks))
+            LOGGER.info("published ingest_run=%s pages=%s chunks=%s", run_id, page_count, len(chunks))
             return True
         except Exception as exc:
             LOGGER.exception("ingest_run=%s failed", run_id)

@@ -63,9 +63,13 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   邮箱；在用户确认前不创建外部账户、不发邮件。用户随后说明企业邮箱本身由 Lark Mail 托管，并
   指定 `pavilionstore.my@hotcrush.net` 为发件邮箱，因此 Brevo 不再是首选。Lark 官方支持第三方客户端
   通过 `smtp.larksuite.com:465`（SSL）发送；Vultr 可负责 10:00 MYT 定时、名单、幂等与自定义 HTML，
-  Lark Mail 负责最后一跳，完全不依赖 RES。SMTP 登录不能使用现有 Lark App ID/Secret，必须由该邮箱
-  在 Lark 桌面版“Settings > Email > Third-party email client login > Set Up Now”生成 dedicated
-  password。待用户确认该入口可见并生成专用密码；确认前不改服务器、不部署、不发送。
+  Lark Mail 负责最后一跳，完全不依赖 RES。后续核对官方 Mail OpenAPI 后更正：Lark 确有
+  `POST /open-apis/mail/v1/user_mailboxes/me/messages/send`，支持 HTML、附件与 `dedupe_key`，因此无需
+  SMTP dedicated password。2026-08-21 已在 tokyo-01 安装官方 `lark-cli v1.0.88`，并从服务器既有
+  `/opt/hotcrush/scripts/lark_app.json` 安全绑定应用 `cli_aa82af2c7878de17`（未输出或复制 secret）；
+  应用凭据只能换应用令牌，邮件写操作仍需该邮箱完成一次 `mail` 域用户 OAuth，之后 CLI 可维护刷新
+  令牌。已生成 10 分钟设备授权链接，正等待用户以 `pavilionstore.my@hotcrush.net` 所属账号授权；
+  尚未完成 token 兑换、未创建草稿、未部署发送 job、未发送邮件。
 
 **近 12 个月等级回算只读预演**：
 

@@ -67,9 +67,14 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   `POST /open-apis/mail/v1/user_mailboxes/me/messages/send`，支持 HTML、附件与 `dedupe_key`，因此无需
   SMTP dedicated password。2026-08-21 已在 tokyo-01 安装官方 `lark-cli v1.0.88`，并从服务器既有
   `/opt/hotcrush/scripts/lark_app.json` 安全绑定应用 `cli_aa82af2c7878de17`（未输出或复制 secret）；
-  应用凭据只能换应用令牌，邮件写操作仍需该邮箱完成一次 `mail` 域用户 OAuth，之后 CLI 可维护刷新
-  令牌。已生成 10 分钟设备授权链接，正等待用户以 `pavilionstore.my@hotcrush.net` 所属账号授权；
-  尚未完成 token 兑换、未创建草稿、未部署发送 job、未发送邮件。
+  应用凭据只能换应用令牌，邮件写操作仍需用户 OAuth。用户已于 2026-08-21 完成授权，tokyo-01
+  成功兑换并持久化 user/refresh token，`mail:user_mailbox.message:send` 与 `offline_access` 等 mail scopes
+  均已授予；授权主体主邮箱为 `weiliangshao@hotcrush.net`。只读枚举确认指定发件地址
+  `pavilionstore.my@hotcrush.net` 是当前用户可访问的 `PUBLIC_MAILBOX`，且从该 mailbox 查询
+  `settings/send_as` 明确返回其为可发信地址（显示名“Pavilion门店”）。注意官方 CLI v1.0.88 的
+  `mail +send --mailbox <公共邮箱>` dry-run 会先调公共邮箱 `/profile`，该端点实际返回 1230001，
+  因此生产脚本不要用 `+send` 快捷命令；直接调用该公共邮箱的原生 `messages/send`，其 dry-run 已
+  确认 HTML/plain text/`dedupe_key` 请求结构正确。未创建草稿、未部署发送 job、未发送邮件。
 
 **近 12 个月等级回算只读预演**：
 

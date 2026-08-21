@@ -1,0 +1,5 @@
+# 生日礼预约 → Lark 群通知 relay
+# ⚠️ 时间点按【系统时区】解释。本机已设为 Asia/Kuala_Lumpur（同 hotcrush-recruit 的教训，不要写 CRON_TZ）。
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+*/2 * * * * root cd /opt/hotcrush/scripts && /usr/bin/node /opt/hotcrush/res_api/scripts/task-switch-run.mjs birthday_reservation_lark_notify -- node birthday-notify.mjs >> /opt/hotcrush/scripts/logs/birthday_notify.log 2>&1

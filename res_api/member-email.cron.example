@@ -2,4 +2,4 @@
 # unsubscribe route and template content are approved. RES subscribed=true is
 # the user-confirmed consent filter, but it does not by itself prove legal consent.
 CRON_TZ=Asia/Kuala_Lumpur
-0 10 * * * root cd /opt/hotcrush/res_api && MEMBER_EMAIL_MODE=preview MEMBER_EMAIL_CONSENT_MODE=res_subscribed ./member-email-daily.sh
+0 10 * * * root cd /opt/hotcrush/res_api && MEMBER_EMAIL_MODE=preview MEMBER_EMAIL_CONSENT_MODE=res_subscribed /usr/bin/node scripts/task-switch-run.mjs member_email_job -- ./member-email-daily.sh

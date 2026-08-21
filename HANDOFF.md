@@ -104,6 +104,27 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   “表里有一行”误报成自动投递完成。测试收件人、通道测试和 `res_subscribed` 口径已经确认；
   正式发送前仍须逐项确认邮件内容和退订处理地址，在此之前不得把 cron 切到 live。
 
+- **Lark 自动任务开关中心（2026-08-21）**：用户要求把 Vultr 与项目里的定时推送集中到多维表格
+  管理。已创建 [`HOT CRUSH 自动任务开关中心`](https://fjpks7iroa9l.jp.larksuite.com/base/ZgQ4bYgRkaJKDUsj9mjjWMRupkd)
+  （Base `ZgQ4bYgRkaJKDUsj9mjjWMRupkd`，表 `tbl50MRrv8oDbReO`，默认视图
+  `vew9Mnsshi`（“全部任务”）），写入 13 项服务器任务。5 项实际接入 `启用` 开关：生日礼预约 Lark 通知、招聘早报、
+  明日面试/试工预告、总经办自动周报、会员邮件任务；其余招聘/RES 同步、会员等级单写者、HBTI
+  令牌维护和 Lark Wiki 同步共 8 项标为“仅查看”，防止运营开关破坏数据完整性。
+  开关是**额外许可门禁**：关闭必定跳过，打开只允许任务按原配置运行，绝不能绕过会员邮件的
+  preview/模板/consent/退订/额度门禁。`scripts/sync-task-switches.mjs` 每 15 分钟用用户身份读取 Base，
+  只有 5 行齐全、代码唯一、管理模式正确且 `启用` 为布尔值时才原子替换
+  `/var/lib/hotcrush-task-switch/state.json`；临时 Lark 故障沿用最后一次有效缓存，缓存缺失/损坏则受控
+  推送 fail closed。`scripts/task-switch-run.mjs` 不经 shell 执行固定 cron 命令并透传退出码。
+  已部署到 tokyo-01 且本地/远端 SHA-256 一致；新增 `/etc/cron.d/hotcrush-task-switch`，并对白名单
+  改写 `hotcrush-member-email`、`hotcrush-recruit`、`hotcrush-birthday` 与 root 周报 crontab，未包裹
+  两条招聘数据同步。服务器原文件备份在
+  `/opt/hotcrush/backups/task-switch-20260821-1735`；此前放在 `/etc/cron.d` 的旧 member-email 备份
+  已移入该备份目录，避免 cron 扫描歧义。端到端用本来不发信的 `member_email_job` 临时切 false，
+  实际同步后 runner 正确 skip，再恢复 true 并独立回读 Base 和本地缓存均为 true；自动 15 分钟同步
+  日志也已出现，生日通知 cron 已多次记录 `allowed`。当前 5 个受控开关全部为 true，实际运行状态
+  与改造前一致；会员邮件内部模式仍为 `preview`，本次验收没有发送邮件或 Lark 测试消息。新增专项
+  测试并跑过 `npm run test:unit`，195/195 全绿。
+
 **近 12 个月等级回算只读预演**：
 
 - 新增 `res_api/lib/loyalty-levels.js`、`scripts/preview-loyalty-levels.mjs` 与单测，

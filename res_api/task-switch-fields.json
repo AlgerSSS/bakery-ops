@@ -1,0 +1,59 @@
+[
+  {
+    "type": "text",
+    "name": "任务代码",
+    "description": "稳定唯一标识；服务器控制器按此字段识别任务"
+  },
+  { "type": "text", "name": "任务名称" },
+  {
+    "type": "select",
+    "name": "管理模式",
+    "multiple": false,
+    "options": [
+      { "name": "表格开关", "hue": "Green", "lightness": "Lighter" },
+      { "name": "仅查看", "hue": "Gray", "lightness": "Lighter" }
+    ]
+  },
+  { "type": "checkbox", "name": "启用" },
+  {
+    "type": "select",
+    "name": "当前模式",
+    "multiple": false,
+    "options": [
+      { "name": "正常运行", "hue": "Green", "lightness": "Lighter" },
+      { "name": "预览（不发送）", "hue": "Blue", "lightness": "Lighter" },
+      { "name": "暂停", "hue": "Red", "lightness": "Lighter" },
+      { "name": "仅查看", "hue": "Gray", "lightness": "Lighter" }
+    ]
+  },
+  {
+    "type": "select",
+    "name": "类型",
+    "multiple": false,
+    "options": [
+      { "name": "Lark推送", "hue": "Blue", "lightness": "Lighter" },
+      { "name": "邮件", "hue": "Purple", "lightness": "Lighter" },
+      { "name": "数据同步", "hue": "Turquoise", "lightness": "Lighter" },
+      { "name": "系统维护", "hue": "Gray", "lightness": "Lighter" },
+      { "name": "核心写入", "hue": "Red", "lightness": "Lighter" }
+    ]
+  },
+  { "type": "text", "name": "调度" },
+  { "type": "text", "name": "运行位置" },
+  { "type": "text", "name": "关闭影响" },
+  {
+    "type": "select",
+    "name": "故障策略",
+    "multiple": false,
+    "options": [
+      { "name": "沿用最后状态", "hue": "Orange", "lightness": "Lighter" },
+      { "name": "不适用", "hue": "Gray", "lightness": "Lighter" }
+    ]
+  },
+  { "type": "text", "name": "备注" },
+  {
+    "type": "updated_at",
+    "name": "更新时间",
+    "style": { "format": "yyyy-MM-dd HH:mm" }
+  }
+]

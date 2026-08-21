@@ -1,0 +1,5 @@
+# Refresh the Lark task switch cache every 15 minutes. Jobs read the last valid
+# cache, so a temporary Lark outage does not overwrite the previous decision.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+*/15 * * * * root cd /opt/hotcrush/res_api && /usr/bin/node scripts/sync-task-switches.mjs >> output/logs/task-switch-sync.log 2>&1

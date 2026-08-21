@@ -6,6 +6,26 @@
 
 ---
 
+## Brain 中财务网站源码定位与 R6 评审纠正（2026-08-21，Codex，只读核验）
+
+用户指出此前“当前本机没有可复核的完整财务源码”的结论可能错误。已在 Brain 中定位唯一带
+`hotcrush-finance` Git remote 的完整仓库：
+`~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Brain/raw/General/雅楠需求/门店财务AI分析系统`。
+它不是零散资料或旧截图：仓库 `master`/`origin/master` 均在 `e3d9eca`，Vercel 绑定项目为
+`hotcrush-finance`，自身 HANDOFF 记录生产域名 `finance.hotcrush.net`、共享 Supabase 迁移账本和已上线修复。
+本轮运行其 `npm test`，497/497 通过且 `db integration --static: ok`；未读取或输出 `.env`，未修改财务
+源码、数据库、Vercel 或生产部署。
+
+更正评审结论：财务网站源码现在可以完整复核。它通过 `DATABASE_URL` 直连共享 PostgreSQL，读取
+`daily_revenue`、`item_hourly_sales`、`pos_product`、`item_waste`，并读写 `finance_*`、`cost_card_*`、
+`app_*` 数据域；服务端已有权限/门店范围、审计、事务导入、成本卡发布，以及从授权快照重建财务事实包、
+匿名化后才允许外部 AI 增强的受测边界。R6 Green 当前仍不能承接这个网站，但原因不再是“源码缺失”，而是
+现有 18 表只覆盖 Raw/处理控制、POS 日小时汇总、RAG、Agent 与来源同步，尚无上述财务事实、成本卡和财务
+账号权限对象。下一步架构评审应以这个仓库的真实调用路径建立 R6 财务兼容矩阵，保留财务域边界并通过受控
+只读 API/Tool 接入 Agent，不能只把 `finance-private` Storage bucket 当成财务业务层。
+
+---
+
 ## Lark Wiki 自动同步调整为每小时（2026-08-21，Codex，已部署）
 
 用户要求把 Lark 知识库自动同步从每 30 分钟改为每小时。仓库中的

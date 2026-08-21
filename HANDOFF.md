@@ -6,6 +6,22 @@
 
 ---
 
+## Lark Wiki 自动同步调整为每小时（2026-08-21，Codex，已部署）
+
+用户要求把 Lark 知识库自动同步从每 30 分钟改为每小时。仓库中的
+`hotcrush-lark-wiki-sync.timer` 已将 `OnUnitActiveSec` 从 `30min` 改为 `1h`，说明、测试、R6 蓝图、
+完成度审计、详细 SVG/PNG 汇报图和远端验收门禁均同步更新；验收脚本现在会读取 systemd 实际解析结果，
+要求 `OnUnitActiveUSec=1h`，避免只改仓库而服务器继续旧周期。
+
+东京服务器 `/etc/systemd/system/hotcrush-lark-wiki-sync.timer` 已完成同样替换、`daemon-reload` 和 timer
+重启；远端回读为 active/enabled、`OnUnitActiveUSec=1h`，2026-08-21 15:49:41 +08 上次触发后，下一次
+计划为 16:50:33 +08（包含最多 2 分钟随机延迟）。旧 unit 可从
+`/etc/systemd/system/hotcrush-lark-wiki-sync.timer.bak-before-hourly-20260821` 恢复。本次没有重装 RAG
+Worker、没有执行数据库 DDL/DML、没有修改旧生产连接或其他定时任务。数据平台 65 项 pytest、Ruff、
+shell 语法和 `git diff --check` 均通过。
+
+---
+
 ## R6 Green 独立 Supabase 数据平台基座（2026-08-21，Codex，已实施/未切库）
 
 用户最终收紧本阶段边界：先重建独立的 `hotcrush-core-r6-green`
@@ -160,7 +176,7 @@ read permission`。所以当前只具备“按已知链接读取”，不具备�
 bot 随后可遍历全部 8 个空间，首轮 24 个节点同步成功，第二轮 24 个均判定 unchanged，0 failed，证明
 幂等。R6 新增 migration 26/27 与 `ai_source_connector`、`ai_source_sync_run`、`ai_source_item`，migration
 28 为 `last_seen_sync_run_id` 外键补专用索引；tokyo-01
-已部署每 30 分钟运行的 `hotcrush-lark-wiki-sync.timer`；C1 自动进入 RAG，C2 待审，C3/C4 不自动发布。
+已部署每小时运行的 `hotcrush-lark-wiki-sync.timer`；C1 自动进入 RAG，C2 待审，C3/C4 不自动发布。
 当前 Lark 来源为 24 份文档，其中 8 份 C1 已 READY 且具备 chunk/vector；在线 Lark 文档使用原始引用 URI，
 不伪造 PDF 页码。旧应用配置和旧生产库连接仍未修改。BakeryOps 的 `SupabaseKnowledgeClient` 已从旧
 `ai_search_knowledge` 改为 citation-aware v2，单元测试和真实查询均证明 Lark 返回“在线文档”与原 URI。

@@ -1,9 +1,9 @@
 [Unit]
-Description=Run Hot Crush Lark Wiki sync every 30 minutes
+Description=Run Hot Crush Lark Wiki sync every hour
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=30min
+OnUnitActiveSec=1h
 RandomizedDelaySec=2min
 Persistent=true
 Unit=hotcrush-lark-wiki-sync.service

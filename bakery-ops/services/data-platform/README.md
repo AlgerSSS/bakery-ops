@@ -63,7 +63,7 @@ also dry-run unless `--apply` is explicit; they retain the original, review, chu
 allowlisted by `ai_list_source_connectors`, traverses each Wiki space, stores exact PDF bytes or a
 canonical Docx raw JSON payload, and records source revision/SHA/Lark URI. Database-owned space
 classification decides whether the document is C1 auto-RAG, C2 review-required, or C3/C4 blocked.
-The Tokyo systemd timer runs it every 30 minutes; online Docx chunks have null page numbers and use
+The Tokyo systemd timer runs it every hour; online Docx chunks have null page numbers and use
 the original Lark URI as their citation.
 
 `brainctl auto` was the earlier local unattended C1 entry point. It never consumes a review ledger, so C2/C3/C4

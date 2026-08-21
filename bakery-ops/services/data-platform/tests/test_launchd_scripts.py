@@ -272,10 +272,10 @@ def test_lark_sync_service_uses_only_encrypted_machine_credentials() -> None:
     assert "ProtectSystem=strict" in unit
 
 
-def test_lark_sync_timer_is_persistent_and_bounded_to_thirty_minutes() -> None:
+def test_lark_sync_timer_is_persistent_and_runs_hourly() -> None:
     timer = LARK_TIMER.read_text(encoding="utf-8")
 
-    assert "OnUnitActiveSec=30min" in timer
+    assert "OnUnitActiveSec=1h" in timer
     assert "RandomizedDelaySec=2min" in timer
     assert "Persistent=true" in timer
     assert "Unit=hotcrush-lark-wiki-sync.service" in timer

@@ -266,7 +266,7 @@
     <text x="380" y="1721" class="card-body">财务、法务、市场、人事、营运、</text>
     <text x="380" y="1752" class="card-body">公共、供应链、总经办</text>
     <rect x="380" y="1771" width="170" height="27" rx="13" fill="#E0EFE4"/>
-    <text x="465" y="1790" text-anchor="middle" class="badge" fill="#2D6945">每 30 分钟自动扫描</text>
+    <text x="465" y="1790" text-anchor="middle" class="badge" fill="#2D6945">每小时自动扫描</text>
   </g>
   <g filter="url(#shadow)">
     <rect x="795" y="1632" width="420" height="180" rx="18" fill="#FFFFFF"/>
@@ -303,7 +303,7 @@
 
   <rect x="2245" y="330" width="230" height="94" rx="15" fill="#FFFFFF" filter="url(#shadow)"/>
   <text x="2360" y="363" text-anchor="middle" class="card-title">① 定时发现</text>
-  <text x="2360" y="397" text-anchor="middle" class="rail-body">Lark 每 30 分钟扫描</text>
+  <text x="2360" y="397" text-anchor="middle" class="rail-body">Lark 每小时扫描</text>
   <line x1="2360" y1="427" x2="2360" y2="464" stroke="#4F795B" stroke-width="4" marker-end="url(#arrow)"/>
 
   <rect x="2245" y="470" width="230" height="106" rx="15" fill="#FFFFFF" filter="url(#shadow)"/>

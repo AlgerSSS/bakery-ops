@@ -16,7 +16,7 @@ R6 Green 已建成一个适合单店阶段的 Supabase 分层数据平台：
 - 在同一个 Supabase Project 内使用 PostgreSQL、Storage、pgvector、RLS、RPC、Cron 和 Realtime。
 - Raw 原件放私有 Storage，PostgreSQL 只放元数据与处理状态。
 - Processed 层只建立已有明确粒度的结构化事实；目前已有 POS 日销售和小时销售版本表。
-- Lark 已成为权威知识入口：tokyo-01 每 30 分钟遍历 8 个显式 allowlist 团队空间，保存不可变 Raw、来源血缘和同步状态；C1 自动进入 RAG，C2 等待审阅，C3/C4 不自动发布。
+- Lark 已成为权威知识入口：tokyo-01 每小时遍历 8 个显式 allowlist 团队空间，保存不可变 Raw、来源血缘和同步状态；C1 自动进入 RAG，C2 等待审阅，C3/C4 不自动发布。
 - 历史 PDF RAG 仍保留 manifest 分级、逐文件审阅账本、源文件/manifest 哈希绑定、权限内去重、解析/OCR、切块、embedding、发布、检索和可逆回滚。Mac Brain 自动发现已退出主流程，不再要求 Full Disk Access。
 - POS 已具备 Raw 文件校验、日/小时交叉对账、有界范围回填、版本发布、隔离和恢复的结构化 worker。
 - Agent 层只保存运行账本和追加事件，不让 Agent 直接任意写业务表。
@@ -97,7 +97,7 @@ Cron 不应每天全量复制 Raw；它是补偿机制，不是主数据流。
 ```mermaid
 flowchart TB
   subgraph S[写入源]
-    LARK[Lark 8 个团队知识空间<br/>tokyo-01 每 30 分钟扫描]
+    LARK[Lark 8 个团队知识空间<br/>tokyo-01 每小时扫描]
     POS[RES POS / 旧库只读历史回填]
     PDF[历史 Brain PDF<br/>不再作为自动入口]
   end
@@ -322,7 +322,7 @@ sequenceDiagram
   participant ST as Private Storage
   participant W as RAG worker
 
-  T->>S: 每 30 分钟启动一次
+  T->>S: 每小时启动一次
   S->>DB: ai_list_source_connectors()
   loop 8 个 allowlist 空间
     S->>L: 完整遍历节点
@@ -399,7 +399,7 @@ PENDING → RUNNING → SUCCEEDED
 
 | unit | 频率 | 作用 |
 |---|---:|---|
-| `hotcrush-lark-wiki-sync.timer` | 每 30 分钟，最多 2 分钟随机延迟 | 遍历 8 个 Lark 空间、登记 Raw 和来源血缘；active/enabled |
+| `hotcrush-lark-wiki-sync.timer` | 每小时，最多 2 分钟随机延迟 | 遍历 8 个 Lark 空间、登记 Raw 和来源血缘；active/enabled |
 | `hotcrush-lark-wiki-sync.service` | oneshot，20 分钟上限 | 使用 systemd encrypted credentials 执行一次有界同步 |
 | `hotcrush-rag-worker.service` | 常驻 | 领取 C1 ingest run，执行解析/OCR、分块、embedding 和原子发布 |
 
@@ -524,7 +524,7 @@ BakeryOps build、远端 migration/lint/来源新鲜度、稳定 PDF 基线、�
 8. 已完成历史回滚抽样：2026-02-15 隔离时 current 229→228，259/2742 个日/小时版本保留，恢复后回到 229 并再次对账 0 差异。
 9. 已完成 70 份 `REVIEW_REQUIRED` 清单决策：3 份安全 C2 批准，67 份拒绝；数据库批准记录绑定原 manifest 与源文件 SHA，冲突重放会失败。
 10. 已完成代表性 RAG 验收：C1 价格表、C2 会员方案、C2 HR 制度均命中预期标题/页码；C1 与 C2 均完成真实 unpublish/restore。
-11. 已完成 Lark 权威入口：8 个团队空间 allowlist、24 节点首轮同步、幂等复跑、C1 自动 RAG、C2/C3 阻断、Lark URI 引用和 30 分钟 timer 均有远端证据。
+11. 已完成 Lark 权威入口：8 个团队空间 allowlist、24 节点首轮同步、幂等复跑、C1 自动 RAG、C2/C3 阻断、Lark URI 引用和每小时 timer 均有远端证据。
 12. 待完成：实现可证明的 C3 脱敏流水线，并扩展正式业务黄金问题集；不以“向量有数据”或布尔标记代替质量/安全验收。
 13. 单独批准后才开启一个项目的 POS 影子写入；后续再批准切读。
 14. 所有写入者切换、高水位一致且回滚演练通过后，才考虑冻结旧库写入。

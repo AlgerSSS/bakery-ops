@@ -236,6 +236,8 @@ run_remote() {
       set -e
       test "$(systemctl is-active hotcrush-lark-wiki-sync.timer)" = active
       test "$(systemctl is-enabled hotcrush-lark-wiki-sync.timer)" = enabled
+      systemctl show hotcrush-lark-wiki-sync.timer -p TimersMonotonic --value \
+        | grep -Fq "OnUnitActiveUSec=1h"
       test "$(systemctl show hotcrush-lark-wiki-sync.service -p Result --value)" = success
       test "$(systemctl show hotcrush-lark-wiki-sync.service -p ExecMainStatus --value)" = 0
       test "$(systemctl is-active hotcrush-rag-worker)" = active

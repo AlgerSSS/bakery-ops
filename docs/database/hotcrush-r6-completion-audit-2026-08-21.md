@@ -7,7 +7,7 @@
 
 R6 数据平台在当前授权边界内已经形成可重建、可运行、可监控、可回滚的闭环。此前把 Mac Brain 目录
 当成权威入口，因此 macOS TCC 被列为完成阻塞；用户随后纠正了错误前提：权威入口是 Lark 团队知识库。
-现在入口已改为 tokyo-01 每 30 分钟遍历 8 个 allowlist Wiki 空间，Mac LaunchAgent 已退出主流程，
+现在入口已改为 tokyo-01 每小时遍历 8 个 allowlist Wiki 空间，Mac LaunchAgent 已退出主流程，
 Full Disk Access 不再是完成条件。
 
 这不代表现网已经切到 R6。用户明确要求旧生产继续运行且不得改旧应用配置，因此持续 POS 增量、
@@ -43,7 +43,7 @@ Full Disk Access 不再是完成条件。
 
 ```text
 Lark 8 个 allowlist 团队空间
-  → tokyo-01 systemd timer 每 30 分钟完整遍历
+  → tokyo-01 systemd timer 每小时完整遍历
   → Docx：保存 canonical raw JSON；PDF：保存精确原文件 bytes
   → Private Storage + ops_raw_batch/object + ai_source_item 血缘
   → C1：自动建立 ingest run

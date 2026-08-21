@@ -651,6 +651,23 @@ as $$
   );
 $$;
 
+create or replace function public.ops_get_finance_domain_totals()
+returns table (domain text, store_scope text, rows bigint, amount numeric)
+language sql
+stable
+security definer
+set search_path = ''
+set statement_timeout = '5s'
+as $$
+  select fact.domain, fact.store_scope, count(*)::bigint, sum(fact.amount)
+  from public.v_fin_month_fact_current as fact
+  group by fact.domain, fact.store_scope
+  order by fact.domain, fact.store_scope;
+$$;
+
+comment on function public.ops_get_finance_domain_totals() is
+  'Row count and summed amount per finance domain and store scope. Counts alone would reconcile even if every amount were zero, so the migration check compares both.';
+
 comment on function public.ops_get_finance_summary() is
   'Aggregate finance-domain health. Reports referential orphans across cost-card levels instead of assuming a clean import; a non-zero orphan count is a real migration defect, not noise.';
 
@@ -674,6 +691,7 @@ revoke all on function public.ops_load_finance_monthly(bigint, text, jsonb, json
 revoke all on function public.ops_load_finance_cost_cards(bigint, text, jsonb, jsonb, jsonb, jsonb)
   from public, anon, authenticated;
 revoke all on function public.ops_get_finance_summary() from public, anon, authenticated;
+revoke all on function public.ops_get_finance_domain_totals() from public, anon, authenticated;
 
 grant execute on function public.ops_register_raw_batch(text, text, text, text, text, timestamptz, timestamptz, bigint, jsonb)
   to hc_finance_writer;
@@ -682,11 +700,24 @@ grant execute on function public.ops_register_raw_object(uuid, text, text, chara
 grant execute on function public.ops_complete_raw_batch(uuid, bigint, bigint, text[], text, text)
   to hc_finance_writer;
 
+-- service_role is how the finance worker connects, so it needs the loaders - but it must not
+-- get a direct read on the fact tables or their views. Reaching finance data has to go through
+-- a leased processing run or the aggregate summary, exactly as the POS domain already requires.
+revoke all on public.fin_month_fact, public.fin_revenue_day, public.fin_cost_item,
+               public.fin_cost_item_price, public.fin_cost_recipe, public.fin_cost_recipe_item
+  from public, anon, authenticated, service_role;
+revoke all on public.v_fin_month_fact_current, public.v_fin_revenue_day_current,
+               public.v_fin_cost_item_current, public.v_fin_cost_item_price_current,
+               public.v_fin_cost_recipe_current, public.v_fin_cost_recipe_item_current
+  from public, anon, authenticated, service_role;
+
 grant execute on function public.ops_load_finance_monthly(bigint, text, jsonb, jsonb),
                         public.ops_load_finance_cost_cards(bigint, text, jsonb, jsonb, jsonb, jsonb)
-  to hc_ops_processor;
+  to service_role, hc_ops_processor;
 
-grant execute on function public.ops_get_finance_summary() to hc_ops_processor, hc_agent_worker;
+grant execute on function public.ops_get_finance_summary(),
+                        public.ops_get_finance_domain_totals()
+  to service_role, hc_ops_processor, hc_agent_worker;
 
 comment on role hc_finance_writer is
   'Finance ingestion capability; registers immutable finance Raw batches. It cannot load facts directly - loading stays with hc_ops_processor under an active lease.';

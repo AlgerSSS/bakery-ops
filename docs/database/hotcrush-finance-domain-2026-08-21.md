@@ -105,10 +105,26 @@ RestoSuite 的 `avgTicket` 口径经验证为 `netSales / billCount`（1,566,756
 
 ### 验证
 
-- pgTAP：14 个文件、**154 项断言**（原 135，财务域新增 19）
-- Python：**88 项**（原 65，财务解析 20 + Raw 制品校验 7 剔重后净增 23）
-- RES Node：**153 项**（原 143，财务导出新增 10）
-- 真实生产数据预检：545 条月度行、3698 条成本卡行全部通过解析与引用完整性校验
+- pgTAP：14 个文件、**157 项断言**（原 135，财务域新增 22）
+- Python：**92 项**（原 65）
+- RES Node：**153 项**（原 143）
+- **端到端实跑**：拿真实生产数据完整跑通「导出 → 注册 Raw → worker 领租约 → 解析 → 装载 → 对账」
+
+端到端对账结果 `ok: true`，14 项检查零 mismatch，每个域的行数与金额都与旧库一致：
+
+| 域 / 口径 | 行数 | 金额 |
+|---|---:|---:|
+| PL_METRIC / STORE | 66 | 11,201,859.98 |
+| EXPENSE / STORE | 103 | 2,504,579.87 |
+| LABOR / STORE | 148 | 4,493,182.25 |
+| MATERIAL / STORE | 48 | 2,940,991.97 |
+| CASHFLOW / STORE | 42 | 2,018,811.50 |
+| TARGET / GROUP | 69 | 33,906,375.00 |
+| TARGET / STORE | 69 | 33,906,375.00 |
+
+成本卡 471 / 344 / 430 / 2453，三类孤儿引用均为 0。
+
+对账刻意同时比对**行数和金额合计** —— 只比行数的话，一次把所有金额清零的装载也会「通过」。
 
 ### 代码位置
 
@@ -117,7 +133,18 @@ RestoSuite 的 `avgTicket` 口径经验证为 `netSales / billCount`（1,566,756
 - 解析：`bakery-ops/services/data-platform/hotcrush_data_platform/finance_pipeline.py`
 - Worker：`bakery-ops/services/data-platform/hotcrush_data_platform/finance_worker.py`
 - 导出：`res_api/lib/r6-finance-export.js`
-- CLI：`res_api/scripts/backfill-r6-finance.js`
+- 迁移 CLI：`res_api/scripts/backfill-r6-finance.js`
+- 对账 CLI：`res_api/scripts/verify-r6-finance.js`
+- 共享 Raw 校验：`bakery-ops/services/data-platform/hotcrush_data_platform/raw_artifacts.py`
+
+### 端到端实跑抓到的第二个缺陷
+
+单元测试全绿之后，端到端实跑仍然失败：`permission denied for function ops_load_finance_monthly`。
+原因是 worker 以 `service_role` 连接，而我只把执行权授给了 `hc_ops_processor`。
+对照 POS 域才发现它的约定是两条：**授 `service_role` 执行 RPC，同时 revoke 掉
+`service_role` 对事实表和视图的直读**。两条我都漏了，现在都补上并加了断言。
+
+这个缺陷单元测试抓不到 —— 只有真的跑一遍才会暴露。
 
 ### 顺带修掉的一个隐患
 
@@ -129,8 +156,15 @@ Raw 制品的 size / sha256 校验原先只存在于 `pos_worker.py` 内部，�
 
 1. **迁移未推送到 R6 线上。** `supabase db push --linked` 被权限拦截。
    在推送之前，R6 线上不存在这 6 张表，数据迁移也无法执行。
-2. **数据未装载。** 推送后需依次执行：
-   `node res_api/scripts/backfill-r6-finance.js --r6-store=HC001`，
-   再由财务 worker 领取租约完成装载，最后用 `ops_get_finance_summary()` 对账。
+2. **数据未装载到 R6 线上。** 整条链路已在本地 Supabase 用真实生产数据跑通并对账通过，
+   推送后对着 R6 重复同样三步即可：
+
+   ```
+   node res_api/scripts/backfill-r6-finance.js --r6-store=HC001
+   uv run python -m hotcrush_data_platform.finance_worker --max-runs 5
+   node res_api/scripts/verify-r6-finance.js
+   ```
+
+   第三步必须返回 `ok: true`；它同时比对行数和金额，任何一项不符都会以非零码退出。
 3. **财务站仍连旧库。** 本轮不改 `DATABASE_URL`、不改 Vercel 变量 —— 与既有约束一致。
 4. **2026-04-12 旧库修正未执行**（见第一节）。

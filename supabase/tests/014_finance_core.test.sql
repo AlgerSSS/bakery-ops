@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select extensions.plan(19);
+select extensions.plan(22);
 
 -- ---------------------------------------------------------------------------
 -- Monthly finance facts
@@ -109,6 +109,13 @@ select extensions.throws_ok($$
   values ((select batch_id from fin_batch), 'TARGET', 'z', '2026-03', 'HC001', 'REGION', 1, '{}'::jsonb)
 $$, '23514', null, 'an unknown store scope is rejected');
 
+-- Reconciliation compares amounts, not just counts: a load that dropped every value would
+-- still match on row count.
+select extensions.is(
+  (select amount from public.ops_get_finance_domain_totals()
+   where domain = 'TARGET' and store_scope = 'STORE'),
+  1766000.00::numeric, 'domain totals report the summed amount per domain and scope');
+
 -- ---------------------------------------------------------------------------
 -- Cost cards
 -- ---------------------------------------------------------------------------
@@ -188,6 +195,16 @@ select extensions.is(
 select extensions.ok(
   not has_function_privilege('hc_pos_writer', 'public.ops_load_finance_monthly(bigint, text, jsonb, jsonb)', 'execute'),
   'the POS writer capability cannot load finance facts');
+
+-- The worker connects as service_role, so it must be able to call the loader...
+select extensions.ok(
+  has_function_privilege('service_role', 'public.ops_load_finance_monthly(bigint, text, jsonb, jsonb)', 'execute'),
+  'service_role can run the finance loader, which is how the worker reaches it');
+
+-- ...but must not be able to read the facts directly, or the leased-run boundary is pointless.
+select extensions.ok(
+  not has_table_privilege('service_role', 'public.fin_month_fact', 'select'),
+  'service_role cannot read finance facts directly, only through a leased run or the summary');
 
 select * from extensions.finish();
 rollback;

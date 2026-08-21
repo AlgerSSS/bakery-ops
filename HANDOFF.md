@@ -104,6 +104,33 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   “表里有一行”误报成自动投递完成。测试收件人、通道测试和 `res_subscribed` 口径已经确认；
   正式发送前仍须逐项确认邮件内容和退订处理地址，在此之前不得把 cron 切到 live。
 
+- **五封会员邮件正文已落库（2026-08-21，Claude Code 接管）**：按 Lark 原方案
+  `HU22dHZwio6RQ8xrvqij3eq9pgc`（「See You Often」日常储值方案-完整版，obj_edit_time 2026-08-21 12:27）
+  逐条对齐口径后起草标题与 HTML，写入 Base `CE6WbyvHNayXh8sgByWjArJlpvh` 表 `tble1DdoQGjfydrI`
+  的 5 行；`batch_update` 返回 code=0，随后独立回读 5/5 标题与 HTML 与本地逐字节一致，
+  再把线上内容喂回 `lib/member-email.js` 的 `normalizeTemplateRecords`+`renderTemplate` 真实校验，
+  5/5 通过（含 `{{member_name}}` 注入转义、上线必需链接检查）。**`启用` 仍全部为 false，服务器仍是
+  `MEMBER_EMAIL_MODE=preview`，本次没有发送任何邮件。** 邮件为中英双语、纯内联样式无外链资源。
+  内容口径：T-5 蛋糕仅 L3/L4 且写明 450 积分、T-2 巴斯克 L2 起、蛋糕与巴斯克二选一且生日月限一次、
+  滚动 12 个月、降级每月 1 日一次最多一级、生日月不降级、积分永久有效、已领权益不追回。
+  写入用的是 app `cli_aa82af2c7878de17` 的 tenant token；此前写返回 91403，是用户把该应用加为
+  该 Base 协作者后才生效——换台机器操作前先确认这个协作者关系还在。
+- **接管时发现的三处待决（2026-08-21，未处理）**：
+  1. **积分商城与 Lark 原方案冲突**：方案原文写「8.29 首发不启动积分兑换周边」，小件改作 HBTI 资料礼品；
+     但用户 2026-08-20 曾指示把 13 个周边加进积分兑换。用户 08-21 回复「按照我的 lark 文件去走」，
+     字面结论是**线上现有 2 个商品应下架**而非改价上架，但用户尚未在两种读法之间明确选边，
+     **不要凭这条就去改 RES**。
+  2. **450 积分**在方案里仍标【待定·成本核算中】，且方案要求印刷物料不印该数字；本次仍写进了
+     T-5 蛋糕邮件（预约邮件不写价格无法转化）。若定价变动必须同步改这一行。
+  3. **降级结构性阻塞**：`bakery-ops/src/modules/data/migrations/113_loyalty_downgrade_notice_gate.sql:53`
+     硬约束 `CHECK (delivery_channel = 'res_sms')`。项目已放弃 RES 短信改走 Lark Mail，该门禁因此
+     永远无法满足，2026-11 首次降级会被结构性挡死。要跑通需新增迁移放行 `lark_mail`。另外方案要求的
+     「降级前 7 天、告知保级差额」预警邮件**没有模板**，现有 `tier_downgrade` 是降级后的事后通知，
+     `TEMPLATE_POLICIES` 的变量白名单里也没有差额字段。
+- **本次接管的环境限制**：Claude Code 会话的安全策略拦截了 `ssh root@45.77.12.118`，
+  因此**没有**读写 RES、没有碰服务器、没有改 cron；本地 `res_api` 无 `storageState.json`，
+  RES 只读预览也跑不了。涉及 RES / tokyo-01 的动作需在有 SSH 权限的会话里做。
+
 - **Lark 自动任务开关中心（2026-08-21）**：用户要求把 Vultr 与项目里的定时推送集中到多维表格
   管理。已创建 [`HOT CRUSH 自动任务开关中心`](https://fjpks7iroa9l.jp.larksuite.com/base/ZgQ4bYgRkaJKDUsj9mjjWMRupkd)
   （Base `ZgQ4bYgRkaJKDUsj9mjjWMRupkd`，表 `tbl50MRrv8oDbReO`，默认视图

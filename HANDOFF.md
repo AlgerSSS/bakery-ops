@@ -60,11 +60,12 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   全员，但字段语义未证明等于明确的邮件营销同意，不能据此跳过 consent/退订管理。RES 生成的
   正式邮件会自动附带 unsubscribe 链接。若用户允许放宽“只通过 RES”约束，可评估服务器接 Brevo
   免费层（官方当前为 300 封/日），但需自有域名 DNS 验证、API key、退订/退信同步及先补充会员
-  邮箱；在用户确认前不创建外部账户、不发邮件。用户随后提出由自有 Vultr 服务器运行发送脚本：
-  推荐边界是 **Vultr 负责 10:00 MYT 定时、名单、幂等与自定义 HTML，Brevo 免费 SMTP/API 只做
-  最后一跳投递**，这不依赖 RES；不推荐 Vultr 自建 Postfix 直投，因为 Vultr 默认封出站 TCP 25，
-  即使申请解封仍需 PTR/SPF/DKIM/DMARC、IP 信誉、退信/投诉/退订与封禁名单运维。待用户先确认
-  “Vultr 脚本 + Brevo 免费中继”边界；确认前不建账号、不改 DNS、不部署、不发送。
+  邮箱；在用户确认前不创建外部账户、不发邮件。用户随后说明企业邮箱本身由 Lark Mail 托管，并
+  指定 `pavilionstore.my@hotcrush.net` 为发件邮箱，因此 Brevo 不再是首选。Lark 官方支持第三方客户端
+  通过 `smtp.larksuite.com:465`（SSL）发送；Vultr 可负责 10:00 MYT 定时、名单、幂等与自定义 HTML，
+  Lark Mail 负责最后一跳，完全不依赖 RES。SMTP 登录不能使用现有 Lark App ID/Secret，必须由该邮箱
+  在 Lark 桌面版“Settings > Email > Third-party email client login > Set Up Now”生成 dedicated
+  password。待用户确认该入口可见并生成专用密码；确认前不改服务器、不部署、不发送。
 
 **近 12 个月等级回算只读预演**：
 

@@ -111,7 +111,8 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   明日面试/试工预告、总经办自动周报、会员邮件任务；其余招聘/RES 同步、会员等级单写者、HBTI
   令牌维护和 Lark Wiki 同步共 8 项标为“仅查看”，防止运营开关破坏数据完整性。
   开关是**额外许可门禁**：关闭必定跳过，打开只允许任务按原配置运行，绝不能绕过会员邮件的
-  preview/模板/consent/退订/额度门禁。`scripts/sync-task-switches.mjs` 每 15 分钟用用户身份读取 Base，
+  preview/模板/consent/退订/额度门禁。`scripts/sync-task-switches.mjs` 最初每 15 分钟读取 Base；用户随后
+  要求改为**每小时整点一次**，因此表格开关最长约 60 分钟生效。同步使用用户身份，
   只有 5 行齐全、代码唯一、管理模式正确且 `启用` 为布尔值时才原子替换
   `/var/lib/hotcrush-task-switch/state.json`；临时 Lark 故障沿用最后一次有效缓存，缓存缺失/损坏则受控
   推送 fail closed。`scripts/task-switch-run.mjs` 不经 shell 执行固定 cron 命令并透传退出码。
@@ -120,7 +121,7 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   两条招聘数据同步。服务器原文件备份在
   `/opt/hotcrush/backups/task-switch-20260821-1735`；此前放在 `/etc/cron.d` 的旧 member-email 备份
   已移入该备份目录，避免 cron 扫描歧义。端到端用本来不发信的 `member_email_job` 临时切 false，
-  实际同步后 runner 正确 skip，再恢复 true 并独立回读 Base 和本地缓存均为 true；自动 15 分钟同步
+  实际同步后 runner 正确 skip，再恢复 true 并独立回读 Base 和本地缓存均为 true；自动同步
   日志也已出现，生日通知 cron 已多次记录 `allowed`。当前 5 个受控开关全部为 true，实际运行状态
   与改造前一致；会员邮件内部模式仍为 `preview`，本次验收没有发送邮件或 Lark 测试消息。新增专项
   测试并跑过 `npm run test:unit`，195/195 全绿。

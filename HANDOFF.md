@@ -146,6 +146,16 @@ acceptance 为 109 pgTAP / 56 Python / 143+22 RES / 463 BakeryOps / Next build�
 用户授权后重新恢复目标，第一步只需重跑 installer 并保存 `first background run exited 0`、launchctl
 `last exit code = 0` 和空 stderr 证据；旧生产配置仍禁止修改。
 
+2026-08-21 用户随后纠正了来源前提：权威文件入口是 Lark 知识库，不是 Mac Brain 目录。因此不要再推进
+LaunchAgent/Full Disk Access；目标入口应改为 tokyo-01 定时读取 Lark Wiki，写入 R6 Raw，再由现有
+`hotcrush-rag-worker` 处理。只读实测确认 tokyo-01 现有 `/opt/hotcrush/scripts/lark_app.json` 为 600、
+凭证有效，RAG worker 仍 active；应用能用 tenant token 解析两个已知 Wiki 链接并读取其 docx raw content
+（分别 5,122/7,492 字符）。但 `GET /wiki/v2/spaces` 返回 0 个空间，遍历这两个文档所在 space
+`7613405956986113558` 时返回 Lark `131006 permission denied: wiki space permission denied, tenant needs
+read permission`。所以当前只具备“按已知链接读取”，不具备“完整知识空间定时遍历”。下一步先让用户确认
+同步空间/根节点，并把现有 Lark 应用加入对应知识空间的只读成员；同时每个根节点必须显式映射 C1/C2/C3/C4，
+不能把未分类的整个空间默认当作 C1。权限到位前不得部署一个会假报成功的 Wiki 定时抓取服务。
+
 ---
 
 ## See You Often 会员体系接管与生产差距审计（2026-08-20，Codex，在途/只读）

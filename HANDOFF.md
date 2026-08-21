@@ -80,7 +80,8 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   （Base `CE6WbyvHNayXh8sgByWjArJlpvh`，表 `tble1DdoQGjfydrI`，时区
   `Asia/Kuala_Lumpur`），内含 `birthday_cake_t5`、`birthday_basque_t2`、
   `birthday_card_t0`、`tier_upgrade`、`tier_downgrade` 五行。标题、HTML、启用开关、测试收件人
-  均可由用户自行编辑；五行当前全部关闭，标题/HTML/测试收件人均为空。新增
+  均可由用户自行编辑；五行当前全部关闭，标题/HTML 仍为空，测试收件人已统一设置为
+  `weiliangshao1@gmail.com` 并经 5/5 行独立回读确认。新增
   `res_api/lib/member-email.js`、`scripts/member-email-dispatch.mjs`、
   `member-email-daily.sh` 与专项测试：只认固定模板代码和变量白名单；会员变量做 HTML 转义；
   拒绝脚本/事件属性/危险 URL；生日受众按 T-5=L3/L4 积分蛋糕、T-2=L2-L4 巴斯克、T0=全部
@@ -92,6 +93,10 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   `/etc/cron.d/hotcrush-member-email` 已安装为每日 **10:00 MYT**，当前强制
   `MEMBER_EMAIL_MODE=preview`，手动跑同一入口 exit=0、失败标记不存在，只校验 Base 而不会读取
   名单或发送；cron 服务 active。生日链路已接通到发送函数但保持关闭；
+  2026-08-21 17:00 MYT 经用户明确授权，从公共邮箱 `pavilionstore.my@hotcrush.net` 向上述测试
+  收件人只发送了一封标题为 `[HOT CRUSH] Lark Mail 通道测试` 的独立链路测试邮件；原生发送接口
+  返回唯一 message id，随后以公共邮箱地址查询 `send_status`，收件人状态为 `4`（delivered）。
+  此次没有读取会员名单、没有触发五种会员模板，也没有把任何 Base 开关或服务器 cron 切到 live。
   升级/降级行当前只作配置，尚缺可靠的等级事件队列，脚本若发现其被启用会 fail closed，不能把
   “表里有一行”误报成自动投递完成。正式发送前还必须让用户逐项确认：邮件内容与测试收件人、
   是否把 RES `subscribed=true` 作为邮件 consent、退订处理地址；收到确认并完成测试发送之前不得把

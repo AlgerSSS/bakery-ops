@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
-import hmac
 import json
 import logging
 import time
@@ -15,6 +13,7 @@ from .pos_pipeline import (
     parse_legacy_pos_export,
     parse_pos_daily_artifacts,
 )
+from .raw_artifacts import download_verified_artifacts
 from .supabase_client import SupabasePlatformClient
 
 LOGGER = logging.getLogger("hotcrush-pos-worker")
@@ -30,29 +29,9 @@ def _download_verified_artifacts(
     manifest: list[dict[str, Any]],
     required_artifacts: set[str],
 ) -> dict[str, bytes]:
-    by_key: dict[str, dict[str, Any]] = {}
-    for item in manifest:
-        key = str(item.get("source_record_key") or "")
-        if key not in required_artifacts:
-            continue
-        if key in by_key:
-            raise PosDataValidationError(f"duplicate Raw object registration for {key}")
-        by_key[key] = item
-    missing = required_artifacts.difference(by_key)
-    if missing:
-        raise PosDataValidationError(f"required POS artifacts are missing: {sorted(missing)}")
-
-    artifacts: dict[str, bytes] = {}
-    for key in sorted(required_artifacts):
-        item = by_key[key]
-        content = client.download_object(str(item["bucket_id"]), str(item["object_path"]))
-        if len(content) != int(item["size_bytes"]):
-            raise PosDataValidationError(f"size mismatch for {key}")
-        actual_sha256 = hashlib.sha256(content).hexdigest()
-        if not hmac.compare_digest(actual_sha256, str(item["sha256"])):
-            raise PosDataValidationError(f"sha256 mismatch for {key}")
-        artifacts[key] = content
-    return artifacts
+    return download_verified_artifacts(
+        client, manifest, required_artifacts, error_type=PosDataValidationError
+    )
 
 
 def process_one(

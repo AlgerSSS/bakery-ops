@@ -1,0 +1,4 @@
+# Validate Lark email configuration at 10:00 MYT. Keep MODE=preview until the
+# consent policy, unsubscribe route, template content and test send are approved.
+CRON_TZ=Asia/Kuala_Lumpur
+0 10 * * * root cd /opt/hotcrush/res_api && MEMBER_EMAIL_MODE=preview ./member-email-daily.sh

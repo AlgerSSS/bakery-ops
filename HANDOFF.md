@@ -74,7 +74,28 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
   `settings/send_as` 明确返回其为可发信地址（显示名“Pavilion门店”）。注意官方 CLI v1.0.88 的
   `mail +send --mailbox <公共邮箱>` dry-run 会先调公共邮箱 `/profile`，该端点实际返回 1230001，
   因此生产脚本不要用 `+send` 快捷命令；直接调用该公共邮箱的原生 `messages/send`，其 dry-run 已
-  确认 HTML/plain text/`dedupe_key` 请求结构正确。未创建草稿、未部署发送 job、未发送邮件。
+  确认 HTML/plain text/`dedupe_key` 请求结构正确。未创建草稿、未发送邮件。
+- **Lark 邮件配置中心与服务器脚本（2026-08-21）**：已创建多维表格
+  [`HOT CRUSH 自动邮件中心`](https://fjpks7iroa9l.jp.larksuite.com/base/CE6WbyvHNayXh8sgByWjArJlpvh)
+  （Base `CE6WbyvHNayXh8sgByWjArJlpvh`，表 `tble1DdoQGjfydrI`，时区
+  `Asia/Kuala_Lumpur`），内含 `birthday_cake_t5`、`birthday_basque_t2`、
+  `birthday_card_t0`、`tier_upgrade`、`tier_downgrade` 五行。标题、HTML、启用开关、测试收件人
+  均可由用户自行编辑；五行当前全部关闭，标题/HTML/测试收件人均为空。新增
+  `res_api/lib/member-email.js`、`scripts/member-email-dispatch.mjs`、
+  `member-email-daily.sh` 与专项测试：只认固定模板代码和变量白名单；会员变量做 HTML 转义；
+  拒绝脚本/事件属性/危险 URL；生日受众按 T-5=L3/L4 积分蛋糕、T-2=L2-L4 巴斯克、T0=全部
+  生日会员筛选；邮箱/姓名/生日只在内存中使用，日志只报计数；Lark 请求体从 stdin 传入，
+  正式发送另需 Base 开关、精确确认短语、服务器 live 开关、consent 模式、退订 URL 和每日上限。
+  相关文件已按白名单部署到 tokyo-01，SHA-256 与本地一致，备份目录为
+  `/opt/hotcrush/backups/member-email-20260821-A3MaX3`；实机只读回读 5/5 行成功，RES 会话刷新后
+  受众预演读取 4,872 张卡、4,855 份档案，当日 T-5/T-2/T0 均为 0；全过程没有发送邮件。
+  `/etc/cron.d/hotcrush-member-email` 已安装为每日 **10:00 MYT**，当前强制
+  `MEMBER_EMAIL_MODE=preview`，手动跑同一入口 exit=0、失败标记不存在，只校验 Base 而不会读取
+  名单或发送；cron 服务 active。生日链路已接通到发送函数但保持关闭；
+  升级/降级行当前只作配置，尚缺可靠的等级事件队列，脚本若发现其被启用会 fail closed，不能把
+  “表里有一行”误报成自动投递完成。正式发送前还必须让用户逐项确认：邮件内容与测试收件人、
+  是否把 RES `subscribed=true` 作为邮件 consent、退订处理地址；收到确认并完成测试发送之前不得把
+  cron 切到 live。
 
 **近 12 个月等级回算只读预演**：
 

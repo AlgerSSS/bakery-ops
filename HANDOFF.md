@@ -133,6 +133,38 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
     **上架/改价端点没扫到** —— 创建表单的 JS 是按需加载的，没打开表单抓不到。
     `buildPointsMallCouponPayload` 的载荷结构至今仍是上一个 agent 的推测，从未与 RES 验证过；
     上传端点同样未调用验证。批量上架脚本尚不能安全实现。
+- **会员日 1.5 倍积分补差已开发并部署（2026-08-22，Claude Code）**：用户在三个方案里选定
+  「补差脚本」——不改 2 倍（那会把周三返利率从 15% 推到 20%，与门店把折扣率从 28.4% 压到 7.9%
+  的方向相反），也不换权益形式。
+  - **为什么要补差**：RES 的 Member Day 权益只接受 **2–9 的整数倍**，1.5 倍配不出来。
+    所以周三 RES 只发原生 1 倍，服务器在周四补 0.5 倍。
+  - **RES 积分调整契约（已用不存在的卡号安全探明，全程零写入）**：
+    `POST /crm/memberPoints/web/points/adjust`，必填 `cardNo, points, corporationId, shopId, type`
+    （`type` 10=增加 / 20=扣减），可选 `remark, adjustmentType, ownerOrgId, orgPath`。
+    字段齐全后返回 `CRM-02-1004 card not found`，即只差真实卡号。后台该操作的说明是
+    「只改资产、不生成累计数据记录」，因此补的分**不会污染成长值与等级计算**。
+  - **补差公式必须是 `floor(实付×1.5) − floor(实付)`，不是 `floor(实付×0.5)`**。
+    RM1.99 两者差 1 分。必须逐笔算再相加，先汇总再乘会少给分。单测锁死了这两个用例。
+  - 新增 `lib/member-day-points.js`、`scripts/member-day-topup.mjs`、`member-day-topup.sh`、
+    `test/member-day-points.test.js`（12 例），`npm run memberday:preview`。
+    全量单测 **207/207** 通过（原 195 + 新增 12）。
+  - **幂等是 claimed→applied 状态机，不是「跑完再记」**：调用 RES 前先写 `claimed` 并原子落盘，
+    成功后改 `applied`。RES 成功但进程崩溃的窗口会停在 `claimed`，下次运行 **fail-closed 要求人工核对，
+    绝不自动重试**——重试就是重复送分，积分送出去收不回来。账本在
+    `/var/lib/hotcrush-member-day/YYYY-MM.json`，损坏时拒绝运行而不是当成「没记录」全量重发。
+  - 正式发分三重闸门：`--apply` + `MEMBER_DAY_LIVE_ENABLED=1` + `MEMBER_DAY_CONFIRM='GRANT MEMBER DAY BONUS POINTS'`，
+    另加「业务日必须是周三」硬校验与单卡上限（超限整批拒绝，不静默发放）。四条闸门均已逐条实测拦截。
+  - 已按文件白名单部署 tokyo-01，5 个文件 SHA-256 与本地一致，远端单测 12/12。
+    `/etc/cron.d/hotcrush-member-day`：`CRON_TZ=Asia/Kuala_Lumpur`，**周四 03:30 MYT**，
+    当前 `MEMBER_DAY_MODE=preview`（只算不发）。支持 `MEMBER_DAY_BUSINESS_DATE=YYYY-MM-DD` 补跑指定周三。
+  - **真实预演（2026-08-19 周三）**：30 笔会员订单 / 22 张卡 / 合计 **741 分**
+    （≈RM74 兑换价值；若改 2 倍则约 RM148）。入口脚本端到端 exit=0，无失败标记，未发出任何积分。
+  - ⚠️ **尚未接入 Lark 任务开关中心**：`lib/task-switch.js` 的 `MANAGED_TASK_CODES` 是硬编码白名单，
+    且 `sync-task-switches` 会校验**所有**登记码都在表里存在，缺一个就整体抛错、连带影响现有 5 个开关。
+    因此顺序必须是**先在开关表加 `member_day_topup` 行，再改代码**。目前加不了：
+    app `cli_aa82af2c7878de17` 对 Base `ZgQ4bYgRkaJKDUsj9mjjWMRupkd` 只有读权限，写返回 **403**，
+    需要用户把该应用加为这张表的协作者（邮件表 `CE6WbyvHNayXh8sgByWjArJlpvh` 已经加过）。
+
 - **储值方案与积分商城已落地（2026-08-22，Claude Code，已写生产）**：
   - **新建储值方案「充100送20」`2091005082169749511`**，2026-08-29 ~ 2027-12-31，
     `storedAmount=10000 / returnAmount=2000`，`sourceType=[10,30]`（POS+Online），

@@ -21,6 +21,7 @@
     "points-mall:preview": "node scripts/preview-points-mall.mjs",
     "benefits:preview": "node scripts/preview-benefit-readiness.mjs",
     "email:preview": "node scripts/member-email-dispatch.mjs",
+    "memberday:preview": "node scripts/member-day-topup.mjs",
     "email:dispatch": "node scripts/member-email-dispatch.mjs",
     "test:unit": "node --test test/*.test.js",
     "test": "node test-api.js"

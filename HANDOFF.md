@@ -133,6 +133,34 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
     **上架/改价端点没扫到** —— 创建表单的 JS 是按需加载的，没打开表单抓不到。
     `buildPointsMallCouponPayload` 的载荷结构至今仍是上一个 agent 的推测，从未与 RES 验证过；
     上传端点同样未调用验证。批量上架脚本尚不能安全实现。
+- **储值方案与积分商城已落地（2026-08-22，Claude Code，已写生产）**：
+  - **新建储值方案「充100送20」`2091005082169749511`**，2026-08-29 ~ 2027-12-31，
+    `storedAmount=10000 / returnAmount=2000`，`sourceType=[10,30]`（POS+Online），
+    `frozenRule.freezeDuration=1`（次日起可用）。做法：以已过期的同规则方案 `2079087063617204227`
+    为模板，`storedValueProgram/detail` 取全量 → 删 id/rules[].id/审计字段 → 只改 name/日期 →
+    `storedValueProgram/save` → 建前建后比对 id 集合确认新增恰好 1 条 → detail 回读校验数值。
+    ⚠️ RES 要求有限结束日期（`requiresFiniteEndDate`），方案写的是「日常储值无期限」，
+    2027-12-31 是我取的一年半窗口，**到期前须续建**。
+  - **积分商城新建 11 个商品**（冷萃杯因无券模板跳过）：白/红/黑铅笔各 100 分，
+    爱心/玫瑰/蝴蝶纸香卡、玫瑰/吉隆坡/蝴蝶结冰箱贴各 150 分，帆布包 400 分，抱枕 800 分；
+    库存按方案原价表填。ids `2091007141711245319` `20910082158…` ~ `2091008237674491912`。
+  - **RES 图片上传契约（已验证）**：`POST /resource/management/file/upload`，
+    `multipart/form-data` 字段名 **`file`**，返回 `{code:"000",data:{fileLink,s3Path,fileMd5,...}}`，
+    图落在 `https://img.sea.restosuite.ai/c{corp}/s{shop}/{n}-{date}.png`。请求头沿用 `authHeaders`
+    但**必须删掉 `content-type`**，让浏览器自己带 multipart boundary。
+  - **`pointsmall/item/save` 契约（已验证）**：payload 同 `getById` 结构，
+    **必须带 `owner`（`1990706730765467654`），缺了报 `owner must not be null`**；
+    `details[].couponBatchId` 不要传，RES 会自己生成。
+  - ⚠️ **`status` 字段语义纠正**：`item/list`/`getById` 的 `status=2` **表示「已下架 Removal」**，
+    不是在售。后台第 2 页确认耳机包、450 积分生日蛋糕、白色铅笔全部显示 `Removal`，操作列是
+    `Upload Product`。**即整个积分商城至今从未上架，没有会员能兑换**；耳机包 `availableInventoryQty=98`
+    的那 2 次消耗发生在更早某个上架时段，不是当前正在发生的漏洞。此前交接里把它记成
+    「洞还开着、正在漏」是错的，据此改价仍然正确但并不紧急。新建的 11 个商品同样是下架状态，
+    配置就位、等人工一键上架。`item/offsale` 返回 `code=000` 但对本就下架的商品无可见变化。
+  - **储值方案状态语义（后台实测）**：`status=1` → `Completed`（已结束），`status=2` → `Disabled`（已停用）。
+    因此 8/29 之前线上确实**一个储值方案都不生效**；`储值RM100赠送50` 等长窗口方案是被手动停用的，
+    门店并没有在多送。`lib/benefit-readiness.js:88` 把 `status===1` 当作「生效」是错的，需要修。
+
 - **对照活动方案的全量线上盘点（2026-08-21，只读）**：接口
   `storedValueProgram/list|detail`、`pointsProgram/details`、`levelProgram/level/list`、
   `memberRights/pageQuery`、`marketing/campaigns/pageQuery`（前两个的分页参数都是 `{page:{pageNo,pageSize}}`）。

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   MEMBER_DAY,
+  POINT_ADJUST_TYPE,
   adjustmentRemark,
   assertBusinessDate,
   assertMemberDay,
@@ -102,4 +103,12 @@ test("the remark carries the business date so RES records can be reconciled", ()
 test("the multiplier stays 1.5 — changing it silently would change payouts", () => {
   assert.equal(MEMBER_DAY.multiplier, 1.5);
   assert.equal(MEMBER_DAY.weekday, 3);
+});
+
+test("point adjustment uses the points enum, not the stored-value one", () => {
+  // 用储值调整的 10 打积分接口会被 RES 拒绝（invalid request param: type）。
+  // 7 是在真实卡上验证过的"增加积分"，并且不会改动成长值或储值余额。
+  assert.equal(POINT_ADJUST_TYPE.increase, 7);
+  assert.equal(POINT_ADJUST_TYPE.decrease, 701);
+  assert.notEqual(POINT_ADJUST_TYPE.increase, 10);
 });

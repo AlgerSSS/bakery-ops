@@ -19,6 +19,13 @@ export const MEMBER_DAY = Object.freeze({
   resBaseMultiplier: 1, // RES 原生 RM1 = 1 分
 });
 
+/**
+ * RES 积分调整的方向枚举。这两个值来自后台 JS 包里 Point Adjustment 表单的
+ * adjustIncrease / adjustDecrease 单选项，并在真实卡上验证过 7 确实是"增加积分"。
+ * 注意别用储值调整那套（10/20）——用 10 打积分接口会被拒：invalid request param: type。
+ */
+export const POINT_ADJUST_TYPE = Object.freeze({ increase: 7, decrease: 701 });
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function assertBusinessDate(value) {

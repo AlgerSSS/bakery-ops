@@ -4,6 +4,7 @@ export const MANAGED_TASK_CODES = Object.freeze([
   "recruit_tomorrow_preview",
   "weekly_executive_report",
   "member_email_job",
+  "member_day_topup",
 ]);
 
 function columnIndex(fields, name) {

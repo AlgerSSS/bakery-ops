@@ -17,6 +17,7 @@ import path from "node:path";
 import { exitCodeFor, fetchReportRowsByDateChunks, openAuthedPage } from "../lib/report-client.js";
 import {
   MEMBER_DAY,
+  POINT_ADJUST_TYPE,
   adjustmentRemark,
   assertBusinessDate,
   assertMemberDay,
@@ -28,7 +29,6 @@ import {
 const CONFIRM_PHRASE = "GRANT MEMBER DAY BONUS POINTS";
 const LEDGER_DIR = process.env.MEMBER_DAY_LEDGER_DIR || "/var/lib/hotcrush-member-day";
 const ADJUST_PATH = "/crm/memberPoints/web/points/adjust";
-const TYPE_INCREASE = 10;
 
 function args() {
   const out = { apply: false, businessDate: null };
@@ -188,7 +188,7 @@ async function main() {
       const res = await session.call(ADJUST_PATH, {
         cardNo: card.cardNo,
         points: card.points,
-        type: TYPE_INCREASE,
+        type: POINT_ADJUST_TYPE.increase,
         corporationId,
         shopId,
         remark: adjustmentRemark(businessDate, card.orders.length),

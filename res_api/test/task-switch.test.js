@@ -69,6 +69,7 @@ test("only the five approved push jobs are wrapped by Lark switches", () => {
     "../task-switch-birthday.cron.example",
     "../task-switch-root.crontab.example",
     "../member-email.cron.example",
+    "../member-day.cron.example",
   ].map((file) => readFileSync(new URL(file, import.meta.url), "utf8"));
   const combined = files.join("\n");
 

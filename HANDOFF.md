@@ -133,6 +133,28 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
     **上架/改价端点没扫到** —— 创建表单的 JS 是按需加载的，没打开表单抓不到。
     `buildPointsMallCouponPayload` 的载荷结构至今仍是上一个 agent 的推测，从未与 RES 验证过；
     上传端点同样未调用验证。批量上架脚本尚不能安全实现。
+- **对照活动方案的全量线上盘点（2026-08-21，只读）**：接口
+  `storedValueProgram/list|detail`、`pointsProgram/details`、`levelProgram/level/list`、
+  `memberRights/pageQuery`、`marketing/campaigns/pageQuery`（前两个的分页参数都是 `{page:{pageNo,pageSize}}`）。
+  - **已配**：积分规则完全符合方案（`amountType=2` 实付、`consumeAmount=100→earnPoints=1`、
+    `exchangeAmount=1000→exchangePoints=100`、`clearingEnabled=false`、`exchangeChannel=["offline"]`）；
+    等级四级名称正确；H5 两页 200（birthday / hbti-test）。
+  - **储值方案共 10 个，没有一个是「RM100 送 RM20」且覆盖 8/29 的**：两个 `充100送20`
+    （rules `storedAmount=10000 / returnAmount=2000`，符合方案）窗口分别是 7/15–7/19、7/20–7/31，**均已过期**。
+    日期覆盖 8/29 的有 5 个，其中 `储值RM100赠送50` 是 RM100→**RM50**（`returnAmount=5000`）。
+    ⚠️ **状态语义未定**：过期那批 `status=1`，覆盖 8/29 那批 `status=2`，`detail` 里 `state=null`
+    且无 enable/online 字段。`lib/benefit-readiness.js:88` 把 `status===1` 当作生效，但那是上一个 agent 的
+    假设、未经证实。两种解读的结论相反（要么 8/29 无任何储值方案，要么门店正在多送 1.5 倍），
+    **必须由人在 RES 后台看状态列文字确认后再动**。
+  - **会员权益全公司只有 1 条** `Membership Price`（id `2043516425477521411`），且
+    `memberDayRule=null`、`memberBirthdayRule=null`、`multiplePoints=null`、
+    `levelRightsRelationList=[]`、`isAllCardLevel=true`。即：**每周三会员日 1.5 倍积分、生日权益、
+    等级差异化权益（Lv2 巴斯克 / Lv3 蛋糕升级资格 / Lv4 五项）在 RES 里一条都没有配置。**
+  - **营销活动只有 1 个** `Pistachio Green Jewel Voucher`（2026-05-24~2027-05-25，与本活动无关）。
+    新人入会礼、好友同行储值礼、储值当单最低价免单**都没有活动**。RM10 券模板本身存在
+    （`10元代金劵` `2043286175804100613` type 2201 status=1），但没有发放活动挂它。
+  - 5 封会员邮件标题/HTML 齐全但 `启用` 仍全为 false，服务器仍 `MEMBER_EMAIL_MODE=preview`。
+
 - **耳机包积分已修正为 900（2026-08-21，Claude Code，已写生产）**：路由是 **`/points-mall`**（不是
   `/pointsMall`，后者在应用内 404）；该页**不在 `queryMenuResourceListV3` 的菜单树里**，只能直接输 URL。
   详情接口是 **`/crm/marketing/pointsmall/item/getById` `{id}`**（`item/get`/`detail`/`queryById`/`info`/`query`

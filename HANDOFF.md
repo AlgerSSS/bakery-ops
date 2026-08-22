@@ -133,6 +133,35 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
     **上架/改价端点没扫到** —— 创建表单的 JS 是按需加载的，没打开表单抓不到。
     `buildPointsMallCouponPayload` 的载荷结构至今仍是上一个 agent 的推测，从未与 RES 验证过；
     上传端点同样未调用验证。批量上架脚本尚不能安全实现。
+- **耳机包积分已修正为 900（2026-08-21，Claude Code，已写生产）**：路由是 **`/points-mall`**（不是
+  `/pointsMall`，后者在应用内 404）；该页**不在 `queryMenuResourceListV3` 的菜单树里**，只能直接输 URL。
+  详情接口是 **`/crm/marketing/pointsmall/item/getById` `{id}`**（`item/get`/`detail`/`queryById`/`info`/`query`
+  全部 404，别再试那几个）。`item/list` 的分页参数是嵌套的 **`{page:{pageNo,pageSize},archive:false}`**。
+  写入用 **`/crm/marketing/pointsmall/item/update`**，载荷为 getById 的完整对象原样回写、只改一个字段。
+  执行纪律：写前快照存 `/tmp/earphone_snapshot.json` → 断言写前值确为 100 → 单字段改 900 → update
+  返回 `code=000` → `getById` 回读 → 逐字段 diff（忽略 modifyTime/modifiedBy）→ 只有 `redeemPoints:100->900`
+  一处变化 → 再用 `item/list` 独立复核。**券绑定 `details[0].businessId=1998965051872153608`、
+  `couponBatchId=1998965516248711177` 写入前后一致。** 库存未动（总 100 / 可用 98），门店实际只有 6 个，
+  仍需盘点后修正。⚠️ `item/list` 返回的字段**不含 `picUrl`/`remark`/`details`**，拿它去 update 会清空券绑定，
+  必须用 `getById` 取全量再回写。
+- **POS 商品库实况（2026-08-21，只读）**：商品选择器接口 **`/boMenuApi/api/selector/lib/item/list`**，
+  参数 `{listLevel:"SIZE",withCombo:true,page:{...},priceTypeList:["ITEM_PRICE","WEIGHT_PRICE","HOT_POT_BASE"],
+  targetOrgType:1,targetOrgId:"1990716608733069315"}`（品牌层；用集团层 `1990706730765467654` 或 `1000833`
+  都返回 0 条）。品牌层共 102 个商品，**【Peripheral products】只有 10 项**：
+  Petite Bow Earbuds Case / Ceramic Coffee Cup / Red Stripes Canvas Tote Bag /
+  Petronas Twin Towers Fridge Magnet / Rosé Bloom Fridge Magnet / Butterfly Fridge Magnet /
+  **Heart Fridge Magnet** / Rosé Bloom Scent Card / Butterfly Scent Card / Heart Scent Card。
+  由此确认两件事：
+  1. **`冷萃杯＋杯套` 在 POS 里不存在**。相近的只有 `Hot Crush Ceramic Coffee Cup`（周边类）与
+     `Hot Crush Dual-Layer Coffee Cup`（TOP list 类），都不叫冷萃杯。type 2101 是「Item exchange coupon」，
+     必须绑定一个具体 POS 商品（帆布包券绑的是 `itemId 1998617846862888969` / `itemCode 1327419062`），
+     所以**在确认冷萃杯对应哪个 POS 商品之前，这张券建不出来**。
+  2. **POS 有 `Heart Fridge Magnet`（爱心冰箱贴），但 `points-mall-catalog.js` 里没有这个商品**。
+     `~/Desktop/周边png/` 里那张一直没配上号的「卡纸包装·心形」（`周边_0009_图层-3.png`）
+     很可能就是它，不是废图。冰箱贴实际是 4 款不是 3 款，方案原价表也漏了它。
+  另注：`overseas-square-cushion` 与三款铅笔同样不在 POS 商品库里，但它们的券已存在
+  （cushion 券 type 2101、铅笔券 type 2301），说明 2301「礼品券」不绑 POS 商品，2101 绑。
+
 - **13 张商品图已备好（2026-08-21）**：源图在 `~/Desktop/周边png/`，成品在
   `~/Desktop/周边png/_上架用/`，按 SKU 命名、1000×1000 白底。用户确认的品类映射：
   **带 HOT CRUSH 织带吊绳的一组是纸香卡**（心=heart、玫瑰=rose、蝴蝶结=butterfly），

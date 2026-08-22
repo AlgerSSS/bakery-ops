@@ -23,6 +23,7 @@ import {
   assertMemberDay,
   buildTopUpPlan,
   decideCard,
+  mostRecentMemberDay,
   ledgerKey,
 } from "../lib/member-day-points.js";
 
@@ -42,12 +43,13 @@ function args() {
   return out;
 }
 
-/** 默认取"昨天"（吉隆坡时区）。cron 在周四凌晨跑，昨天就是周三。 */
-function yesterdayInKL() {
-  const now = new Date();
-  const kl = new Date(now.getTime() + 8 * 3600 * 1000);
-  kl.setUTCDate(kl.getUTCDate() - 1);
-  return kl.toISOString().slice(0, 10);
+/**
+ * 默认业务日 = 最近的一个周三（含今天，吉隆坡时区）。
+ * 主跑在周三 23:59 → 目标是今天；补扫在周四凌晨 → 目标是昨天。同一逻辑都成立。
+ */
+function defaultBusinessDate() {
+  const kl = new Date(Date.now() + 8 * 3600 * 1000);
+  return mostRecentMemberDay(kl.toISOString().slice(0, 10));
 }
 
 function ledgerPath(businessDate) {
@@ -115,7 +117,7 @@ async function main() {
     console.log("Usage: node scripts/member-day-topup.mjs [--business-date=YYYY-MM-DD] [--apply]");
     return;
   }
-  const businessDate = assertMemberDay(assertBusinessDate(opts.businessDate || yesterdayInKL()));
+  const businessDate = assertMemberDay(assertBusinessDate(opts.businessDate || defaultBusinessDate()));
   const live = opts.apply;
 
   if (live) {
@@ -165,7 +167,7 @@ async function main() {
     const ledger = readLedger(businessDate);
     const halted = [];
     for (const card of plan.cards) {
-      const decision = decideCard(ledger[ledgerKey(businessDate, card.cardNo)]);
+      const decision = decideCard(ledger[ledgerKey(businessDate, card.cardNo)], card.points);
       if (decision.action === "halt") halted.push({ cardNo: card.cardNo, reason: decision.reason });
     }
     if (halted.length) {
@@ -174,20 +176,27 @@ async function main() {
       throw new Error("Unresolved ledger claims require manual reconciliation.");
     }
 
-    let applied = 0, skipped = 0, failed = 0;
+    let applied = 0, skipped = 0, failed = 0, topUps = 0;
     for (const card of plan.cards) {
       const key = ledgerKey(businessDate, card.cardNo);
-      const decision = decideCard(ledger[key]);
+      const prior = ledger[key];
+      const decision = decideCard(prior, card.points);
       if (decision.action === "skip") { skipped += 1; continue; }
 
+      const alreadyGranted = prior?.state === "applied" ? Number(prior.points) : 0;
       // 先记 claimed 再调用：调用成功但进程挂掉时，账本停在 claimed，
       // 下一次运行会 halt 要求人工核对，而不是重复送分。
-      ledger[key] = { state: "claimed", points: card.points, orders: card.orders.length, at: new Date().toISOString() };
+      // points 记的是【本次之后的累计值】，这样补扫能算出差额。
+      ledger[key] = {
+        state: "claimed", points: alreadyGranted + decision.points,
+        lastGrant: decision.points, reason: decision.reason,
+        orders: card.orders.length, at: new Date().toISOString(),
+      };
       writeLedger(businessDate, ledger);
 
       const res = await session.call(ADJUST_PATH, {
         cardNo: card.cardNo,
-        points: card.points,
+        points: decision.points,
         type: POINT_ADJUST_TYPE.increase,
         corporationId,
         shopId,
@@ -196,13 +205,16 @@ async function main() {
       if (res?.body?.code === "000") {
         ledger[key] = { ...ledger[key], state: "applied", at: new Date().toISOString() };
         applied += 1;
+        if (decision.reason === "late_orders_top_up") topUps += 1;
       } else {
+        // 失败要把累计值退回写前的值，否则下次补扫会以为已经发过。
+        ledger[key] = { ...ledger[key], points: alreadyGranted };
         ledger[key] = { ...ledger[key], state: "failed", error: `${res?.body?.code} ${res?.body?.msg}`.slice(0, 200), at: new Date().toISOString() };
         failed += 1;
       }
       writeLedger(businessDate, ledger);
     }
-    console.log(`[member-day] applied=${applied} skipped=${skipped} failed=${failed}`);
+    console.log(`[member-day] applied=${applied} (含晚到补差 ${topUps}) skipped=${skipped} failed=${failed}`);
     if (failed) process.exitCode = 4;
   } finally {
     await session.close();

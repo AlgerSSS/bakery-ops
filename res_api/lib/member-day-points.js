@@ -48,6 +48,21 @@ export function isMemberDay(businessDate) {
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay() === MEMBER_DAY.weekday;
 }
 
+/**
+ * 从给定日期往回找最近的一个周三（含当天）。
+ * 主跑在周三 23:59（当天即目标），补扫在周四凌晨（目标是昨天），同一函数都成立。
+ */
+export function mostRecentMemberDay(fromDate) {
+  const date = assertBusinessDate(fromDate);
+  const [y, m, d] = date.split("-").map(Number);
+  const cursor = new Date(Date.UTC(y, m - 1, d));
+  for (let i = 0; i < 7; i += 1) {
+    if (cursor.getUTCDay() === MEMBER_DAY.weekday) return cursor.toISOString().slice(0, 10);
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+  throw new Error("Unreachable: no Wednesday within 7 days.");
+}
+
 export function assertMemberDay(businessDate) {
   const date = assertBusinessDate(businessDate);
   if (!isMemberDay(date)) {
@@ -124,18 +139,36 @@ export function ledgerKey(businessDate, cardNo) {
 export const LEDGER_STATES = Object.freeze(["claimed", "applied", "failed"]);
 
 /**
- * 判断一张卡这一天该不该发。
- * applied  -> 已经发过，跳过。
- * claimed  -> RES 调用结果不明（进程在调用与记账之间挂了）。必须人工核对，不自动重试。
- * failed   -> 明确失败，可以重试。
+ * 判断一张卡这一天该发多少。
+ *
+ * 账本里的 points 是【累计已发】，不是"本次要发"。这样主跑（周三 23:59）之后
+ * 如果还有晚到的订单，补扫（周四凌晨）能只补差额而不重复发。
+ *
+ * applied 且计划额 > 已发  -> 补差额
+ * applied 且计划额 <= 已发  -> 跳过（不做负向回收，退单由 RES 自己的冲正处理）
+ * claimed                  -> RES 调用结果不明，必须人工核对，绝不自动重试
+ * failed                   -> 明确失败，可以整额重试
  */
-export function decideCard(ledgerEntry) {
-  if (!ledgerEntry) return { action: "grant", reason: "no_prior_record" };
+export function decideCard(ledgerEntry, plannedPoints) {
+  const planned = Number(plannedPoints);
+  if (!Number.isInteger(planned) || planned < 0) {
+    throw new TypeError(`Planned points must be a non-negative integer, got ${JSON.stringify(plannedPoints)}.`);
+  }
+  if (!ledgerEntry) return { action: "grant", points: planned, reason: "no_prior_record" };
   switch (ledgerEntry.state) {
-    case "applied": return { action: "skip", reason: "already_applied" };
-    case "claimed": return { action: "halt", reason: "unresolved_claim" };
-    case "failed":  return { action: "grant", reason: "retry_after_failure" };
-    default: return { action: "halt", reason: `unknown_state:${ledgerEntry.state}` };
+    case "applied": {
+      const granted = Number(ledgerEntry.points);
+      if (!Number.isInteger(granted) || granted < 0) {
+        return { action: "halt", points: 0, reason: "corrupt_applied_amount" };
+      }
+      const delta = planned - granted;
+      return delta > 0
+        ? { action: "grant", points: delta, reason: "late_orders_top_up" }
+        : { action: "skip", points: 0, reason: "already_applied" };
+    }
+    case "claimed": return { action: "halt", points: 0, reason: "unresolved_claim" };
+    case "failed":  return { action: "grant", points: planned, reason: "retry_after_failure" };
+    default: return { action: "halt", points: 0, reason: `unknown_state:${ledgerEntry.state}` };
   }
 }
 

@@ -12,6 +12,7 @@ import {
   decideCard,
   isMemberDay,
   ledgerKey,
+  mostRecentMemberDay,
 } from "../lib/member-day-points.js";
 
 test("bonus is the gap between 1.5x and what RES already granted", () => {
@@ -81,11 +82,44 @@ test("an implausibly large per-card total is surfaced, not granted quietly", () 
 
 test("an unresolved claim halts instead of retrying", () => {
   // RES 成功但记账前崩溃会停在 claimed。自动重试 = 重复送分，积分收不回来。
-  assert.deepEqual(decideCard({ state: "claimed" }), { action: "halt", reason: "unresolved_claim" });
-  assert.deepEqual(decideCard({ state: "applied" }), { action: "skip", reason: "already_applied" });
-  assert.deepEqual(decideCard({ state: "failed" }), { action: "grant", reason: "retry_after_failure" });
-  assert.deepEqual(decideCard(null), { action: "grant", reason: "no_prior_record" });
-  assert.equal(decideCard({ state: "weird" }).action, "halt");
+  assert.deepEqual(decideCard({ state: "claimed", points: 25 }, 25),
+    { action: "halt", points: 0, reason: "unresolved_claim" });
+  assert.equal(decideCard({ state: "weird" }, 25).action, "halt");
+  assert.deepEqual(decideCard({ state: "failed", points: 0 }, 25),
+    { action: "grant", points: 25, reason: "retry_after_failure" });
+  assert.deepEqual(decideCard(null, 25),
+    { action: "grant", points: 25, reason: "no_prior_record" });
+});
+
+test("a rerun grants only the difference when late orders arrive", () => {
+  // 周三 23:59 主跑发了 25 分；周四补扫时计划涨到 40，只能再发 15，不能再发 40。
+  assert.deepEqual(decideCard({ state: "applied", points: 25 }, 40),
+    { action: "grant", points: 15, reason: "late_orders_top_up" });
+});
+
+test("a rerun never claws points back", () => {
+  // 计划额回落（例如订单被冲正）时跳过，不做负向调整——回收由 RES 自己的冲正流程负责。
+  assert.deepEqual(decideCard({ state: "applied", points: 40 }, 25),
+    { action: "skip", points: 0, reason: "already_applied" });
+  assert.deepEqual(decideCard({ state: "applied", points: 25 }, 25),
+    { action: "skip", points: 0, reason: "already_applied" });
+});
+
+test("a corrupt applied amount halts rather than guessing", () => {
+  assert.equal(decideCard({ state: "applied", points: "oops" }, 25).action, "halt");
+  assert.equal(decideCard({ state: "applied", points: -5 }, 25).action, "halt");
+});
+
+test("the planned amount itself must be a sane integer", () => {
+  assert.throws(() => decideCard(null, -1), /non-negative integer/);
+  assert.throws(() => decideCard(null, 1.5), /non-negative integer/);
+});
+
+test("the default business date resolves to Wednesday from either run slot", () => {
+  // 主跑在周三 23:59（目标=当天），补扫在周四凌晨（目标=昨天），同一函数都要落到同一个周三。
+  assert.equal(mostRecentMemberDay("2026-08-26"), "2026-08-26");
+  assert.equal(mostRecentMemberDay("2026-08-27"), "2026-08-26");
+  assert.equal(mostRecentMemberDay("2026-09-01"), "2026-08-26");
 });
 
 test("ledger keys are unique per card per business date", () => {

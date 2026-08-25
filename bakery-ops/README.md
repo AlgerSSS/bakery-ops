@@ -122,6 +122,23 @@ npm run dev:tsx
 npx vitest
 ```
 
+## Deployment
+
+**`main` is the deploy source.** Deploy scripts rsync the local working tree to the
+server — they do not reference a branch name — so whatever is checked out is what
+ships. Check out `main` before deploying.
+
+Until 2026-08-25 production tracked the feature branch `codex/fabric-agent-blueprint`
+while `main` sat three weeks behind. That branch has been fast-forwarded into `main`;
+don't let it drift again.
+
+| Service | Script | Server |
+| --- | --- | --- |
+| R6 RAG worker + Lark Wiki sync | `services/data-platform/deploy-rag-worker.sh` | tokyo-01 (45.77.12.118) |
+
+The data-platform deploy runs `pytest` and `ruff` as gates before it touches the
+server, then rebuilds the venv from `requirements.lock` and restarts the units.
+
 ## Key Workflows
 
 **Recruitment**: Parse JD → Search 3 job sites (stealth) → Deduplicate → AI score → Generate resume PDFs → Auto-outreach → Sync to Feishu

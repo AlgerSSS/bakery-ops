@@ -7,6 +7,9 @@ After=network-online.target
 Type=oneshot
 DynamicUser=yes
 UMask=0077
+# 增量同步的状态盘。DynamicUser + ProtectSystem=strict 下这是唯一可写的
+# 目录，systemd 会把路径注入 $STATE_DIRECTORY。删掉它只会导致下一轮全量同步。
+StateDirectory=hotcrush-lark-wiki-sync
 WorkingDirectory=/opt/hotcrush/bakery-ops/services/data-platform
 ExecStart=/opt/hotcrush/bakery-ops/services/data-platform/.venv/bin/hotcrush-lark-wiki-sync
 Environment=R6_SUPABASE_URL=https://tmmkknnkcptunxbfjxqn.supabase.co

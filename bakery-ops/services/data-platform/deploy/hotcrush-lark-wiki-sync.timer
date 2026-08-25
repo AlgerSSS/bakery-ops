@@ -1,9 +1,11 @@
 [Unit]
-Description=Run Hot Crush Lark Wiki sync every hour
+Description=Run Hot Crush Lark Wiki sync every 6 hours
 
 [Timer]
 OnBootSec=5min
-OnUnitActiveSec=1h
+# 每轮都要把空间目录树走一遍才能发现改动，这部分开销与频率成正比。
+# 知识库不是实时数据，6 小时足够，目录遍历的调用量直接降到四分之一。
+OnUnitActiveSec=6h
 RandomizedDelaySec=2min
 Persistent=true
 Unit=hotcrush-lark-wiki-sync.service

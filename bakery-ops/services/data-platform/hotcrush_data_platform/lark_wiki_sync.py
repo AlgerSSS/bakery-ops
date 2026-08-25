@@ -70,6 +70,10 @@ class LarkNode:
     title: str
     parent_node_token: str
     has_child: bool
+    # 节点列表接口本来就返回 obj_edit_time，此前没有取用，导致每轮都要再打
+    # get_node + get_docx 才能知道文档有没有变。增量同步靠它判断。
+    # 字段放在最后并给默认值，避免打断既有的位置参数构造。
+    obj_edit_time: str = ""
 
     @classmethod
     def from_api(cls, value: dict[str, Any]) -> LarkNode:
@@ -80,6 +84,7 @@ class LarkNode:
             title=str(value.get("title", "")),
             parent_node_token=str(value.get("parent_node_token", "")),
             has_child=bool(value.get("has_child", False)),
+            obj_edit_time=str(value.get("obj_edit_time", "")),
         )
         if not TOKEN_PATTERN.fullmatch(node.node_token) or not TOKEN_PATTERN.fullmatch(
             node.obj_token
@@ -205,6 +210,136 @@ class LarkApiClient:
         return self._request(
             "GET", f"/open-apis/drive/v1/files/{file_token}/download"
         ).content
+
+
+@dataclass(frozen=True)
+class SyncedNode:
+    """上一轮成功入库的节点，用于在内容未变时原样复现 source_item 记录。"""
+
+    obj_edit_time: str
+    source_revision: str
+    source_sha256: str
+    document_id: str | None
+
+    def as_json(self) -> dict[str, Any]:
+        return {
+            "obj_edit_time": self.obj_edit_time,
+            "source_revision": self.source_revision,
+            "source_sha256": self.source_sha256,
+            "document_id": self.document_id,
+        }
+
+    @classmethod
+    def from_json(cls, value: Any) -> SyncedNode | None:
+        if not isinstance(value, dict):
+            return None
+        edit = str(value.get("obj_edit_time", ""))
+        revision = str(value.get("source_revision", ""))
+        sha256 = str(value.get("source_sha256", ""))
+        if not edit or not revision or not sha256:
+            return None
+        document_id = value.get("document_id")
+        return cls(
+            obj_edit_time=edit,
+            source_revision=revision,
+            source_sha256=sha256,
+            document_id=str(document_id) if document_id else None,
+        )
+
+
+def state_file_path() -> Path:
+    """
+    增量状态的落盘位置。
+
+    unit 用了 DynamicUser + ProtectSystem=strict，进程只有 StateDirectory=
+    指定的目录可写，所以优先用 systemd 注入的 $STATE_DIRECTORY。
+    """
+    explicit = os.getenv("LARK_WIKI_STATE_FILE", "")
+    if explicit:
+        return Path(explicit)
+    state_dir = os.getenv("STATE_DIRECTORY", "")
+    if state_dir:
+        return Path(state_dir.split(":")[0]) / "wiki-node-state.json"
+    return Path(".lark-wiki-state.json")
+
+
+def load_sync_state(path: Path) -> dict[str, dict[str, SyncedNode]]:
+    """读取增量状态。任何损坏或缺失都退化成全量同步——宁可多打接口，不可漏同步。"""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(raw, dict) or raw.get("version") != 1:
+        return {}
+    connectors = raw.get("connectors")
+    if not isinstance(connectors, dict):
+        return {}
+    state: dict[str, dict[str, SyncedNode]] = {}
+    for connector_id, nodes in connectors.items():
+        if not isinstance(nodes, dict):
+            continue
+        parsed = {
+            str(token): entry
+            for token, value in nodes.items()
+            if (entry := SyncedNode.from_json(value)) is not None
+        }
+        if parsed:
+            state[str(connector_id)] = parsed
+    return state
+
+
+def save_sync_state(path: Path, state: dict[str, dict[str, SyncedNode]]) -> None:
+    """原子写盘。写失败不能影响同步结果，最坏结果只是下一轮退回全量。"""
+    payload = {
+        "version": 1,
+        "connectors": {
+            connector_id: {token: node.as_json() for token, node in nodes.items()}
+            for connector_id, nodes in state.items()
+        },
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(path)
+    except OSError:
+        LOGGER.warning("could not persist Lark wiki sync state to %s", path)
+
+
+def full_resync_requested() -> bool:
+    return os.getenv("LARK_WIKI_FULL_RESYNC", "").strip().lower() in {"1", "true", "yes"}
+
+
+def partition_nodes(
+    nodes: list[LarkNode],
+    known: dict[str, SyncedNode],
+    *,
+    force_full: bool = False,
+) -> tuple[list[LarkNode], list[tuple[LarkNode, SyncedNode]]]:
+    """
+    把节点分成"要取内容的"和"可以跳过的"。
+
+    跳过的条件是三者同时成立：不是强制全量、列表接口给出了非空的
+    obj_edit_time、且与上一轮成功入库时记下的值一致。obj_edit_time 缺失时
+    一律取内容——飞书哪天不返回这个字段，行为就退回改动前，不会漏同步。
+
+    每篇 docx 取内容要打 3 次接口（get_node + documents + raw_content），
+    PDF 要 2 次。绝大多数轮次里没有文档被编辑，跳过后这些调用全省掉。
+    """
+    to_fetch: list[LarkNode] = []
+    unchanged: list[tuple[LarkNode, SyncedNode]] = []
+    for node in nodes:
+        previous = known.get(node.node_token)
+        if (
+            not force_full
+            and previous is not None
+            and node.obj_edit_time
+            and node.obj_edit_time == previous.obj_edit_time
+        ):
+            unchanged.append((node, previous))
+        else:
+            to_fetch.append(node)
+    return to_fetch, unchanged
 
 
 def walk_space_nodes(client: NodeLister, space_id: str) -> list[LarkNode]:
@@ -419,7 +554,17 @@ def _record_source_item(
     payload: SourcePayload | None = None,
     document_id: str | None = None,
     error_summary: str | None = None,
+    source_revision: str | None = None,
+    source_sha256: str | None = None,
 ) -> None:
+    # 内容未变而被跳过的节点没有 payload，改由调用方直接传上一轮记下的
+    # revision 与 sha256，这样写出的行与全量拉取时完全一致。
+    revision = source_revision if source_revision is not None else (
+        payload.source_version if payload else None
+    )
+    sha256 = source_sha256 if source_sha256 is not None else (
+        payload.sha256 if payload else None
+    )
     platform.rpc(
         "ai_record_source_item",
         {
@@ -429,8 +574,8 @@ def _record_source_item(
             "p_object_type": node.obj_type,
             "p_title": node.title[:500],
             "p_source_uri": source_uri,
-            "p_source_revision": payload.source_version if payload else None,
-            "p_source_sha256": payload.sha256 if payload else None,
+            "p_source_revision": revision,
+            "p_source_sha256": sha256,
             "p_document_id": document_id,
             "p_status": status,
             "p_error_summary": error_summary,
@@ -445,6 +590,9 @@ def sync_connector(
     connector: dict[str, Any],
     settings: Settings,
     lark_settings: LarkWikiSettings,
+    *,
+    known_nodes: dict[str, SyncedNode] | None = None,
+    force_full: bool = False,
 ) -> dict[str, Any]:
     started = platform.one(
         platform.rpc(
@@ -455,7 +603,14 @@ def sync_connector(
     if not started:
         raise RuntimeError("source sync did not return a run")
     sync_run_id = str(started["sync_run_id"])
+    # 这个字典整体作为 p_counts 传给 ai_finish_source_sync，键不能动。
+    # 跳过的节点计入 unchanged（语义正好吻合），另用 skipped 单独统计，
+    # 只出现在本函数的返回值里，不进数据库。
     counts = {"discovered": 0, "synced": 0, "unchanged": 0, "unsupported": 0, "failed": 0}
+    # 就地更新调用方持有的状态字典：同步结果里不该混进内部状态，
+    # 那个 dict 会被 main() 直接 json.dumps 打到 stdout。
+    known = known_nodes if known_nodes is not None else {}
+    skipped = 0
     try:
         nodes = walk_space_nodes(lark, str(connector["external_space_id"]))
     except Exception as exc:
@@ -470,7 +625,26 @@ def sync_connector(
         )
         raise
 
-    for node in nodes:
+    to_fetch, unchanged_nodes = partition_nodes(nodes, known, force_full=force_full)
+
+    # 内容未变：不打飞书，直接用上一轮记下的 revision/sha 复现 source_item，
+    # 写出的行与全量拉取时一致。
+    for node, previous in unchanged_nodes:
+        counts["discovered"] += 1
+        counts["unchanged"] += 1
+        skipped += 1
+        _record_source_item(
+            platform,
+            sync_run_id=sync_run_id,
+            node=node,
+            source_uri=f"{lark_settings.wiki_base_url}/wiki/{node.node_token}",
+            status="SYNCED",
+            source_revision=previous.source_revision,
+            source_sha256=previous.source_sha256,
+            document_id=previous.document_id,
+        )
+
+    for node in to_fetch:
         counts["discovered"] += 1
         source_uri = f"{lark_settings.wiki_base_url}/wiki/{node.node_token}"
         try:
@@ -482,6 +656,7 @@ def sync_connector(
             )
             if payload is None:
                 counts["unsupported"] += 1
+                known.pop(node.node_token, None)
                 _record_source_item(
                     platform,
                     sync_run_id=sync_run_id,
@@ -497,6 +672,13 @@ def sync_connector(
                 counts["synced"] += 1
             else:
                 counts["unchanged"] += 1
+            if node.obj_edit_time:
+                known[node.node_token] = SyncedNode(
+                    obj_edit_time=node.obj_edit_time,
+                    source_revision=payload.source_version,
+                    source_sha256=payload.sha256,
+                    document_id=str(result["document_id"]) if result["document_id"] else None,
+                )
             item_status = (
                 "REVIEW_REQUIRED"
                 if result["document_status"] == "REVIEW_REQUIRED"
@@ -513,6 +695,8 @@ def sync_connector(
             )
         except Exception as exc:
             counts["failed"] += 1
+            # 失败的节点必须从状态里剔除，否则下一轮会被当成"未变"而永久跳过。
+            known.pop(node.node_token, None)
             LOGGER.exception("Lark node sync failed node=%s", node.node_token)
             _record_source_item(
                 platform,
@@ -533,10 +717,25 @@ def sync_connector(
             "p_error_summary": None,
         },
     )
-    return {"connector": connector["display_name"], "status": status, **counts}
+    LOGGER.info(
+        "connector=%s fetched=%d skipped_unchanged=%d",
+        connector["display_name"],
+        len(to_fetch),
+        skipped,
+    )
+    return {
+        "connector": connector["display_name"],
+        "status": status,
+        **counts,
+        "skipped_unchanged": skipped,
+    }
 
 
 def run_all_syncs(settings: Settings, lark_settings: LarkWikiSettings) -> list[dict[str, Any]]:
+    state_path = state_file_path()
+    state = {} if full_resync_requested() else load_sync_state(state_path)
+    force_full = full_resync_requested()
+    results: list[dict[str, Any]] = []
     with (
         LarkApiClient(lark_settings) as lark,
         SupabasePlatformClient(
@@ -548,7 +747,26 @@ def run_all_syncs(settings: Settings, lark_settings: LarkWikiSettings) -> list[d
         connectors = platform.rpc("ai_list_source_connectors", {})
         if not isinstance(connectors, list):
             raise TypeError("source connector RPC did not return a row list")
-        return [sync_connector(lark, platform, row, settings, lark_settings) for row in connectors]
+        try:
+            for row in connectors:
+                connector_id = str(row["connector_id"])
+                known = state.setdefault(connector_id, {})
+                results.append(
+                    sync_connector(
+                        lark,
+                        platform,
+                        row,
+                        settings,
+                        lark_settings,
+                        known_nodes=known,
+                        force_full=force_full,
+                    )
+                )
+        finally:
+            # 某个 connector 抛异常时，前面已经同步成功的进度也要落盘，
+            # 否则重试会白白重新拉一遍。
+            save_sync_state(state_path, state)
+    return results
 
 
 def main() -> None:

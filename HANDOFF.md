@@ -1234,6 +1234,14 @@ tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运�
 - 最终正式 plan：`2090459411142234119`，名称 `See You Often · HBTI optimized · 2026-08-20`；
   发布 API `code=000`，release info、首页内容、开屏内容与 HBTI URL 四项回读一致。发布前的
   正式版均各自克隆为独立 rollback plan，最后一份为 `2090459659960930308`。
+## See You Often 顶部轮播 + HBTI 开屏弹窗草稿（2026-08-20，Codex，已保存草稿、未发布）
+
+用户要求在 RES 官方 H5 最上方预留滚动海报，并增加点击后进入现有 HBTI 页的测试弹窗。
+已在独立分支 `codex/see-you-often-h5` 完成并写入独立 RES Draft：
+
+- Draft 名称：`See You Often · HBTI 弹窗 · 2026-08-20`
+- Draft plan：`2090327910815711232`；首页 page：`2090327910819905566`；开屏 page：
+  `2090327910819905571`。`releaseCalled=false`，**没有发布正式 H5**。
 - 首页最上方使用 RES 原生 `FSwiper`，保留正式版现有 5 张图片作占位，375×220px、3 秒轮播；
   后续换海报只需替换轮播图片，不改页面结构。
 - HBTI 弹窗使用 RES 原生 `POpenScreenPage`，新视觉为桃粉纸张、酒红字、面包指纹与红色烤炉箭头；
@@ -1275,6 +1283,18 @@ T-5 提醒，Lv2–Lv4 免费巴斯克 T-2 提醒，生日当天发送贺卡网�
 RES 官方 H5 的另一独立本地成果在 `/tmp/hot-see-you-often-h5`、分支
 `codex/see-you-often-h5`：顶部原生滚动海报位已保留，HBTI 弹窗图与跳转已写入未发布草稿；
 正式首页未改、未发布。
+- 保存前后两次独立快照确认正式首页 hash 仍为
+  `0552ffb3da571f849f1dedabadece27cf86a7cf4506638612bd0a8602003c31c`，正式开屏 hash 仍为
+  `8161df6599a9f447152e90fac7900f5a982bb602636ef19bd4fc2349ad026bc9`。
+- 草稿回读：首页设计树/保存树 hash 一致，开屏设计树/保存树 hash 一致；HBTI 页与上传图片均 HTTP 200。
+  中文官方编辑器长页预览 375×1293，顶部轮播位置和后续会员内容均正常。
+- 代码：`res_api/lib/h5-design-layout.mjs`、`res_api/tools/h5-design.mjs`、
+  `res_api/test/h5-design-layout.test.js`，新增视觉资产 `res_api/assets/h5/hbti-popup-2026.png`；
+  `res_api` 单测 **121/121** 通过，`git diff --check` 通过。
+
+仍在等待用户逐项确认的当前问题：**450 积分升级定制蛋糕，Lv3 和 Lv4 是否都每个生日年度限一次？**
+未得到回答前，不要把该限制擅自写入生产。已确认的生日时间链路是：Lv3/Lv4 定制蛋糕 T-5 提醒，
+Lv2–Lv4 免费巴斯克 T-2 提醒，生日当天发送贺卡网页并发对应生日券。
 
 ---
 

@@ -12,6 +12,7 @@ APP_BUILDER = SERVICE_DIR / "build-brain-ingest-app.sh"
 PLIST = SERVICE_DIR / "deploy" / "com.hotcrush.r6-brain-ingest.plist"
 LARK_SERVICE = SERVICE_DIR / "deploy" / "hotcrush-lark-wiki-sync.service"
 LARK_TIMER = SERVICE_DIR / "deploy" / "hotcrush-lark-wiki-sync.timer"
+LARK_UNIT = SERVICE_DIR / "deploy" / "hotcrush-lark-wiki-sync.service"
 DEPLOYER = SERVICE_DIR / "deploy-rag-worker.sh"
 
 
@@ -272,13 +273,24 @@ def test_lark_sync_service_uses_only_encrypted_machine_credentials() -> None:
     assert "ProtectSystem=strict" in unit
 
 
-def test_lark_sync_timer_is_persistent_and_runs_hourly() -> None:
+def test_lark_sync_timer_is_persistent_and_runs_every_six_hours() -> None:
+    # 原本是每小时。每轮都要遍历整个空间目录树才能发现改动，这部分开销与
+    # 频率成正比，而知识库不是实时数据——2026-08 租户飞书月度配额被打满，
+    # 这个任务是最大消耗方。
     timer = LARK_TIMER.read_text(encoding="utf-8")
 
-    assert "OnUnitActiveSec=1h" in timer
+    assert "OnUnitActiveSec=6h" in timer
     assert "RandomizedDelaySec=2min" in timer
     assert "Persistent=true" in timer
     assert "Unit=hotcrush-lark-wiki-sync.service" in timer
+
+
+def test_lark_sync_unit_grants_a_writable_state_directory() -> None:
+    # 增量同步要把每个节点的 obj_edit_time 落盘。unit 用了 DynamicUser +
+    # ProtectSystem=strict，没有 StateDirectory 就无处可写，会静默退回全量同步。
+    unit = LARK_UNIT.read_text(encoding="utf-8")
+
+    assert "StateDirectory=hotcrush-lark-wiki-sync" in unit
 
 
 def test_worker_is_stopped_before_the_deployer_rebuilds_its_virtualenv() -> None:

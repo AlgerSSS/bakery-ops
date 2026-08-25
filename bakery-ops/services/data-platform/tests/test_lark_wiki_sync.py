@@ -1,12 +1,18 @@
 import hashlib
 import json
+from pathlib import Path
 from typing import Any
 
 from hotcrush_data_platform.config import Settings
 from hotcrush_data_platform.lark_wiki_sync import (
     LarkNode,
+    SyncedNode,
     build_source_payload,
     ingest_source_payload,
+    load_sync_state,
+    partition_nodes,
+    save_sync_state,
+    state_file_path,
     walk_space_nodes,
 )
 
@@ -162,3 +168,70 @@ def test_ingest_uses_connector_classification_and_controlled_rpcs() -> None:
     assert finalize_call["p_version_no"] == 7
     assert finalize_call["p_title"].startswith("LARK_DOCX ")
     assert result["rag_eligibility"] == "REDACTED_ONLY"
+
+
+def test_unchanged_nodes_are_skipped_without_fetching_content() -> None:
+    # 回归：此前每轮都对每篇文档打 3 次接口（get_node + documents + raw_content），
+    # 无论内容有没有变。这是把租户飞书月度配额打满的主因。
+    changed = LarkNode("n1", "d1", "docx", "改过的", "", False, "1787600000")
+    same = LarkNode("n2", "d2", "docx", "没动的", "", False, "1787500000")
+    known = {
+        "n1": SyncedNode("1787000000", "docx-revision-3", "aaa", "doc-1"),
+        "n2": SyncedNode("1787500000", "docx-revision-9", "bbb", "doc-2"),
+    }
+
+    to_fetch, unchanged = partition_nodes([changed, same], known)
+
+    assert [n.node_token for n in to_fetch] == ["n1"]
+    assert [(n.node_token, prev.source_revision) for n, prev in unchanged] == [
+        ("n2", "docx-revision-9")
+    ]
+
+
+def test_nodes_without_edit_time_are_always_fetched() -> None:
+    # 飞书哪天不再返回 obj_edit_time，行为要退回改动前的全量拉取，绝不能漏同步。
+    node = LarkNode("n1", "d1", "docx", "无编辑时间", "", False, "")
+    known = {"n1": SyncedNode("", "docx-revision-3", "aaa", "doc-1")}
+
+    to_fetch, unchanged = partition_nodes([node], known)
+
+    assert [n.node_token for n in to_fetch] == ["n1"]
+    assert unchanged == []
+
+
+def test_unknown_nodes_and_forced_resync_fetch_everything() -> None:
+    node = LarkNode("n1", "d1", "docx", "新节点", "", False, "1787500000")
+    known = {"n1": SyncedNode("1787500000", "docx-revision-9", "bbb", "doc-2")}
+
+    assert partition_nodes([node], {})[0] == [node]
+    assert partition_nodes([node], known, force_full=True)[0] == [node]
+
+
+def test_sync_state_round_trips_and_rejects_corrupt_files(tmp_path: Any) -> None:
+    path = tmp_path / "wiki-node-state.json"
+    state = {"conn-1": {"n1": SyncedNode("1787500000", "docx-revision-9", "bbb", "doc-2")}}
+
+    save_sync_state(path, state)
+    assert load_sync_state(path) == state
+
+    # 损坏、版本不符、字段缺失都必须退化成全量同步，而不是静默漏掉节点。
+    path.write_text("{ not json", encoding="utf-8")
+    assert load_sync_state(path) == {}
+    path.write_text(json.dumps({"version": 99, "connectors": {}}), encoding="utf-8")
+    assert load_sync_state(path) == {}
+    path.write_text(
+        json.dumps({"version": 1, "connectors": {"c": {"n": {"obj_edit_time": "1"}}}}),
+        encoding="utf-8",
+    )
+    assert load_sync_state(path) == {}
+    assert load_sync_state(tmp_path / "does-not-exist.json") == {}
+
+
+def test_state_file_path_prefers_systemd_state_directory(monkeypatch: Any) -> None:
+    # unit 用了 DynamicUser + ProtectSystem=strict，只有 StateDirectory 可写。
+    monkeypatch.delenv("LARK_WIKI_STATE_FILE", raising=False)
+    monkeypatch.setenv("STATE_DIRECTORY", "/var/lib/hotcrush-lark-wiki-sync")
+    assert state_file_path() == Path("/var/lib/hotcrush-lark-wiki-sync/wiki-node-state.json")
+
+    monkeypatch.setenv("LARK_WIKI_STATE_FILE", "/tmp/custom.json")
+    assert state_file_path() == Path("/tmp/custom.json")

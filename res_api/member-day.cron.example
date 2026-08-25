@@ -1,0 +1,19 @@
+# HOT CRUSH 会员日 1.5 倍积分补差。
+# RES 的 Member Day 权益只接受 2–9 的整数倍，配不出 1.5 倍，所以周三 RES 只给 1 倍，这里补 0.5 倍。
+#
+# ⚠️ 时间点按【系统时区】解释。本机已设为 Asia/Kuala_Lumpur。
+# 不要写 CRON_TZ —— 本机 vixie cron 3.0pl1-162 的二进制里没有这个符号（strings 查为 0），
+# 写了不生效；同 hotcrush-recruit 顶部的教训。
+#
+# 两跑制：
+#   周三 23:59 主跑——当晚到账，会员打开会员端就能看到 1.5 倍，与收银话术一致。
+#   周四 03:30 补扫——五个周三实测最晚一单是 23:16（2026-07-22），23:59 只留 43 分钟余量；
+#                    收尾晚的那天会漏单，补扫按账本累计值只发差额，不会重复。
+# 两跑都用同一任务码，账本 points 记【累计已发】，重跑安全。
+#
+# 装上时 MODE=preview：只算不发。确认预演数字无误后由人改成 live。
+# 补跑指定周三：MEMBER_DAY_BUSINESS_DATE=YYYY-MM-DD ./member-day-topup.sh
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+59 23 * * 3 root cd /opt/hotcrush/res_api && MEMBER_DAY_MODE=preview /usr/bin/node scripts/task-switch-run.mjs member_day_topup -- ./member-day-topup.sh
+30 3 * * 4 root cd /opt/hotcrush/res_api && MEMBER_DAY_MODE=preview /usr/bin/node scripts/task-switch-run.mjs member_day_topup -- ./member-day-topup.sh

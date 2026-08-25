@@ -70,7 +70,8 @@ function postJson(url: string, body: unknown): Request {
 beforeEach(() => {
   vi.stubEnv("BIRTHDAY_LINK_SECRET", SECRET);
   vi.stubEnv("BIRTHDAY_CAMPAIGN_YEAR", "2026");
-  vi.stubEnv("BIRTHDAY_PICKUP_LEAD_DAYS", "2");
+  vi.stubEnv("BIRTHDAY_FREE_BASQUE_LEAD_DAYS", "2");
+  vi.stubEnv("BIRTHDAY_POINTS_CAKE_LEAD_DAYS", "5");
   vi.stubEnv("BIRTHDAY_PICKUP_WINDOW_DAYS", "30");
   vi.stubEnv("BIRTHDAY_NOTIFY_WEBHOOK", "");
   sqlState.handler = (text) => {
@@ -132,6 +133,9 @@ describe("GET /api/birthday/view", () => {
     expect(body.stats.totalQty).toBe(12);
     expect(body.stats.favorite.nameZh).toBe("趁热心动蛋挞");
     expect(body.reservations).toEqual([]);
+    expect(body.pickupByGift.free_basque.minDate).not.toBe(
+      body.pickupByGift.points_450.minDate,
+    );
     expect(res.headers.get("cache-control")).toContain("no-store");
   });
 
@@ -183,8 +187,8 @@ describe("POST /api/birthday/profile", () => {
 });
 
 describe("POST /api/birthday/reserve", () => {
-  function validPickupDate(): string {
-    const d = new Date(Date.now() + 5 * 86400000);
+  function pickupDateAfter(days: number): string {
+    const d = new Date(Date.now() + days * 86400000);
     return new Intl.DateTimeFormat("en-CA", {
       timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit", day: "2-digit",
     }).format(d);
@@ -193,7 +197,7 @@ describe("POST /api/birthday/reserve", () => {
   it("免费巴斯克预约成功，webhook 未配置时通知保持 pending（服务器 relay 收编）", async () => {
     const res = await reservePOST(postJson("/api/birthday/reserve", {
       linkToken: linkFor(MEMBER), forWhom: "self", giftType: "free_basque",
-      pickupDate: validPickupDate(), slot: "noon",
+      pickupDate: pickupDateAfter(2), slot: "noon",
     }));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -223,7 +227,7 @@ describe("POST /api/birthday/reserve", () => {
     };
     const res = await reservePOST(postJson("/api/birthday/reserve", {
       linkToken: linkFor(MEMBER), forWhom: "self", giftType: "points_450",
-      pickupDate: validPickupDate(), slot: "night",
+      pickupDate: pickupDateAfter(5), slot: "night",
     }));
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -241,7 +245,7 @@ describe("POST /api/birthday/reserve", () => {
     };
     const res = await reservePOST(postJson("/api/birthday/reserve", {
       linkToken: linkFor(MEMBER), forWhom: "self", giftType: "points_450",
-      pickupDate: validPickupDate(), slot: "noon",
+      pickupDate: pickupDateAfter(5), slot: "noon",
     }));
     expect(res.status).toBe(403);
     expect((await res.json()).error).toBe("INSUFFICIENT_POINTS");
@@ -257,7 +261,7 @@ describe("POST /api/birthday/reserve", () => {
     };
     const res = await reservePOST(postJson("/api/birthday/reserve", {
       linkToken: linkFor(MEMBER), forWhom: "self", giftType: "points_450",
-      pickupDate: validPickupDate(), slot: "noon",
+      pickupDate: pickupDateAfter(5), slot: "noon",
     }));
     expect(res.status).toBe(409);
     expect((await res.json()).error).toBe("BENEFIT_NOT_AVAILABLE");
@@ -272,11 +276,36 @@ describe("POST /api/birthday/reserve", () => {
     expect((await res.json()).error).toBe("PICKUP_DATE_OUT_OF_RANGE");
   });
 
+  it("450 积分定制蛋糕不足提前 5 天 → 400；免费巴斯克提前 2 天可约", async () => {
+    const base = sqlState.handler;
+    sqlState.handler = (text) => {
+      if (text.includes("SUM(net_sales)")) {
+        return Promise.resolve([{ spend: "800" }]);
+      }
+      if (text.includes("FROM public.pos_member")) {
+        return Promise.resolve([{ ...BASICS_ROW, point_balance: 500 }]);
+      }
+      return base!(text);
+    };
+    const points = await reservePOST(postJson("/api/birthday/reserve", {
+      linkToken: linkFor(MEMBER), forWhom: "self", giftType: "points_450",
+      pickupDate: pickupDateAfter(2), slot: "noon",
+    }));
+    expect(points.status).toBe(400);
+    expect((await points.json()).pickup.minDate).toBeTruthy();
+
+    const basque = await reservePOST(postJson("/api/birthday/reserve", {
+      linkToken: linkFor(MEMBER), forWhom: "self", giftType: "free_basque",
+      pickupDate: pickupDateAfter(2), slot: "noon",
+    }));
+    expect(basque.status).toBe(200);
+  });
+
   it("VIP1（默认权益）不能送亲友 → 409", async () => {
     const res = await reservePOST(postJson("/api/birthday/reserve", {
       linkToken: linkFor(MEMBER), forWhom: "gift", giftType: "free_basque",
       recipientNote: "妈妈",
-      pickupDate: validPickupDate(), slot: "night",
+      pickupDate: pickupDateAfter(2), slot: "night",
     }));
     expect(res.status).toBe(409);
     expect((await res.json()).error).toBe("GIFT_NOT_ALLOWED");
@@ -296,7 +325,7 @@ describe("POST /api/birthday/reserve", () => {
     };
     const res = await reservePOST(postJson("/api/birthday/reserve", {
       linkToken: linkFor(MEMBER), forWhom: "self", giftType: "free_basque",
-      pickupDate: validPickupDate(), slot: "noon",
+      pickupDate: pickupDateAfter(2), slot: "noon",
     }));
     expect(res.status).toBe(409);
     expect((await res.json()).error).toBe("FREE_BASQUE_ALREADY_CLAIMED");
@@ -306,7 +335,7 @@ describe("POST /api/birthday/reserve", () => {
     const req = new Request("https://birthday.test/api/birthday/reserve", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ forWhom: "self", giftType: "free_basque", pickupDate: validPickupDate(), slot: "noon" }),
+      body: JSON.stringify({ forWhom: "self", giftType: "free_basque", pickupDate: pickupDateAfter(2), slot: "noon" }),
     });
     const res = await reservePOST(req);
     expect(res.status).toBe(403);

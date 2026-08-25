@@ -22,7 +22,10 @@ describe("readBirthdayConfig", () => {
     vi.stubEnv("BIRTHDAY_NOTIFY_WEBHOOK", "");
     const config = readBirthdayConfig();
     expect(config.linkTtlDays).toBe(30);
-    expect(config.pickupLeadDays).toBe(2);
+    expect(config.pickupLeadDaysByGift).toEqual({
+      free_basque: 2,
+      points_450: 5,
+    });
     expect(config.benefitsByLevel.L1).toEqual([]);
     expect(config.benefitsByLevel.L2.map((r) => r.kind)).toEqual(["free_basque"]);
     expect(config.benefitsByLevel.L3.map((r) => r.kind)).toEqual([
@@ -30,7 +33,9 @@ describe("readBirthdayConfig", () => {
       "points_450",
     ]);
     expect(config.benefitsByLevel.L3[1].allowGift).toBe(false);
+    expect(config.benefitsByLevel.L3[1].yearlyLimit).toBeNull();
     expect(config.benefitsByLevel.L4[1].allowGift).toBe(true);
+    expect(config.benefitsByLevel.L4[1].yearlyLimit).toBeNull();
     expect(config.defaultBenefits).toEqual([]);
     expect(config.notifyWebhook).toBeUndefined();
   });

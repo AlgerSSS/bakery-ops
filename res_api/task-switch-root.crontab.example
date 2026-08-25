@@ -1,0 +1,1 @@
+0 20 * * 0 /usr/bin/node /opt/hotcrush/res_api/scripts/task-switch-run.mjs weekly_executive_report -- /opt/weekly-report/run.sh

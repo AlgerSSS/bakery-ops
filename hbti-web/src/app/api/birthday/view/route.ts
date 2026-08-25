@@ -86,7 +86,10 @@ export async function GET(request: Request): Promise<NextResponse> {
       },
       stats,
       options,
-      pickup: pickupWindow(config),
+      pickupByGift: {
+        free_basque: pickupWindow(config, "free_basque"),
+        points_450: pickupWindow(config, "points_450"),
+      },
       profile,
       reservations,
       campaignYear: config.campaignYear,

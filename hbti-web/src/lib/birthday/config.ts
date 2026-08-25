@@ -31,8 +31,8 @@ export interface BirthdayConfig {
   campaignYear: number;
   /** 签名链接有效期（天）。 */
   linkTtlDays: number;
-  /** 预约需提前的天数。 */
-  pickupLeadDays: number;
+  /** 预约需提前的天数：免费巴斯克 T-2，450 积分定制蛋糕 T-5。 */
+  pickupLeadDaysByGift: Record<"free_basque" | "points_450", number>;
   /** 最多可以提前多少天预约。 */
   pickupWindowDays: number;
   /** 积分兑换每会员同时有效的预约数上限（防呆，不限量的业务规则不变）。 */
@@ -132,7 +132,10 @@ export function readBirthdayConfig(): BirthdayConfig {
     linkSecret,
     campaignYear: readInteger("BIRTHDAY_CAMPAIGN_YEAR", currentKlYear()),
     linkTtlDays: readInteger("BIRTHDAY_LINK_TTL_DAYS", 30),
-    pickupLeadDays: readInteger("BIRTHDAY_PICKUP_LEAD_DAYS", 2),
+    pickupLeadDaysByGift: {
+      free_basque: readInteger("BIRTHDAY_FREE_BASQUE_LEAD_DAYS", 2),
+      points_450: readInteger("BIRTHDAY_POINTS_CAKE_LEAD_DAYS", 5),
+    },
     pickupWindowDays: readInteger("BIRTHDAY_PICKUP_WINDOW_DAYS", 30),
     maxActivePointsReservations: readInteger("BIRTHDAY_MAX_ACTIVE_POINTS_RESERVATIONS", 3),
     benefitsByLevel,

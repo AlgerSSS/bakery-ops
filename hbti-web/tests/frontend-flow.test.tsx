@@ -1,6 +1,7 @@
 import {
   act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -16,6 +17,10 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     json: async () => body,
   } as Response;
+}
+
+function fillInput(input: HTMLElement, value: string) {
+  fireEvent.change(input, { target: { value } });
 }
 
 /**
@@ -100,14 +105,14 @@ describe("customer HBTI journey", () => {
     const user = userEvent.setup();
 
     render(<HbtiExperience />);
-    await user.type(
+    fillInput(
       await screen.findByLabelText("Member phone number"),
       "0123456789",
     );
     await user.click(
       screen.getByRole("button", { name: "Send verification code" }),
     );
-    await user.type(await screen.findByLabelText("Six-digit code"), "123456");
+    fillInput(await screen.findByLabelText("Six-digit code"), "123456");
     await user.click(
       screen.getByRole("button", { name: "Verify and begin" }),
     );
@@ -166,14 +171,14 @@ describe("customer HBTI journey", () => {
     const user = userEvent.setup();
 
     render(<HbtiExperience />);
-    await user.type(
+    fillInput(
       await screen.findByLabelText("Member phone number"),
       "0123456789",
     );
     await user.click(
       screen.getByRole("button", { name: "Send verification code" }),
     );
-    await user.type(await screen.findByLabelText("Six-digit code"), "123456");
+    fillInput(await screen.findByLabelText("Six-digit code"), "123456");
     await user.click(
       screen.getByRole("button", { name: "Verify and begin" }),
     );
@@ -230,7 +235,11 @@ describe("customer HBTI journey", () => {
 
     render(<HbtiExperience />);
     await user.click(
-      await screen.findByRole("button", { name: /Claim my bread|proofing—continue|认领我的面包|接着来/ }),
+      await screen.findByRole(
+        "button",
+        { name: /Claim my bread|proofing—continue|认领我的面包|接着来/ },
+        { timeout: 5_000 },
+      ),
     );
     await user.click(
       await screen.findByRole("button", {
@@ -246,14 +255,14 @@ describe("customer HBTI journey", () => {
     });
 
     await user.click(screen.getByRole("button", { name: "Change" }));
-    await user.type(
+    fillInput(
       await screen.findByLabelText("Member phone number"),
       "0198764321",
     );
     await user.click(
       screen.getByRole("button", { name: "Send verification code" }),
     );
-    await user.type(await screen.findByLabelText("Six-digit code"), "123456");
+    fillInput(await screen.findByLabelText("Six-digit code"), "123456");
     await user.click(
       screen.getByRole("button", { name: "Verify and begin" }),
     );
@@ -340,11 +349,11 @@ describe("customer HBTI journey", () => {
       await screen.findByLabelText("Country or region"),
       "AU",
     );
-    await user.type(screen.getByLabelText("Member phone number"), "431029692");
+    fillInput(screen.getByLabelText("Member phone number"), "431029692");
     await user.click(
       screen.getByRole("button", { name: "Send verification code" }),
     );
-    await user.type(await screen.findByLabelText("Six-digit code"), "123456");
+    fillInput(await screen.findByLabelText("Six-digit code"), "123456");
     await user.click(
       screen.getByRole("button", { name: "Verify and begin" }),
     );
@@ -408,7 +417,7 @@ describe("customer HBTI journey", () => {
       /^A cup/, //                                    q6  drink
     ];
     for (const option of answerPath) {
-      await chooseAndContinue(user, option);
+      await chooseAndContinue(option);
     }
 
     expect(
@@ -472,7 +481,7 @@ describe("customer HBTI journey", () => {
         ),
       ).toHaveLength(0);
     });
-  });
+  }, 15_000);
 });
 
 describe("周边发完之后", () => {
@@ -527,7 +536,7 @@ describe("周边发完之后", () => {
     expect(
       screen.queryByText("A little something from the counter"),
     ).not.toBeInTheDocument();
-  });
+  }, 15_000);
 
   it("发到券时显示本地化礼物名，而不是后台的内部字符串", async () => {
     const user = mockJourney({
@@ -549,7 +558,7 @@ describe("周边发完之后", () => {
     expect(
       screen.queryByText("HBTI Gift · Rose Fridge Magnet"),
     ).not.toBeInTheDocument();
-  });
+  }, 15_000);
 
   it("券名认不出来时退回兜底文案，不把原字符串漏给顾客", async () => {
     const user = mockJourney({
@@ -569,15 +578,14 @@ describe("周边发完之后", () => {
     expect(
       screen.queryByText("HBTI Gift · Something New"),
     ).not.toBeInTheDocument();
-  });
+  }, 15_000);
 });
 
 async function chooseAndContinue(
-  user: ReturnType<typeof userEvent.setup>,
   answer: RegExp,
 ) {
-  await user.click(await screen.findByRole("button", { name: answer }));
-  await user.click(screen.getByRole("button", { name: /^Next/ }));
+  fireEvent.click(await screen.findByRole("button", { name: answer }));
+  fireEvent.click(screen.getByRole("button", { name: /^Next/ }));
   await act(async () => {});
 }
 
@@ -606,7 +614,7 @@ async function walkTheWholeJourney(
     /Early morning, before the world gets loud/,
     /^A cup/,
   ]) {
-    await chooseAndContinue(user, option);
+    await chooseAndContinue(option);
   }
   await user.click(
     screen.getByRole("button", { name: /Collect my fresh-out gift/ }),

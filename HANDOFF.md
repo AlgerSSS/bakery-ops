@@ -690,6 +690,581 @@ Fabric Trial、没有切换连接串或部署。**
 下一步仅建议做设计/迁移准备包：① 冻结 R6A2 权威模型；② 生成 10 张 Agent 表的声明模型和
 **未执行**迁移草案；③ 给四个消费者建立 SQL/功能契约测试；④ 在 Fabric Trial 激活前批准区域、
 数据驻留和成本边界。该分支为已登记的活跃设计分支，待用户评审后再决定是否继续 R6A2 编译。
+## See You Often 会员体系接管：历史等级回算 + RES 积分商城核验（2026-08-21，Codex，进行中）
+
+活跃实现分支：`codex/see-you-often-loyalty-engine`，独立 worktree
+`/private/tmp/hot-see-you-often-loyalty`。积分规则、成长值倍率、L1 正式名称、RES 官方 H5 与
+历史会员滚动成长值/等级均已正式写入并独立回读。滚动回算的必要文件已按文件白名单部署到
+tokyo-01，02:30 MYT 单写者 cron 已安装并完成一次真实全链路运行；没有执行会夹带主工作区
+其他改动的全仓部署，也没有直接写 Supabase。
+
+**RES 正式短信现场修复（2026-08-21）**：
+
+- 已确认用户所说“账号有全部权限”与 403 不矛盾。集团权限响应的 `pathList` 虽含
+  `/process-management`，但实际 `menuResourceList` 没有该页面资源；切到集团后页面仍跳 403。
+  更关键的是，绕过前端只读请求四个自动化接口（活动列表、统计、事件配置、创建人）均返回
+  HTTP 404，而不是账号鉴权 403，说明当前租户没有部署/路由自动化营销后端，无法靠角色勾选修复。
+- 集团层级的 RES `Mass Message` 与 `Sms Signature Management` 均可正常进入。此前并非“签名待审核”，
+  而是集团与品牌的所有 signer 字段均为空。现已通过 RES 正式编辑入口把集团
+  `450020844` 与品牌 `1990716608733069315` 的 `en_US` signer 都设置为 `HOT CRUSH`，两次写入
+  均 `code=000` 并独立回读一致。
+- 签名修复后，对 RES `/rsconfhub/batch-send/estimate` 做了无发送验证，已从
+  `ErrMissingSignature` 变为 `code=000`。没有点 Test SMS、没有创建群发任务、没有触达会员。
+- 默认短信权益账户 `ea0081827160220525` 当前余额为 **200 计费点**，不是 200 条短信。以一条
+  英文单段短信对当前 4,851 个可投递号码做全会员预估，需要 17,922 点；其中马来西亚号码
+  4,649 个、单段合计 13,947 点，即 MY 单段约 3 点/人。进一步只读核对权益账户接口：
+  `creditPoints=0`、订单 0 条、额度变更流水 0 条，现有 200 点来源没有系统备注，也没有任何
+  月度补充/续期记录；可选短信包只有 1,000 点 RM50、5,000 点 RM225、10,000 点 RM400、
+  50,000 点 RM1,885，全部为付费商品，支付方式只有 Adyen，未发现零价套餐、优惠券、试用金
+  或自行领取免费额度的入口。该账户目前最多覆盖约 66 个 MY 英文单段收件人，且只是消耗现有
+  余额，不是可持续的免费方案。合法的零新增支出路径只剩向 RES 客服申请合同内/补赠额度；
+  是否可获批无法从账户或公开条款验证。测试短信、登录验证码通道不能用于正式营销，也不得拿来
+  规避计费。
+- 已建立三条不会自行发消息的 RES 动态会员群体，供服务器 cron 每日改成目标生日并交给
+  `Mass Message` 正式投递：`SYS Birthday Day`=`2090674694683627525`（当天、全部等级），
+  `SYS Birthday T-2 L2-L4`=`2090674851298942977`，
+  `SYS Birthday T-5 L3-L4`=`2090674852053917702`。三条均为 type=1 动态群体、groupType=0，
+  当前分别锁定 08-21 / 08-23 / 08-26，规则与等级 ID 已逐项回读；当天这三组人数均为 0。
+- RES 生日筛选全年度只估出 98 名填有生日的会员。此前“3,722 名会员每年三次=11,166 条”
+  是把 `has_profile` 误当成“有生日”的错误估算：生产库最新为会员 4,853、可投递号码 4,851、
+  `has_profile` 3,730，而本地 `mkt_birthday_profile` 目前 0 行。生日短信的已知年度上限应先按
+  RES 的 98 名生日会员重算，且需把后续 H5 收集到的生日同步回 RES 或改用官方群体导入名单。
+- 已核对 RES 官方“会员群体导入”模板：用户群体只要求 `Mobile Phone Number`，手机号是唯一标识；
+  因而升级/降级这类无法用固定生日规则表达的名单，仍可由服务器生成名单导入 RES 群体，再用
+  RES `Mass Message` 正式发送，不需要接外部短信供应商。该导入与服务器发送 job 尚未启用；
+  用户已确认每日发送时间为 **10:00 Asia/Kuala_Lumpur**。下一项需逐条确认三类短信正文，并在
+  RES 免费补额/充值及余额门禁满足前保持 fail-closed。
+- **邮件替代只读核验（2026-08-21）**：RES `/email-marketing` 可正常进入，页面支持创建活动、
+  定时/立即发送、测试发送及 Delivered/Open 统计，当前活动 0 条；没有发送测试邮件。集团与品牌
+  邮件 provider 已存在，但 `sender` 都为空，域名固定为 `@support.restosuite.ai`，正式使用前必须
+  先配置发件人前缀。创建邮件时前端强制从 `serviceTypeCode="SMS"` 的权益账户中选择账户；RES
+  资费表同时明确列有 `EMAIL consumeRule=2`，因此当前设计是 **每个收件人约扣 2 点**，不是免费
+  邮件，仍会消耗同一 200 点余额。会员档案接口最新 3,722 人中仅 27 个非空且格式有效的唯一邮箱
+  （约 0.73%，无重复），档案中 38 个填有生日者仅 14 个同时有有效邮箱；`subscribed=true` 虽为
+  全员，但字段语义未证明等于明确的邮件营销同意，不能据此跳过 consent/退订管理。RES 生成的
+  正式邮件会自动附带 unsubscribe 链接。若用户允许放宽“只通过 RES”约束，可评估服务器接 Brevo
+  免费层（官方当前为 300 封/日），但需自有域名 DNS 验证、API key、退订/退信同步及先补充会员
+  邮箱；在用户确认前不创建外部账户、不发邮件。用户随后说明企业邮箱本身由 Lark Mail 托管，并
+  指定 `pavilionstore.my@hotcrush.net` 为发件邮箱，因此 Brevo 不再是首选。Lark 官方支持第三方客户端
+  通过 `smtp.larksuite.com:465`（SSL）发送；Vultr 可负责 10:00 MYT 定时、名单、幂等与自定义 HTML，
+  Lark Mail 负责最后一跳，完全不依赖 RES。后续核对官方 Mail OpenAPI 后更正：Lark 确有
+  `POST /open-apis/mail/v1/user_mailboxes/me/messages/send`，支持 HTML、附件与 `dedupe_key`，因此无需
+  SMTP dedicated password。2026-08-21 已在 tokyo-01 安装官方 `lark-cli v1.0.88`，并从服务器既有
+  `/opt/hotcrush/scripts/lark_app.json` 安全绑定应用 `cli_aa82af2c7878de17`（未输出或复制 secret）；
+  应用凭据只能换应用令牌，邮件写操作仍需用户 OAuth。用户已于 2026-08-21 完成授权，tokyo-01
+  成功兑换并持久化 user/refresh token，`mail:user_mailbox.message:send` 与 `offline_access` 等 mail scopes
+  均已授予；授权主体主邮箱为 `weiliangshao@hotcrush.net`。只读枚举确认指定发件地址
+  `pavilionstore.my@hotcrush.net` 是当前用户可访问的 `PUBLIC_MAILBOX`，且从该 mailbox 查询
+  `settings/send_as` 明确返回其为可发信地址（显示名“Pavilion门店”）。注意官方 CLI v1.0.88 的
+  `mail +send --mailbox <公共邮箱>` dry-run 会先调公共邮箱 `/profile`，该端点实际返回 1230001，
+  因此生产脚本不要用 `+send` 快捷命令；直接调用该公共邮箱的原生 `messages/send`，其 dry-run 已
+  确认 HTML/plain text/`dedupe_key` 请求结构正确。未创建草稿、未发送邮件。
+- **Lark 邮件配置中心与服务器脚本（2026-08-21）**：已创建多维表格
+  [`HOT CRUSH 自动邮件中心`](https://fjpks7iroa9l.jp.larksuite.com/base/CE6WbyvHNayXh8sgByWjArJlpvh)
+  （Base `CE6WbyvHNayXh8sgByWjArJlpvh`，表 `tble1DdoQGjfydrI`，时区
+  `Asia/Kuala_Lumpur`），内含 `birthday_cake_t5`、`birthday_basque_t2`、
+  `birthday_card_t0`、`tier_upgrade`、`tier_downgrade` 五行。标题、HTML、启用开关、测试收件人
+  均可由用户自行编辑；五行当前全部关闭，标题/HTML 仍为空，测试收件人已统一设置为
+  `weiliangshao1@gmail.com` 并经 5/5 行独立回读确认。新增
+  `res_api/lib/member-email.js`、`scripts/member-email-dispatch.mjs`、
+  `member-email-daily.sh` 与专项测试：只认固定模板代码和变量白名单；会员变量做 HTML 转义；
+  拒绝脚本/事件属性/危险 URL；生日受众按 T-5=L3/L4 积分蛋糕、T-2=L2-L4 巴斯克、T0=全部
+  生日会员筛选；邮箱/姓名/生日只在内存中使用，日志只报计数；Lark 请求体从 stdin 传入，
+  正式发送另需 Base 开关、精确确认短语、服务器 live 开关、consent 模式、退订 URL 和每日上限。
+  相关文件已按白名单部署到 tokyo-01，SHA-256 与本地一致，备份目录为
+  `/opt/hotcrush/backups/member-email-20260821-A3MaX3`；实机只读回读 5/5 行成功，RES 会话刷新后
+  受众预演读取 4,872 张卡、4,855 份档案，当日 T-5/T-2/T0 均为 0；全过程没有发送邮件。
+  `/etc/cron.d/hotcrush-member-email` 已安装为每日 **10:00 MYT**，当前强制
+  `MEMBER_EMAIL_MODE=preview`，手动跑同一入口 exit=0、失败标记不存在，只校验 Base 而不会读取
+  名单或发送；cron 服务 active。生日链路已接通到发送函数但保持关闭；
+  2026-08-21 17:00 MYT 经用户明确授权，从公共邮箱 `pavilionstore.my@hotcrush.net` 向上述测试
+  收件人只发送了一封标题为 `[HOT CRUSH] Lark Mail 通道测试` 的独立链路测试邮件；原生发送接口
+  返回唯一 message id，随后以公共邮箱地址查询 `send_status`，收件人状态为 `4`（delivered）。
+  此次没有读取会员名单、没有触发五种会员模板，也没有把任何 Base 开关或服务器 cron 切到 live。
+  用户随后明确确认正式发送的业务筛选口径：仅向邮箱格式有效且 RES `subscribed=true` 的会员发送；
+  对应配置为 `MEMBER_EMAIL_CONSENT_MODE=res_subscribed`。该确认不改变 `subscribed` 字段语义尚未被
+  RES 证明等同于法律意义邮件营销同意这一事实，也不取消退订机制要求。
+  升级/降级行当前只作配置，尚缺可靠的等级事件队列，脚本若发现其被启用会 fail closed，不能把
+  “表里有一行”误报成自动投递完成。测试收件人、通道测试和 `res_subscribed` 口径已经确认；
+  正式发送前仍须逐项确认邮件内容和退订处理地址，在此之前不得把 cron 切到 live。
+
+- **五封会员邮件正文已落库（2026-08-21，Claude Code 接管）**：按 Lark 原方案
+  `HU22dHZwio6RQ8xrvqij3eq9pgc`（「See You Often」日常储值方案-完整版，obj_edit_time 2026-08-21 12:27）
+  逐条对齐口径后起草标题与 HTML，写入 Base `CE6WbyvHNayXh8sgByWjArJlpvh` 表 `tble1DdoQGjfydrI`
+  的 5 行；`batch_update` 返回 code=0，随后独立回读 5/5 标题与 HTML 与本地逐字节一致，
+  再把线上内容喂回 `lib/member-email.js` 的 `normalizeTemplateRecords`+`renderTemplate` 真实校验，
+  5/5 通过（含 `{{member_name}}` 注入转义、上线必需链接检查）。**`启用` 仍全部为 false，服务器仍是
+  `MEMBER_EMAIL_MODE=preview`，本次没有发送任何邮件。** 邮件为中英双语、纯内联样式无外链资源。
+  内容口径：T-5 蛋糕仅 L3/L4 且写明 450 积分、T-2 巴斯克 L2 起、蛋糕与巴斯克二选一且生日月限一次、
+  滚动 12 个月、降级每月 1 日一次最多一级、生日月不降级、积分永久有效、已领权益不追回。
+  写入用的是 app `cli_aa82af2c7878de17` 的 tenant token；此前写返回 91403，是用户把该应用加为
+  该 Base 协作者后才生效——换台机器操作前先确认这个协作者关系还在。
+- **积分商城线上只读实测（2026-08-21，Claude Code）**：SSH 恢复后用 `/tmp` 下的一次性只读脚本
+  （引生产 `lib/report-client.js` 绝对路径，未向 `/opt/hotcrush` 写入任何文件）实测：
+  - 商城 `1998965779072061445`，owner `1990706730765467654`，enable=true。
+  - **在售商品只有 2 个**：`蝴蝶耳机包` id `1998965516164698119`，redeemPoints=**100**、
+    totalInventoryQty=100、**availableInventoryQty=98**、status=2，modifiedBy=邵伟亮
+    modifyTime=2026-08-21T04:44:19Z —— 即**已按 100 分被真实兑走 2 个**，与计划的 900 分差 800 分/个；
+    另一个是 `450积分兑换生日蛋糕` id `2090037406790119431`，450 分、库存 99999、status=2，已上线。
+  - 券模板 38 个。**13 个商品里 12 个的券都存在且 status=1**；唯一真缺券的是 `cold-brew-cup-sleeve`。
+    注意 `bow-earphone-pouch` 的券是存在的（`1998965051872153608`「蝴蝶结耳机包【商城】」），
+    早前一次用英文关键词过滤的核对把它误报成"线上找不到"，不要据那次结论去重建券。
+  - `item/list` 必须走 `fetchCrmList`（它补 `page` 字段）；直接传 `pageNo` 会返回
+    `UNI-00-0101 page must not be null`。返回行里**不含 `picUrl`**，商品图要另找详情接口。
+  - 商品图托管在 `resto-images-uat.s3.us-west-2.amazonaws.com`，因此必须走 RES 自己的上传接口。
+    只读扫 `/pointsMall` 页面的 36 个 JS 包，grep 到上传端点 **`/resource/management/file/upload`**（出现 21 次）；
+    另有 `/ai-assistant/api/v1/ai/image/upload`、`/resource/management/media/space/uploadMedia`。
+    **上架/改价端点没扫到** —— 创建表单的 JS 是按需加载的，没打开表单抓不到。
+    `buildPointsMallCouponPayload` 的载荷结构至今仍是上一个 agent 的推测，从未与 RES 验证过；
+    上传端点同样未调用验证。批量上架脚本尚不能安全实现。
+- **会员日补差改为周三 23:59 主跑 + 周四 03:30 补扫（2026-08-22，用户指定当晚更新）**：
+  - 改时段引出两个必须先解决的问题，都已处理：
+    1. **默认业务日算错**。原来取"昨天"，周三 23:59 跑时昨天是周二，会直接被周三校验拒掉。
+       改为 `mostRecentMemberDay()`——从当天往回找最近的周三（含当天）。
+       主跑（周三夜）目标是当天，补扫（周四凌晨）目标是昨天，同一函数都落到同一个周三。
+    2. **23:59 会漏单且无法补救**。五个周三实测最后一单：22:47 / 22:18 / 22:01 / 22:11 /
+       **23:16（2026-07-22）**——23:59 只留 43 分钟余量。原账本把卡记成"已发放"，重跑直接跳过，
+       晚到的订单就永远补不上了。
+  - **账本语义改为累计已发**：`points` 记的是这张卡这一天【累计发了多少】，不是本次发多少。
+    `decideCard(entry, planned)` 现在返回本次该发的数量：applied 且 planned>granted → 只补差额
+    （reason `late_orders_top_up`）；planned<=granted → skip，**绝不做负向回收**
+    （退单回收交给 RES 自己的冲正流程）；applied 但金额字段损坏 → halt 不猜。
+    调用失败时把累计值退回写前的数，否则补扫会误以为已发过。
+  - cron 两条都用同一任务码 `member_day_topup`，都在开关中心管辖内；仓库副本
+    `res_api/member-day.cron.example` 已同步更新，既有的 cron 一致性测试覆盖两条。
+  - 单测 **213/213**（新增 5 例：差额补发、不倒扣、损坏金额 halt、计划额校验、默认日期两种运行时段）。
+    三个文件重新部署，本地与 tokyo-01 SHA-256 逐一致，远端单测 18/18。
+    不带 `--business-date` 的默认预演在今天（周六）正确解析到 2026-08-19。
+  - 顺带查明门店周三营业时间：最早成交集中在 **11:16–12:03**，比商场 10:00 开门晚 1–2 小时；
+    与会员日无关，但可能值得单独看一眼。报表里可用的时间维度字段是 **`D_checkoutTime`**
+    （`D_orderTime`/`D_hour`/`D_businessHour`/`D_orderCreateTime` 都不存在）。
+
+- **会员日补差：开关接入完成 + 单卡实测通过 + 修掉一个真 bug（2026-08-22 晚，Claude Code）**：
+  - **`type` 枚举原来是错的**。第一版脚本写 `type: 10`（那是**储值**调整的枚举）。用不存在的卡号
+    做的安全探测只走到「card not found」就返回了，**根本没触发枚举校验**，所以那轮探测给了错误的信心。
+    真实卡上一打就报 `invalid request param: type`（余额未变）。从后台 JS 包的 Point Adjustment 表单
+    单选项里查到正确值：**`adjustIncrease=7` / `adjustDecrease=701`**，已提为
+    `POINT_ADJUST_TYPE`（`lib/member-day-points.js`）并加回归测试锁死。
+    **教训：假 ID 探测只能验证必填字段，验证不了枚举值——枚举要么从前端 JS 取，要么在真实对象上验。**
+  - **单卡实测（用户指定账号 +61 431029692）**：该号码下有两张卡，
+    `2083138031082315776`（status=10 有效）与 `2043285798484439049`（status=40，未动）。
+    在有效卡上补 25 分：**积分 0 → 25，成长值 0 → 0 不变，储值余额 0/0 不变，等级不变**。
+    印证后台说明的「只改资产、不生成累计数据记录」——补差不会污染等级计算。
+    **这 25 分是测试写入，仍留在该卡上**；要清掉就用 `type: 701` 扣回 25。
+  - 已接入 Lark 任务开关中心：开关表新增 `member_day_topup` 行（表 14 行，回读确认），
+    `MANAGED_TASK_CODES` 补上该码，服务器同步成功——`state.json` 现有 6 个任务全为 true。
+  - cron 改写：**去掉了 `CRON_TZ`**。实测本机 `strings /usr/sbin/cron | grep -c CRON_TZ` = **0**
+    （vixie cron 3.0pl1-162 确实不认这个变量），但系统时区本身已是 Asia/Kuala_Lumpur，
+    所以写不写都按 MYT 跑（member-email 日志实测在 10:00:01 触发）。去掉是为了不误导后人以为有 CRON_TZ 兜底，
+    与 `hotcrush-recruit` 顶部的既有告诫一致。现命令已包 `task-switch-run.mjs member_day_topup --`，
+    并新增仓库副本 `res_api/member-day.cron.example` 让既有的 cron 一致性测试覆盖到它。
+  - 全量单测 **208/208**；三个改动文件重新部署，本地与 tokyo-01 SHA-256 逐一致；预演复跑 exit=0。
+
+- **会员日 1.5 倍积分补差已开发并部署（2026-08-22，Claude Code）**：用户在三个方案里选定
+  「补差脚本」——不改 2 倍（那会把周三返利率从 15% 推到 20%，与门店把折扣率从 28.4% 压到 7.9%
+  的方向相反），也不换权益形式。
+  - **为什么要补差**：RES 的 Member Day 权益只接受 **2–9 的整数倍**，1.5 倍配不出来。
+    所以周三 RES 只发原生 1 倍，服务器在周四补 0.5 倍。
+  - **RES 积分调整契约（已用不存在的卡号安全探明，全程零写入）**：
+    `POST /crm/memberPoints/web/points/adjust`，必填 `cardNo, points, corporationId, shopId, type`
+    （`type` 10=增加 / 20=扣减），可选 `remark, adjustmentType, ownerOrgId, orgPath`。
+    字段齐全后返回 `CRM-02-1004 card not found`，即只差真实卡号。后台该操作的说明是
+    「只改资产、不生成累计数据记录」，因此补的分**不会污染成长值与等级计算**。
+  - **补差公式必须是 `floor(实付×1.5) − floor(实付)`，不是 `floor(实付×0.5)`**。
+    RM1.99 两者差 1 分。必须逐笔算再相加，先汇总再乘会少给分。单测锁死了这两个用例。
+  - 新增 `lib/member-day-points.js`、`scripts/member-day-topup.mjs`、`member-day-topup.sh`、
+    `test/member-day-points.test.js`（12 例），`npm run memberday:preview`。
+    全量单测 **207/207** 通过（原 195 + 新增 12）。
+  - **幂等是 claimed→applied 状态机，不是「跑完再记」**：调用 RES 前先写 `claimed` 并原子落盘，
+    成功后改 `applied`。RES 成功但进程崩溃的窗口会停在 `claimed`，下次运行 **fail-closed 要求人工核对，
+    绝不自动重试**——重试就是重复送分，积分送出去收不回来。账本在
+    `/var/lib/hotcrush-member-day/YYYY-MM.json`，损坏时拒绝运行而不是当成「没记录」全量重发。
+  - 正式发分三重闸门：`--apply` + `MEMBER_DAY_LIVE_ENABLED=1` + `MEMBER_DAY_CONFIRM='GRANT MEMBER DAY BONUS POINTS'`，
+    另加「业务日必须是周三」硬校验与单卡上限（超限整批拒绝，不静默发放）。四条闸门均已逐条实测拦截。
+  - 已按文件白名单部署 tokyo-01，5 个文件 SHA-256 与本地一致，远端单测 12/12。
+    `/etc/cron.d/hotcrush-member-day`：`CRON_TZ=Asia/Kuala_Lumpur`，**周四 03:30 MYT**，
+    当前 `MEMBER_DAY_MODE=preview`（只算不发）。支持 `MEMBER_DAY_BUSINESS_DATE=YYYY-MM-DD` 补跑指定周三。
+  - **真实预演（2026-08-19 周三）**：30 笔会员订单 / 22 张卡 / 合计 **741 分**
+    （≈RM74 兑换价值；若改 2 倍则约 RM148）。入口脚本端到端 exit=0，无失败标记，未发出任何积分。
+  - ⚠️ **尚未接入 Lark 任务开关中心**：`lib/task-switch.js` 的 `MANAGED_TASK_CODES` 是硬编码白名单，
+    且 `sync-task-switches` 会校验**所有**登记码都在表里存在，缺一个就整体抛错、连带影响现有 5 个开关。
+    因此顺序必须是**先在开关表加 `member_day_topup` 行，再改代码**。目前加不了：
+    app `cli_aa82af2c7878de17` 对 Base `ZgQ4bYgRkaJKDUsj9mjjWMRupkd` 只有读权限，写返回 **403**，
+    需要用户把该应用加为这张表的协作者（邮件表 `CE6WbyvHNayXh8sgByWjArJlpvh` 已经加过）。
+
+- **储值方案与积分商城已落地（2026-08-22，Claude Code，已写生产）**：
+  - **新建储值方案「充100送20」`2091005082169749511`**，2026-08-29 ~ 2027-12-31，
+    `storedAmount=10000 / returnAmount=2000`，`sourceType=[10,30]`（POS+Online），
+    `frozenRule.freezeDuration=1`（次日起可用）。做法：以已过期的同规则方案 `2079087063617204227`
+    为模板，`storedValueProgram/detail` 取全量 → 删 id/rules[].id/审计字段 → 只改 name/日期 →
+    `storedValueProgram/save` → 建前建后比对 id 集合确认新增恰好 1 条 → detail 回读校验数值。
+    ⚠️ RES 要求有限结束日期（`requiresFiniteEndDate`），方案写的是「日常储值无期限」，
+    2027-12-31 是我取的一年半窗口，**到期前须续建**。
+  - **积分商城新建 11 个商品**（冷萃杯因无券模板跳过）：白/红/黑铅笔各 100 分，
+    爱心/玫瑰/蝴蝶纸香卡、玫瑰/吉隆坡/蝴蝶结冰箱贴各 150 分，帆布包 400 分，抱枕 800 分；
+    库存按方案原价表填。ids `2091007141711245319` `20910082158…` ~ `2091008237674491912`。
+  - **RES 图片上传契约（已验证）**：`POST /resource/management/file/upload`，
+    `multipart/form-data` 字段名 **`file`**，返回 `{code:"000",data:{fileLink,s3Path,fileMd5,...}}`，
+    图落在 `https://img.sea.restosuite.ai/c{corp}/s{shop}/{n}-{date}.png`。请求头沿用 `authHeaders`
+    但**必须删掉 `content-type`**，让浏览器自己带 multipart boundary。
+  - **`pointsmall/item/save` 契约（已验证）**：payload 同 `getById` 结构，
+    **必须带 `owner`（`1990706730765467654`），缺了报 `owner must not be null`**；
+    `details[].couponBatchId` 不要传，RES 会自己生成。
+  - ⚠️ **`status` 字段语义纠正**：`item/list`/`getById` 的 `status=2` **表示「已下架 Removal」**，
+    不是在售。后台第 2 页确认耳机包、450 积分生日蛋糕、白色铅笔全部显示 `Removal`，操作列是
+    `Upload Product`。**即整个积分商城至今从未上架，没有会员能兑换**；耳机包 `availableInventoryQty=98`
+    的那 2 次消耗发生在更早某个上架时段，不是当前正在发生的漏洞。此前交接里把它记成
+    「洞还开着、正在漏」是错的，据此改价仍然正确但并不紧急。新建的 11 个商品同样是下架状态，
+    配置就位、等人工一键上架。`item/offsale` 返回 `code=000` 但对本就下架的商品无可见变化。
+  - **储值方案状态语义（后台实测）**：`status=1` → `Completed`（已结束），`status=2` → `Disabled`（已停用）。
+    因此 8/29 之前线上确实**一个储值方案都不生效**；`储值RM100赠送50` 等长窗口方案是被手动停用的，
+    门店并没有在多送。`lib/benefit-readiness.js:88` 把 `status===1` 当作「生效」是错的，需要修。
+
+- **对照活动方案的全量线上盘点（2026-08-21，只读）**：接口
+  `storedValueProgram/list|detail`、`pointsProgram/details`、`levelProgram/level/list`、
+  `memberRights/pageQuery`、`marketing/campaigns/pageQuery`（前两个的分页参数都是 `{page:{pageNo,pageSize}}`）。
+  - **已配**：积分规则完全符合方案（`amountType=2` 实付、`consumeAmount=100→earnPoints=1`、
+    `exchangeAmount=1000→exchangePoints=100`、`clearingEnabled=false`、`exchangeChannel=["offline"]`）；
+    等级四级名称正确；H5 两页 200（birthday / hbti-test）。
+  - **储值方案共 10 个，没有一个是「RM100 送 RM20」且覆盖 8/29 的**：两个 `充100送20`
+    （rules `storedAmount=10000 / returnAmount=2000`，符合方案）窗口分别是 7/15–7/19、7/20–7/31，**均已过期**。
+    日期覆盖 8/29 的有 5 个，其中 `储值RM100赠送50` 是 RM100→**RM50**（`returnAmount=5000`）。
+    ⚠️ **状态语义未定**：过期那批 `status=1`，覆盖 8/29 那批 `status=2`，`detail` 里 `state=null`
+    且无 enable/online 字段。`lib/benefit-readiness.js:88` 把 `status===1` 当作生效，但那是上一个 agent 的
+    假设、未经证实。两种解读的结论相反（要么 8/29 无任何储值方案，要么门店正在多送 1.5 倍），
+    **必须由人在 RES 后台看状态列文字确认后再动**。
+  - **会员权益全公司只有 1 条** `Membership Price`（id `2043516425477521411`），且
+    `memberDayRule=null`、`memberBirthdayRule=null`、`multiplePoints=null`、
+    `levelRightsRelationList=[]`、`isAllCardLevel=true`。即：**每周三会员日 1.5 倍积分、生日权益、
+    等级差异化权益（Lv2 巴斯克 / Lv3 蛋糕升级资格 / Lv4 五项）在 RES 里一条都没有配置。**
+  - **营销活动只有 1 个** `Pistachio Green Jewel Voucher`（2026-05-24~2027-05-25，与本活动无关）。
+    新人入会礼、好友同行储值礼、储值当单最低价免单**都没有活动**。RM10 券模板本身存在
+    （`10元代金劵` `2043286175804100613` type 2201 status=1），但没有发放活动挂它。
+  - 5 封会员邮件标题/HTML 齐全但 `启用` 仍全为 false，服务器仍 `MEMBER_EMAIL_MODE=preview`。
+
+- **耳机包积分已修正为 900（2026-08-21，Claude Code，已写生产）**：路由是 **`/points-mall`**（不是
+  `/pointsMall`，后者在应用内 404）；该页**不在 `queryMenuResourceListV3` 的菜单树里**，只能直接输 URL。
+  详情接口是 **`/crm/marketing/pointsmall/item/getById` `{id}`**（`item/get`/`detail`/`queryById`/`info`/`query`
+  全部 404，别再试那几个）。`item/list` 的分页参数是嵌套的 **`{page:{pageNo,pageSize},archive:false}`**。
+  写入用 **`/crm/marketing/pointsmall/item/update`**，载荷为 getById 的完整对象原样回写、只改一个字段。
+  执行纪律：写前快照存 `/tmp/earphone_snapshot.json` → 断言写前值确为 100 → 单字段改 900 → update
+  返回 `code=000` → `getById` 回读 → 逐字段 diff（忽略 modifyTime/modifiedBy）→ 只有 `redeemPoints:100->900`
+  一处变化 → 再用 `item/list` 独立复核。**券绑定 `details[0].businessId=1998965051872153608`、
+  `couponBatchId=1998965516248711177` 写入前后一致。** 库存未动（总 100 / 可用 98），门店实际只有 6 个，
+  仍需盘点后修正。⚠️ `item/list` 返回的字段**不含 `picUrl`/`remark`/`details`**，拿它去 update 会清空券绑定，
+  必须用 `getById` 取全量再回写。
+- **POS 商品库实况（2026-08-21，只读）**：商品选择器接口 **`/boMenuApi/api/selector/lib/item/list`**，
+  参数 `{listLevel:"SIZE",withCombo:true,page:{...},priceTypeList:["ITEM_PRICE","WEIGHT_PRICE","HOT_POT_BASE"],
+  targetOrgType:1,targetOrgId:"1990716608733069315"}`（品牌层；用集团层 `1990706730765467654` 或 `1000833`
+  都返回 0 条）。品牌层共 102 个商品，**【Peripheral products】只有 10 项**：
+  Petite Bow Earbuds Case / Ceramic Coffee Cup / Red Stripes Canvas Tote Bag /
+  Petronas Twin Towers Fridge Magnet / Rosé Bloom Fridge Magnet / Butterfly Fridge Magnet /
+  **Heart Fridge Magnet** / Rosé Bloom Scent Card / Butterfly Scent Card / Heart Scent Card。
+  由此确认两件事：
+  1. **`冷萃杯＋杯套` 在 POS 里不存在**。相近的只有 `Hot Crush Ceramic Coffee Cup`（周边类）与
+     `Hot Crush Dual-Layer Coffee Cup`（TOP list 类），都不叫冷萃杯。type 2101 是「Item exchange coupon」，
+     必须绑定一个具体 POS 商品（帆布包券绑的是 `itemId 1998617846862888969` / `itemCode 1327419062`），
+     所以**在确认冷萃杯对应哪个 POS 商品之前，这张券建不出来**。
+  2. **POS 有 `Heart Fridge Magnet`（爱心冰箱贴），但 `points-mall-catalog.js` 里没有这个商品**。
+     `~/Desktop/周边png/` 里那张一直没配上号的「卡纸包装·心形」（`周边_0009_图层-3.png`）
+     很可能就是它，不是废图。冰箱贴实际是 4 款不是 3 款，方案原价表也漏了它。
+  另注：`overseas-square-cushion` 与三款铅笔同样不在 POS 商品库里，但它们的券已存在
+  （cushion 券 type 2101、铅笔券 type 2301），说明 2301「礼品券」不绑 POS 商品，2101 绑。
+
+- **13 张商品图已备好（2026-08-21）**：源图在 `~/Desktop/周边png/`，成品在
+  `~/Desktop/周边png/_上架用/`，按 SKU 命名、1000×1000 白底。用户确认的品类映射：
+  **带 HOT CRUSH 织带吊绳的一组是纸香卡**（心=heart、玫瑰=rose、蝴蝶结=butterfly），
+  **粉色卡纸包装的一组是冰箱贴**（玫瑰=rose、蝴蝶结=bow、双子塔=kl）；卡纸组里那张"心"
+  （`周边_0009_图层-3.png`）没有对应商品，弃用。三支铅笔原本在同一张图里，已按 `-crop 3x1@`
+  切成黑/红/白三张。`overseas-square-cushion` 与 `cold-brew-cup-sleeve` 无实拍图，
+  用户同意**先用品牌占位图上架**，占位图为粉底＋品牌字＋品名，之后须换成真实产品图。
+
+- **接管时发现的三处待决（2026-08-21，未处理）**：
+  1. **积分商城口径已定案（2026-08-21）**：方案原文写「8.29 首发不启动积分兑换周边」，与用户 08-20
+     「把 13 个周边加进积分兑换」冲突。用户 08-21 明确选定 **上架全部 13 个**，即 08-20 的指令覆盖
+     方案原文这一条；耳机包按 900 分（线上误设为 100 分／库存 100，必须修正）。
+     **但上架不只缺 SSH。** 本地跑 `catalogReadiness(POINTS_MALL_PRODUCTS, {})` 的阻塞项为：
+     `image_missing` **13/13**（`product()` 工厂把 `imageUrl` 默认成 null，13 个商品一张图都没有，
+     而 `buildPointsMallCouponPayload` 硬要求 `validImageUrl`）、
+     `coupon_missing` 1（`cold-brew-cup-sleeve` 冷萃杯＋杯套没有券模板 ID，其余 12 个都有）、
+     `inventory_unconfirmed` 1（`bow-earphone-pouch` 库存仍为 null，门店称 6 个全新待盘点）、
+     `coupon_validity_unconfirmed` 1 与 `redemption_limit_unconfirmed` 1（券有效期天数与
+     `redemptionLimit="unlimited"` 都还没有确认值）。另外仓库里**没有**积分商城写入脚本，
+     只有只读的 `preview-points-mall.mjs`，且 `test/points-mall-catalog.test.js:150` 专门断言该脚本
+     不含任何 `pointsmall/item/save|update|onsale|...` 变更端点——写入契约尚未实现也未从 RES 审计出来。
+  2. **450 积分**在方案里仍标【待定·成本核算中】，且方案要求印刷物料不印该数字；本次仍写进了
+     T-5 蛋糕邮件（预约邮件不写价格无法转化）。若定价变动必须同步改这一行。
+  3. **降级结构性阻塞**：`bakery-ops/src/modules/data/migrations/113_loyalty_downgrade_notice_gate.sql:53`
+     硬约束 `CHECK (delivery_channel = 'res_sms')`。项目已放弃 RES 短信改走 Lark Mail，该门禁因此
+     永远无法满足，2026-11 首次降级会被结构性挡死。要跑通需新增迁移放行 `lark_mail`。另外方案要求的
+     「降级前 7 天、告知保级差额」预警邮件**没有模板**，现有 `tier_downgrade` 是降级后的事后通知，
+     `TEMPLATE_POLICIES` 的变量白名单里也没有差额字段。
+- **本次接管的环境限制**：Claude Code 会话的安全策略拦截了 `ssh root@45.77.12.118`，
+  因此**没有**读写 RES、没有碰服务器、没有改 cron；本地 `res_api` 无 `storageState.json`，
+  RES 只读预览也跑不了。涉及 RES / tokyo-01 的动作需在有 SSH 权限的会话里做。
+
+- **Lark 自动任务开关中心（2026-08-21）**：用户要求把 Vultr 与项目里的定时推送集中到多维表格
+  管理。已创建 [`HOT CRUSH 自动任务开关中心`](https://fjpks7iroa9l.jp.larksuite.com/base/ZgQ4bYgRkaJKDUsj9mjjWMRupkd)
+  （Base `ZgQ4bYgRkaJKDUsj9mjjWMRupkd`，表 `tbl50MRrv8oDbReO`，默认视图
+  `vew9Mnsshi`（“全部任务”）），写入 13 项服务器任务。5 项实际接入 `启用` 开关：生日礼预约 Lark 通知、招聘早报、
+  明日面试/试工预告、总经办自动周报、会员邮件任务；其余招聘/RES 同步、会员等级单写者、HBTI
+  令牌维护和 Lark Wiki 同步共 8 项标为“仅查看”，防止运营开关破坏数据完整性。
+  开关是**额外许可门禁**：关闭必定跳过，打开只允许任务按原配置运行，绝不能绕过会员邮件的
+  preview/模板/consent/退订/额度门禁。`scripts/sync-task-switches.mjs` 最初每 15 分钟读取 Base；用户随后
+  要求改为**每小时整点一次**，因此表格开关最长约 60 分钟生效。同步使用用户身份，
+  只有 5 行齐全、代码唯一、管理模式正确且 `启用` 为布尔值时才原子替换
+  `/var/lib/hotcrush-task-switch/state.json`；临时 Lark 故障沿用最后一次有效缓存，缓存缺失/损坏则受控
+  推送 fail closed。`scripts/task-switch-run.mjs` 不经 shell 执行固定 cron 命令并透传退出码。
+  已部署到 tokyo-01 且本地/远端 SHA-256 一致；新增 `/etc/cron.d/hotcrush-task-switch`，并对白名单
+  改写 `hotcrush-member-email`、`hotcrush-recruit`、`hotcrush-birthday` 与 root 周报 crontab，未包裹
+  两条招聘数据同步。服务器原文件备份在
+  `/opt/hotcrush/backups/task-switch-20260821-1735`；此前放在 `/etc/cron.d` 的旧 member-email 备份
+  已移入该备份目录，避免 cron 扫描歧义。端到端用本来不发信的 `member_email_job` 临时切 false，
+  实际同步后 runner 正确 skip，再恢复 true 并独立回读 Base 和本地缓存均为 true；自动同步
+  日志也已出现，生日通知 cron 已多次记录 `allowed`。当前 5 个受控开关全部为 true，实际运行状态
+  与改造前一致；会员邮件内部模式仍为 `preview`，本次验收没有发送邮件或 Lark 测试消息。新增专项
+  测试并跑过 `npm run test:unit`，195/195 全绿。
+
+**近 12 个月等级回算只读预演**：
+
+- 新增 `res_api/lib/loyalty-levels.js`、`scripts/preview-loyalty-levels.mjs` 与单测，
+  `npm run loyalty:preview -- --as-of=YYYY-MM-DD` 按执行日自动计算截至前一日的 12 个自然月
+  窗口并只读拉取 RES 会员订单，
+  用订单历史与冲正链补齐换卡归属，并以报表 `Total Sales` 作为实付口径；该指标已经
+  扣除赠送余额，再减 Payment Discount 会重复扣减。
+- 2025-11-19 至 2026-08-19 实跑：13,693 笔会员订单，实付 RM483,434.26；
+  2026-08-20 重跑时新增 1 名有效会员，因此 4,837 名有效会员的最新预览分层为
+  L1 4,422 / L2 396 / L3 15 / L4 4；
+  9 笔未归因订单实付总额为 0，不影响等级。目标门槛仍为 RM0 / 250 / 750 / 1,500。
+- 重新逐字核对 Lark 原方案后确认：消费达标时立即升级；降级只在每月 1 日执行、每次最多
+  降一级；生日本月锁级；降级前 7 天提示保级差额；门店 2025-11 开业，首次实际降级不早于
+  2026-11-01。此前把 429 张“按消费直接对齐”等同于立即改级是错误解释，现已修正并停止旧
+  canary。2026-08-20 写前政策预览：4,862 张有效卡中 404 张可立即升级，19 张消费目标较低但
+  全部保持现级，0 张允许降级。列表里 6 张 `0/空` 旧卡中抽 1 张请求 L1 时，RES 返回“与当前
+  等级相同”，因此它们是默认 L1 的隐式投影，不是真正未分配；该非成功响应后列表原始空值数
+  从 6 变 5，不能排除服务端只补了投影字段，但业务等级前后均为 L1。预览与回滚现统一按 L1
+  解释，并继续对两个非空等级字段冲突 fail-closed。
+- 已从 RES 前端只读审计出单卡改级契约：`/crm/memberCard/web/card/modifyCard`，改级时
+  `changeTypeList=["2"]`；也确认成长值调整契约
+  `/crm/memberCard/web/card/adjustGrowth` 和批量成长值调整 type 24，官方导入模板只有
+  `Card number` / `Growth` 两列并带版本元数据。闭店后两个单卡 canary 已调用成长值 mutation；
+  未使用批量导入，也未直接调用改级 mutation。
+- 核验过程中 L4 卡数从 14 自动变为 15，证明 RES 仍会按不清零的累计成长值自动升级；
+  它不能独立实现“近 12 个月滚动”。正式方案必须同时把成长值校准为滚动实付并按目标
+  等级回写，之后持续周期性重算，否则一次回填后仍会再次漂移。
+- 已新增 `res_api/lib/loyalty-reconciliation.js`；原只读预览 CLI 现有显式 apply 模式，
+  默认仍只读，正式模式必须带 `SEE_YOU_OFTEN_LEVELS_V1`，逐卡校验快照、调整成长值、
+  自动升级或直接改级、回读成长值＋等级，单卡失败时恢复该卡。流水号为 KL 时间 14 位
+  加进程内单秒序号 4 位，避免批量碰撞。详情接口已抽查包含所有写入/回滚必需字段。
+- 历史批次已全部完成：先后处理 2,831 张同级成长值卡、19 张锁级成长值卡、404 张即时升级卡，
+  共 3,254 张；每张均以写前快照和最终详情回读核验。所有升级均由 RES 原生门槛在成长值校准后
+  自动完成，直接改级 0、回滚 0。2026-08-20 最终只读复核为待变更 0、未知等级 0、不可恢复
+  基线 0，19 张低消费卡按确认规则保持原等级。
+- 写入 CLI 现在强制显式 `--action`，不再提供无分类的“一把全跑”；每轮写入前都会重读四级
+  配置并确认 RES 原生降级仍全部关闭、L2/L3/L4 自动升级阈值仍为 250/750/1500，任一字段
+  漂移即拒绝改卡。2026-08-20 只读回读已确认这组线上基线成立，因此校准低成长值不会让 RES
+  偷跑月初之外的降级。
+- 7 天预警已进入聚合预览：只有执行日恰为下次月初前 7 天才计算候选，生日月与生日缺失均
+  fail-closed；当前只生成数量与保级差额计划，不发送消息。正式 RES SMS 仍受签名、事件、
+  流程权限与额度门禁控制。
+- 服务器单写者入口 `res_api/loyalty-reconcile-daily.sh` 已按文件白名单部署，`/etc/cron.d/hotcrush-loyalty`
+  在 02:30 MYT 运行。入口用 `flock` 防重入、先执行 `login.js` 刷新会话，登录失败立即留下
+  `LOYALTY_LAST_FAILURE` 并停止；随后只运行“同级成长值、锁级成长值、升级”三类显式动作。
+  2026-08-21 01:28 的首次手动全链路运行成功：7/7 同级、15/15 锁级、0 升级，合计补齐当日
+  新增消费对应的 22 张卡 / 1,071 成长值，直接改级 0、失败标记不存在。01:32 服务器端最终
+  只读复核再次得到待变更 0、未知等级 0、不可恢复基线 0。
+- 自动升级后 `/crm/datamanage/card/queryCardOperationLog` 的等级操作日志仍为 0，说明 RES
+  自动升级不留 type=2 记录。这不影响今晚两个 canary，但不能据此证明 2026-11 月初直接降级
+  的月内幂等。现已新增并正式应用迁移
+  `112_loyalty_level_change_ledger.sql`：`mkt_loyalty_level_change_ledger` 以
+  `(card_id, recalculation_date, action)` 唯一键保证同一卡同月只有一个降级业务操作，并使用
+  `claimed/applied/failed/ambiguous` 状态机覆盖“RES 成功但响应丢失”和“RES 成功后进程崩溃”窗口。
+  表不存卡号、姓名、手机号或生日，`anon/authenticated` 权限为 0；生产约束 9/9，迁移记录 112，
+  当前正式行数 0。
+- 生产数据库事务探针（2099 虚拟卡 ID）验证：首 claim 成功、同月重复 claim 被阻止、置 applied
+  后再次执行返回 prevent、事务回滚后探针行 0。tokyo-01 已按文件白名单部署提交 `da3b089` 的
+  ledger library 与 CLI；远端 schema assertion 通过，随后用线上代码做 2026-08-21 全量只读预演，
+  4,862 张卡仍为待变更 0、未知等级 0、不可恢复基线 0。
+- 部署时预备的远端备份命令因本地 zsh 没拆分带空格的 SSH 变量而未创建备份目录；随后逐项核对
+  发现三个 rsync 文件都已成功且 SHA-256 与本地一致，再完成 owner/syntax/schema 验证。代码回滚
+  以父提交 `05a7c64` 为准；迁移 112 目前表为空，可按 SQL 尾部 down 方案回滚，但一旦产生正式
+  ledger 行就禁止删表。
+- 当前 cron 默认不含 `downgrade`；只有显式设置 `LOYALTY_DOWNGRADE_ENABLED=1` 才会加入，生产
+  cron 未设置该开关。账本已解决“每月最多一级”的幂等，但 7 天前 RES 短信预警仍没有可验证
+  送达链路；在该条件完成前继续 fail-closed，不能让有账本但没预警的降级自动发生。
+- 进一步新增并正式应用迁移 `113_loyalty_downgrade_notice_gate.sql`：
+  `mkt_loyalty_downgrade_notice` 只接受 `delivery_channel=res_sms`，强制
+  `notice_date=recalculation_date-7`，`delivered` 必须同时有 RES provider message ID，且
+  `delivered_at` 的 KL 日期必须正好是 notice_date。112 ledger 的 `notice_id` 已为 NOT NULL，
+  并通过复合外键绑定同一卡、同月、同 from/target 等级；预警窗口截至 T-8、最终降级窗口截至
+  T-1，二者本就相差 7 天，因此窗口字段刻意不做外键相等。
+- 113 生产事务探针验证：没有 notice 时 claim 明确拒绝；插入提前 7 天的 RES SMS delivered
+  后 claim/applied 成功；ledger 引用后把 notice 改为 failed 会被触发器拒绝；两轮探针事务最终
+  均回滚，正式 notice/ledger 行数仍为 0。`anon/authenticated` 两表权限均为 0，远端部署文件
+  SHA-256 与本地一致，备份目录为
+  `/opt/hotcrush/backups/loyalty-notice-gate-20260821-0202`。这只建送达事实门禁，不伪造任何
+  短信送达；RES SMS 权限/签名未解决前表会保持空，降级因此在结构上无法执行。
+
+**RES 成长规则与等级目录已正式修正**：
+
+- 2026-08-20 审计发现后台 Level Rules 显示“消费 RM0.01 = 1 成长值”，接口是
+  `amount="1"`；这是旧配置 100 倍倍率错误，也是现有等级持续漂移的直接原因。已新增
+  `lib/level-program-config.js` / `scripts/configure-level-program.mjs`，正式把购买规则改为
+  `amount="100"`，即实付 RM1 = 1 成长值；其他成长来源仍关闭，成长值支付规则为空，
+  未启用原生降级。独立回读 `modifyTime=2026-08-20T11:09:48.716164Z`，写入成功且未回滚。
+- 等级列表接口核验 L2/L3/L4 的门槛已经是 250/750/1500，名称正确；默认 L1 名称仍为
+  `VIP1`。已新增 `lib/level-catalog-config.js` / `scripts/configure-level-catalog.mjs`，只保留
+  原字段并正式改名为 `Lv1 初见会员 First Crush`；字段级回读一致，未触发回滚。
+- 本轮新增了自然月窗口、闰日、首降级日、单级降级、生日月锁级、月内幂等、7 天预警和线上
+  升降配置护栏测试；最新只读实跑仍是 13,693 笔订单、RM483,434.26 实付，38 笔需历史钱包
+  归因且最终仅 9 笔零金额未归因。最新 `res_api` 全量单测 **182/182**、shell 语法和
+  `git diff --check` 通过；线上部署文件与本地 SHA-256 一致，cron 服务 active。
+
+**RES 积分规则已正式改为 See You Often 口径**：
+
+- 新增 `res_api/lib/points-program-config.js` 与
+  `scripts/configure-points-program.mjs`。脚本默认只读预览；正式模式必须带精确确认短语，
+  并依次执行已审计基线校验、写前并发指纹校验、单次写入、三次内回读验证；验证失败会
+  自动恢复原始配置并再次回读，不把半成品留在生产。
+- 2026-08-20 已正式执行并独立只读复核：`amountType=2`（会员实际支付）、
+  RM1 实付积 1 分、100 分抵 RM10、兑换渠道仅 POS、`clearingEnabled=false`（积分不自动
+  清零）。写入成功、回读一致、未触发回滚；RES `modifyTime=2026-08-20T10:36:36.635037Z`。
+- 写前旧配置是商户实收口径、现金抵扣关闭、积分按获得日滚动 12 个月清零；回滚载荷仍由
+  同一份已审计快照构建，但不要在新配置正常时执行回滚。
+
+**RES 权益、生日/升级活动与储值原生能力只读审计**：
+
+- 新增 `res_api/lib/benefit-readiness.js`、`scripts/preview-benefit-readiness.mjs` 与专项测试；
+  `npm run benefits:preview` 只读对照已确认规则与线上权益、营销活动、储值方案，并检查当前
+  账号能否进入流程管理页，不包含保存、发送或归档接口。
+- 2026-08-20 22:06 MYT 最新实跑：线上权益 0 条、营销活动 1 条（既有消费赠礼）、储值方案
+  10 条；会员日、生日赠礼、升级赠礼、当前有效的 RM100+20 与短信流程管理均未配置/不可用。
+- 会员日原生倍率输入框只接受 **2–9 的整数**（precision=0），因此每周三 1.5 倍积分不能
+  直接配置。消费赠礼是固定门槛后送固定积分/券，也不能精确替代任意订单的 0.5 倍加赠。
+- “生日赠礼”原生活动可以把提前天数设为 0，故生日当天发券可表示；发出的券可选当天有效、
+  当月有效、自定义 1–1200 天或固定起止日期。“升级赠礼”可绑定当前会员计划，选择全部或部分
+  等级。两种活动的通知控件都只有 Mini Program，没有 SMS；当前 `/process-management` 又因
+  账号权限跳 403，所以仍不能把正式三次触达配置为 RES 短信。
+- 储值表单可以建 RM100 赠 RM20，也有“充值当天赠送金额不可使用”或“本金当天可用比例”字段；
+  但本金可用比例最小 1%，无法表达 0%。表单没有单笔赠送余额 90 天到期、赠送余额优先消费、
+  永久有效活动。Report 100150 的 1,387 条双余额消费记录中，1,188 条明确出现赠送余额足够
+  覆盖订单却仍扣本金，反证当前系统不是赠送金优先。
+- 因此当前不能把近似配置伪装成完整版：已确认的原生缺口固定为会员日 1.5 倍、本金充值当天
+  0% 可用、赠送余额 90 天到期、赠送余额优先、储值活动永久有效。后续需逐项让用户选择外部
+  补算/券替代等近似方案；在选择前不写生产。
+- 生日/升级券的“有效期”会改变真实权益，仍待用户后续单独确认；当前只问商品占位图，不并行
+  抛出第二个问题。RES 现有 37 个券模板中没有通用生日蛋糕券，也没有冷萃杯＋杯套券；现有
+  `French Matcha Melty Basque` 只是单一商品兑换券，不能擅自解释为全口味生日巴斯克券。
+- 本轮专项 5/5；`res_api` 全量单测 **164/164**；`git diff --check` 通过。全程没有新建活动、
+  券或储值方案，没有发短信/发券、没有改会员数据。
+- 22:08 MYT 对 HBTI 生产入口做无副作用验收：`https://hbti-test.hotcrush.net/` HTTP 200，
+  `/api/health` HTTP 200 且 `alert/db/res/signIn` 四项均为 `ok`；CSP、HSTS、no-store 与
+  `X-Frame-Options: DENY` 正常。没有请求 OTP、没有调用完成接口、没有重复发券。
+
+**RES 积分商城只读核验**：
+
+- 商城 `HOT CRUSH 积分商城` 已启用并绑定当前卡项目，但商品数为 0；后台支持优惠券商品
+  和实物商品、独立总库存、积分价、上下架、总参与次数/每日参与次数限制。用户已确认
+  450 积分定制蛋糕不设年度次数限制。
+- 用户新增 13 个商品已核对：白/红/黑铅笔 100 分；爱心/玫瑰/蝴蝶纸香卡与玫瑰/
+  吉隆坡/蝴蝶结冰箱贴 150 分；红色条纹帆布包 400 分；海外方形抱枕 800 分；
+  蝴蝶结耳机包 900 分；冷萃杯＋杯套 1,500 分。除耳机包外库存分别为
+  100/184/190/86/231/427/6/16/136/2,000/3,400/1,000。
+- 前 9 个可复用现有 HBTI 实物礼券；帆布包、抱枕、耳机包可复用现有商品兑换券；
+  冷萃杯＋杯套没有现成券，建议按同一 POS 核销流程新建实物礼券。
+- RES 每个商城商品强制要求一张 800×800 jpg/png 商品图；当前工作区和现有券模板都没有
+  这 13 个商品的可用图片（现有 HBTI 券 `imageUrl` 为空）。下一步必须先让用户逐项确认：
+  提供真实商品图，或先用统一品牌占位图建立下架草稿。其后再确认券有效期、周边限兑规则与耳机包库存
+  （“门店 6 个全新”是否作为首批库存 6）。
+- 已新增 `res_api/lib/points-mall-catalog.js`，逐项固化用户给出的积分、库存、成本、零售价、
+  占比与 12 张现有券映射；耳机包库存保持 `null`（只记录观察到 6 个），冷萃杯券保持
+  `null`，绝不把推测伪装成确认值。`scripts/preview-points-mall.mjs` 只调用商城/券查询接口，
+  自动核对生产现状与写入阻断项，代码中不含任何商城 mutation endpoint。
+- 2026-08-20 实跑 `npm run points-mall:preview`：商城启用、绑定 1 个卡项目、生产商品 0；
+  12/12 张已映射券的 ID/名称/类型/启用状态全部匹配，唯一券问题是冷萃杯未分配。
+  当前写入阻断项：13 张图片、1 个耳机包库存、1 张冷萃杯券、券有效期、周边限兑规则。
+  商品清单/载荷专项单测 6/6 通过。
+
+**尚未写生产的原因**：商品图是 RES 强制必填项；券有效期、周边限兑规则与耳机包库存仍会改变会员实际
+可兑结果。等待用户按“一次只问一个问题”的方式确认后，再创建下架草稿、回读核验，最后
+经明确的上架门禁发布。
+---
+
+## 生日 T-5 / T-2 / 当天三段式页面拆分（2026-08-20，Codex，已部署）
+
+用户确认 450 积分定制蛋糕在系统中暂不设年度次数限制；`points_450.yearlyLimit` 继续为
+`null`。现有“每会员最多同时 3 个有效积分蛋糕预约”只保留为并发防滥用保险丝，不解释为
+年度限领。免费巴斯克仍为每会员每年一份。
+
+本分支把原来统一的生日卡入口拆成三个明确投递模式：默认 `/birthday` 仍是生日当天的完整
+贺卡与年度回顾；`?mode=cake` 是 T-5 的 450 积分定制蛋糕预约信，只展示该权益；
+`?mode=basque` 是 T-2 的免费巴斯克预约信，只展示该权益。专属签名链接路由
+`/birthday/t/[token]` 同样保留 `mode`。提前送达入口跳过完整生日信和年度回顾，资料页返回时回到
+各自预约信，不会静默换成另一种蛋糕；生日当天文案由“生日当月”更正为“生日当天”。视觉沿用
+现有奶油烘焙纸、酒红字标、印章与蜡烛蛋糕插画。
+
+服务端取货窗口也已按礼物拆分：免费巴斯克默认最早 T+2，450 积分定制蛋糕默认最早 T+5，
+分别由 `BIRTHDAY_FREE_BASQUE_LEAD_DAYS` / `BIRTHDAY_POINTS_CAKE_LEAD_DAYS` 配置；最远仍为
+统一 T+30。view API 返回 `pickupByGift`，reserve API 按请求的 `giftType` 独立校验，避免前端绕过。
+
+验证：TypeScript、ESLint、全量 Vitest（339 过、39 跳过）、Next production build 全绿；新增
+生日端到端在 320×740、375×812、430×932 三档共 9/9 通过。另以 375×812 实际渲染回读 T-5/T-2
+两页，首屏内权益、提前天数与 CTA 完整可见。2026-08-20 已部署到 Vercel production
+`dpl_6MFScVi7FWXqy8rviP3hAHV22vYw`，并把 `hbti-test.hotcrush.net` 与
+`birthday.hotcrush.net` 都指到该部署。两个域名的 `/api/health` 均回读 `status=ok`，
+数据库、RES、告警与登录依赖全绿；生日域名首页 HTTP 200，实际匹配 `/birthday`，
+`?mode=cake` 标题回读正常，CSP/HSTS/X-Frame-Options 与 no-store 缓存头均符合预期。
+生日页面部署本身没有发送会员消息、发券、改 RES 正式 H5 或写生产数据库。合并门禁时另把既有 HBTI
+前端流程测试从逐键输入改成原子 change，并为 13 题长流程
+设置 15 秒预算；生产页面未改，修正了验证码探测/自动翻题计时与 `user.type` 之间的随机测试竞态。
+
+用户已确认正式三次触达全部走 RES 短信，但当前生产账户尚不能启用：流程管理接口 403、
+短信返回 `ErrMissingSignature`、生日事件触发器列表为空，余额仅 200 条，而 3,722 名会员每年三次
+触达的理论上限是 11,166 条。没有发送任何消息，也不接外部短信兜底；需 RES 侧先开权限、配置并
+审核短信签名/生日事件、补足额度。顶部轮播和 HBTI 弹窗后来已在闭店后正式发布并通过顾客端验收，
+详见下一节。
+---
+
+## See You Often 顶部轮播 + HBTI 开屏弹窗（2026-08-20，Codex，已正式发布）
+
+用户要求在 RES 官方 H5 最上方预留滚动海报，并增加点击后进入现有 HBTI 页的测试弹窗。
+原独立分支成果现已合入 `codex/see-you-often-loyalty-engine`，并已正式发布到 RES 顾客 H5：
+
+- 最终正式 plan：`2090459411142234119`，名称 `See You Often · HBTI optimized · 2026-08-20`；
+  发布 API `code=000`，release info、首页内容、开屏内容与 HBTI URL 四项回读一致。发布前的
+  正式版均各自克隆为独立 rollback plan，最后一份为 `2090459659960930308`。
+- 首页最上方使用 RES 原生 `FSwiper`，保留正式版现有 5 张图片作占位，375×220px、3 秒轮播；
+  后续换海报只需替换轮播图片，不改页面结构。
+- HBTI 弹窗使用 RES 原生 `POpenScreenPage`，新视觉为桃粉纸张、酒红字、面包指纹与红色烤炉箭头；
+  图片已上传 RES 自有存储，点击目标固定为 `https://hbti-test.hotcrush.net/`，外链配置回读一致。
+- 删除旧草稿中未经当前规则确认的“完善资料得 RM10”整块及登录按钮 RM10 文案，避免错误承诺。
+- 发布前两次独立快照确认旧正式首页 hash 为
+  `0552ffb3da571f849f1dedabadece27cf86a7cf4506638612bd0a8602003c31c`、旧正式开屏 hash 为
+  `8161df6599a9f447152e90fac7900f5a982bb602636ef19bd4fc2349ad026bc9`；未在草稿阶段误改正式页。
+- 草稿回读：首页设计树/保存树 hash 一致，开屏设计树/保存树 hash 一致；HBTI 页与上传图片均 HTTP 200。
+  中文官方编辑器长页预览 375×1293，顶部轮播位置和后续会员内容均正常。
+- 2026-08-20 重新拦截核对了发布契约：RES 发布会先保存草稿，再弹出“顾客端立即变化、尽量
+  避开营业时间”的二次确认；最终请求是 `/ordering/config/decoration/release`，载荷仅含
+  appId 与 draft plan id。测试拦截期间 UI 曾重序列化首页树，随后已用审阅过的设计重新覆盖
+  草稿；12:24 UTC 再次回读，首页与开屏组件树均恢复到审阅 hash，HBTI 链接存在，正式页
+  两个 hash 仍完全不变。
+- `tools/h5-design.mjs` 现支持外部只读登录状态路径、线上草稿检查和受保护发布：必须输入精确
+  确认 `SEE_YOU_OFTEN_H5_V1`，写前验证正式页未漂移与草稿树一致，先克隆当前正式页为独立
+  回滚 draft，再调用发布并轮询正式页内容回读；若发布后不一致会自动发布回滚 draft 并再次
+  核验。实际发布等到 23:00 nightly refresh 在 23:03:50 以 exit=0 完成后才执行，避免会话竞态。
+- 首次顾客端验收发现 RES 同一开屏页同时存 `componentsTree` 与运行时 `pageData`：旧门禁只校验
+  前者，导致配置看似有 HBTI、实际不开屏。现已让构建、保存、检查、发布四段同时写/验两份数据，
+  并重新发布。随后又发现 2.85 MB PNG 在 3 秒展示期内冷缓存可能来不及绘制；保持视觉不变压缩为
+  1000×1500、416 KB JPEG，上传为 `20260820-73306623.jpg` 后第三次受保护发布。
+- 最终顾客端 Playwright 冷缓存实测：375×812 开屏完整显示 HBTI 视觉与 `Skip 3s`，顶部轮播
+  正常显示；点击开屏后当前页实际到达 `https://hbti-test.hotcrush.net/`，标题
+  `HBTI — Hot Crush`。不是只做配置 hash 验收。
+- 代码：`res_api/lib/h5-design-layout.mjs`、`res_api/tools/h5-design.mjs`、
+  `res_api/test/h5-design-layout.test.js`，新增视觉资产 `res_api/assets/h5/hbti-popup-2026.png`；
+  当前 `res_api` 全量单测 **159/159** 通过，`git diff --check` 通过。
+
+用户已确认 450 积分升级定制蛋糕暂不设年度次数限制。生日时间链路是：Lv3/Lv4 定制蛋糕
+T-5 提醒，Lv2–Lv4 免费巴斯克 T-2 提醒，生日当天发送贺卡网页并发对应生日券。
 
 ---
 
@@ -2571,6 +3146,7 @@ B. **本地改动会自动上生产，不只是 `deploy.sh`。** 2026-07-27 之�
 | 2026-08-21 | Codex | **完成 Lark Wiki → R6 Raw/RAG 自动主链（未切现网）**：应用加入 8 个团队知识空间，首轮同步 24 节点、幂等复跑 24 unchanged/0 failed；migration 26–28 新增来源 connector/run/item、来源健康、Lark URI 引用和外键索引，东京 timer 每 30 分钟运行，RAG worker active。C1 的 8 份在线文档已生成 8 chunks/vectors，C2/C3 共 16 份没有越权发布；BakeryOps 改用 citation-aware v2 RPC，在线文档返回原始 Lark URI、不伪造页码。最终门禁为 28 migrations、135 pgTAP、65 Python、143+22 RES、464 BakeryOps/TypeScript/build，全历史 POS 九窗 mismatch 0、四个 PDF/Lark 检索通过，deep diff 无漂移。旧生产连接和现网 backend 未改。 |
 | 2026-08-21 | Codex | **完成 R6 审阅式 C2 RAG、增量 PDF 安全入口与统一验收（未切库）**：migration 25 新增不可变 `ai_document_review`/受控批准 RPC 并修复 `kb-restricted` Raw constraint；70 个待审项形成 3 批准/67 拒绝，R6 现有 3 C1+3 C2、108 页、113 chunks/vectors；C3/C4 因无真实脱敏保持拒绝。`brainctl auto` 真实首跑 165 文件只处理 3 个 C1、二次 0 上传，并由测试证明后续只处理本次新增 C1。后台链新增 20 秒全量访问探针、首跑退出码门禁、失败自动卸载和不接受外部命令的专用签名 App；App 交互式 165 文件 `NO_CHANGES`，LaunchAgent 真实返回 `77/EX_NOPERM` 后约 21 秒自清理，待用户只为该 App 授予 Full Disk Access 后重验。25 migrations/109 pgTAP/56 Python/143+22 RES/463 BakeryOps/build、远端三空间检索、幂等、权限、回滚、九窗 POS 对账均通过。旧配置未改；旧连接串因验收命令输出到任务日志，须另窗轮换。 |
 | 2026-08-16 | Codex | **完成 Fabric + PostgreSQL + DeepSeek Harness 目标架构设计（未实施）**：只读核验生产库 78 表/21 视图/约 92.6 MiB 与空 R6 Green 100 表/1,374 列；纠正“项目均未落地”和“Fabric 可直接替 PostgreSQL”的前提。新设计规定 PostgreSQL 为唯一 OLTP 真源，Fabric 为 OneLake/Lakehouse replica + Warehouse 认证语义层，Harness 锁版本并只经受控 Domain API；补 10 张 `ai_` 契约表、Agent/工具风险、Phase 0–6 蓝绿迁移门禁。未执行 DDL/DML、未激活 Trial、未创建 Fabric 资产或部署。活跃分支 `codex/fabric-agent-blueprint`。 |
+| 2026-08-20 | Codex | **See You Often 顶部轮播 + HBTI 弹窗（已保存独立草稿、未发布）**：Draft plan `2090327910815711232`；首页顶部复用 5 张正式图作 375×220、3 秒原生轮播占位；新 HBTI 桃粉/酒红“面包指纹”开屏图点击直达 `https://hbti-test.hotcrush.net/`；删除未经确认的 RM10 文案。首页/开屏双页回读 hash 一致，正式双页 hash 前后不变，releaseCalled=false；res_api 单测 121/121。 |
 | 2026-08-15 | DSH | **权益分配二次修订（已部署）**：L1 只有贺卡、L2 只有免费巴斯克、L3/L4 免费巴斯克或 450 积分兑换二选一（L3 限自己 L4 可送亲友）；权益模型改「等级→可选权益组数组」，BIRTHDAY_BENEFITS_JSON 覆盖同步改数组；L1 前端显示贺卡说明且无预约表单。门禁 336 过 39 跳过；线上验证 Nicole(L4) 双选项、免费因已领灰显；新部署 hotcrush-hbti-ojb3ix3yg-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **会员等级按用户定版（已部署）**：等级改为按年累计实付消费实时计算（Lv1 初见 RM0 / Lv2 心动 RM250 / Lv3 热爱 RM750 / Lv4 挚爱 RM1500），不再读 RES 等级名；权益收紧为 L1/L2 只有免费巴斯克、L3/L4 才有 450 积分兑换（L3 限自己 L4 可送亲友）；view 返回 member.level 含升级差，reserve 同口径判定；线上验证 Nicole=Lv4 挚爱、仅积分兑换选项。门禁 333 过 39 跳过；新部署 hotcrush-hbti-p9oyc6z0z-algersss-projects.vercel.app。 |
 | 2026-08-15 | DSH | **修复生日域名提交 403 INVALID_ORIGIN（已上线）**：Origin 白名单从单一 HBTI_LINK_BASE_URL 改为与 HBTI_EXTRA_ORIGINS 的并集（语义收紧为「主机 ∈ 名单 且 Origin===主机」）；Vercel 配 HBTI_EXTRA_ORIGINS=https://birthday.hotcrush.net；验证生日域名提交 403→400、hbti-test 不变、陌生 Origin 仍 403；新部署 hotcrush-hbti-fmwd9xk5x-algersss-projects.vercel.app。教训：应用加自有域名必须同步加白名单。 |

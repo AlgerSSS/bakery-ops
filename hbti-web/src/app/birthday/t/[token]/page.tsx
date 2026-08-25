@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
+import { parseBirthdayDeliveryMode } from "@/lib/birthday/delivery-mode";
+
 import { BirthdayExperience } from "../../BirthdayExperience";
 
 export const metadata: Metadata = {
@@ -13,9 +15,15 @@ export const viewport: Viewport = {
 /** 专属签名链接入口：/birthday/t/<token>（birthday 域名上由中间件重写到这里）。 */
 export default async function BirthdayTokenPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { token } = await params;
-  return <BirthdayExperience linkToken={token} />;
+  const query = await searchParams;
+  const deliveryMode = parseBirthdayDeliveryMode(query.mode);
+  return (
+    <BirthdayExperience linkToken={token} deliveryMode={deliveryMode} />
+  );
 }

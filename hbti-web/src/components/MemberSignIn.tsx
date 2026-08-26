@@ -48,6 +48,7 @@ type Confirmation = "conflict" | "membership";
 interface AuthenticatedMember {
   maskedPhone: string;
   draftKey: string;
+  emailCollected: boolean;
 }
 
 interface MemberSignInProps {
@@ -75,6 +76,7 @@ interface OtpReply {
   retryAfterSeconds?: number;
   authenticated?: boolean;
   draftKey?: string;
+  emailCollected?: boolean;
   error?: string;
   /** 这个号码今天已经发过码了；实测这种情况下新的短信多半不会送达。 */
   resendMayNotArrive?: boolean;
@@ -305,11 +307,13 @@ export function MemberSignIn({
         response.ok &&
         payload.authenticated === true &&
         typeof payload.maskedPhone === "string" &&
-        typeof payload.draftKey === "string"
+        typeof payload.draftKey === "string" &&
+        typeof payload.emailCollected === "boolean"
       ) {
         onAuthenticated({
           maskedPhone: payload.maskedPhone,
           draftKey: payload.draftKey,
+          emailCollected: payload.emailCollected,
         });
         return;
       }

@@ -274,6 +274,7 @@ describe("MemberSignIn 的重发闸门", () => {
           authenticated: true,
           maskedPhone: "+60 12*****89",
           draftKey: "draft-1",
+          emailCollected: true,
         }),
       );
     stubFetch(fetchMock);

@@ -5,6 +5,7 @@ const routeMocks = vi.hoisted(() => ({
   getHbtiCompletionStatus: vi.fn(),
   createCompletionStoreFromEnv: vi.fn(),
   createResApiClientFromEnv: vi.fn(),
+  hasMemberEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -29,6 +30,10 @@ vi.mock("@/lib/res/client", () => ({
   createResApiClientFromEnv: routeMocks.createResApiClientFromEnv,
 }));
 
+vi.mock("@/lib/member/email-store", () => ({
+  hasMemberEmail: routeMocks.hasMemberEmail,
+}));
+
 import { GET } from "@/app/api/complete/status/route";
 
 const ORIGIN = "https://hbti-test.hotcrush.net";
@@ -41,12 +46,14 @@ describe("completion status route", () => {
     routeMocks.getHbtiCompletionStatus.mockReset();
     routeMocks.createCompletionStoreFromEnv.mockReset();
     routeMocks.createResApiClientFromEnv.mockReset();
+    routeMocks.hasMemberEmail.mockReset();
     routeMocks.createCompletionStoreFromEnv.mockResolvedValue({
       kind: "fake-store",
     });
     routeMocks.createResApiClientFromEnv.mockReturnValue({
       kind: "fake-res",
     });
+    routeMocks.hasMemberEmail.mockResolvedValue(true);
     routeMocks.readHbtiAuthSession.mockResolvedValue({
       payload: {
         resToken: "server-only-res-token",
@@ -130,6 +137,19 @@ describe("completion status route", () => {
       status: "not_found",
       retryable: true,
     });
+  });
+
+  it("does not reveal an existing result before a legacy member supplies email", async () => {
+    routeMocks.hasMemberEmail.mockResolvedValue(false);
+
+    const response = await GET(statusRequest());
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "EMAIL_REQUIRED",
+      retryable: false,
+    });
+    expect(routeMocks.getHbtiCompletionStatus).not.toHaveBeenCalled();
   });
 });
 

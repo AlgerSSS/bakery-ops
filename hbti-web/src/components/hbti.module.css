@@ -312,6 +312,7 @@
 
 .introPanel,
 .authPanel,
+.emailPanel,
 .questionPanel,
 .resultPanel,
 .detailsPanel,
@@ -327,6 +328,13 @@
   padding-block: 1rem 1.25rem;
 }
 
+.emailPanel {
+  display: flex;
+  align-self: center;
+  flex-direction: column;
+  padding-block: 1rem 1.25rem;
+}
+
 .authTitle {
   max-width: 12ch;
   margin-top: 0.75rem;
@@ -336,6 +344,18 @@
   font-weight: 700;
   letter-spacing: -0.045em;
   line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.emailTitle {
+  max-width: 17ch;
+  margin-top: 0.75rem;
+  color: var(--cocoa-dark);
+  font-family: var(--font-brand);
+  font-size: clamp(2.15rem, 8vw, 3.7rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 0.94;
   text-transform: uppercase;
 }
 
@@ -2024,7 +2044,8 @@
    Keyed on height, not width, because this is a vertical-fit problem — tall
    phones keep the roomier spacing above. */
 @media (max-height: 880px) {
-  .authPanel {
+  .authPanel,
+  .emailPanel {
     padding-block: 0.75rem 1rem;
   }
 
@@ -2034,7 +2055,8 @@
     margin-bottom: 0.75rem;
   }
 
-  .authTitle {
+  .authTitle,
+  .emailTitle {
     margin-top: 0.5rem;
     font-size: clamp(2.1rem, 9vw, 3.4rem);
   }
@@ -2054,7 +2076,8 @@
 /* Smallest supported phone (320x740). One more notch of tightening so the
    sign-in card, its consent notice and the CTA all still land above the fold. */
 @media (max-height: 760px) {
-  .authPanel {
+  .authPanel,
+  .emailPanel {
     padding-block: 0.5rem 0.4rem;
   }
 
@@ -2064,7 +2087,8 @@
     margin-bottom: 0.6rem;
   }
 
-  .authTitle {
+  .authTitle,
+  .emailTitle {
     margin-top: 0.4rem;
     font-size: clamp(1.95rem, 9vw, 3rem);
   }

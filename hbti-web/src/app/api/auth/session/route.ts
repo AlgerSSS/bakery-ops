@@ -7,6 +7,7 @@ import {
   clearHbtiSessionCookie,
   readHbtiSessionCookie,
 } from "@/lib/auth/session-cookie";
+import { hasMemberEmail } from "@/lib/member/email-store";
 
 export const runtime = "nodejs";
 
@@ -27,6 +28,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       authenticated: true,
       maskedPhone: maskAuthPhone(session.payload.identity),
       draftKey: session.draftKey,
+      emailCollected: await hasMemberEmail(session.payload.memberId),
     });
   } catch {
     return noStoreJson(

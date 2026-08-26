@@ -83,6 +83,57 @@ describe("customer HBTI journey", () => {
     expect(document.documentElement.lang).toBe("zh-CN");
   });
 
+  it("requires legacy members without email to save one before showing their result", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          authenticated: true,
+          maskedPhone: "+60 123••6789",
+          draftKey: "legacy-member-draft-key",
+          emailCollected: false,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ emailCollected: true }));
+    stubFetch(
+      fetchMock,
+      jsonResponse({
+        status: "issued",
+        code: "HSDA",
+        color: "pistachio",
+        reward: { couponTemplateName: "HBTI Gift · Heart Scent Card" },
+      }),
+    );
+    const user = userEvent.setup();
+
+    render(<HbtiExperience />);
+
+    const emailInput = await screen.findByLabelText("Email address");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await user.type(emailInput, "not-an-email");
+    await user.click(screen.getByRole("button", { name: "Save and continue" }));
+    expect(
+      await screen.findByText("Enter a valid email address to continue."),
+    ).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    fillInput(emailInput, "hello@example.com");
+    await user.click(screen.getByRole("button", { name: "Save and continue" }));
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Your gift is in your member wallet.",
+      }),
+    ).toBeInTheDocument();
+    expect(fetchMock.mock.calls[1][0]).toBe("/api/member/email");
+    expect(
+      JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body)),
+    ).toEqual({ email: "hello@example.com" });
+    expect(JSON.stringify(window.localStorage)).not.toContain(
+      "hello@example.com",
+    );
+  });
+
   it("keeps the phone and challenge out of URLs and local storage", async () => {
     const fetchMock = vi
       .fn()
@@ -99,6 +150,7 @@ describe("customer HBTI journey", () => {
           authenticated: true,
           maskedPhone: "+60 123••6789",
           draftKey: "member-draft-key-123456",
+          emailCollected: true,
         }),
       );
     stubFetch(fetchMock);
@@ -165,6 +217,7 @@ describe("customer HBTI journey", () => {
           authenticated: true,
           maskedPhone: "+60 123••6789",
           draftKey: "member-draft-key-123456",
+          emailCollected: true,
         }),
       );
     stubFetch(fetchMock);
@@ -214,6 +267,7 @@ describe("customer HBTI journey", () => {
           authenticated: true,
           maskedPhone: "+60 123••6789",
           draftKey: "first-member-draft-key",
+          emailCollected: true,
         }),
       )
       .mockResolvedValueOnce(jsonResponse({ authenticated: false }))
@@ -228,6 +282,7 @@ describe("customer HBTI journey", () => {
           authenticated: true,
           maskedPhone: "+60 198••4321",
           draftKey: "second-member-draft-key",
+          emailCollected: true,
         }),
       );
     stubFetch(fetchMock);
@@ -283,6 +338,7 @@ describe("customer HBTI journey", () => {
         authenticated: true,
         maskedPhone: "+61 43•••••92",
         draftKey: "completed-member-draft-key",
+        emailCollected: true,
       }),
     );
     stubFetch(
@@ -329,6 +385,7 @@ describe("customer HBTI journey", () => {
           authenticated: true,
           maskedPhone: "+61 43•••••92",
           draftKey: "completed-member-draft-key",
+          emailCollected: true,
         }),
       );
     stubFetch(
@@ -378,6 +435,7 @@ describe("customer HBTI journey", () => {
           authenticated: true,
           maskedPhone: "+60 123••6789",
           draftKey: "member-draft-key-123456",
+          emailCollected: true,
         }),
       )
       .mockResolvedValueOnce(
@@ -505,6 +563,7 @@ describe("周边发完之后", () => {
             authenticated: true,
             maskedPhone: "+60 123••6789",
             draftKey: "member-draft-key-123456",
+            emailCollected: true,
           }),
         )
         .mockResolvedValueOnce(jsonResponse(completion)),

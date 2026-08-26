@@ -12,6 +12,15 @@ export interface UiCopy {
   countryLabel: string;
   phoneLabel: string;
   phoneHint: string;
+  emailEyebrow: string;
+  emailTitle: string;
+  emailBody: string;
+  emailLabel: string;
+  emailPrivacy: string;
+  invalidEmail: string;
+  saveEmail: string;
+  savingEmail: string;
+  emailSaveError: string;
   membershipConsent: string;
   sendCode: string;
   sendingCode: string;
@@ -212,6 +221,18 @@ export const uiCopy: Localized<UiCopy> = {
     countryLabel: "Country or region",
     phoneLabel: "Member phone number",
     phoneHint: "We’ll text a six-digit code. Standard SMS rates may apply.",
+    emailEyebrow: "One detail before we begin",
+    emailTitle: "Where can we remember you?",
+    emailBody:
+      "Add the email address you want connected to this Hot Crush member account.",
+    emailLabel: "Email address",
+    emailPrivacy:
+      "Required for HBTI. We save it with your member profile. This does not subscribe you to marketing emails.",
+    invalidEmail: "Enter a valid email address to continue.",
+    saveEmail: "Save and continue",
+    savingEmail: "Saving your email…",
+    emailSaveError:
+      "We couldn’t save your email just now. Check your connection and try again.",
     membershipConsent:
       "By continuing, you agree that we may create a Hot Crush member account for this number if one does not exist yet.",
     sendCode: "Send verification code",
@@ -418,6 +439,16 @@ export const uiCopy: Localized<UiCopy> = {
     countryLabel: "国家或地区",
     phoneLabel: "会员手机号",
     phoneHint: "我们会发送一条 6 位验证码短信，运营商可能收取短信费用。",
+    emailEyebrow: "开始前，再记住一件事",
+    emailTitle: "留下你的邮箱",
+    emailBody: "请填写要与这个 Hot Crush 会员账户关联的邮箱地址。",
+    emailLabel: "邮箱地址",
+    emailPrivacy:
+      "HBTI 必填。邮箱会保存到你的会员资料中；这不代表你已同意接收营销邮件。",
+    invalidEmail: "请输入有效的邮箱地址后继续。",
+    saveEmail: "保存并继续",
+    savingEmail: "正在保存邮箱…",
+    emailSaveError: "暂时无法保存邮箱，请检查网络后再试。",
     membershipConsent:
       "继续即表示你同意：如果这个手机号还没有 Hot Crush 会员账户，我们可以为你创建一个。",
     sendCode: "发送验证码",
@@ -597,6 +628,18 @@ export const uiCopy: Localized<UiCopy> = {
     phoneLabel: "Nombor telefon ahli",
     phoneHint:
       "Kami akan menghantar kod enam digit melalui SMS. Caj SMS biasa mungkin dikenakan.",
+    emailEyebrow: "Satu butiran sebelum bermula",
+    emailTitle: "Di mana kami boleh mengingati anda?",
+    emailBody:
+      "Masukkan alamat e-mel yang mahu dipautkan kepada akaun ahli Hot Crush ini.",
+    emailLabel: "Alamat e-mel",
+    emailPrivacy:
+      "Wajib untuk HBTI. E-mel disimpan bersama profil ahli anda. Ini tidak melanggan anda kepada e-mel pemasaran.",
+    invalidEmail: "Masukkan alamat e-mel yang sah untuk teruskan.",
+    saveEmail: "Simpan dan teruskan",
+    savingEmail: "Sedang menyimpan e-mel…",
+    emailSaveError:
+      "Kami tidak dapat menyimpan e-mel anda sekarang. Semak sambungan dan cuba lagi.",
     membershipConsent:
       "Dengan meneruskan, anda bersetuju bahawa kami boleh mencipta akaun ahli Hot Crush untuk nombor ini jika akaun belum wujud.",
     sendCode: "Hantar kod pengesahan",

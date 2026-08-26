@@ -30,6 +30,11 @@ import {
 } from "@/content/ui";
 import { scoreHbti } from "@/lib/hbti/scoring";
 import {
+  isValidMemberEmail,
+  MAX_MEMBER_EMAIL_LENGTH,
+  normalizeMemberEmail,
+} from "@/lib/member/email-address";
+import {
   createResultCardPng,
   createResultShareText,
 } from "@/lib/share/result-card";
@@ -85,12 +90,14 @@ interface CompletionResponse {
 interface AuthenticatedMember {
   maskedPhone: string;
   draftKey: string;
+  emailCollected: boolean;
 }
 
 interface SessionResponse {
   authenticated?: boolean;
   maskedPhone?: string;
   draftKey?: string;
+  emailCollected?: boolean;
 }
 
 export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
@@ -101,7 +108,11 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
   );
   const [member, setMember] = useState<AuthenticatedMember | undefined>(
     demoMode
-      ? { maskedPhone: "", draftKey: "public-demo" }
+      ? {
+          maskedPhone: "",
+          draftKey: "public-demo",
+          emailCollected: true,
+        }
       : undefined,
   );
   const [stage, setStage] = useState<JourneyStage>("intro");
@@ -160,6 +171,10 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
     async (authenticatedMember: AuthenticatedMember) => {
       clearCompletion();
       setMember(authenticatedMember);
+      if (!authenticatedMember.emailCollected) {
+        setAuthState("signedIn");
+        return;
+      }
       // Keep the account-check screen visible until the authoritative
       // completion read finishes. Otherwise an already-finished member sees
       // the quiz for a moment and can start creating a conflicting local result.
@@ -177,6 +192,11 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
           return;
         }
         if (response.status === 404) {
+          setAuthState("signedIn");
+          return;
+        }
+        if (response.status === 409) {
+          setMember({ ...authenticatedMember, emailCollected: false });
           setAuthState("signedIn");
           return;
         }
@@ -223,11 +243,13 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
       if (
         payload.authenticated === true &&
         typeof payload.maskedPhone === "string" &&
-        typeof payload.draftKey === "string"
+        typeof payload.draftKey === "string" &&
+        typeof payload.emailCollected === "boolean"
       ) {
         await restoreAuthenticatedMember({
           maskedPhone: payload.maskedPhone,
           draftKey: payload.draftKey,
+          emailCollected: payload.emailCollected,
         });
         return;
       }
@@ -259,7 +281,7 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
   );
 
   useEffect(() => {
-    if (authState !== "signedIn" || !member) {
+    if (authState !== "signedIn" || !member?.emailCollected) {
       return;
     }
     const timer = window.setTimeout(() => {
@@ -423,6 +445,12 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
         if (response.status === 401) {
           setMember(undefined);
           setAuthState("signedOut");
+        } else if (response.status === 409) {
+          setMember((current) =>
+            current ? { ...current, emailCollected: false } : current,
+          );
+          setSubmission("idle");
+          return;
         }
         setSubmission("error");
         return;
@@ -449,6 +477,13 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
         setMember(undefined);
         setAuthState("signedOut");
         setSubmission("error");
+        return;
+      }
+      if (response.status === 409) {
+        setMember((current) =>
+          current ? { ...current, emailCollected: false } : current,
+        );
+        setSubmission("idle");
         return;
       }
       if (!response.ok) {
@@ -564,6 +599,21 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
                 void restoreAuthenticatedMember(authenticatedMember);
               }}
             />
+          ) : member && !member.emailCollected ? (
+            <MemberEmailGate
+              copy={copy}
+              headingRef={headingRef}
+              onSaved={() => {
+                void restoreAuthenticatedMember({
+                  ...member,
+                  emailCollected: true,
+                });
+              }}
+              onSessionExpired={() => {
+                setMember(undefined);
+                setAuthState("signedOut");
+              }}
+            />
           ) : submission !== "idle" && submission !== "error" ? (
             <CompletionState
               state={submission}
@@ -642,6 +692,7 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
             已发券的完成态本身带有自己的钱包 CTA,不需要这个。 */}
         {!demoMode &&
           authState !== "signedOut" &&
+          member?.emailCollected === true &&
           submission === "idle" &&
           (stage === "intro" || stage === "result") && (
             <a className={styles.memberReturn} href={MEMBER_WALLET_URL}>
@@ -656,6 +707,134 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
 interface CopyProp {
   copy: (typeof uiCopy)["en"];
   headingRef: React.RefObject<HTMLHeadingElement | null>;
+}
+
+function MemberEmailGate({
+  copy,
+  headingRef,
+  onSaved,
+  onSessionExpired,
+}: CopyProp & {
+  onSaved: () => void;
+  onSessionExpired: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string>();
+
+  async function saveEmail() {
+    const normalized = normalizeMemberEmail(email);
+    if (!isValidMemberEmail(normalized)) {
+      setError(copy.invalidEmail);
+      return;
+    }
+
+    setSaving(true);
+    setError(undefined);
+    try {
+      const response = await fetch("/api/member/email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalized }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
+      if (response.status === 401) {
+        onSessionExpired();
+        return;
+      }
+      if (response.status === 400) {
+        setError(copy.invalidEmail);
+        return;
+      }
+      if (!response.ok) {
+        setError(copy.emailSaveError);
+        return;
+      }
+      const payload = (await response.json()) as { emailCollected?: boolean };
+      if (payload.emailCollected !== true) {
+        setError(copy.emailSaveError);
+        return;
+      }
+      onSaved();
+    } catch {
+      setError(copy.emailSaveError);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className={styles.emailPanel}>
+      <div
+        className={styles.steamMark}
+        data-brand-mark="arrow"
+        aria-hidden="true"
+      >
+        <i />
+        <i />
+        <i />
+      </div>
+      <p className={styles.eyebrow}>{copy.emailEyebrow}</p>
+      <h1 ref={headingRef} tabIndex={-1} className={styles.emailTitle}>
+        {copy.emailTitle}
+      </h1>
+      <p className={styles.authBody}>{copy.emailBody}</p>
+      <div className={styles.authCard}>
+        <div className={styles.memberPass} aria-hidden="true">
+          <span>HBTI</span>
+          <i />
+          <span>MEMBER</span>
+        </div>
+        <form
+          className={styles.authForm}
+          noValidate
+          onSubmit={(event) => {
+            event.preventDefault();
+            void saveEmail();
+          }}
+        >
+          <label htmlFor="member-email">{copy.emailLabel}</label>
+          <input
+            id="member-email"
+            className={styles.textInput}
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            required
+            maxLength={MAX_MEMBER_EMAIL_LENGTH}
+            placeholder="name@example.com"
+            value={email}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setError(undefined);
+            }}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={`member-email-note${
+              error ? " member-email-error" : ""
+            }`}
+          />
+          <p id="member-email-note" className={styles.membershipConsent}>
+            <span aria-hidden="true">✓</span>
+            {copy.emailPrivacy}
+          </p>
+          {error && (
+            <p id="member-email-error" className={styles.inlineError} role="alert">
+              {error}
+            </p>
+          )}
+          <button
+            className={styles.primaryButton}
+            type="submit"
+            disabled={saving}
+          >
+            {saving ? copy.savingEmail : copy.saveEmail}
+            {!saving && <ForwardIcon />}
+          </button>
+        </form>
+      </div>
+    </section>
+  );
 }
 
 function AccountCheckState({

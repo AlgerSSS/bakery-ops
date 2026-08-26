@@ -9,6 +9,7 @@ import {
 import { maskAuthPhone } from "@/lib/auth/phone";
 import { createResH5MemberAuthClientFromEnv } from "@/lib/auth/res-auth-client";
 import { setHbtiSessionCookie } from "@/lib/auth/session-cookie";
+import { hasMemberEmail } from "@/lib/member/email-store";
 import {
   ResH5AuthDiagnosticError,
   ResH5LoginConflictError,
@@ -140,6 +141,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       throw error;
     }
 
+    // 在消费验证码之前确认邮箱资料表可读。若数据库暂时不可用，challenge 仍可释放后重试；
+    // 不能先消费验证码、再因查询失败把顾客锁死在一个拿不到 cookie 的孤儿会话里。
+    const emailCollected = await hasMemberEmail(member.memberId);
     const session = await store.createSession({
       memberId: member.memberId,
       resToken: member.resToken,
@@ -158,6 +162,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       authenticated: true,
       maskedPhone: maskAuthPhone(attempt.payload.identity),
       draftKey: session.draftKey,
+      emailCollected,
     });
     setHbtiSessionCookie(response, session.token, session.expiresAt);
     return response;

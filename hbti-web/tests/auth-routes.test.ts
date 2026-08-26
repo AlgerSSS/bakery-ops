@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => {
     readAuthConfig: vi.fn(),
     readCaptchaConfig: vi.fn(),
     forgetCaptchaConfig: vi.fn(),
+    hasMemberEmail: vi.fn(),
   };
 });
 
@@ -60,6 +61,10 @@ vi.mock("@/lib/server-config", () => ({
 vi.mock("@/lib/auth/captcha-config", () => ({
   readCaptchaConfig: mocks.readCaptchaConfig,
   forgetCaptchaConfig: mocks.forgetCaptchaConfig,
+}));
+
+vi.mock("@/lib/member/email-store", () => ({
+  hasMemberEmail: mocks.hasMemberEmail,
 }));
 
 import { POST as logout } from "@/app/api/auth/logout/route";
@@ -154,6 +159,7 @@ beforeEach(() => {
     resToken: "res-member-token",
     newlyRegistered: false,
   });
+  mocks.hasMemberEmail.mockResolvedValue(true);
 });
 
 describe("POST /api/auth/otp/request", () => {
@@ -445,6 +451,7 @@ describe("POST /api/auth/otp/verify", () => {
       authenticated: true,
       maskedPhone: "+86 139****5678",
       draftKey: "d".repeat(43),
+      emailCollected: true,
     });
     expect(mocks.res.verifyLoginAndEnsureMember).toHaveBeenCalledWith({
       session: { deviceId: "device-1", token: "guest-token" },
@@ -764,6 +771,7 @@ describe("GET /api/auth/session", () => {
       authenticated: true,
       maskedPhone: "+86 139****5678",
       draftKey: "d".repeat(43),
+      emailCollected: true,
     });
     expect(JSON.stringify(body)).not.toContain("res-member-token");
     expect(JSON.stringify(body)).not.toContain("member-1");

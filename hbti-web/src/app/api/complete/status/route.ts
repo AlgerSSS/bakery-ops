@@ -6,6 +6,7 @@ import {
   CompleteHbtiError,
   getHbtiCompletionStatus,
 } from "@/lib/completion/complete-hbti";
+import { hasMemberEmail } from "@/lib/member/email-store";
 import { createResApiClientFromEnv } from "@/lib/res/client";
 import {
   isTrustedRequestOrigin,
@@ -34,6 +35,12 @@ export async function GET(request: Request): Promise<NextResponse> {
       return noStoreJson(
         { error: "AUTHENTICATION_REQUIRED", retryable: false },
         { status: 401 },
+      );
+    }
+    if (!(await hasMemberEmail(session.payload.memberId))) {
+      return noStoreJson(
+        { error: "EMAIL_REQUIRED", retryable: false },
+        { status: 409 },
       );
     }
 

@@ -6,12 +6,13 @@
 
 ---
 
-## See You Often 五等级 / 会员日 / 权益履约（2026-08-26，Codex，部分生产已生效）
+## See You Often 五等级 / 会员日 / 权益履约 / HBTI 邮箱（2026-08-26，Codex，部分生产已生效）
 
 活跃分支：`codex/see-you-often-rights-v2`。用户本轮明确：立即开始；会员日以 2026-08-30
 为生效日（该日是周日，首个实际周三为 2026-09-02）；采用最新五等级；统一权益表由本轮建立；
 好友同行采用店员确认页；生日积分扣退/履约完成。用户同时明确“不要再开浏览器”，本轮全部使用
-代码、测试、curl/纯 HTTP、SSH 和 Vercel CLI，未启动浏览器或 Playwright。
+代码、测试、curl/纯 HTTP、SSH 和 Vercel CLI，未启动浏览器或 Playwright。用户随后明确 HBTI 页面必须
+收集邮箱；已按“手机号验证后、答题/旧结果前强制补齐”的口径实现，公开 `/demo` 仍是明确不落会员资料的预览。
 
 **已在生产生效的部分**：
 
@@ -48,20 +49,27 @@
 - 生日 H5 已改为 RES 最新五等级优先、年度二选一、定制蛋糕 T-3；积分预约先落 processing，
   服务端 RES 扣 450 后回读余额才转 reserved。店员页支持已取货、取消；积分蛋糕取消会加回 450
   并回读，不确定即人工核对。重复提交由年度唯一索引挡住。
+- 新迁移 `116_hbti_member_contact.sql` 新建 HBTI 自有的 `mkt_member_contact`：邮箱不写入爬虫拥有的
+  `pos_member`，以 `(store, member_id)` 为主键，邮箱不设唯一（允许家庭共用），RLS + revoke；
+  `email_marketing_opt_in` 默认 false，明确“收集邮箱 ≠ 同意营销邮件”。主 HBTI 登录后会查询
+  `emailCollected`：新会员/历史缺邮箱会员必须先完成单屏邮箱卡，之后才可答题或恢复旧结果；已有邮箱直接跳过。
+  `/api/member/email` 只接受同源、已登录写入且不回显邮箱；`/api/complete` 与 `/api/complete/status`
+  也在服务端 fail closed，不能绕过前端直接发礼或读取旧结果。邮箱不进 URL/localStorage。
 
 **不可跳过的上线顺序 / 当前阻塞**：本仓库规则明确只有一个生产 Supabase，DDL/DML 必须由人执行
-迁移，agent 不得直接应用。因此本轮没有执行 114/115，也没有部署依赖新列/新表的 HBTI 构建。
-人工需按顺序执行 114、115，确认 `schema_migrations` 有 114/115 后，再配置 Vercel：
+迁移，agent 不得直接应用。因此本轮没有执行 114/115/116，也没有部署依赖新列/新表的 HBTI 构建。
+人工需按顺序执行 114、115、116，确认 `schema_migrations` 有 114/115/116 后，再配置 Vercel：
 `STAFF_REWARDS_ACCESS_CODE`、`STAFF_REWARDS_SESSION_SECRET`、
 `FRIEND_TOPUP_COUPON_TEMPLATE_ID=2043286175804100613`、
 `FRIEND_TOPUP_COUPON_TEMPLATE_NAME=10元代金劵`；随后部署 HBTI，运行一次
 `level-entitlements:sync`，最后用非真实发券的只读 health/队列检查验收。不要在迁移前部署：旧表没有
 `points_status`，会直接使生日 view 503。
 
-门禁：HBTI `tsc`、ESLint、352/352 Vitest（另 39 跳过）和 Next 生产构建全绿；本机 Node 26
+门禁：HBTI `tsc`、ESLint、366/366 Vitest（另 39 跳过）和 Next 生产构建全绿；本机 Node 26
 跑 jsdom 必须加 `NODE_OPTIONS=--no-experimental-webstorage`（Node 自带 experimental localStorage
 会遮蔽 jsdom，非产品失败）；RES 侧 55/55 规则测试 + 22/22 API 测试通过；迁移检查器单测 8/8，
-生产只读差集如预期报告 114/115 未记录，同时仍报告该仓库既有的跨仓编号差异。
+生产只读差集上一轮如预期报告 114/115 未记录；本轮新增 116 后未重复联网查询生产库，三份迁移均应视为
+未应用，同时仍有该仓库既有的跨仓编号差异。
 
 ---
 

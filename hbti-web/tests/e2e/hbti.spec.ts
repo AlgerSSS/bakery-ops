@@ -15,6 +15,7 @@ type SessionReply =
             authenticated: true;
             maskedPhone: string;
             draftKey: string;
+            emailCollected: boolean;
           }
         | { authenticated: false };
     }
@@ -43,6 +44,7 @@ async function mockPrivateNetwork(
       authenticated: true,
       maskedPhone: "+60 123••6789",
       draftKey: "e2e-member-draft-123456",
+      emailCollected: true,
     },
   };
   const completionReplies = options.completionReplies ?? [
@@ -435,6 +437,7 @@ test("verifies a +86 phone without putting identity in the URL or storage", asyn
         authenticated: true,
         maskedPhone: "+86 139••••5678",
         draftKey: "e2e-member-draft-123456",
+        emailCollected: true,
       },
     },
   });

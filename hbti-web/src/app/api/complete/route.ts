@@ -12,6 +12,7 @@ import {
   CompleteHbtiError,
 } from "@/lib/completion/complete-hbti";
 import { hbtiAnswersSchema } from "@/lib/hbti/schema";
+import { hasMemberEmail } from "@/lib/member/email-store";
 import { consumeTokenRateLimit } from "@/lib/rate-limit/pg-rate-limit";
 import { createResApiClientFromEnv } from "@/lib/res/client";
 import { readHbtiServerConfig } from "@/lib/server-config";
@@ -107,6 +108,12 @@ export async function POST(request: Request): Promise<NextResponse> {
             "Retry-After": String(rateLimit.retryAfterSeconds),
           },
         },
+      );
+    }
+    if (!(await hasMemberEmail(session.payload.memberId))) {
+      return noStoreJson(
+        { error: "EMAIL_REQUIRED", retryable: false },
+        { status: 409 },
       );
     }
 

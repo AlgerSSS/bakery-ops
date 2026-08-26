@@ -7,6 +7,7 @@ const routeMocks = vi.hoisted(() => ({
   consumeTokenRateLimit: vi.fn(),
   readHbtiAuthSession: vi.fn(),
   readHbtiSessionCookie: vi.fn(),
+  hasMemberEmail: vi.fn(),
 }));
 
 vi.mock("@/lib/completion/complete-hbti", async () => {
@@ -34,6 +35,10 @@ vi.mock("@/lib/auth/session", () => ({
 
 vi.mock("@/lib/auth/session-cookie", () => ({
   readHbtiSessionCookie: routeMocks.readHbtiSessionCookie,
+}));
+
+vi.mock("@/lib/member/email-store", () => ({
+  hasMemberEmail: routeMocks.hasMemberEmail,
 }));
 
 import { POST } from "@/app/api/complete/route";
@@ -65,6 +70,7 @@ describe("complete route", () => {
     routeMocks.consumeTokenRateLimit.mockReset();
     routeMocks.readHbtiAuthSession.mockReset();
     routeMocks.readHbtiSessionCookie.mockReset();
+    routeMocks.hasMemberEmail.mockReset();
     routeMocks.createCompletionStoreFromEnv.mockResolvedValue({
       kind: "fake-store",
     });
@@ -76,6 +82,7 @@ describe("complete route", () => {
       retryAfterSeconds: 0,
     });
     routeMocks.readHbtiSessionCookie.mockReturnValue("s".repeat(43));
+    routeMocks.hasMemberEmail.mockResolvedValue(true);
     routeMocks.readHbtiAuthSession.mockResolvedValue({
       payload: {
         resToken: "server-only-res-token",
@@ -241,6 +248,22 @@ describe("complete route", () => {
     expect(routeMocks.createCompletionStoreFromEnv).not.toHaveBeenCalled();
     expect(routeMocks.createResApiClientFromEnv).not.toHaveBeenCalled();
     expect(routeMocks.completeHbti).not.toHaveBeenCalled();
+  });
+
+  it("refuses to issue a result or gift until the member has supplied an email", async () => {
+    routeMocks.hasMemberEmail.mockResolvedValue(false);
+
+    const response = await POST(
+      completionRequest({ answers: validAnswers, color: "pistachio" }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "EMAIL_REQUIRED",
+      retryable: false,
+    });
+    expect(routeMocks.completeHbti).not.toHaveBeenCalled();
+    expect(routeMocks.createResApiClientFromEnv).not.toHaveBeenCalled();
   });
 
   it("accepts a valid completion without optional gender or age and never exposes the receipt ID", async () => {

@@ -4,6 +4,7 @@ import { hasAlertDestination } from "@/lib/alert";
 
 import { reconcilePendingCompletions } from "@/lib/completion/reconcile-pending";
 import { createResApiClientFromEnv } from "@/lib/res/client";
+import { processPendingRewardGrants } from "@/lib/rewards/grant-worker";
 import { readHbtiServerConfig } from "@/lib/server-config";
 import {
   createCompletionStoreFromEnv,
@@ -67,9 +68,15 @@ export async function GET(request: Request): Promise<NextResponse> {
       store: await createCompletionStoreFromEnv(),
       res,
     });
-    const ok = summary.errors === 0 && alertsOk;
+    const rewardGrants = await processPendingRewardGrants(res);
+    const ok =
+      summary.errors === 0 &&
+      rewardGrants.failed === 0 &&
+      rewardGrants.ambiguous === 0 &&
+      rewardGrants.staleQuarantined === 0 &&
+      alertsOk;
     return noStoreJson(
-      { ok, ...summary, purged, purgeOk, alerts, alertsOk },
+      { ok, ...summary, rewardGrants, purged, purgeOk, alerts, alertsOk },
       ok ? 200 : 503,
     );
   } catch (error) {

@@ -11,6 +11,7 @@ const reservation = {
   slot: "noon" as const,
   memberNote: null,
   status: "reserved" as const,
+  pointsStatus: "not_applicable" as const,
   createdAt: "2026-08-15T04:00:00.000Z",
 };
 

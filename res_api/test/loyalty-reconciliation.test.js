@@ -199,8 +199,8 @@ test("RES level operation logs distinguish upgrades from downgrades", () => {
   assert.equal(
     levelOperationDirection(
       record(
-        "Lv3 热爱会员 Hot Crush",
-        "Lv2 心动会员 Sweet Crush",
+        "Lv3 流心会员 Gooey Crush",
+        "Lv2 暖香会员 Toasty Crush",
       ),
     ),
     "downgrade",
@@ -208,8 +208,8 @@ test("RES level operation logs distinguish upgrades from downgrades", () => {
   assert.equal(
     levelOperationDirection(
       record(
-        "Lv1 初见会员 First Crush",
-        "Lv2 心动会员 Sweet Crush",
+        "Lv1 软绵会员 Fluffy Crush",
+        "Lv2 暖香会员 Toasty Crush",
       ),
     ),
     "upgrade",

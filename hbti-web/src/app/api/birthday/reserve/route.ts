@@ -3,7 +3,11 @@ import { z } from "zod";
 
 import { getJsonMutationRejection, noStoreJson } from "@/lib/auth/http";
 import { getDb } from "@/lib/db/postgres";
-import { deriveLevelKey, readBirthdayConfig } from "@/lib/birthday/config";
+import {
+  deriveLevelKey,
+  deriveLevelKeyFromResName,
+  readBirthdayConfig,
+} from "@/lib/birthday/config";
 import { decideReservation, pickupWindow } from "@/lib/birthday/eligibility";
 import { notifyStore } from "@/lib/birthday/notify";
 import { resolveBirthdayAuth } from "@/lib/birthday/resolve-auth";
@@ -11,13 +15,17 @@ import { readAnnualSpend, readMemberBasics } from "@/lib/birthday/stats";
 import {
   createReservation,
   listReservations,
+  markPointsDeducted,
+  markPointsReservationAmbiguous,
+  markPointsReservationRejected,
   markReservationNotified,
   readProfile,
 } from "@/lib/birthday/store";
+import { createResApiClientFromEnv } from "@/lib/res/client";
 import { readHbtiServerConfig } from "@/lib/server-config";
 
 export const runtime = "nodejs";
-export const maxDuration = 15;
+export const maxDuration = 30;
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -77,7 +85,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       readAnnualSpend(sql, auth.memberId, config.campaignYear),
     ]);
     // 等级按年累计实付消费实时计算（用户 2026-08-15 定版），与 view 接口同口径。
-    const levelKey = deriveLevelKey(annualSpend);
+    const levelKey =
+      deriveLevelKeyFromResName(basics?.levelName) ??
+      deriveLevelKey(annualSpend);
 
     const decision = decideReservation(
       {
@@ -109,13 +119,76 @@ export async function POST(request: Request): Promise<NextResponse> {
       return noStoreJson({ error: created.reason }, { status: 409 });
     }
 
+    let confirmedReservation = created.reservation;
+    if (input.giftType === "points_450") {
+      const reference = `BIRTHDAY-${config.campaignYear}-${created.reservation.reservationId}`;
+      if (!basics?.phoneE164) {
+        await markPointsReservationRejected(
+          sql,
+          created.reservation.reservationId,
+          "member_phone_unavailable",
+        );
+        return noStoreJson({ error: "MEMBER_PHONE_UNAVAILABLE" }, { status: 409 });
+      }
+
+      try {
+        const resClient = createResApiClientFromEnv(AbortSignal.timeout(24_000));
+        const adjusted = await resClient.adjustMemberPoints({
+          phoneE164: basics.phoneE164,
+          points: 450,
+          direction: "decrease",
+          reference,
+        });
+        if (adjusted.status === "rejected") {
+          await markPointsReservationRejected(
+            sql,
+            created.reservation.reservationId,
+            "res_point_adjustment_rejected",
+          );
+          return noStoreJson(
+            { error: "POINT_DEDUCTION_REJECTED" },
+            { status: 409 },
+          );
+        }
+        await markPointsDeducted(sql, created.reservation.reservationId, adjusted);
+        confirmedReservation = {
+          ...created.reservation,
+          status: "reserved",
+          pointsStatus: "deducted",
+        };
+      } catch (error) {
+        await markPointsReservationAmbiguous(
+          sql,
+          created.reservation.reservationId,
+          reference,
+        );
+        console.error("[birthday] point deduction requires reconciliation", {
+          reservationId: created.reservation.reservationId,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        return noStoreJson(
+          {
+            reserved: false,
+            processing: true,
+            error: "POINT_DEDUCTION_UNCONFIRMED",
+            reservation: {
+              ...created.reservation,
+              status: "ambiguous",
+              pointsStatus: "ambiguous",
+            },
+          },
+          { status: 202 },
+        );
+      }
+    }
+
     // 门店通知：webhook 未配置时保持 notify_status='pending'，
     // 由 tokyo-01 上的生日通知 relay（scripts/birthday-notify.mjs）收编发送——
     // 通知通道部署在服务器上，Vercel 侧不配 BIRTHDAY_NOTIFY_WEBHOOK。
     let notifyOutcome: "sent" | "skipped" | "failed" | "pending" = "pending";
     if (config.notifyWebhook) {
       notifyOutcome = await notifyStore(config.notifyWebhook, {
-        reservation: created.reservation,
+        reservation: confirmedReservation,
         maskedPhone:
           auth.kind === "session" ? auth.maskedPhone : (basics?.maskedPhone ?? null),
         levelName: basics?.levelName ?? null,
@@ -133,7 +206,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const reservations = await listReservations(sql, auth.memberId, config.campaignYear);
     return noStoreJson({
       reserved: true,
-      reservation: created.reservation,
+      reservation: confirmedReservation,
       reservations,
       notified: notifyOutcome,
     });

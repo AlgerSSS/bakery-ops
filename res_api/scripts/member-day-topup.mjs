@@ -23,6 +23,7 @@ import {
   assertMemberDay,
   buildTopUpPlan,
   decideCard,
+  isMemberDayActive,
   mostRecentMemberDay,
   ledgerKey,
 } from "../lib/member-day-points.js";
@@ -118,6 +119,15 @@ async function main() {
     return;
   }
   const businessDate = assertMemberDay(assertBusinessDate(opts.businessDate || defaultBusinessDate()));
+  const effectiveFrom = assertBusinessDate(
+    process.env.MEMBER_DAY_EFFECTIVE_FROM || MEMBER_DAY.effectiveFrom,
+  );
+  if (!isMemberDayActive(businessDate, effectiveFrom)) {
+    console.log(
+      `[member-day] ${businessDate} is before the effective date ${effectiveFrom}; nothing to do.`,
+    );
+    return;
+  }
   const live = opts.apply;
 
   if (live) {

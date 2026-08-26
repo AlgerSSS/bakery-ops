@@ -49,6 +49,30 @@ function couponPage(input: {
   });
 }
 
+function phoneFormats(): Response {
+  return jsonResponse({
+    code: "000",
+    data: [{ internationalPhoneAreaCode: "60", applyCountry: "MY" }],
+  });
+}
+
+function memberCard(points: number, overrides: Record<string, unknown> = {}): Response {
+  return jsonResponse({
+    code: "000",
+    data: {
+      page: { total: 1 },
+      list: [{
+        id: "card-id-1",
+        customerId: "member-1",
+        cardNo: "card-1",
+        status: 10,
+        points: String(points),
+        ...overrides,
+      }],
+    },
+  });
+}
+
 const couponQuery = {
   member: { id: "member-1" },
   template: {
@@ -148,6 +172,27 @@ describe("ResApiClient", () => {
       id: "template-1",
       name: "Pistachio Green Jewel",
     });
+  });
+
+  it("can resolve an exact enabled amount-discount template for friend rewards", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        code: "000",
+        data: [{
+          couponTemplateType: 2201,
+          couponTemplateList: [{
+            id: "2043286175804100613",
+            couponTemplateName: "10元代金劵",
+            couponTemplateType: 2201,
+            couponTemplateStatus: 1,
+          }],
+        }],
+      }),
+    );
+    const client = new ResApiClient(config, fetcher);
+    await expect(
+      client.resolveEnabledCouponTemplateByName("10元代金劵", 2201),
+    ).resolves.toEqual({ id: "2043286175804100613", name: "10元代金劵" });
   });
 
   it("reads every coupon page and keeps only exact available matches", async () => {
@@ -487,5 +532,133 @@ describe("ResApiClient", () => {
         quantity: 1,
       }),
     ).resolves.toEqual({ status: "ambiguous" });
+  });
+
+  it("gives friend vouchers with a 90-day period and a reconciliation reference", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(phoneFormats())
+      .mockResolvedValueOnce(jsonResponse({ code: "000" }));
+    const client = new ResApiClient(config, fetcher);
+    await client.giveCoupon({
+      phoneE164: "+60123456789",
+      member: { id: "member-1" },
+      template: { id: "2043286175804100613", name: "10元代金劵" },
+      quantity: 1,
+      effectiveDays: 90,
+      remark: "FRIEND-TOPUP-42",
+    });
+    const body = JSON.parse(String(fetcher.mock.calls[1][1]?.body));
+    expect(body.remark).toBe("FRIEND-TOPUP-42");
+    expect(body.couponEffectiveTime.relativeEffectiveTime.effectiveValue).toBe(90);
+  });
+
+  it("deducts points once and proves the result with an exact balance readback", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(phoneFormats())
+      .mockResolvedValueOnce(
+        jsonResponse({ code: "000", data: { id: "member-1" } }),
+      )
+      .mockResolvedValueOnce(memberCard(500))
+      .mockResolvedValueOnce(jsonResponse({ code: "000" }))
+      .mockResolvedValueOnce(memberCard(50));
+    const client = new ResApiClient(config, fetcher);
+
+    await expect(client.adjustMemberPoints({
+      phoneE164: "+60123456789",
+      points: 450,
+      direction: "decrease",
+      reference: "BIRTHDAY-2026-42",
+    })).resolves.toEqual({
+      status: "applied",
+      reference: "BIRTHDAY-2026-42",
+      pointsBefore: 500,
+      pointsAfter: 50,
+    });
+
+    const lookupBody = JSON.parse(String(fetcher.mock.calls[2][1]?.body));
+    expect(lookupBody).toMatchObject({
+      page: { pageNo: 1, pageSize: 20 },
+      corporationId: "corp-1",
+      phone: "123456789",
+    });
+    const adjustmentBody = JSON.parse(String(fetcher.mock.calls[3][1]?.body));
+    expect(adjustmentBody).toEqual({
+      cardNo: "card-1",
+      points: 450,
+      type: 701,
+      customerId: "member-1",
+      corporationId: "corp-1",
+      shopId: "shop-1",
+      remark: "BIRTHDAY-2026-42",
+    });
+    expect(fetcher).toHaveBeenCalledTimes(5);
+  });
+
+  it("rejects an insufficient balance without sending a RES write", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(phoneFormats())
+      .mockResolvedValueOnce(
+        jsonResponse({ code: "000", data: { id: "member-1" } }),
+      )
+      .mockResolvedValueOnce(memberCard(449));
+    const client = new ResApiClient(config, fetcher);
+
+    await expect(client.adjustMemberPoints({
+      phoneE164: "+60123456789",
+      points: 450,
+      direction: "decrease",
+      reference: "BIRTHDAY-2026-43",
+    })).resolves.toEqual({
+      status: "rejected",
+      reference: "BIRTHDAY-2026-43",
+    });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it("treats a successful write with an inconsistent readback as uncertain", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(phoneFormats())
+      .mockResolvedValueOnce(
+        jsonResponse({ code: "000", data: { id: "member-1" } }),
+      )
+      .mockResolvedValueOnce(memberCard(500))
+      .mockResolvedValueOnce(jsonResponse({ code: "000" }))
+      .mockResolvedValueOnce(memberCard(500));
+    const client = new ResApiClient(config, fetcher);
+
+    await expect(client.adjustMemberPoints({
+      phoneE164: "+60123456789",
+      points: 450,
+      direction: "decrease",
+      reference: "BIRTHDAY-2026-44",
+    })).rejects.toThrow("readback was inconsistent");
+  });
+
+  it("uses RES adjustment type 7 when refunding points", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(phoneFormats())
+      .mockResolvedValueOnce(
+        jsonResponse({ code: "000", data: { id: "member-1" } }),
+      )
+      .mockResolvedValueOnce(memberCard(50))
+      .mockResolvedValueOnce(jsonResponse({ code: "000" }))
+      .mockResolvedValueOnce(memberCard(500));
+    const client = new ResApiClient(config, fetcher);
+
+    await expect(client.adjustMemberPoints({
+      phoneE164: "+60123456789",
+      points: 450,
+      direction: "increase",
+      reference: "BIRTHDAY-REFUND-2026-42",
+    })).resolves.toMatchObject({ status: "applied", pointsAfter: 500 });
+    expect(JSON.parse(String(fetcher.mock.calls[3][1]?.body))).toMatchObject({
+      type: 7,
+      remark: "BIRTHDAY-REFUND-2026-42",
+    });
   });
 });

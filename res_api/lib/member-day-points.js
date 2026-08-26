@@ -17,6 +17,7 @@ export const MEMBER_DAY = Object.freeze({
   weekday: 3,          // 周三
   multiplier: 1.5,
   resBaseMultiplier: 1, // RES 原生 RM1 = 1 分
+  effectiveFrom: "2026-08-30",
 });
 
 /**
@@ -69,6 +70,16 @@ export function assertMemberDay(businessDate) {
     throw new Error(`${date} is not a Wednesday; member-day top-up refuses to run.`);
   }
   return date;
+}
+
+/** 活动从 8 月 30 日生效；由于当天是周日，首个可补积分业务日是 9 月 2 日。 */
+export function isMemberDayActive(
+  businessDate,
+  effectiveFrom = MEMBER_DAY.effectiveFrom,
+) {
+  const date = assertBusinessDate(businessDate);
+  const start = assertBusinessDate(effectiveFrom);
+  return isMemberDay(date) && date >= start;
 }
 
 /**

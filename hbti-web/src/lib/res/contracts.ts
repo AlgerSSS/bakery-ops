@@ -30,6 +30,10 @@ export interface GiveCouponInput extends UsableCouponQuery {
    */
   phoneE164: string;
   quantity: 1;
+  /** Defaults to 30 for HBTI; friend top-up vouchers use 90 days. */
+  effectiveDays?: number;
+  /** Non-PII reconciliation reference stored in RES. */
+  remark?: string;
 }
 
 export type GiveCouponResult =
@@ -41,6 +45,7 @@ export interface ResCouponAdapter {
   resolveMemberByPhone(phoneE164: string): Promise<ResMember>;
   resolveEnabledCouponTemplateByName(
     templateName: string,
+    expectedType?: number,
   ): Promise<ResCouponTemplate>;
   listUsableMatchingCoupons(
     query: UsableCouponQuery,

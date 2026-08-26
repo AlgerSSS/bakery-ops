@@ -8,11 +8,9 @@
 # 本轮换保留作令牌异常失效时的兜底。根治仍是向 RES 申请受限服务凭证。
 #
 # 锁的实际作用范围(别高估它):
-#   /var/lock/hotcrush-bo-session.lock 目前**只有本脚本获取**,所以它防的是本任务
-#   自重入 —— 上一班卡住时,下一班不会叠上来一起写 storageState.json。
-#   它**不能**防 intraday-refresh.sh(14:20) / daily-refresh.sh(23:00) 并发,因为
-#   那两个脚本没取这把锁。与它们的隔离目前只靠错峰(本任务 03/09/15/21 点)。
-#   要真正闭合,得让那两个 wrapper 也取同一把锁。
+#   /var/lock/hotcrush-bo-session.lock 防本任务自重入。脚本只短暂读取 storageState，
+#   不再启动 Playwright 或改写该文件；若恰逢 POS 刷新写文件，解析失败会 fail closed，
+#   下一班再同步，不会拿半截凭证去改生产。
 #
 # 超时是必需的,不是保险:没有外层 timeout,挂死的进程会永久占锁,之后每班都只打印
 # 「拿不到锁」然后跳过 —— 静默停摆比失败更糟。
@@ -47,19 +45,11 @@ main() {
     return 75   # EX_TEMPFAIL:与真正的失败区分开,不触发告警
   fi
 
-  # 先刷 BO 会话再借令牌 —— storageState 过期时 openAuthedPage 借不到 token。
-  # timeout 180:正常 ~10s,超过即 Playwright 卡死,杀掉以释放锁。
-  echo "$(date '+%F %T') 刷新 BO 会话"
-  if ! (cd /opt/hotcrush/res_api && timeout -k 20 180 node login.js); then
-    echo "$(date '+%F %T') login.js 失败或超时,中止"
-    return 1
-  fi
-
   echo "$(date '+%F %T') 执行轮换"
   # 凭证走 --env-file:不进 cron 命令行,也不进 argv
   # (rotate.mjs 用 VERCEL_TOKEN 环境变量传给 CLI,不用 --token,否则 ps 上人人可见)。
-  # timeout 900:借令牌 ~20s + redeploy ~60s + health 轮询最多 60s,留足余量。
-  if ! timeout -k 30 900 node --env-file="$ROOT/.env" "$ROOT/rotate.mjs"; then
+  # timeout 600:Vercel redeploy + health 轮询留足余量。
+  if ! timeout -k 30 600 node --env-file="$ROOT/.env" "$ROOT/rotate.mjs"; then
     echo "$(date '+%F %T') 轮换失败或超时"
     return 1
   fi

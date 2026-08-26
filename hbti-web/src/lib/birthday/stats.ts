@@ -42,6 +42,8 @@ export interface BirthdayMemberBasics {
   pointBalance: number | null;
   registeredOn: string | null;
   maskedPhone: string | null;
+  /** 仅服务端调用 RES 使用；任何生日 API 响应都不得原样返回。 */
+  phoneE164: string | null;
 }
 
 export async function readMemberBasics(
@@ -66,6 +68,10 @@ export async function readMemberBasics(
         : Number(row.point_balance),
     registeredOn: row.registered_on ?? null,
     maskedPhone: maskPhone(row.phone_e164),
+    phoneE164:
+      typeof row.phone_e164 === "string" && /^\+[1-9]\d{7,14}$/.test(row.phone_e164)
+        ? row.phone_e164
+        : null,
   };
 }
 

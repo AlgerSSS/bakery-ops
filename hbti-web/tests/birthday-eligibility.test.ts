@@ -15,20 +15,23 @@ function makeConfig(overrides: Partial<BirthdayConfig> = {}): BirthdayConfig {
     linkTtlDays: 30,
     pickupLeadDaysByGift: {
       free_basque: 2,
-      points_450: 5,
+      points_450: 3,
     },
     pickupWindowDays: 30,
-    maxActivePointsReservations: 3,
     benefitsByLevel: {
       L1: [],
       L2: [{ kind: "free_basque", allowGift: false, yearlyLimit: 1, label: "免费巴斯克" }],
       L3: [
         { kind: "free_basque", allowGift: false, yearlyLimit: 1, label: "免费巴斯克" },
-        { kind: "points_450", allowGift: false, yearlyLimit: null, label: "450积分兑换" },
+        { kind: "points_450", allowGift: false, yearlyLimit: 1, label: "450积分兑换" },
       ],
       L4: [
         { kind: "free_basque", allowGift: false, yearlyLimit: 1, label: "免费巴斯克" },
-        { kind: "points_450", allowGift: true, yearlyLimit: null, label: "450积分兑换(可送亲友)" },
+        { kind: "points_450", allowGift: true, yearlyLimit: 1, label: "450积分兑换(可送亲友)" },
+      ],
+      L5: [
+        { kind: "free_basque", allowGift: false, yearlyLimit: 1, label: "免费巴斯克" },
+        { kind: "points_450", allowGift: true, yearlyLimit: 1, label: "450积分兑换(可送亲友)" },
       ],
     },
     defaultBenefits: [],
@@ -46,7 +49,9 @@ describe("deriveLevelKey 等级升级线（用户定版）", () => {
     expect(deriveLevelKey(750)).toBe("L3");
     expect(deriveLevelKey(1499.99)).toBe("L3");
     expect(deriveLevelKey(1500)).toBe("L4");
-    expect(deriveLevelKey(4290.45)).toBe("L4");
+    expect(deriveLevelKey(2999.99)).toBe("L4");
+    expect(deriveLevelKey(3000)).toBe("L5");
+    expect(deriveLevelKey(4290.45)).toBe("L5");
   });
   it("无消费记录按 L1 初见", () => {
     expect(deriveLevelKey(null)).toBe("L1");
@@ -62,10 +67,11 @@ describe("resolveBenefits 等级权益组", () => {
   it("L2 只有免费巴斯克", () => {
     expect(resolveBenefits("L2", config).map((r) => r.kind)).toEqual(["free_basque"]);
   });
-  it("L3/L4 免费巴斯克 + 积分兑换，L4 可送亲友", () => {
+  it("L3/L4/L5 免费巴斯克 + 积分兑换，L4/L5 可送亲友", () => {
     expect(resolveBenefits("L3", config).map((r) => r.kind)).toEqual(["free_basque", "points_450"]);
     expect(resolveBenefits("L3", config)[1].allowGift).toBe(false);
     expect(resolveBenefits("L4", config)[1].allowGift).toBe(true);
+    expect(resolveBenefits("L5", config)[1].allowGift).toBe(true);
   });
   it("未知等级（如 RES 的 VIP1）落默认=只有贺卡", () => {
     expect(resolveBenefits("VIP1", config)).toEqual([]);
@@ -100,22 +106,19 @@ describe("listBirthdayOptions 按等级给选项", () => {
     expect(options[1].available).toBe(false);
     expect(options[1].deniedReason).toBe("INSUFFICIENT_POINTS");
   });
-  it("免费巴斯克已领过后免费选项不可用，积分选项仍可用", () => {
+  it("年度生日礼已选后，两种选项都不可用", () => {
     const existing = [{ giftType: "free_basque" as const, status: "reserved" as const }];
     const options = listBirthdayOptions({ levelName: "L4", pointBalance: 900 }, existing, config);
     expect(options[0].available).toBe(false);
-    expect(options[0].deniedReason).toBe("FREE_BASQUE_ALREADY_CLAIMED");
-    expect(options[1].available).toBe(true);
-  });
-  it("进行中的积分预约达到防呆上限", () => {
-    const existing = [
-      { giftType: "points_450" as const, status: "reserved" as const },
-      { giftType: "points_450" as const, status: "reserved" as const },
-      { giftType: "points_450" as const, status: "reserved" as const },
-    ];
-    const options = listBirthdayOptions({ levelName: "L4", pointBalance: 9000 }, existing, config);
+    expect(options[0].deniedReason).toBe("BIRTHDAY_GIFT_ALREADY_CLAIMED");
     expect(options[1].available).toBe(false);
-    expect(options[1].deniedReason).toBe("TOO_MANY_ACTIVE_RESERVATIONS");
+    expect(options[1].deniedReason).toBe("BIRTHDAY_GIFT_ALREADY_CLAIMED");
+  });
+  it("已取消的预约不占用年度生日礼", () => {
+    const existing = [{ giftType: "points_450" as const, status: "cancelled" as const }];
+    const options = listBirthdayOptions({ levelName: "L4", pointBalance: 9000 }, existing, config);
+    expect(options[0].available).toBe(true);
+    expect(options[1].available).toBe(true);
   });
 });
 
@@ -135,7 +138,7 @@ describe("decideReservation 预约资格", () => {
     const existing = [{ giftType: "free_basque" as const, status: "reserved" as const }];
     const second = decideReservation(member, existing, input, config);
     expect(second.ok).toBe(false);
-    expect(second.denial).toBe("FREE_BASQUE_ALREADY_CLAIMED");
+    expect(second.denial).toBe("BIRTHDAY_GIFT_ALREADY_CLAIMED");
   });
   it("L2 选积分兑换 → BENEFIT_NOT_AVAILABLE", () => {
     const input = { forWhom: "self" as const, giftType: "points_450" as const };
@@ -164,12 +167,12 @@ describe("decideReservation 预约资格", () => {
 });
 
 describe("pickupWindow 取货窗口", () => {
-  it("免费巴斯克提前 2 天，450 积分定制蛋糕提前 5 天", () => {
+  it("免费巴斯克提前 2 天，450 积分定制蛋糕提前 3 天", () => {
     const now = new Date("2026-08-15T04:00:00.000Z");
     const basque = pickupWindow(makeConfig(), "free_basque", now);
     const customCake = pickupWindow(makeConfig(), "points_450", now);
     expect(basque.minDate).toBe("2026-08-17");
-    expect(customCake.minDate).toBe("2026-08-20");
+    expect(customCake.minDate).toBe("2026-08-18");
     expect(basque.maxDate).toBe("2026-09-14");
     expect(customCake.maxDate).toBe("2026-09-14");
   });

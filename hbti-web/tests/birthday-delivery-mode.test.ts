@@ -15,7 +15,7 @@ describe("生日页面分阶段入口", () => {
     expect(parseBirthdayDeliveryMode("other")).toBe("card");
   });
 
-  it("T-5 入口锁定积分定制蛋糕，T-2 入口锁定免费巴斯克", () => {
+  it("T-3 入口锁定积分定制蛋糕，T-2 入口锁定免费巴斯克", () => {
     expect(deliveryModeGiftType("card")).toBeUndefined();
     expect(deliveryModeGiftType("cake")).toBe("points_450");
     expect(deliveryModeGiftType("basque")).toBe("free_basque");

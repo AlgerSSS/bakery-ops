@@ -17,14 +17,14 @@ describe("readBirthdayConfig", () => {
     expect(() => readBirthdayConfig()).toThrow("32 bytes");
   });
 
-  it("默认配置完整可读：L1 只有贺卡、L2 免费巴斯克、L3/L4 双选项", () => {
+  it("默认配置完整可读：最新五等级与年度生日礼二选一", () => {
     vi.stubEnv("BIRTHDAY_LINK_SECRET", "s".repeat(32));
     vi.stubEnv("BIRTHDAY_NOTIFY_WEBHOOK", "");
     const config = readBirthdayConfig();
     expect(config.linkTtlDays).toBe(30);
     expect(config.pickupLeadDaysByGift).toEqual({
       free_basque: 2,
-      points_450: 5,
+      points_450: 3,
     });
     expect(config.benefitsByLevel.L1).toEqual([]);
     expect(config.benefitsByLevel.L2.map((r) => r.kind)).toEqual(["free_basque"]);
@@ -33,9 +33,10 @@ describe("readBirthdayConfig", () => {
       "points_450",
     ]);
     expect(config.benefitsByLevel.L3[1].allowGift).toBe(false);
-    expect(config.benefitsByLevel.L3[1].yearlyLimit).toBeNull();
+    expect(config.benefitsByLevel.L3[1].yearlyLimit).toBe(1);
     expect(config.benefitsByLevel.L4[1].allowGift).toBe(true);
-    expect(config.benefitsByLevel.L4[1].yearlyLimit).toBeNull();
+    expect(config.benefitsByLevel.L4[1].yearlyLimit).toBe(1);
+    expect(config.benefitsByLevel.L5[1].allowGift).toBe(true);
     expect(config.defaultBenefits).toEqual([]);
     expect(config.notifyWebhook).toBeUndefined();
   });

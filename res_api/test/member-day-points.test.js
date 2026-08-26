@@ -11,6 +11,7 @@ import {
   buildTopUpPlan,
   decideCard,
   isMemberDay,
+  isMemberDayActive,
   ledgerKey,
   mostRecentMemberDay,
 } from "../lib/member-day-points.js";
@@ -41,6 +42,13 @@ test("only Wednesday business dates are accepted", () => {
   assert.equal(isMemberDay("2026-08-27"), false);
   assert.equal(assertMemberDay("2026-09-02"), "2026-09-02");
   assert.throws(() => assertMemberDay("2026-08-28"), /not a Wednesday/i);
+});
+
+test("the 8/30 launch date makes 9/2 the first active Wednesday", () => {
+  assert.equal(MEMBER_DAY.effectiveFrom, "2026-08-30");
+  assert.equal(isMemberDayActive("2026-08-26"), false);
+  assert.equal(isMemberDayActive("2026-08-30"), false);
+  assert.equal(isMemberDayActive("2026-09-02"), true);
 });
 
 test("malformed or impossible dates are refused", () => {

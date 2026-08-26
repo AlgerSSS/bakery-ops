@@ -4,6 +4,8 @@ import { noStoreJson } from "@/lib/auth/http";
 import { getDb } from "@/lib/db/postgres";
 import {
   deriveLevelKey,
+  deriveLevelKeyFromResName,
+  MEMBER_LEVELS,
   memberLevelInfo,
   readBirthdayConfig,
 } from "@/lib/birthday/config";
@@ -44,12 +46,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     const levelName = basics?.levelName ?? null;
     const pointBalance = basics?.pointBalance ?? null;
     // 等级按「今年实付消费」实时计算（用户 2026-08-15 定版），RES 等级名只作档案。
-    const levelKey = deriveLevelKey(stats?.totalNetSales);
+    const levelKey =
+      deriveLevelKeyFromResName(levelName) ??
+      deriveLevelKey(stats?.totalNetSales);
     const level = memberLevelInfo(levelKey);
     const annualSpend = stats?.totalNetSales ?? 0;
-    const nextLevel = levelKey === "L4" ? null : memberLevelInfo(
-      levelKey === "L1" ? "L2" : levelKey === "L2" ? "L3" : "L4",
-    );
+    const levelIndex = MEMBER_LEVELS.findIndex((candidate) => candidate.key === levelKey);
+    const nextLevel = MEMBER_LEVELS[levelIndex + 1] ?? null;
     const options = listBirthdayOptions(
       { levelName: levelKey, pointBalance },
       reservations.map((r) => ({ giftType: r.giftType, status: r.status })),

@@ -68,6 +68,10 @@ secret store. Never commit RES credentials or secret-bearing environment files.
   lookup, coupon readback/template lookup, and one-coupon issuance.
 - `RES_*`: tenant, organisation, brand, shop, coupon-template, member-wallet,
   and verified H5 member-auth configuration.
+- `STAFF_REWARDS_*`: protects `/staff`; the access code is shared with trained
+  store staff, while the independent session secret signs eight-hour cookies.
+- `FRIEND_TOPUP_COUPON_TEMPLATE_*`: exact RES amount-discount template identity
+  used for the 90-day RM10 friend top-up reward.
 
 Local secret-bearing files should be mode `0600`.
 
@@ -79,7 +83,8 @@ Local secret-bearing files should be mode `0600`.
   means the site must not send a new campaign batch.
 - `GET /api/cron/reconcile` is protected by `CRON_SECRET`. Vercel invokes it
   daily at `19:00 UTC` (`03:00 Asia/Kuala_Lumpur`) to retry durable review
-  alerts, reconcile ambiguous completions, and purge expired operational rows.
+  alerts, reconcile ambiguous completions, issue queued friend top-up rewards,
+  and purge expired operational rows.
 - Records in `review` require an operator to check the member wallet before any
   manual action. Never retry a real coupon mutation merely because the browser
   timed out.

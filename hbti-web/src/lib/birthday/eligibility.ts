@@ -12,7 +12,7 @@ export interface MemberLevelSnapshot {
 
 export interface ExistingReservationLike {
   giftType: "free_basque" | "points_450";
-  status: "reserved" | "fulfilled" | "cancelled";
+  status: "processing" | "reserved" | "fulfilled" | "cancelled" | "ambiguous";
 }
 
 /** 等级 → 可选权益组（2026-08-15 用户二次修订：L1 空组=只有贺卡；L2 免费巴斯克；
@@ -37,10 +37,9 @@ export function resolveBenefits(
 }
 
 export type ReserveDenial =
-  | "FREE_BASQUE_ALREADY_CLAIMED"
+  | "BIRTHDAY_GIFT_ALREADY_CLAIMED"
   | "GIFT_NOT_ALLOWED"
   | "INSUFFICIENT_POINTS"
-  | "TOO_MANY_ACTIVE_RESERVATIONS"
   | "BENEFIT_NOT_AVAILABLE";
 
 export const POINTS_EXCHANGE_COST = 450;
@@ -50,13 +49,13 @@ export const POINTS_EXCHANGE_COST = 450;
  *   - L1：[] —— 只有电子贺卡，没有任何蛋糕选项；
  *   - L2：[免费巴斯克]；
  *   - L3：[免费巴斯克, 450 积分兑换（限自己）]；
- *   - L4：[免费巴斯克, 450 积分兑换（可送亲友）]。
- * 等级来自 deriveLevelKey(年累计消费)，见 config.ts；积分在门店 POS 结算。
+ *   - L4/L5：[免费巴斯克, 450 积分兑换（可送亲友）]。
+ * 每位会员每年只能选其中一份；积分蛋糕在预约确认时由服务端扣 450 分。
  */
 export interface BirthdayOption {
   giftType: "free_basque" | "points_450";
   label: string;
-  /** 0 = 免费；450 = 积分兑换（积分在门店 POS 结算，H5 不扣）。 */
+  /** 0 = 免费；450 = 预约确认时在线扣分。 */
   cost: number;
   allowGift: boolean;
   yearlyLimit: number | null;
@@ -71,12 +70,10 @@ export function listBirthdayOptions(
 ): BirthdayOption[] {
   const rules = resolveBenefits(member.levelName, config);
   const options: BirthdayOption[] = [];
+  const annualGiftClaimed = existing.some((reservation) => reservation.status !== "cancelled");
 
   for (const rule of rules) {
     if (rule.kind === "free_basque") {
-      const claimed = existing.some(
-        (r) => r.giftType === "free_basque" && r.status !== "cancelled",
-      );
       options.push({
         giftType: "free_basque",
         label: rule.label,
@@ -84,28 +81,25 @@ export function listBirthdayOptions(
         allowGift: rule.allowGift,
         yearlyLimit: rule.yearlyLimit,
         available:
-          !claimed && (rule.yearlyLimit === null || rule.yearlyLimit > 0),
-        deniedReason: claimed ? "FREE_BASQUE_ALREADY_CLAIMED" : undefined,
+          !annualGiftClaimed && (rule.yearlyLimit === null || rule.yearlyLimit > 0),
+        deniedReason: annualGiftClaimed ? "BIRTHDAY_GIFT_ALREADY_CLAIMED" : undefined,
       });
     }
 
     if (rule.kind === "points_450") {
       const balance = member.pointBalance;
-      const activePoints = existing.filter(
-        (r) => r.giftType === "points_450" && r.status === "reserved",
-      ).length;
       let pointsDenied: ReserveDenial | undefined;
-      if (balance === null || balance < POINTS_EXCHANGE_COST) {
+      if (annualGiftClaimed) {
+        pointsDenied = "BIRTHDAY_GIFT_ALREADY_CLAIMED";
+      } else if (balance === null || balance < POINTS_EXCHANGE_COST) {
         pointsDenied = "INSUFFICIENT_POINTS";
-      } else if (activePoints >= config.maxActivePointsReservations) {
-        pointsDenied = "TOO_MANY_ACTIVE_RESERVATIONS";
       }
       options.push({
         giftType: "points_450",
         label: rule.label,
         cost: POINTS_EXCHANGE_COST,
         allowGift: rule.allowGift,
-        yearlyLimit: null,
+        yearlyLimit: rule.yearlyLimit,
         available: pointsDenied === undefined,
         deniedReason: pointsDenied,
       });
@@ -141,7 +135,7 @@ export function decideReservation(
   return { ok: true };
 }
 
-/** 可选取货日期窗口：巴斯克 T-2、积分定制蛋糕 T-5，最远仍是统一窗口。 */
+/** 可选取货日期窗口：巴斯克 T-2、积分定制蛋糕 T-3，最远仍是统一窗口。 */
 export function pickupWindow(
   config: BirthdayConfig,
   giftType: "free_basque" | "points_450",

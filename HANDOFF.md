@@ -6,6 +6,65 @@
 
 ---
 
+## See You Often 五等级 / 会员日 / 权益履约（2026-08-26，Codex，部分生产已生效）
+
+活跃分支：`codex/see-you-often-rights-v2`。用户本轮明确：立即开始；会员日以 2026-08-30
+为生效日（该日是周日，首个实际周三为 2026-09-02）；采用最新五等级；统一权益表由本轮建立；
+好友同行采用店员确认页；生日积分扣退/履约完成。用户同时明确“不要再开浏览器”，本轮全部使用
+代码、测试、curl/纯 HTTP、SSH 和 Vercel CLI，未启动浏览器或 Playwright。
+
+**已在生产生效的部分**：
+
+- RES 五等级已经正式写入并独立回读：L1 `Lv1 软绵会员 Fluffy Crush` RM0；L2
+  `Lv2 暖香会员 Toasty Crush` RM250；L3 `Lv3 流心会员 Gooey Crush` RM750；L4
+  `Lv4 黄金会员 Golden Crush` RM1500；L5 `Lv5 挚爱会员 Diamond Crush` RM3000。
+  五个 RES level ID 已锁在 `res_api/lib/loyalty-levels.js` / `level-catalog-v2.js`。
+- 五等级引擎、会员日生效闸、无浏览器 storageState token 读取均按文件白名单同步到 tokyo-01；
+  远端 52/52 测试通过。`/etc/cron.d/hotcrush-member-day` 已从 preview 改为
+  `MEMBER_DAY_MODE=live MEMBER_DAY_EFFECTIVE_FROM=2026-08-30`，两条任务仍是周三 23:59 主跑、
+  周四 03:30 补扫；服务器回读确认。首个真实发放是 2026-09-02，不是 8/30。
+- HBTI 的 RES 鉴权已恢复：服务器 storageState 令牌纯 HTTP 读验证 200，Vercel 项目
+  `hotcrush-hbti` 的 production/development `RES_VULCAN_TOKEN` 已更新并 redeploy；
+  `https://hbti-test.hotcrush.net/api/health` 三次间隔检查均 200。服务器
+  `/opt/hotcrush/hbti-token/.env` 已补 Vercel CLI token（600），新轮换脚本不再运行 login.js/
+  Chromium；语法与服务器文件权限均复核。
+
+**已完成代码、尚未部署 HBTI 的部分**：
+
+- 新迁移 `114_member_entitlements_and_rewards.sql`：`mkt_member_entitlement`、
+  `mkt_reward_grant`、`mkt_friend_topup_group`、`mkt_friend_topup_participant`；RLS + revoke、
+  唯一幂等键、外部发券 claimed/issued/ambiguous 状态机。`sync-level-entitlements.mjs` 把最新五等级
+  映射为生日礼、新品提前体验、姓名插牌、周边优先、WhatsApp 优先、季度品鉴、L5 试吃礼盒和
+  快速通道等年度/季度权益；脚本已同步 tokyo-01 但**未执行**。
+- 新迁移 `115_birthday_fulfillment.sql`：生日礼年度二选一、450 积分扣减/退款回读字段、
+  processing/reserved/fulfilled/cancelled/ambiguous 状态和店员履约审计。历史唯一一条 points_450
+  预约没有在线扣分证据，迁移会显式标 ambiguous，不伪装成已扣。
+- HBTI `/staff` 店员权益台已完成：共享门店口令 + 8 小时签名会话 + 登录限流；好友同行输入 2–6
+  个手机号，只接受同店、最近 2 小时、相隔不超过 30 分钟、每人真实充值本金 RM100+ 且一人唯一
+  一笔的交易；随后为每人建立 RM10 发券账本。RES 当前存在启用中的 Amount discount 模板
+  `2043286175804100613 / 10元代金劵`；worker 按 ID+名称核对，发 90 天券并做发券前后券 ID 回读，
+  不确定结果进入 ambiguous，绝不盲目重发。模板名称/类型/启用状态已纯 HTTP 证实；面额目前只有
+  模板名证据，正式首发前仍应由业务人在 RES 核对其金额/叠加/适用范围。
+- 生日 H5 已改为 RES 最新五等级优先、年度二选一、定制蛋糕 T-3；积分预约先落 processing，
+  服务端 RES 扣 450 后回读余额才转 reserved。店员页支持已取货、取消；积分蛋糕取消会加回 450
+  并回读，不确定即人工核对。重复提交由年度唯一索引挡住。
+
+**不可跳过的上线顺序 / 当前阻塞**：本仓库规则明确只有一个生产 Supabase，DDL/DML 必须由人执行
+迁移，agent 不得直接应用。因此本轮没有执行 114/115，也没有部署依赖新列/新表的 HBTI 构建。
+人工需按顺序执行 114、115，确认 `schema_migrations` 有 114/115 后，再配置 Vercel：
+`STAFF_REWARDS_ACCESS_CODE`、`STAFF_REWARDS_SESSION_SECRET`、
+`FRIEND_TOPUP_COUPON_TEMPLATE_ID=2043286175804100613`、
+`FRIEND_TOPUP_COUPON_TEMPLATE_NAME=10元代金劵`；随后部署 HBTI，运行一次
+`level-entitlements:sync`，最后用非真实发券的只读 health/队列检查验收。不要在迁移前部署：旧表没有
+`points_status`，会直接使生日 view 503。
+
+门禁：HBTI `tsc`、ESLint、352/352 Vitest（另 39 跳过）和 Next 生产构建全绿；本机 Node 26
+跑 jsdom 必须加 `NODE_OPTIONS=--no-experimental-webstorage`（Node 自带 experimental localStorage
+会遮蔽 jsdom，非产品失败）；RES 侧 55/55 规则测试 + 22/22 API 测试通过；迁移检查器单测 8/8，
+生产只读差集如预期报告 114/115 未记录，同时仍报告该仓库既有的跨仓编号差异。
+
+---
+
 ## 财务网站生产恢复与旧库/上传验收（2026-08-21，Codex，已上线）
 
 Brain 中的财务网站仓库已完成实际修复，不再只是只读评审。代码已合并并推送到该仓库 `master`

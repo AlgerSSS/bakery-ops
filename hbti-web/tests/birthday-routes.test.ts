@@ -13,6 +13,10 @@ const sqlState = vi.hoisted(() => ({
   handler: null as null | ((text: string) => Promise<unknown[]>),
 }));
 
+const resState = vi.hoisted(() => ({
+  adjustMemberPoints: vi.fn(),
+}));
+
 vi.mock("@/lib/db/postgres", () => ({
   getDb: () => {
     const sql = (strings: TemplateStringsArray) => {
@@ -27,6 +31,12 @@ vi.mock("@/lib/db/postgres", () => ({
 vi.mock("@/lib/server-config", () => ({
   readHbtiServerConfig: () => ({
     linkBaseUrl: "https://birthday.test",
+  }),
+}));
+
+vi.mock("@/lib/res/client", () => ({
+  createResApiClientFromEnv: () => ({
+    adjustMemberPoints: resState.adjustMemberPoints,
   }),
 }));
 
@@ -71,7 +81,7 @@ beforeEach(() => {
   vi.stubEnv("BIRTHDAY_LINK_SECRET", SECRET);
   vi.stubEnv("BIRTHDAY_CAMPAIGN_YEAR", "2026");
   vi.stubEnv("BIRTHDAY_FREE_BASQUE_LEAD_DAYS", "2");
-  vi.stubEnv("BIRTHDAY_POINTS_CAKE_LEAD_DAYS", "5");
+  vi.stubEnv("BIRTHDAY_POINTS_CAKE_LEAD_DAYS", "3");
   vi.stubEnv("BIRTHDAY_PICKUP_WINDOW_DAYS", "30");
   vi.stubEnv("BIRTHDAY_NOTIFY_WEBHOOK", "");
   sqlState.handler = (text) => {
@@ -82,7 +92,9 @@ beforeEach(() => {
         member_note: null, status: "reserved", created_at: "2026-08-15T04:00:00.000Z",
       }]);
     }
-    if (text.includes("UPDATE public.mkt_birthday_reservation")) return Promise.resolve([]);
+    if (text.includes("UPDATE public.mkt_birthday_reservation")) {
+      return Promise.resolve([{ reservation_id: 42 }]);
+    }
     if (text.includes("FROM public.mkt_birthday_reservation")) return Promise.resolve([]);
     if (text.includes("mkt_birthday_profile")) return Promise.resolve([]);
     if (text.includes("COUNT(DISTINCT order_id)")) {
@@ -97,12 +109,19 @@ beforeEach(() => {
     // 注意顺序：pos_member_order_item 包含 pos_member 子串，
     // 年度消费（SUM(net_sales)）必须先于它匹配，否则会被当成会员基础信息行。
     if (text.includes("SUM(net_sales)")) {
-      // 年度消费 345.6 → Lv2 心动会员
+      // 年度消费 345.6 → Lv2 暖香会员
       return Promise.resolve([{ spend: "345.6" }]);
     }
     if (text.includes("FROM public.pos_member")) return Promise.resolve([BASICS_ROW]);
     return Promise.resolve([]);
   };
+  resState.adjustMemberPoints.mockReset();
+  resState.adjustMemberPoints.mockResolvedValue({
+    status: "applied",
+    reference: "BIRTHDAY-2026-43",
+    pointsBefore: 500,
+    pointsAfter: 50,
+  });
 });
 
 afterEach(() => {
@@ -120,13 +139,13 @@ describe("GET /api/birthday/view", () => {
     expect(body.member.levelName).toBe("VIP1");
     expect(body.member.pointBalance).toBe(120);
     expect(body.maskedPhone).toBe("**** 6789");
-    // 年度消费 345.6 → Lv2 心动会员 → 只有免费巴斯克（积分再多也不给兑换）
+    // 年度消费 345.6 → Lv2 暖香会员 → 只有免费巴斯克（积分再多也不给兑换）
     expect(body.options.map((o: { giftType: string }) => o.giftType)).toEqual([
       "free_basque",
     ]);
     expect(body.options[0].available).toBe(true);
     expect(body.member.level.key).toBe("L2");
-    expect(body.member.level.nameZh).toBe("Lv2 心动会员");
+    expect(body.member.level.nameZh).toBe("Lv2 暖香会员");
     expect(body.member.level.annualSpend).toBe(345.6);
     expect(body.member.level.next?.key).toBe("L3");
     expect(body.member.level.next?.gap).toBeCloseTo(404.4, 1);
@@ -210,7 +229,7 @@ describe("POST /api/birthday/reserve", () => {
     const base = sqlState.handler;
     sqlState.handler = (text) => {
       if (text.includes("SUM(net_sales)")) {
-        // 年度消费 800 → Lv3 热爱会员
+        // 年度消费 800 → Lv3 流心会员
         return Promise.resolve([{ spend: "800" }]);
       }
       if (text.includes("FROM public.pos_member")) {
@@ -232,7 +251,15 @@ describe("POST /api/birthday/reserve", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.reservation.giftType).toBe("points_450");
+    expect(body.reservation.status).toBe("reserved");
+    expect(body.reservation.pointsStatus).toBe("deducted");
     expect(body.notified).toBe("pending");
+    expect(resState.adjustMemberPoints).toHaveBeenCalledWith({
+      phoneE164: "+60123456789",
+      points: 450,
+      direction: "decrease",
+      reference: "BIRTHDAY-2026-43",
+    });
   });
 
   it("L3 积分不足选积分兑换 → 403", async () => {
@@ -276,7 +303,7 @@ describe("POST /api/birthday/reserve", () => {
     expect((await res.json()).error).toBe("PICKUP_DATE_OUT_OF_RANGE");
   });
 
-  it("450 积分定制蛋糕不足提前 5 天 → 400；免费巴斯克提前 2 天可约", async () => {
+  it("450 积分定制蛋糕不足提前 3 天 → 400；免费巴斯克提前 2 天可约", async () => {
     const base = sqlState.handler;
     sqlState.handler = (text) => {
       if (text.includes("SUM(net_sales)")) {
@@ -328,7 +355,43 @@ describe("POST /api/birthday/reserve", () => {
       pickupDate: pickupDateAfter(2), slot: "noon",
     }));
     expect(res.status).toBe(409);
-    expect((await res.json()).error).toBe("FREE_BASQUE_ALREADY_CLAIMED");
+    expect((await res.json()).error).toBe("BIRTHDAY_GIFT_ALREADY_CLAIMED");
+  });
+
+  it("RES 扣分结果不确定时返回处理中，并禁止自动再扣", async () => {
+    const base = sqlState.handler;
+    sqlState.handler = (text) => {
+      if (text.includes("SUM(net_sales)")) return Promise.resolve([{ spend: "800" }]);
+      if (text.includes("FROM public.pos_member")) {
+        return Promise.resolve([{ ...BASICS_ROW, point_balance: 500 }]);
+      }
+      if (text.includes("INSERT INTO public.mkt_birthday_reservation")) {
+        return Promise.resolve([{
+          reservation_id: 44, gift_type: "points_450", for_whom: "self",
+          recipient_note: null, pickup_date: "2026-09-01", slot: "night",
+          member_note: null, status: "processing", points_status: "claiming",
+          created_at: "2026-08-26T04:00:00.000Z",
+        }]);
+      }
+      if (text.includes("UPDATE public.mkt_birthday_reservation")) {
+        return Promise.resolve([{ reservation_id: 44 }]);
+      }
+      return base!(text);
+    };
+    resState.adjustMemberPoints.mockRejectedValueOnce(new Error("network timeout"));
+
+    const res = await reservePOST(postJson("/api/birthday/reserve", {
+      linkToken: linkFor(MEMBER), forWhom: "self", giftType: "points_450",
+      pickupDate: pickupDateAfter(3), slot: "night",
+    }));
+    expect(res.status).toBe(202);
+    expect(await res.json()).toMatchObject({
+      reserved: false,
+      processing: true,
+      error: "POINT_DEDUCTION_UNCONFIRMED",
+      reservation: { status: "ambiguous", pointsStatus: "ambiguous" },
+    });
+    expect(resState.adjustMemberPoints).toHaveBeenCalledTimes(1);
   });
 
   it("缺 Origin 头的跨源提交被拒绝", async () => {

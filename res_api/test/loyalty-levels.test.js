@@ -60,6 +60,8 @@ test("level thresholds are inclusive and match See You Often", () => {
   assert.equal(tierForSpend(750).key, "L3");
   assert.equal(tierForSpend(1499.99).key, "L3");
   assert.equal(tierForSpend(1500).key, "L4");
+  assert.equal(tierForSpend(2999.99).key, "L4");
+  assert.equal(tierForSpend(3000).key, "L5");
 });
 
 test("blank or zero RES default-level projections resolve to L1", () => {
@@ -142,14 +144,15 @@ test("tier preview includes active members without spend", () => {
       ["b", 250],
       ["c", 750],
       ["d", 1500],
-      ["e", 1500.01],
+      ["e", 3000],
     ]),
   );
   assert.deepEqual(preview, [
-    { tier: "L1 First Crush", memberCount: 1 },
-    { tier: "L2 Sweet Crush", memberCount: 1 },
-    { tier: "L3 Hot Crush", memberCount: 1 },
-    { tier: "L4 Forever Crush", memberCount: 2 },
+    { tier: "L1 Fluffy Crush", memberCount: 1 },
+    { tier: "L2 Toasty Crush", memberCount: 1 },
+    { tier: "L3 Gooey Crush", memberCount: 1 },
+    { tier: "L4 Golden Crush", memberCount: 1 },
+    { tier: "L5 Diamond Crush", memberCount: 1 },
   ]);
 });
 
@@ -164,12 +167,12 @@ test("transition preview compares every active card with its member target", () 
       {
         customerId: "a",
         levelId: "2090027041029333000",
-        levelName: "Lv2 心动会员 Sweet Crush",
+        levelName: "Lv2 暖香会员 Toasty Crush",
       },
       {
         customerId: "b",
         levelId: "2090027043797577737",
-        levelName: "Lv3 热爱会员 Hot Crush",
+        levelName: "Lv3 流心会员 Gooey Crush",
       },
       {
         customerId: "c",
@@ -211,10 +214,10 @@ test("transition preview compares every active card with its member target", () 
     },
   );
   assert.deepEqual(preview.matrix, [
-    { from: "L1 First Crush", to: "L1 First Crush", cardCount: 1 },
-    { from: "L1 First Crush", to: "L2 Sweet Crush", cardCount: 1 },
-    { from: "L2 Sweet Crush", to: "L2 Sweet Crush", cardCount: 1 },
-    { from: "L3 Hot Crush", to: "L3 Hot Crush", cardCount: 1 },
-    { from: "unknown:Legacy", to: "L4 Forever Crush", cardCount: 1 },
+    { from: "L1 Fluffy Crush", to: "L1 Fluffy Crush", cardCount: 1 },
+    { from: "L1 Fluffy Crush", to: "L2 Toasty Crush", cardCount: 1 },
+    { from: "L2 Toasty Crush", to: "L2 Toasty Crush", cardCount: 1 },
+    { from: "L3 Gooey Crush", to: "L3 Gooey Crush", cardCount: 1 },
+    { from: "unknown:Legacy", to: "L4 Golden Crush", cardCount: 1 },
   ]);
 });

@@ -1,31 +1,38 @@
 export const LOYALTY_LEVELS = Object.freeze([
   Object.freeze({
     key: "L1",
-    name: "First Crush",
-    resName: "Lv1 初见会员 First Crush",
+    name: "Fluffy Crush",
+    resName: "Lv1 软绵会员 Fluffy Crush",
     resLevelId: "1998685858403844100",
     threshold: 0,
   }),
   Object.freeze({
     key: "L2",
-    name: "Sweet Crush",
-    resName: "Lv2 心动会员 Sweet Crush",
+    name: "Toasty Crush",
+    resName: "Lv2 暖香会员 Toasty Crush",
     resLevelId: "2090027041029333000",
     threshold: 250,
   }),
   Object.freeze({
     key: "L3",
-    name: "Hot Crush",
-    resName: "Lv3 热爱会员 Hot Crush",
+    name: "Gooey Crush",
+    resName: "Lv3 流心会员 Gooey Crush",
     resLevelId: "2090027043797577737",
     threshold: 750,
   }),
   Object.freeze({
     key: "L4",
-    name: "Forever Crush",
-    resName: "Lv4 挚爱会员 Forever Crush",
+    name: "Golden Crush",
+    resName: "Lv4 黄金会员 Golden Crush",
     resLevelId: "2090027045185888261",
     threshold: 1500,
+  }),
+  Object.freeze({
+    key: "L5",
+    name: "Diamond Crush",
+    resName: "Lv5 挚爱会员 Diamond Crush",
+    resLevelId: "2092524707546116100",
+    threshold: 3000,
   }),
 ]);
 

@@ -14,8 +14,8 @@
 // 根治仍然是向 RES 申请受限服务凭证。
 //
 // 与 Mac 版(hbti-web/scripts/refresh-res-token.mjs)的差异:
-//   1. 路径不写死,从 RES_API_ROOT 解析;
-//   2. Vercel CLI 固定版本并用专用 --token,不依赖交互式登录态;
+//   1. 不启动浏览器，直接读取 res_api 已维护的 storageState；
+//   2. Vercel CLI 固定版本并用专用令牌,不依赖交互式登录态;
 //   3. 多做三步:redeploy -> alias -> 轮询 /api/health,任一步失败即非零退出。
 //      只写 env 不 redeploy 等于没生效 —— 这是最容易自欺的一步。
 import { spawnSync } from "node:child_process";
@@ -72,39 +72,14 @@ function vercel(args, { input } = {}) {
   return `${result.stdout ?? ""}`;
 }
 
-const { openAuthedPage } = await import(
-  new URL("lib/report-client.js", `file://${RES_API_ROOT}/`).href
-);
-
-let session;
 try {
-  step("1/6 借 BO 会话里的 vulcan-token");
-  session = await openAuthedPage({
-    storageState: `${RES_API_ROOT}/storageState.json`,
-    warmupPath: "/member-overview",
-    settleMs: 5_000,
-    log: () => {},
-  });
-  const headers = session.authHeaders;
-  const token = headers["vulcan-token"];
-  if (typeof token !== "string" || token.length < 32) {
-    throw new Error(
-      "没有从页面请求里借到 vulcan-token —— BO 会话多半已经过期，run.sh 应先跑 login.js。",
-    );
-  }
-
-  // 只校验租户边界。组织/品牌作用域不校验：刚登录的会话是集团级(type=0、无 brand-id)，
-  // 而运行时用的是 env 里的品牌/门店级头，抓取作用域与运行作用域本就无关。
-  for (const [name, expected] of [
-    ["corporation-id", process.env.RES_CORPORATION_ID],
-    ["shop-id", process.env.RES_SHOP_ID],
-  ]) {
-    if (headers[name] !== expected) {
-      throw new Error(
-        `抓到的会话不属于目标租户：${name} 是 ${headers[name]}，期望 ${expected}。`,
-      );
-    }
-  }
+  step("1/6 从服务器会话文件读取 vulcan-token（不启动浏览器）");
+  const { readVulcanTokenFromStorageState } = await import(
+    new URL("lib/storage-state-token.js", `file://${RES_API_ROOT}/`).href
+  );
+  const token = readVulcanTokenFromStorageState(
+    `${RES_API_ROOT}/storageState.json`,
+  );
 
   step("2/6 用运行时头做只读验证");
   const verification = await fetch(
@@ -225,10 +200,5 @@ try {
   process.stderr.write(
     `${new Date().toISOString()} 轮换失败：${error?.message ?? error}\n`,
   );
-  // 用 exitCode 而不是 process.exit(1):后者同步终止进程,下面 finally 里的
-  // `await session.close()` 不会跑完,每次失败都漏一个 Chromium。
-  // 这个任务每 12 小时一班,失败若连续发生,泄漏的浏览器会把内存吃光。
   process.exitCode = 1;
-} finally {
-  await session?.close();
 }

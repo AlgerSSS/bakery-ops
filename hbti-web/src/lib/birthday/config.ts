@@ -3,24 +3,25 @@
  * （与 server-config.ts 的 requireEnvironmentVariable 同一套纪律）。
  *
  * 会员等级（2026-08-15 用户定版，等级由年累计实付消费实时计算，不看 RES 等级名）：
- *   Lv1 初见会员 First Crush     注册入会（RM0）
- *   Lv2 心动会员 Sweet Crush     年累计消费 RM250
- *   Lv3 热爱会员 Hot Crush       年累计消费 RM750
- *   Lv4 挚爱会员 Forever Crush   年累计消费 RM1,500
+ *   Lv1 软绵会员 Fluffy Crush    注册入会（RM0）
+ *   Lv2 暖香会员 Toasty Crush    年累计消费 RM250
+ *   Lv3 流心会员 Gooey Crush     年累计消费 RM750
+ *   Lv4 黄金会员 Golden Crush    年累计消费 RM1,500
+ *   Lv5 挚爱会员 Diamond Crush   年累计消费 RM3,000
  * 生日权益（2026-08-15 用户第二次修订，等级决定「可选权益组」）：
  *   L1：只有电子贺卡，没有蛋糕权益；
  *   L2：只有免费巴斯克（每年一份）；
  *   L3：免费巴斯克（每年一份）或 450 积分兑换（限自己），二选一；
- *   L4：免费巴斯克（每年一份）或 450 积分兑换（可送亲友），二选一。
+ *   L4/L5：免费巴斯克或 450 积分兑换（可送亲友），每年二选一。
  * RES 里的等级名（如 VIP1）只作原始档案保留，权益判定一律用 deriveLevelKey(年消费)。
  */
 
 export interface BirthdayBenefitRule {
-  /** free_basque = 免费巴斯克；points_450 = 450 积分兑换（积分在门店 POS 结算，H5 不扣）。 */
+  /** free_basque = 免费巴斯克；points_450 = 450 积分兑换（预约确认时在线扣分）。 */
   kind: "free_basque" | "points_450";
-  /** 是否允许给亲友兑换（L4）。 */
+  /** 是否允许给亲友兑换（L4/L5）。 */
   allowGift: boolean;
-  /** 每会员每年份数上限；null = 不限量（L3/L4 积分兑换）。 */
+  /** 每会员每年份数上限。 */
   yearlyLimit: number | null;
   /** 页面上给顾客看的权益文案。 */
   label: string;
@@ -31,12 +32,10 @@ export interface BirthdayConfig {
   campaignYear: number;
   /** 签名链接有效期（天）。 */
   linkTtlDays: number;
-  /** 预约需提前的天数：免费巴斯克 T-2，450 积分定制蛋糕 T-5。 */
+  /** 预约需提前的天数：免费巴斯克 T-2，450 积分定制蛋糕 T-3。 */
   pickupLeadDaysByGift: Record<"free_basque" | "points_450", number>;
   /** 最多可以提前多少天预约。 */
   pickupWindowDays: number;
-  /** 积分兑换每会员同时有效的预约数上限（防呆，不限量的业务规则不变）。 */
-  maxActivePointsReservations: number;
   /** 等级 → 可选权益组（数组；空数组 = 该等级只有贺卡没有蛋糕权益）。 */
   benefitsByLevel: Record<string, BirthdayBenefitRule[]>;
   /** 未知等级的保险丝默认：空数组 = 只有贺卡。 */
@@ -54,14 +53,14 @@ export const FREE_BASQUE_RULE: BirthdayBenefitRule = {
 const POINTS_450_SELF_RULE: BirthdayBenefitRule = {
   kind: "points_450",
   allowGift: false,
-  yearlyLimit: null,
+  yearlyLimit: 1,
   label: "450 积分兑换生日蛋糕",
 };
 
 const POINTS_450_GIFT_RULE: BirthdayBenefitRule = {
   kind: "points_450",
   allowGift: true,
-  yearlyLimit: null,
+  yearlyLimit: 1,
   label: "450 积分兑换生日蛋糕（可送亲友）",
 };
 
@@ -71,13 +70,14 @@ export const DEFAULT_LEVEL_BENEFITS: Record<string, BirthdayBenefitRule[]> = {
   L2: [FREE_BASQUE_RULE],
   L3: [FREE_BASQUE_RULE, POINTS_450_SELF_RULE],
   L4: [FREE_BASQUE_RULE, POINTS_450_GIFT_RULE],
+  L5: [FREE_BASQUE_RULE, POINTS_450_GIFT_RULE],
 };
 
 export const POINTS_CAKE_COST = 450;
 
 /** 会员等级体系（升级条件来自用户定版）。 */
 export interface MemberLevelInfo {
-  key: "L1" | "L2" | "L3" | "L4";
+  key: "L1" | "L2" | "L3" | "L4" | "L5";
   nameZh: string;
   nameEn: string;
   /** 年累计消费（RM，实付口径）达到即升级。 */
@@ -85,10 +85,11 @@ export interface MemberLevelInfo {
 }
 
 export const MEMBER_LEVELS: readonly MemberLevelInfo[] = [
-  { key: "L1", nameZh: "Lv1 初见会员", nameEn: "First Crush", annualThreshold: 0 },
-  { key: "L2", nameZh: "Lv2 心动会员", nameEn: "Sweet Crush", annualThreshold: 250 },
-  { key: "L3", nameZh: "Lv3 热爱会员", nameEn: "Hot Crush", annualThreshold: 750 },
-  { key: "L4", nameZh: "Lv4 挚爱会员", nameEn: "Forever Crush", annualThreshold: 1500 },
+  { key: "L1", nameZh: "Lv1 软绵会员", nameEn: "Fluffy Crush", annualThreshold: 0 },
+  { key: "L2", nameZh: "Lv2 暖香会员", nameEn: "Toasty Crush", annualThreshold: 250 },
+  { key: "L3", nameZh: "Lv3 流心会员", nameEn: "Gooey Crush", annualThreshold: 750 },
+  { key: "L4", nameZh: "Lv4 黄金会员", nameEn: "Golden Crush", annualThreshold: 1500 },
+  { key: "L5", nameZh: "Lv5 挚爱会员", nameEn: "Diamond Crush", annualThreshold: 3000 },
 ];
 
 /** 年累计实付消费 → 等级。无消费记录（含消费口径外只付现金的会员）按 L1 初见。 */
@@ -96,10 +97,31 @@ export function deriveLevelKey(
   annualSpend: number | null | undefined,
 ): MemberLevelInfo["key"] {
   const spend = annualSpend ?? 0;
+  if (spend >= 3000) return "L5";
   if (spend >= 1500) return "L4";
   if (spend >= 750) return "L3";
   if (spend >= 250) return "L2";
   return "L1";
+}
+
+/** 生产 RES 已配置的五等级名 → 权益键；未知/旧名称返回 null，绝不猜等级。 */
+export function deriveLevelKeyFromResName(
+  levelName: string | null | undefined,
+): MemberLevelInfo["key"] | null {
+  if (!levelName) return null;
+  const normalized = levelName.trim().toUpperCase();
+  const livePrefix = normalized.match(/^LV([1-5])(?:\s|$)/);
+  if (livePrefix) return `L${livePrefix[1]}` as MemberLevelInfo["key"];
+  for (const level of MEMBER_LEVELS) {
+    if (
+      normalized === level.key ||
+      normalized.startsWith(`${level.key} `) ||
+      normalized.includes(level.nameEn.toUpperCase())
+    ) {
+      return level.key;
+    }
+  }
+  return null;
 }
 
 export function memberLevelInfo(key: MemberLevelInfo["key"]): MemberLevelInfo {
@@ -134,10 +156,9 @@ export function readBirthdayConfig(): BirthdayConfig {
     linkTtlDays: readInteger("BIRTHDAY_LINK_TTL_DAYS", 30),
     pickupLeadDaysByGift: {
       free_basque: readInteger("BIRTHDAY_FREE_BASQUE_LEAD_DAYS", 2),
-      points_450: readInteger("BIRTHDAY_POINTS_CAKE_LEAD_DAYS", 5),
+      points_450: readInteger("BIRTHDAY_POINTS_CAKE_LEAD_DAYS", 3),
     },
     pickupWindowDays: readInteger("BIRTHDAY_PICKUP_WINDOW_DAYS", 30),
-    maxActivePointsReservations: readInteger("BIRTHDAY_MAX_ACTIVE_POINTS_RESERVATIONS", 3),
     benefitsByLevel,
     defaultBenefits: [],
     notifyWebhook: readWebhook(),

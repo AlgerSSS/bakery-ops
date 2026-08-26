@@ -11,9 +11,9 @@
 #                    收尾晚的那天会漏单，补扫按账本累计值只发差额，不会重复。
 # 两跑都用同一任务码，账本 points 记【累计已发】，重跑安全。
 #
-# 装上时 MODE=preview：只算不发。确认预演数字无误后由人改成 live。
+# 2026-08-30 生效；当天是周日，所以首个实际会员日是 2026-09-02。
 # 补跑指定周三：MEMBER_DAY_BUSINESS_DATE=YYYY-MM-DD ./member-day-topup.sh
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-59 23 * * 3 root cd /opt/hotcrush/res_api && MEMBER_DAY_MODE=preview /usr/bin/node scripts/task-switch-run.mjs member_day_topup -- ./member-day-topup.sh
-30 3 * * 4 root cd /opt/hotcrush/res_api && MEMBER_DAY_MODE=preview /usr/bin/node scripts/task-switch-run.mjs member_day_topup -- ./member-day-topup.sh
+59 23 * * 3 root cd /opt/hotcrush/res_api && MEMBER_DAY_MODE=live MEMBER_DAY_EFFECTIVE_FROM=2026-08-30 /usr/bin/node scripts/task-switch-run.mjs member_day_topup -- ./member-day-topup.sh
+30 3 * * 4 root cd /opt/hotcrush/res_api && MEMBER_DAY_MODE=live MEMBER_DAY_EFFECTIVE_FROM=2026-08-30 /usr/bin/node scripts/task-switch-run.mjs member_day_topup -- ./member-day-topup.sh

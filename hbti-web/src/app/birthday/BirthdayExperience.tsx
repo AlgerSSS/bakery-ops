@@ -130,7 +130,15 @@ interface BirthdayReservation {
   pickupDate: string;
   slot: "noon" | "night";
   memberNote: string | null;
-  status: "reserved" | "fulfilled" | "cancelled";
+  status: "processing" | "reserved" | "fulfilled" | "cancelled" | "ambiguous";
+  pointsStatus:
+    | "not_applicable"
+    | "claiming"
+    | "deducted"
+    | "refund_claimed"
+    | "refunded"
+    | "failed"
+    | "ambiguous";
   createdAt: string;
 }
 
@@ -144,12 +152,12 @@ interface BirthdayView {
     pointBalance: number | null;
     registeredOn: string | null;
     level: {
-      key: "L1" | "L2" | "L3" | "L4";
+      key: "L1" | "L2" | "L3" | "L4" | "L5";
       nameZh: string;
       nameEn: string;
       annualSpend: number;
       next: {
-        key: "L2" | "L3" | "L4";
+        key: "L2" | "L3" | "L4" | "L5";
         nameZh: string;
         threshold: number;
         gap: number;
@@ -181,9 +189,11 @@ const GIFT_TYPE_LABEL: Record<BirthdayReservation["giftType"], string> = {
 };
 
 const STATUS_LABEL: Record<BirthdayReservation["status"], string> = {
+  processing: "处理中",
   reserved: "已留好",
   fulfilled: "已取货",
   cancelled: "已取消",
+  ambiguous: "待核对",
 };
 
 /** 静态稿里 2 月给 29 天，与服务端 MONTH_DAY_MAX 一致。 */
@@ -474,6 +484,12 @@ export function BirthdayExperience({
         setStep("done");
         return;
       }
+      if (response.status === 202 && payload.processing === true) {
+        setReserveError(
+          "积分结果正在核对，请不要重复提交。确认后这条预约会自动显示为已留好。",
+        );
+        return;
+      }
       if (handleAuthFailure(response.status, payload.error as string)) return;
       setReserveError(reserveErrorMessage(payload.error as string | undefined));
     } catch (caught) {
@@ -580,20 +596,18 @@ export function BirthdayExperience({
 
   /* ── 已登录 ── */
 
-  const activeFreeBasque = view.reservations.find(
-    (r) =>
-      r.giftType === "free_basque" &&
-      (r.status === "reserved" || r.status === "fulfilled"),
+  const activeBirthdayGift = view.reservations.find(
+    (r) => r.status !== "cancelled",
   );
   const selectedOption =
     view.options.find((option) => option.giftType === giftType) ??
     (deliveryMode === "card"
       ? (view.options.find((option) => option.available) ?? view.options[0])
       : undefined);
-  const freeBasqueClaimed =
-    selectedOption?.giftType === "free_basque" &&
+  const birthdayGiftClaimed =
+    selectedOption !== undefined &&
     !selectedOption.available &&
-    selectedOption.deniedReason === "FREE_BASQUE_ALREADY_CLAIMED";
+    selectedOption.deniedReason === "BIRTHDAY_GIFT_ALREADY_CLAIMED";
 
   const stepProps = { headingRef };
 
@@ -696,7 +710,7 @@ export function BirthdayExperience({
               giftType={giftType}
               birthdayMonth={birthdayMonth}
               birthdayDay={birthdayDay}
-              claimed={freeBasqueClaimed ? activeFreeBasque : undefined}
+              claimed={birthdayGiftClaimed ? activeBirthdayGift : undefined}
               pickupDate={pickupDate}
               slot={slot}
               forWhom={forWhom}
@@ -1253,12 +1267,14 @@ function reserveErrorMessage(error: string | undefined): string {
       return "告诉我们这份要送给谁。";
     case "INSUFFICIENT_POINTS":
       return "积分还差一点点——生日前再来几次，就够换啦。";
-    case "FREE_BASQUE_ALREADY_CLAIMED":
-      return "今年的免费巴斯克已经留过了。";
+    case "BIRTHDAY_GIFT_ALREADY_CLAIMED":
+      return "今年的生日礼已经选过了。";
+    case "POINT_DEDUCTION_REJECTED":
+      return "450 积分暂时没有扣成功，请稍后再试。";
+    case "MEMBER_PHONE_UNAVAILABLE":
+      return "会员手机号资料不完整，请到店让伙伴帮你处理。";
     case "GIFT_NOT_ALLOWED":
       return "这份权益只能留给自己。";
-    case "TOO_MANY_ACTIVE_RESERVATIONS":
-      return "已经有进行中的预约了——先到店取完，再约下一份。";
     case "BENEFIT_NOT_AVAILABLE":
       return "这份礼物这会儿还不能选——返回上一步换个选项。";
     case "INVALID_REQUEST":
@@ -1658,8 +1674,7 @@ function BenefitScreen({
           {options.map((option) => {
             const chosen = selected?.giftType === option.giftType;
             const freeClaimed =
-              option.giftType === "free_basque" &&
-              option.deniedReason === "FREE_BASQUE_ALREADY_CLAIMED";
+              option.deniedReason === "BIRTHDAY_GIFT_ALREADY_CLAIMED";
             const notEnough = option.deniedReason === "INSUFFICIENT_POINTS";
             return (
               <button
@@ -1685,7 +1700,7 @@ function BenefitScreen({
                         : `还差 ${pointsShort} 分`
                       : option.cost === 0
                         ? "每会员每年一份"
-                        : "到店取货时在 POS 扣 450 积分"}
+                        : "预约确认时在线扣 450 积分"}
                 </span>
               </button>
             );
@@ -1701,7 +1716,7 @@ function BenefitScreen({
             再花 RM{member.level.next.gap.toFixed(0)} 就升 {member.level.next.nameZh}。
           </p>
         )}
-        {member.level.key === "L4" && (
+        {member.level.key === "L5" && (
           <p className={styles.hintline}>
             今年已消费 RM{member.level.annualSpend.toFixed(2)}，是我们的挚爱会员。
           </p>
@@ -1719,7 +1734,7 @@ function BenefitScreen({
   );
 }
 
-/* ── 提前送达的预约信：T-5 定制蛋糕 / T-2 免费巴斯克 ── */
+/* ── 提前送达的预约信：T-3 定制蛋糕 / T-2 免费巴斯克 ── */
 function DeliveryIntroScreen({
   headingRef,
   view,
@@ -1735,12 +1750,10 @@ function DeliveryIntroScreen({
   onSeeReservations: () => void;
 }) {
   const option = view.options.find((item) => item.giftType === giftType);
-  const claimed =
-    giftType === "free_basque" &&
-    option?.deniedReason === "FREE_BASQUE_ALREADY_CLAIMED";
+  const claimed = option?.deniedReason === "BIRTHDAY_GIFT_ALREADY_CLAIMED";
   const notEnough = option?.deniedReason === "INSUFFICIENT_POINTS";
   const unavailableCopy = claimed
-    ? "今年的免费巴斯克已经留过了，预约记录还在这里。"
+    ? "今年的生日礼已经选过了，预约记录还在这里。"
     : notEnough
       ? `这次还差 ${Math.max(0, 450 - (view.member.pointBalance ?? 0))} 积分，攒够后再回来。`
       : "这份生日礼现在还不能预约。";
@@ -1773,7 +1786,7 @@ function DeliveryIntroScreen({
             <p className={styles.body}>
               {deliveryMode === "cake" ? (
                 <>
-                  定制蛋糕要<em>提前 5 天</em>备料。先告诉我们取货时间和口味，生日当天的贺卡会另外送到。
+                  定制蛋糕要<em>提前 3 天</em>备料。先告诉我们取货时间和口味，生日当天的贺卡会另外送到。
                 </>
               ) : (
                 <>
@@ -1783,7 +1796,7 @@ function DeliveryIntroScreen({
             </p>
             {giftType === "points_450" && (
               <p className={styles.hintline}>
-                到店取货时在 POS 扣 450 积分；系统暂不设年度次数限制。
+                预约确认时在线扣 450 积分；每年与免费巴斯克二选一。
               </p>
             )}
             <button className={styles.btn} type="button" onClick={onContinue}>

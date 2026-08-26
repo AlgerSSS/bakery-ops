@@ -20,6 +20,8 @@
     "verify:r6-pos-range": "node scripts/verify-r6-pos-range.js",
     "verify:r6-pos-history": "node scripts/verify-r6-pos-history.js",
     "level-catalog:configure": "node scripts/configure-level-catalog.mjs",
+    "level-catalog-v2:configure": "node scripts/configure-level-catalog-v2.mjs",
+    "level-entitlements:sync": "node scripts/sync-level-entitlements.mjs",
     "level-program:configure": "node scripts/configure-level-program.mjs",
     "loyalty:preview": "node scripts/preview-loyalty-levels.mjs",
     "loyalty:reconcile": "node scripts/preview-loyalty-levels.mjs",

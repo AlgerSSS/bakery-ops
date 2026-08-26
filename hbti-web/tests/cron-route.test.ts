@@ -8,6 +8,7 @@ const routeMocks = vi.hoisted(() => ({
   createResApiClientFromEnv: vi.fn(),
   readHbtiServerConfig: vi.fn(),
   reconcilePendingCompletions: vi.fn(),
+  processPendingRewardGrants: vi.fn(),
   resolveEnabledCouponTemplateByName: vi.fn(),
 }));
 
@@ -17,6 +18,10 @@ vi.mock("@/lib/alert", () => ({
 
 vi.mock("@/lib/completion/reconcile-pending", () => ({
   reconcilePendingCompletions: routeMocks.reconcilePendingCompletions,
+}));
+
+vi.mock("@/lib/rewards/grant-worker", () => ({
+  processPendingRewardGrants: routeMocks.processPendingRewardGrants,
 }));
 
 vi.mock("@/lib/store/pg-completion-store", () => ({
@@ -57,6 +62,14 @@ describe("cron reconciliation route", () => {
     routeMocks.createResApiClientFromEnv.mockReset();
     routeMocks.readHbtiServerConfig.mockReset();
     routeMocks.reconcilePendingCompletions.mockReset();
+    routeMocks.processPendingRewardGrants.mockReset();
+    routeMocks.processPendingRewardGrants.mockResolvedValue({
+      claimed: 0,
+      issued: 0,
+      failed: 0,
+      ambiguous: 0,
+      staleQuarantined: 0,
+    });
     routeMocks.resolveEnabledCouponTemplateByName.mockReset();
 
     routeMocks.readHbtiServerConfig.mockReturnValue({
@@ -86,6 +99,9 @@ describe("cron reconciliation route", () => {
       processing: 0,
       review: 0,
       errors: 0,
+      rewardGrants: {
+        claimed: 0, issued: 0, failed: 0, ambiguous: 0, staleQuarantined: 0,
+      },
     });
 
     const response = await GET(request());
@@ -98,6 +114,9 @@ describe("cron reconciliation route", () => {
       processing: 0,
       review: 0,
       errors: 0,
+      rewardGrants: {
+        claimed: 0, issued: 0, failed: 0, ambiguous: 0, staleQuarantined: 0,
+      },
       purged: 0,
       purgeOk: true,
       alerts: { claimed: 0, sent: 0 },
@@ -163,6 +182,9 @@ describe("cron reconciliation route", () => {
       processing: 0,
       review: 0,
       errors: 0,
+      rewardGrants: {
+        claimed: 0, issued: 0, failed: 0, ambiguous: 0, staleQuarantined: 0,
+      },
       purged: 0,
       purgeOk: false,
       alerts: { claimed: 0, sent: 0 },
@@ -183,6 +205,9 @@ describe("cron reconciliation route", () => {
       processing: 1,
       review: 0,
       errors: 1,
+      rewardGrants: {
+        claimed: 0, issued: 0, failed: 0, ambiguous: 0, staleQuarantined: 0,
+      },
     });
 
     const response = await GET(request());
@@ -195,6 +220,9 @@ describe("cron reconciliation route", () => {
       processing: 1,
       review: 0,
       errors: 1,
+      rewardGrants: {
+        claimed: 0, issued: 0, failed: 0, ambiguous: 0, staleQuarantined: 0,
+      },
       purged: 0,
       purgeOk: true,
       alerts: { claimed: 0, sent: 0 },

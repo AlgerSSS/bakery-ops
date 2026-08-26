@@ -65,7 +65,7 @@ async function mockBirthdayNetwork(page: Page) {
   });
 }
 
-test("T-5 entry opens only the custom-cake reservation envelope", async ({
+test("T-3 entry opens only the custom-cake reservation envelope", async ({
   page,
 }) => {
   await mockBirthdayNetwork(page);
@@ -74,7 +74,7 @@ test("T-5 entry opens only the custom-cake reservation envelope", async ({
   await expect(
     page.getByRole("heading", { name: "生日蛋糕，先替你留档期。" }),
   ).toBeVisible();
-  await expect(page.getByText("提前 5 天")).toBeVisible();
+  await expect(page.getByText("提前 3 天")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "打开你的生日信" }),
   ).toHaveCount(0);

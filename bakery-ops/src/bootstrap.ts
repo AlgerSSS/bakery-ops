@@ -18,7 +18,6 @@ import { checkAndNotify } from "./modules/domain/recruitment/notifications/notif
 import { checkDataFreshness } from "./modules/domain/notifications/freshness-check";
 import { runMorningBrief } from "./modules/domain/notifications/morning-brief.service";
 import { runProductionPlanPush } from "./modules/domain/notifications/production-plan-push.service";
-import { runRestockAdvicePush } from "./modules/domain/notifications/restock-advice-push.service";
 import { runTrialDigest } from "./modules/domain/recruitment/digest/trial-digest.service";
 import { runInterviewDigest } from "./modules/domain/recruitment/digest/interview-digest.service";
 import { drainOutboundQueue } from "./modules/channel/whatsapp/outbound.worker";
@@ -178,9 +177,10 @@ async function runBootstrap() {
   //     注释曾写「显式设 true 后恢复」，但块里没有任何注册代码，设了也不会恢复 —— 已删除，
   //     避免下一个人以为翻个开关就能把功能打开。要恢复得先把服务实现写回来。
 
-  // 15a. 每日 14:30 加减货建议：据今日到 14:20 实际销量(res_api intraday 14:20 拉)判加/减，
-  //      Lark 订阅制('restock_advice')，测试期只发 owner。数据不全时引擎自带护栏返回空。
-  if (onCore) cron.schedule("30 14 * * *", wrapCron("restock_advice", runRestockAdvicePush), TZ);
+  // 15a. 每日 14:30 加减货建议推送已停用（2026-09-04，应用户要求）：只摘掉 cron 注册，
+  //      实现保留在 restock-advice-push.service.ts / restock-advice.ts。要恢复就把下面这行加回来：
+  //      if (onCore) cron.schedule("30 14 * * *", wrapCron("restock_advice", runRestockAdvicePush), TZ);
+  //      并恢复顶部对 runRestockAdvicePush 的 import。
 
   // ── whatsapp 角色的定时任务（招聘/候选人；跑有 WA 客户端的一侧）──
   // 8. 每 15 分钟检查招聘通知（JobStreet，默认关闭；候选人走 WhatsApp）

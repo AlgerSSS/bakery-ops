@@ -1,10 +1,6 @@
-# RES_VULCAN_TOKEN 轮换 + 保温(服务器本地时区 UTC+8)。
-#
-# 轮换:每 6 小时换新,保留作异常失效时的兜底。15:00 排在
-# intraday-refresh(14:20) 之后;21:00 距 daily-refresh(23:00) 有 2 小时。
-0 3,9,15,21 * * * /opt/hotcrush/hbti-token/run.sh
-#
+# RES_VULCAN_TOKEN 保温(服务器本地时区 UTC+8)。
+# 轮换不再定时空跑；keepalive 连续两次确认 res=fail 后会触发一次 run.sh。
 # 保温:2026-08-02 交叉对照实测 RES 会话空闲 2~4 小时后 401;
 # 每 30 分钟调用一次 production health,让同一令牌保持活跃。
-# 用 7/37 分而非整点,避免和轮换同时打 production。
+# 用 7/37 分避开其他整点任务。
 7,37 * * * * /opt/hotcrush/hbti-token/keepalive.sh

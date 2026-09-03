@@ -273,13 +273,13 @@ def test_lark_sync_service_uses_only_encrypted_machine_credentials() -> None:
     assert "ProtectSystem=strict" in unit
 
 
-def test_lark_sync_timer_is_persistent_and_runs_every_six_hours() -> None:
-    # 原本是每小时。每轮都要遍历整个空间目录树才能发现改动，这部分开销与
-    # 频率成正比，而知识库不是实时数据——2026-08 租户飞书月度配额被打满，
-    # 这个任务是最大消耗方。
+def test_lark_sync_timer_is_persistent_and_runs_daily() -> None:
+    # 每轮都要遍历整个空间目录树才能发现改动，这部分开销与频率成正比。
+    # 知识库不是实时数据，日更加人工即时触发足够。
     timer = LARK_TIMER.read_text(encoding="utf-8")
 
-    assert "OnUnitActiveSec=6h" in timer
+    assert "OnCalendar=*-*-* 04:15:00" in timer
+    assert "OnUnitActiveSec=" not in timer
     assert "RandomizedDelaySec=2min" in timer
     assert "Persistent=true" in timer
     assert "Unit=hotcrush-lark-wiki-sync.service" in timer

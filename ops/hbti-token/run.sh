@@ -5,7 +5,8 @@
 # 2026-08-02 两轮实验证实它空闲 2~4 小时后会 401,持续使用则至少 8 小时有效。
 # 失效后顾客仍能登录答题(H5 走每请求现取的访客令牌),但**发券会失败**,
 # /api/health 也会因券模板只读探测 401 而 503。keepalive.sh 每 30 分钟保温;
-# 本轮换保留作令牌异常失效时的兜底。根治仍是向 RES 申请受限服务凭证。
+# 本轮换只在 keepalive 连续确认 RES 探测失败后触发，不再按时钟空跑。
+# 根治仍是向 RES 申请受限服务凭证。
 #
 # 锁的实际作用范围(别高估它):
 #   /var/lock/hotcrush-bo-session.lock 防本任务自重入。脚本只短暂读取 storageState，
@@ -21,12 +22,13 @@ ROOT="/opt/hotcrush/hbti-token"
 LOG_DIR="$ROOT/logs"
 LOG="$LOG_DIR/rotate-$(date '+%Y-%m').log"
 LOCK="/var/lock/hotcrush-bo-session.lock"
+FAILURE_SENTINEL="$LOG_DIR/ROTATION_LAST_BAD"
 
 mkdir -p "$LOG_DIR"
 
 main() {
   # 未配置 ≠ 坏了。VERCEL_TOKEN 是可选项(轮换是兜底,日常保活靠 keepalive.sh)，
-  # 没填就干净地跳过，不要每 6 小时推一条「轮换失败」——那种噪音只会把人训练成忽略告警。
+  # 没填就干净地跳过，不要周期性推送「轮换失败」——那种噪音只会把人训练成忽略告警。
   # 只取这一个键，不 source 整个 .env。
   if [ -z "${VERCEL_TOKEN:-}" ] && [ -f "$ROOT/.env" ]; then
     _vt=$(grep -E '^VERCEL_TOKEN=' "$ROOT/.env" | tail -1 | cut -d= -f2- | tr -d '"')
@@ -72,12 +74,15 @@ main() {
 # logs/LAST_FAILURE 哨兵文件,不会有人被主动通知 —— 想要通知就往 .env 填一个
 # webhook 地址(已实测:填了就会 POST)。ALERT_WEBHOOK 只从环境/.env 读,不写死 URL。
 if [ "$CODE" != "0" ] && [ "$CODE" != "75" ] && [ "$CODE" != "78" ]; then
+  FIRST_FAILURE=0
+  [ ! -f "$FAILURE_SENTINEL" ] && FIRST_FAILURE=1
+  echo "$(date '+%F %T') FAILED code=$CODE log=$LOG" > "$FAILURE_SENTINEL"
   echo "$(date '+%F %T') FAILED code=$CODE log=$LOG" > "$LOG_DIR/LAST_FAILURE"
   # 只取这一个键,不 source 整个 .env(避免把 Vercel 令牌灌进 shell 环境)。
   if [ -z "${ALERT_WEBHOOK:-}" ] && [ -f "$ROOT/.env" ]; then
     ALERT_WEBHOOK=$(grep -E '^ALERT_WEBHOOK=' "$ROOT/.env" | tail -1 | cut -d= -f2- | tr -d '"')
   fi
-  if [ -n "${ALERT_WEBHOOK:-}" ]; then
+  if [ "$FIRST_FAILURE" = "1" ] && [ "${SUPPRESS_ALERT:-0}" != "1" ] && [ -n "${ALERT_WEBHOOK:-}" ]; then
     # 飞书/Lark 群机器人不吃 {"text":…}:形状不对照样 200,错误号只在包体里。
     # ${CODE} 必须带花括号:紧跟中文逗号时,UTF-8 locale 下 bash 会把逗号的首字节
     # 吃进变量名,配上 set -u 就是在告警这一步直接崩掉。
@@ -112,7 +117,7 @@ if [ "$CODE" != "0" ] && [ "$CODE" != "75" ] && [ "$CODE" != "78" ]; then
     fi
   fi
 elif [ "$CODE" = "0" ]; then
-  rm -f "$LOG_DIR/LAST_FAILURE"
+  rm -f "$LOG_DIR/LAST_FAILURE" "$FAILURE_SENTINEL"
 fi
 # 注意 75 既不建哨兵也不删:一次跳过无害,但不该掩盖上一次真实失败。
 

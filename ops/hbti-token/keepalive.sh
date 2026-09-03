@@ -32,7 +32,8 @@
 # 注:诊断期间**不能**这么做 —— 保温会让令牌永不过期,把要观测的故障
 # 一起按住(观察者效应)。现在结论已经拿到,保温才从干扰变成修复。
 #
-# 轮换(0 3,9,15,21)保留作兜底:万一令牌因别的原因作废,还有它换新。
+# 轮换不再按固定时间执行。只有连续两次 health 明确返回 res=fail 时才触发一次；
+# 同一次故障期间不重复轮换，避免无效请求和重复告警。
 set -o pipefail
 set -u
 
@@ -40,6 +41,43 @@ URL="https://hbti-test.hotcrush.net/api/health"
 LOG_DIR="/opt/hotcrush/hbti-token/logs"
 LOG="$LOG_DIR/keepalive-$(date '+%Y-%m').log"
 mkdir -p "$LOG_DIR"
+
+send_alert() {
+  local text="$1"
+  local webhook="${ALERT_WEBHOOK:-}"
+  local payload raw http receipt failed
+
+  if [ -z "$webhook" ] && [ -f "/opt/hotcrush/hbti-token/.env" ]; then
+    webhook=$(grep -E '^ALERT_WEBHOOK=' "/opt/hotcrush/hbti-token/.env" |
+      tail -1 | cut -d= -f2- | tr -d '"')
+  fi
+  [ -n "$webhook" ] || return 0
+
+  case "$webhook" in
+    */open-apis/bot/v2/hook/*)
+      payload="{\"msg_type\":\"text\",\"content\":{\"text\":\"$text\"}}" ;;
+    *)
+      payload="{\"text\":\"$text\"}" ;;
+  esac
+
+  raw=$(curl -s -m 10 -X POST -H 'Content-Type: application/json' \
+    -d "$payload" -w '\n%{http_code}' "$webhook" 2>/dev/null || true)
+  http=${raw##*$'\n'}
+  receipt=$(printf '%s' "${raw%$'\n'*}" | tr -d ' \n')
+  failed=""
+  case "$http" in
+    2??) ;;
+    *) failed="http=${http:-ERR}" ;;
+  esac
+  case "$webhook" in
+    */open-apis/bot/v2/hook/*)
+      case "$receipt" in
+        *'"code":0'*) ;;
+        *) failed="${failed:+$failed }lark_code" ;;
+      esac ;;
+  esac
+  [ -z "$failed" ]
+}
 
 # 一次 curl 同时取响应体与状态码 —— 分两次请求会让「503 的响应体」和
 # 「200 的状态码」凑到同一行,记录本身就说不清了。
@@ -53,6 +91,9 @@ printf '%s HTTP %s %s\n' "$(date -u '+%FT%TZ')" "${code:-ERR}" "${body:-<empty>}
 # 与 run.sh 一样留下哨兵并走可选 webhook。只在首次失败时通知,避免每 30 分钟刷屏;
 # 恢复 200 后清哨兵,下一次故障才能再次通知。
 SENTINEL="$LOG_DIR/KEEPALIVE_LAST_BAD"
+RES_FAILURE_COUNT_FILE="$LOG_DIR/KEEPALIVE_RES_FAILURE_COUNT"
+ROTATION_TRIGGERED_FILE="$LOG_DIR/KEEPALIVE_ROTATION_TRIGGERED"
+ROTATION_FAILURE_SENTINEL="$LOG_DIR/ROTATION_LAST_BAD"
 if [ "${code:-}" != "200" ]; then
   first_failure=0
   [ ! -f "$SENTINEL" ] && first_failure=1
@@ -60,44 +101,48 @@ if [ "${code:-}" != "200" ]; then
     > "$SENTINEL"
 
   if [ "$first_failure" = "1" ]; then
-    # 只取这一个键,不 source 整个 .env(避免把 Vercel 令牌灌进 shell 环境)。
-    if [ -z "${ALERT_WEBHOOK:-}" ] && [ -f "/opt/hotcrush/hbti-token/.env" ]; then
-      ALERT_WEBHOOK=$(grep -E '^ALERT_WEBHOOK=' "/opt/hotcrush/hbti-token/.env" |
-        tail -1 | cut -d= -f2- | tr -d '"')
-    fi
-    if [ -n "${ALERT_WEBHOOK:-}" ]; then
-      # 飞书/Lark 群机器人不吃 {"text":…}:形状不对照样 200,错误号只在包体里。
-      ALERT_TEXT="[HOT CRUSH] HBTI RES 令牌保温失败 HTTP ${code:-ERR}，日志 $LOG"
-      case "$ALERT_WEBHOOK" in
-        */open-apis/bot/v2/hook/*)
-          ALERT_BODY="{\"msg_type\":\"text\",\"content\":{\"text\":\"$ALERT_TEXT\"}}" ;;
-        *)
-          ALERT_BODY="{\"text\":\"$ALERT_TEXT\"}" ;;
-      esac
-      # 判「送到了」要两条都过:HTTP 2xx(任何目的地,含告警中转的 502),
-      # 以及 Lark 的包体 code:0(它用 200 + 非零 code 表示拒收)。
-      ALERT_RAW=$(curl -s -m 10 -X POST -H 'Content-Type: application/json' \
-        -d "$ALERT_BODY" -w '\n%{http_code}' "$ALERT_WEBHOOK" 2>/dev/null || true)
-      ALERT_HTTP=${ALERT_RAW##*$'\n'}
-      ALERT_RECEIPT=$(printf '%s' "${ALERT_RAW%$'\n'*}" | tr -d ' \n')
-      ALERT_FAILED=""
-      case "$ALERT_HTTP" in
-        2??) ;;
-        *) ALERT_FAILED="http=${ALERT_HTTP:-ERR}" ;;
-      esac
-      case "$ALERT_WEBHOOK" in
-        */open-apis/bot/v2/hook/*)
-          case "$ALERT_RECEIPT" in
-            *'"code":0'*) ;;
-            *) ALERT_FAILED="${ALERT_FAILED:+$ALERT_FAILED }lark_code" ;;
-          esac ;;
-      esac
-      if [ -n "$ALERT_FAILED" ]; then
-        printf '%s 告警未送达 %s receipt=%s\n' "$(date -u '+%FT%TZ')" "$ALERT_FAILED" \
-          "${ALERT_RECEIPT:-<empty>}" >> "$SENTINEL"
-      fi
-    fi
+    send_alert "[HOT CRUSH] HBTI 健康检查失败 HTTP ${code:-ERR}，日志 $LOG" ||
+      printf '%s 首次故障告警未送达\n' "$(date -u '+%FT%TZ')" >> "$SENTINEL"
   fi
+
+  case "$body" in
+    *'"res":"fail"'*)
+      failures=0
+      if [ -r "$RES_FAILURE_COUNT_FILE" ]; then
+        read -r failures < "$RES_FAILURE_COUNT_FILE" || failures=0
+      fi
+      case "$failures" in
+        ''|*[!0-9]*) failures=0 ;;
+      esac
+      failures=$((failures + 1))
+      printf '%s\n' "$failures" > "$RES_FAILURE_COUNT_FILE"
+
+      if [ "$failures" -ge 2 ] && [ ! -f "$ROTATION_TRIGGERED_FILE" ]; then
+        printf '%s health 连续 %s 次返回 res=fail，触发一次令牌轮换\n' \
+          "$(date -u '+%FT%TZ')" "$failures" >> "$SENTINEL"
+        SUPPRESS_ALERT=1 /opt/hotcrush/hbti-token/run.sh
+        rotation_code=$?
+        # 75 表示暂时拿不到会话锁，不算已经尝试；下一轮 keepalive 应继续重试。
+        if [ "$rotation_code" != "75" ]; then
+          printf '%s\n' "$rotation_code" > "$ROTATION_TRIGGERED_FILE"
+        fi
+        printf '%s 令牌轮换结束 exit=%s\n' "$(date -u '+%FT%TZ')" "$rotation_code" >> "$SENTINEL"
+      fi ;;
+    *)
+      rm -f "$RES_FAILURE_COUNT_FILE" "$ROTATION_TRIGGERED_FILE" ;;
+  esac
   exit 1
 fi
-rm -f "$SENTINEL"
+
+was_bad=0
+[ -f "$SENTINEL" ] && was_bad=1
+rm -f \
+  "$SENTINEL" \
+  "$RES_FAILURE_COUNT_FILE" \
+  "$ROTATION_TRIGGERED_FILE" \
+  "$ROTATION_FAILURE_SENTINEL" \
+  "$LOG_DIR/LAST_FAILURE"
+if [ "$was_bad" = "1" ]; then
+  send_alert "[HOT CRUSH] HBTI 健康检查已恢复" ||
+    printf '%s 恢复告警未送达\n' "$(date -u '+%FT%TZ')" >> "$LOG"
+fi

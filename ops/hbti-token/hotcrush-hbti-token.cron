@@ -1,0 +1,6 @@
+# HBTI RES token health keepalive. Token rotation is event-driven by keepalive.sh
+# after two consecutive health responses explicitly report checks.res=fail.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+7,37 * * * * root /opt/hotcrush/hbti-token/keepalive.sh >> /opt/hotcrush/hbti-token/logs/cron.log 2>&1

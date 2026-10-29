@@ -6,7 +6,7 @@
 
 ---
 
-## HBTI 场景题自动推荐（2026-10-29，Codex，验证完成待发布）
+## HBTI 场景题自动推荐（2026-10-29，Codex，已提交并部署）
 
 活跃分支：`codex/hbti-curated-products`；隔离工作树：`/Users/weiliangshao/.codex/projects/hbti-curated-products`。
 以包含已上线 HBTI 邮箱收集的本地 `33f100a` 为基线；已 fetch 并确认最新 `origin/main` 是祖先。
@@ -29,10 +29,19 @@
 中途 Next dev 的 E2E 缓存出现空/损坏 manifest，最终使用 `next build` + `next start` 跑上述 12 项，全部通过。
 不要拿旧的 `hbti-curated-products-20261029` 截图作验收，那里是已被用户否决、未部署的商品选择器。
 
-发布目标为原 Vercel `hotcrush-hbti` / `hbti-test.hotcrush.net`，不用根目录东京部署脚本。
-发布前基线 `dpl_3GaKX4FnMqVQNsXDtbcFKV2Rrhak` READY；health 既有 `res=fail`、db/alert/signIn=ok。
-下一步：提交本分支、Vercel skip-domain 构建验证、promote，再回读域名、公开 bundle 和健康基线并更新本节。
-主工作树 `/Users/weiliangshao/hot/HANDOFF.md` 已有其他任务未提交内容，保留，不代提交。
+代码提交 `e715a987ded812c25ec8c9b00002b0ba6105e037` 已推送；使用原 Vercel `hotcrush-hbti`，未运行东京部署脚本。
+最终部署 `dpl_3AQRXZ3ek9kxeSZypbEpXaTfwV3o`（`hotcrush-hbti-hcz8m72bj-algersss-projects.vercel.app`）READY，
+已 promote；域名 alias API 独立确认 `hbti-test.hotcrush.net` 指向该部署。正式入口 `/`，免登录体验 `/demo`。
+线上 `/demo` 已实际走完 15 题：果香 + 柔软得到蓝莓泡芙，无选择器、无价格、无横向溢出、无页面错误，
+API 请求数为 0（没有真实 OTP、发券或会员写入）。公开脚本的新题、六款名称、v3 草稿存在，旧搭配/选择器/SGD 不存在。
+
+发布时修复一项实际配置漂移：Vercel production DATABASE_URL 在旧生产发布后被更新，当前值不符合代码要求的
+Supabase pooler host，首个新部署 `dpl_k2Xd4itEz2BdFgD7zJ6BF5XazpKB` 因 db=fail 未推广到正式域名。
+使用现有 `res_api` 所连共享 Supabase 的 transaction pooler 6543，只读验证 `pos_member` 与 `fact_hbti_response` 后，
+以 sensitive 方式更新本项目 production DATABASE_URL，再重新部署。连接值未写入源码、日志或本文；未执行 DDL/DML。
+最终健康与原生产基线一致：db/alert/signIn=ok，既有 RES 后台券模板检查仍 res=fail；本次不宣称真实发券链路正常。
+回退保留旧生产部署 `dpl_3GaKX4FnMqVQNsXDtbcFKV2Rrhak`。后续待确认蛋糕实际口味，再加入匹配规则。
+主工作树 `/Users/weiliangshao/hot/HANDOFF.md` 已有其他任务未提交内容；只追加本次交接，保留原文且不代其他任务提交。
 
 ## RES 官方 H5 整个开篇广告下线（2026-08-29，Codex，已正式发布）
 

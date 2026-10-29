@@ -180,10 +180,10 @@ async function assertNoHorizontalOverflow(page: Page) {
   expect(overflow.body).toBeLessThanOrEqual(0);
 }
 
-const TOTAL_QUESTIONS = 13;
-// 展示顺序 q1,q2,q3,q4,q7,q9,q10,q13,q8,q11,q12,q5,q6
+const TOTAL_QUESTIONS = 15;
+// 展示顺序 q1,q2,q14,q3,q4,q7,q9,q10,q13,q8,q15,q11,q12,q5,q6
 // 同轴三票一致 → 结果稳定为 ILBA，与改版前该用例的落点相同。
-const DEFAULT_ANSWER_PATH = [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0] as const;
+const DEFAULT_ANSWER_PATH = [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0] as const;
 
 async function startQuiz(page: Page) {
   await page.getByRole("button", { name: /Claim my bread/ }).click();
@@ -211,9 +211,33 @@ async function answerAllQuestions(
     );
     await assertNoHorizontalOverflow(page);
 
-    // 打包题（最后一题）三个选项，其余两个。
+    // 香气场景四个选项，最后的打包题三个，其余两个。
     const answers = page.locator("fieldset").getByRole("button");
-    await expect(answers).toHaveCount(index === TOTAL_QUESTIONS - 1 ? 3 : 2);
+    await expect(answers).toHaveCount(index === 2 ? 4 : index === TOTAL_QUESTIONS - 1 ? 3 : 2);
+    if (index === 2 || index === 10) {
+      const lastOption = await answers.last().boundingBox();
+      expect(lastOption).not.toBeNull();
+      expect(lastOption!.y + lastOption!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+      await page.screenshot({
+        path: test.info().outputPath(index === 2 ? "aroma-scene.png" : "texture-scene.png"),
+        fullPage: true,
+        animations: "disabled",
+      });
+      if (index === 2) {
+        for (const [label, language] of [["简体中文", "zh"], ["Bahasa Melayu", "ms"]]) {
+          await page.getByRole("button", { name: new RegExp(label) }).click();
+          await assertNoHorizontalOverflow(page);
+          const localizedLastOption = await answers.last().boundingBox();
+          expect(localizedLastOption!.y + localizedLastOption!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+          await page.screenshot({
+            path: test.info().outputPath(`aroma-scene-${language}.png`),
+            fullPage: true,
+            animations: "disabled",
+          });
+        }
+        await page.getByRole("button", { name: /English/ }).click();
+      }
+    }
     await answers.nth(optionIndexes[index]).click();
 
     if (index < optionIndexes.length - 1) {
@@ -268,6 +292,34 @@ test("defaults to English and fits every supported mobile width", async ({
   await assertNoHorizontalOverflow(page);
   expect(network.externalRequests).toEqual([]);
   expect(network.completionCalls()).toBe(0);
+});
+
+test("derives a name-only product from food scenes without a product picker", async ({ page }) => {
+  await mockPrivateNetwork(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("hot-crush-hbti-draft-v3:e2e-member-draft-123456", JSON.stringify({
+      version: 3, savedAt: Date.now(), currentQuestion: 14, stage: "result",
+      answers: {
+        q1: "iced", q2: "light", q3: "bitter", q4: "alone", q5: "morning",
+        q6: "drink", q7: "iced", q8: "light", q9: "light", q10: "bitter",
+        q11: "bitter", q12: "alone", q13: "alone", q14: "fruity", q15: "soft",
+      },
+    }));
+  });
+  await page.goto("/");
+  await expect(page.getByText("Blueberry Puff", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Blueberry Puff", exact: true })).toHaveCount(0);
+  await expect(page.locator("details")).toHaveCount(0);
+  await page.getByRole("button", { name: /简体中文/ }).click();
+  await expect(page.getByText("蓝莓泡芙", { exact: true })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("SGD");
+  await expect(page.locator("body")).not.toContainText("换一款");
+  await assertNoHorizontalOverflow(page);
+  await page.screenshot({ path: test.info().outputPath("curated-result-zh.png"), fullPage: true, animations: "disabled" });
+  await page.getByRole("button", { name: "收下这份出炉礼", exact: true }).click();
+  await expect(page.getByTestId("result-colour-preview")).toContainText("蓝莓泡芙");
+  await expect(page.getByTestId("result-colour-preview")).not.toContainText("SGD");
+  await assertNoHorizontalOverflow(page);
 });
 
 test("restores an existing member result before offering the quiz", async ({
@@ -550,7 +602,7 @@ test("restores a local draft and Back returns to the saved answer", async ({
     .poll(() =>
       page.evaluate(() =>
         Object.keys(localStorage).some((key) =>
-          key.startsWith("hot-crush-hbti-draft-v2:"),
+          key.startsWith("hot-crush-hbti-draft-v3:"),
         ),
       ),
     )
@@ -608,7 +660,7 @@ test("recovers when member-account status cannot be checked", async ({
   expect(network.completionCalls()).toBe(0);
 });
 
-test("completes all thirteen questions and safely retries from 500 to issued", async ({
+test("completes all fifteen questions and safely retries from 500 to issued", async ({
   page,
 }) => {
   await installResultCardCapture(page);

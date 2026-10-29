@@ -6,13 +6,17 @@ export type SweetnessAnswer = "bitter" | "dolce";
 export type SocialAnswer = "alone" | "together";
 export type VisitTimeAnswer = "morning" | "night";
 export type CategoryAnswer = "drink" | "dessert" | "bakery";
+export type AromaAnswer = "toasted" | "fruity" | "cocoa" | "savoury";
+export type TextureAnswer = "crisp" | "soft";
 export type HbtiAnswerValue =
   | TemperatureAnswer
   | StrengthAnswer
   | SweetnessAnswer
   | SocialAnswer
   | VisitTimeAnswer
-  | CategoryAnswer;
+  | CategoryAnswer
+  | AromaAnswer
+  | TextureAnswer;
 
 export interface HbtiAnswers {
   q1: TemperatureAnswer;
@@ -31,6 +35,10 @@ export interface HbtiAnswers {
   q11?: SweetnessAnswer;
   q12?: SocialAnswer;
   q13?: SocialAnswer;
+  // Food-scene answers are independent of the four personality axes.
+  // Optional for already-open 13-question clients and historical records.
+  q14?: AromaAnswer;
+  q15?: TextureAnswer;
 }
 
 export type ScorableHbtiAnswers = Omit<HbtiAnswers, "q1"> &

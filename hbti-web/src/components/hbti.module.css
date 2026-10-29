@@ -867,6 +867,22 @@
   gap: 0.65rem;
 }
 
+/* Four short scenes should fit together on a small phone. */
+.questionPanel[data-option-count="4"] .questionTitle {
+  font-size: clamp(1.8rem, 7vw, 3rem);
+  text-wrap: balance;
+}
+
+.answerGrid[data-count="4"] {
+  gap: 0.55rem;
+  margin-top: 1.1rem;
+}
+
+.answerGrid[data-count="4"] .answerCard {
+  min-height: 3.85rem;
+  padding: 0.6rem 0.8rem;
+}
+
 /* 选项卡：默认无边框无阴影,只靠填充与留白成形。
    边框/左红条/对勾一律只在选中时出现 —— 让「有框」本身成为选中的语义,
    而不是所有卡片的默认装饰。同屏 8 个等分量的框正是「乱」的来源。 */

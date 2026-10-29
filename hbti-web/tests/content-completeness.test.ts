@@ -6,12 +6,13 @@ import { hbtiCodes, results } from "@/content/results";
 import { giftTemplateNames, uiCopy } from "@/content/ui";
 
 describe("HBTI localized content", () => {
-  it("provides all thirteen questions in English, Chinese and Malaysia Malay", () => {
+  it("provides all fifteen questions in English, Chinese and Malaysia Malay", () => {
     expect(defaultLocale).toBe("en");
     expect(supportedLocales).toEqual(["en", "zh-CN", "ms-MY"]);
     expect(questions.map((question) => question.id)).toEqual([
       "q1",
       "q2",
+      "q14",
       "q3",
       "q4",
       "q7",
@@ -19,13 +20,14 @@ describe("HBTI localized content", () => {
       "q10",
       "q13",
       "q8",
+      "q15",
       "q11",
       "q12",
       "q5",
       "q6",
     ]);
     expect(questions.map((question) => question.options.length)).toEqual([
-      2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3,
+      2, 2, 4, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3,
     ]);
     // 按 id 取，不按下标——题目顺序是文案方案的一部分，未来还会调，
     // 下标断言会在每次调序时假报警。

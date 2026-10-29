@@ -87,7 +87,7 @@ export interface UiCopy {
   /** 进度的**可见**表述,烘焙口径,aria-hidden。 */
   questionProgressFlavor: (current: number, total: number) => string;
   /** 按题 id 键控而非索引:题目重排不会让提示语错位。
-   *  Record<keyof HbtiAnswers, …> 让 TS 强制 13 条齐全 —— 漏一条编译就不过,
+   *  Record<keyof HbtiAnswers, …> 让 TS 强制所有题目齐全 —— 漏一条编译就不过,
    *  不会出现某个语言某一题渲染成 undefined。 */
   chooseOne: Record<keyof HbtiAnswers, string>;
   resultEyebrow: string;
@@ -298,7 +298,7 @@ export const uiCopy: Localized<UiCopy> = {
     introTitle: "Which bread on our shelf is you?",
     introBody:
       "Sixteen bread personalities, baked fresh every morning. A few small questions to claim the one with your name on it.",
-    introTime: "13 little choices · about 60 seconds",
+    introTime: "15 little choices · take your time",
     introReward: "P.S. There's a little something waiting at the counter once yours is out of the oven.",
     begin: "Claim my bread",
     resume: "The dough's still proofing—continue",
@@ -306,7 +306,7 @@ export const uiCopy: Localized<UiCopy> = {
     next: "Next",
     questionProgress: (current, total) => `Question ${current} of ${total}`,
     questionProgressFlavor: (current, total) => `Batch ${current} of ${total}`,
-    // 13 句烘焙房口吻的作答提示,每题一句。老板点名喜欢第一句那种感觉
+    // 烘焙房口吻的作答提示,每题一句。老板点名喜欢第一句那种感觉
     // (「用烘焙术语讲测验规则」),这里铺满全程,最后一题回扣第一句。
     //
     // 硬约束:每句只能讲「怎么作答」,**不得出现任何映射到计分轴的词** ——
@@ -326,13 +326,15 @@ export const uiCopy: Localized<UiCopy> = {
       q10: "Answer like nobody's watching the counter.",
       q11: "Whichever you'd actually pick on a Tuesday.",
       q12: "Don't let this one sit too long.",
-      q13: "Last one. Same as the first—don't overthink.",
+      q13: "Same as the first—don't overthink.",
+      q14: "Imagine the moment, then follow your instinct.",
+      q15: "The little details count. Go with your first thought.",
     },
     resultEyebrow: "Fresh from the oven · Your HBTI",
     resultTitle: "Fresh out of the oven: you.",
     recipeNoLabel: "Recipe no.",
     traitsLabel: "Ingredients",
-    signatureLabel: "Your table order",
+    signatureLabel: "Your next bite",
     discoverGift: "Collect my fresh-out gift",
     retake: "Bake it again",
     detailsEyebrow: "One last little detail",
@@ -503,7 +505,7 @@ export const uiCopy: Localized<UiCopy> = {
     introEyebrow: "Freshly Crafted Every Day · 每日新鲜制作",
     introTitle: "你是货架上的哪一块？",
     introBody: "16 种面包性格，每天新鲜出炉。几个小问题，认领那块和你同名的。",
-    introTime: "13 个小选择 · 大约 60 秒",
+    introTime: "15 个小选择 · 跟着第一感觉",
     introReward: "顺便说一句：出炉之后，柜台有一份小心意等你。",
     begin: "认领我的面包",
     resume: "面团还醒着，接着来",
@@ -524,13 +526,15 @@ export const uiCopy: Localized<UiCopy> = {
       q10: "当柜台前没人看着你那样答。",
       q11: "挑你平常真的会选的那个。",
       q12: "这题别放太久。",
-      q13: "最后一题。和第一题一样，别多想。",
+      q13: "和第一题一样，别多想。",
+      q14: "先在脑海里停一下，跟着第一感觉走。",
+      q15: "小细节也算数，第一反应就好。",
     },
     resultEyebrow: "刚出炉 · 你的 HBTI",
     resultTitle: "刚出炉的，是你。",
     recipeNoLabel: "配方编号",
     traitsLabel: "配料",
-    signatureLabel: "你的专属搭配",
+    signatureLabel: "此刻的心动之选",
     discoverGift: "收下这份出炉礼",
     retake: "重烤一次",
     detailsEyebrow: "最后一个小问题",
@@ -705,7 +709,7 @@ export const uiCopy: Localized<UiCopy> = {
     introTitle: "Anda roti yang mana di rak kami?",
     introBody:
       "Enam belas personaliti roti, dibakar segar setiap pagi. Beberapa soalan kecil untuk menuntut yang tertulis nama anda.",
-    introTime: "13 pilihan kecil · kira-kira 60 saat",
+    introTime: "15 pilihan kecil · ikut rasa hati",
     introReward: "P.S. Ada sedikit buah tangan menanti di kaunter selepas roti anda keluar ketuhar.",
     begin: "Tuntut roti saya",
     resume: "Doh masih menunggu—sambung",
@@ -727,13 +731,15 @@ export const uiCopy: Localized<UiCopy> = {
       q10: "Jawab seolah tiada sesiapa memerhati di kaunter.",
       q11: "Yang anda betul-betul akan pilih pada hari biasa.",
       q12: "Jangan biarkan yang ini terlalu lama.",
-      q13: "Yang terakhir. Sama seperti yang pertama—jangan fikir lama.",
+      q13: "Seperti yang pertama—jangan fikir lama.",
+      q14: "Bayangkan saat itu, kemudian ikut gerak hati.",
+      q15: "Butiran kecil juga bermakna. Ikut fikiran pertama.",
     },
     resultEyebrow: "Baru keluar ketuhar · HBTI anda",
     resultTitle: "Baru keluar dari ketuhar: anda.",
     recipeNoLabel: "No. resipi",
     traitsLabel: "Bahan",
-    signatureLabel: "Pesanan khas anda",
+    signatureLabel: "Pilihan anda",
     discoverGift: "Terima hadiah keluar ketuhar",
     retake: "Bakar sekali lagi",
     detailsEyebrow: "Satu butiran kecil lagi",

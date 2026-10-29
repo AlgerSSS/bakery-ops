@@ -6,6 +6,34 @@
 
 ---
 
+## HBTI 场景题自动推荐（2026-10-29，Codex，验证完成待发布）
+
+活跃分支：`codex/hbti-curated-products`；隔离工作树：`/Users/weiliangshao/.codex/projects/hbti-curated-products`。
+以包含已上线 HBTI 邮箱收集的本地 `33f100a` 为基线；已 fetch 并确认最新 `origin/main` 是祖先。
+不要用只到 `origin/main` 的旧 HBTI 代码覆盖线上已部署功能。
+
+- 用户指定六款商品、全部 HBTI 使用、名字不带价格，并更正为通过题目自动推荐，不能让顾客挑商品。
+- 保留原 13 题人格计分，穿插 q14 香气场景、q15 口感场景共 15 题。推荐独立于人格、社交和昼夜隐喻。
+- 自动匹配原味蛋挞、草莓挞、蓝莓泡芙、惠灵顿、巧克力薄脆碱水结；蛋糕保留在库，口味确认前不自动匹配。
+- 删除旧 48 条饮品搭配；结果、颜色预览、分享文字及 PNG 用同一个推荐名称，无商品选择器、无价格。
+- 新答案沿既有 answers JSON 提交；新 UI 要求 15 题，API 允许 q14/q15 成对缺失兼容已经打开的旧客户端。
+  草稿升级 v3；未改数据库结构、会员登录、发券或生日权益。答案写入仍沿原有路径，不宣称新增落库可靠性保证。
+- 精确模块位置与规则：`hbti-web/docs/curated-products.md`。
+
+验证：TypeScript、ESLint、Next production build 通过；Vitest 377 通过 / 39 集成测试按原配置跳过。
+生产构建的 Playwright 12/12 通过：320×740、375×812、430×932 的完整 15 题、自动推荐、键盘、分享 PNG；
+香气题三语均无横向溢出且选项完整可见，截图已视觉检查。没有真实 OTP、发券或会员写入。
+证据目录：`/Users/weiliangshao/Documents/Codex/2026-09-29/wo-xi/outputs/hbti-scene-recommendations-20261029`。
+
+本机 Node 26 的 Vitest 需 `NODE_OPTIONS=--no-experimental-webstorage` 避免原生 localStorage 与 jsdom 冲突。
+中途 Next dev 的 E2E 缓存出现空/损坏 manifest，最终使用 `next build` + `next start` 跑上述 12 项，全部通过。
+不要拿旧的 `hbti-curated-products-20261029` 截图作验收，那里是已被用户否决、未部署的商品选择器。
+
+发布目标为原 Vercel `hotcrush-hbti` / `hbti-test.hotcrush.net`，不用根目录东京部署脚本。
+发布前基线 `dpl_3GaKX4FnMqVQNsXDtbcFKV2Rrhak` READY；health 既有 `res=fail`、db/alert/signIn=ok。
+下一步：提交本分支、Vercel skip-domain 构建验证、promote，再回读域名、公开 bundle 和健康基线并更新本节。
+主工作树 `/Users/weiliangshao/hot/HANDOFF.md` 已有其他任务未提交内容，保留，不代提交。
+
 ## RES 官方 H5 整个开篇广告下线（2026-08-29，Codex，已正式发布）
 
 用户先要求删除开篇广告中的指纹，随后明确更正为“整个图都不要”，因此最终没有上传或保留任何

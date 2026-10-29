@@ -8,10 +8,11 @@ const sweetness = z.enum(["bitter", "dolce"]);
 const social = z.enum(["alone", "together"]);
 
 /**
- * 提交端契约：13 题版上线后，完成请求必须带齐 12 道计分题 + 1 道打包题。
+ * 完成请求仍必须带齐原 13 题。新版另有 q14/q15 两道食物场景题，
+ * 两题必须同时提交；同时缺失只兼容升级时仍打开的旧客户端。
  *
- * 这里**不放宽**成可选：放宽等于让过期的前端静默提交 6 题，
- * 拿到一个精度更低的结果却没人发现。缺题一律 400。
+ * 原 13 题不放宽成可选，避免更早的 6 题客户端静默提交不完整画像。
+ * 新版 UI 另行要求 15 题齐全后才能进入结果页。
  *
  * 兼容只留在两处，都不经过本 schema：
  *   · 已存的完成记录里只有算好的 code，没有 answers，回读不受影响；
@@ -32,6 +33,11 @@ export const hbtiAnswersSchema = z.strictObject({
   q11: sweetness,
   q12: social,
   q13: social,
-}) satisfies z.ZodType<HbtiAnswers>;
+  q14: z.enum(["toasted", "fruity", "cocoa", "savoury"]).optional(),
+  q15: z.enum(["crisp", "soft"]).optional(),
+}).refine(
+  (answers) => (answers.q14 === undefined) === (answers.q15 === undefined),
+  { message: "Food-scene answers must be provided together.", path: ["q14"] },
+) satisfies z.ZodType<HbtiAnswers>;
 
 export type HbtiAnswersInput = z.infer<typeof hbtiAnswersSchema>;

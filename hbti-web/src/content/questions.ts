@@ -59,6 +59,48 @@ export const questions = [
     ],
   },
   {
+    id: "q14",
+    prompt: {
+      en: "At the shop door, you pause for—",
+      "zh-CN": "推开店门，什么让你慢了半拍？",
+      "ms-MY": "Di pintu kedai, anda terpikat oleh—",
+    },
+    options: [
+      {
+        value: "toasted", emoji: "🌤️",
+        label: {
+          en: "A familiar bake, warm as the morning",
+          "zh-CN": "熟悉的烘烤香，像刚醒来的早晨",
+          "ms-MY": "Haruman pastri hangat seperti pagi",
+        },
+      },
+      {
+        value: "fruity", emoji: "🌿",
+        label: {
+          en: "A little fruit fragrance, bright as daylight",
+          "zh-CN": "一缕果香，像午后透进来的光",
+          "ms-MY": "Haruman buah, cerah seperti siang",
+        },
+      },
+      {
+        value: "cocoa", emoji: "🌒",
+        label: {
+          en: "Deep cocoa that lingers a little longer",
+          "zh-CN": "一点可可深香，让人多停一会",
+          "ms-MY": "Haruman koko yang kekal seketika",
+        },
+      },
+      {
+        value: "savoury", emoji: "🧺",
+        label: {
+          en: "Something warm and savoury. Time to sit down.",
+          "zh-CN": "咸香热乎的烟火气，肚子先回应了",
+          "ms-MY": "Haruman savuri hangat. Masa untuk duduk.",
+        },
+      },
+    ],
+  },
+  {
     id: "q3",
     // 甜度轴。原题「关于甜,你的立场」把测量维度直接摆上台面 —— 是问卷不是体验,
     // 老板评价「太直接」。改成试吃新配方给反馈:场景在烘焙房,但选的是**怎么开口**
@@ -258,6 +300,32 @@ export const questions = [
           en: "Break it into steps, work alongside",
           "zh-CN": "拆成几步，陪着他一段一段来",
           "ms-MY": "Pecahkan ikut langkah, temani dia",
+        },
+      },
+    ],
+  },
+  {
+    id: "q15",
+    prompt: {
+      en: "What makes you reach for one more bite?",
+      "zh-CN": "第一口之后，哪个小细节会让你偷偷再拿一块？",
+      "ms-MY": "Apa buat anda mahu satu gigitan lagi?",
+    },
+    options: [
+      {
+        value: "crisp", emoji: "✨",
+        label: {
+          en: "That little crunch, with another layer in every bite",
+          "zh-CN": "轻轻一咬就咔嚓，越嚼越有层次",
+          "ms-MY": "Bunyi rangup kecil, dengan lapisan baharu pada setiap gigitan",
+        },
+      },
+      {
+        value: "soft", emoji: "☁️",
+        label: {
+          en: "Sinking softly into a centre that slowly melts away",
+          "zh-CN": "软软地陷进去，绵密的内心慢慢化开",
+          "ms-MY": "Gigitan lembut dengan isi yang perlahan-lahan cair di mulut",
         },
       },
     ],

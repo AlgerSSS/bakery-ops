@@ -10,6 +10,8 @@ import {
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { MemberSignIn } from "@/components/MemberSignIn";
+import { hbtiProductName } from "@/content/products";
+import { recommendHbtiProduct } from "@/lib/hbti/recommendation";
 import { questions } from "@/content/questions";
 import { results } from "@/content/results";
 import type {
@@ -42,12 +44,9 @@ import {
 import styles from "./hbti.module.css";
 import { useLocale } from "./useLocale";
 
-// v2：题目从 6 题扩到 13 题（每轴三票多数决）。v1 草稿只有 q1–q6，
-// 恢复后 hasCompleteAnswers 必然为 false，若它停在 result/details 阶段
-// 就会还原到一个算不出分数的页面。直接换键让旧草稿失效、从头答，
-// 比带着半份答案走进坏分支干净。
-const DRAFT_KEY_PREFIX = "hot-crush-hbti-draft-v2";
-const DRAFT_VERSION = 2;
+// v3 adds two food-scene questions. Earlier drafts must not skip them.
+const DRAFT_KEY_PREFIX = "hot-crush-hbti-draft-v3";
+const DRAFT_VERSION = 3;
 const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1_000;
 const REQUEST_TIMEOUT_MS = 15_000;
 const MEMBER_WALLET_URL =
@@ -67,7 +66,7 @@ type SubmissionState =
   | "error";
 
 interface HbtiDraft {
-  version: 2;
+  version: 3;
   savedAt: number;
   answers: Partial<HbtiAnswers>;
   currentQuestion: number;
@@ -352,7 +351,12 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
     () => (hasCompleteAnswers(answers) ? scoreHbti(answers) : null),
     [answers],
   );
-  const result = score ? results[score.code][locale] : null;
+  const result = score
+    ? {
+        ...results[score.code][locale],
+        signatureOrder: hbtiProductName(recommendHbtiProduct(answers), locale),
+      }
+    : null;
 
   function chooseAnswer(
     question: HbtiQuestion,
@@ -928,7 +932,7 @@ function QuestionStep({
   locale: keyof typeof uiCopy;
 }) {
   return (
-    <section className={styles.questionPanel}>
+    <section className={styles.questionPanel} data-option-count={question.options.length}>
       <Progress
         current={index + 1}
         total={questions.length}
@@ -1098,7 +1102,7 @@ function ResultStep({
         <p className={styles.resultDescription}>{result.description}</p>
         <div className={styles.signatureOrder}>
           <span>{copy.signatureLabel}</span>
-          <strong>{result.signatureOrder}</strong>
+          <strong aria-live="polite">{result.signatureOrder}</strong>
         </div>
       </article>
       <button
@@ -1162,7 +1166,7 @@ function DetailsStep({
       throw new Error("Result card is incomplete.");
     }
     const publicUrl = new URL("/", window.location.origin).toString();
-    const key = `${resultCode}:${color}:${locale}:${publicUrl}`;
+    const key = `${resultCode}:${color}:${locale}:${result.signatureOrder}:${publicUrl}`;
     if (preparedCardRef.current?.key === key) {
       return preparedCardRef.current;
     }

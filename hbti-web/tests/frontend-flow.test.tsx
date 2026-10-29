@@ -462,6 +462,7 @@ describe("customer HBTI journey", () => {
     const answerPath = [
       /Something iced: 'Wake up. It's fine now.'/, // q1  iced
       /Ease you into the day/, //                     q2  light
+      /A little fruit fragrance/, // q14 sensory scene
       /Name the first fix while it's still warm/, //  q3  bitter
       /Alone, unhurried, no talking, no sharing/, //  q4  alone
       /Refreshing the longer someone stays/, //       q7  iced
@@ -469,6 +470,7 @@ describe("customer HBTI journey", () => {
       /The honest part: someone has to say it/, //    q10 bitter
       /Don't call me\. I have plans with myself\./, //q13 alone
       /Break it into steps, work alongside/, //q8  light
+      /That little crunch/, // q15 texture scene
       /The over-baked batch/, //                    q11 bitter
       /Alone time\. Crowds drain the battery\./, //   q12 alone
       /Early morning, before the world gets loud/, // q5  morning
@@ -527,6 +529,8 @@ describe("customer HBTI journey", () => {
         q11: "bitter",
         q12: "alone",
         q13: "alone",
+        q14: "fruity",
+        q15: "crisp",
       },
     });
     expect(completionBody).not.toHaveProperty("token");
@@ -581,7 +585,7 @@ describe("周边发完之后", () => {
 
     await walkTheWholeJourney(user);
 
-    // 最要紧的一条：答完 13 题的人必须还能看到自己的面包人格。
+    // 最要紧的一条：答完 15 题的人必须还能看到自己的面包人格。
     expect(
       await screen.findByRole("heading", {
         name: "Your bread type is yours to keep.",
@@ -648,7 +652,7 @@ async function chooseAndContinue(
   await act(async () => {});
 }
 
-/** 答完 13 题并提交，走到结果页。这组答案凑出 ILBA。 */
+/** 答完 15 题并提交，走到结果页。这组答案凑出 ILBA。 */
 async function walkTheWholeJourney(
   user: ReturnType<typeof userEvent.setup>,
 ) {
@@ -661,6 +665,7 @@ async function walkTheWholeJourney(
   for (const option of [
     /Something iced: 'Wake up. It's fine now.'/,
     /Ease you into the day/,
+    /A little fruit fragrance/, // q14 sensory scene
     /Name the first fix while it's still warm/,
     /Alone, unhurried, no talking, no sharing/,
     /Refreshing the longer someone stays/,
@@ -668,6 +673,7 @@ async function walkTheWholeJourney(
     /The honest part: someone has to say it/,
     /Don't call me\. I have plans with myself\./,
     /Break it into steps, work alongside/,
+    /That little crunch/, // q15 texture scene
     /The over-baked batch/,
     /Alone time\. Crowds drain the battery\./,
     /Early morning, before the world gets loud/,

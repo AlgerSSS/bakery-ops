@@ -481,7 +481,7 @@ describe("customer HBTI journey", () => {
     }
 
     expect(
-      await screen.findByRole("heading", { name: "Strawberry Tart · Clear-eyed Observer" }),
+      await screen.findByRole("heading", { name: "Clear-eyed Observer" }),
     ).toBeInTheDocument();
 
     await user.click(

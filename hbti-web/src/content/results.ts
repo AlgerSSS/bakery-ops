@@ -401,7 +401,7 @@ export const results = {
   ),
 } satisfies Record<HbtiCode, Localized<HbtiResultContent>>;
 
-/** Use the matched product in the title. A code alone only identifies a personality. */
+/** Keep the personality title separate from the matched product recommendation. */
 export function getHbtiResult(
   code: HbtiCode,
   locale: Locale,
@@ -412,7 +412,6 @@ export function getHbtiResult(
   const productName = hbtiProductName(productId, locale);
   return {
     ...personality,
-    name: `${productName} · ${personality.name}`,
     signatureOrder: productName,
   };
 }

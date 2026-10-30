@@ -312,7 +312,7 @@ test("derives a name-only product from food scenes without a product picker", as
   await expect(page.locator("details")).toHaveCount(0);
   await page.getByRole("button", { name: /简体中文/ }).click();
   await expect(page.getByText("蓝莓泡芙", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "蓝莓泡芙 · 稳场军师" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "稳场军师" })).toBeVisible();
   await expect(page.locator("body")).not.toContainText("全麦");
   await expect(page.locator("body")).not.toContainText("SGD");
   await expect(page.locator("body")).not.toContainText("换一款");
@@ -324,7 +324,7 @@ test("derives a name-only product from food scenes without a product picker", as
   await assertNoHorizontalOverflow(page);
 });
 
-test("keeps long product personality names inside trilingual share cards", async ({ page }) => {
+test("keeps personality titles separate from products in trilingual share cards", async ({ page }) => {
   await installResultCardCapture(page);
   await mockPrivateNetwork(page);
   await page.addInitScript(() => {
@@ -338,14 +338,14 @@ test("keeps long product personality names inside trilingual share cards", async
     }));
   });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Chocolate Crispy Pretzel · After-hours Confidant" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "After-hours Confidant" })).toBeVisible();
   await page.getByRole("button", { name: /Collect my fresh-out gift/ }).click();
   await page.getByRole("button", { name: "Cherry red", exact: true }).click();
 
   for (const item of [
-    { language: /English/, name: "Chocolate Crispy Pretzel · After-hours Confidant", save: "Save my HBTI card", file: "en" },
-    { language: /简体中文/, name: "巧克力薄脆碱水结 · 慢热知心人", save: "保存我的心动卡", file: "zh" },
-    { language: /Bahasa Melayu/, name: "Pretzel Coklat Rangup · Sahabat Akrab", save: "Simpan kad HBTI saya", file: "ms" },
+    { language: /English/, name: "After-hours Confidant", save: "Save my HBTI card", file: "en" },
+    { language: /简体中文/, name: "慢热知心人", save: "保存我的心动卡", file: "zh" },
+    { language: /Bahasa Melayu/, name: "Sahabat Akrab", save: "Simpan kad HBTI saya", file: "ms" },
   ]) {
     await page.getByRole("button", { name: item.language }).click();
     await expect(page.getByTestId("result-colour-preview")).toContainText(item.name);
@@ -732,7 +732,7 @@ test("completes all fifteen questions and safely retries from 500 to issued", as
   await answerAllQuestions(page);
 
   await expect(
-    page.getByRole("heading", { name: "Strawberry Tart · Clear-eyed Observer" }),
+    page.getByRole("heading", { name: "Clear-eyed Observer" }),
   ).toBeVisible();
   await assertNoHorizontalOverflow(page);
   await page
@@ -804,7 +804,7 @@ test("completes all fifteen questions and safely retries from 500 to issued", as
   ).toHaveText("Your HBTI card is ready to share.");
   const cardCapture = await readResultCardCapture(page);
   expect(cardCapture.share).toMatchObject({
-    title: "HBTI ILBA · Strawberry Tart · Clear-eyed Observer",
+    title: "HBTI ILBA · Clear-eyed Observer",
     url: `${localOrigin}/`,
     files: [
       {
@@ -931,7 +931,7 @@ for (const localizedJourney of [
     languageButton: /简体中文/,
     begin: "找到我的心动",
     firstQuestion: "辛苦一天之后，你更想被怎样安慰？",
-    resultName: "草莓挞 · 清醒观察家",
+    resultName: "清醒观察家",
     lang: "zh-CN",
   },
   {
@@ -940,7 +940,7 @@ for (const localizedJourney of [
     begin: "Cari padanan saya",
     firstQuestion:
       "Selepas hari yang panjang, pujukan mana yang anda mahu?",
-    resultName: "Tat Strawberi · Pemerhati Jernih",
+    resultName: "Pemerhati Jernih",
     lang: "ms-MY",
   },
 ] as const) {

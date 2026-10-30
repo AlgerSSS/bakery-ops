@@ -109,12 +109,12 @@ describe("automatic name-only HBTI result", () => {
     const user = userEvent.setup();
     const view = render(<HbtiExperience />);
     expect(await screen.findByText("Blueberry Puff", { selector: "strong" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Blueberry Puff · Clear-eyed Observer" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Clear-eyed Observer" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Blueberry Puff" })).not.toBeInTheDocument();
     expect(document.querySelector("details")).toBeNull();
     await user.click(screen.getByRole("button", { name: /简体中文/ }));
     expect(screen.getByText("蓝莓泡芙", { selector: "strong" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "蓝莓泡芙 · 清醒观察家" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "清醒观察家" })).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/SGD|\$|\b14\.9\b|换一款|冷萃|马卡龙|拿铁/);
 
     view.unmount();
@@ -133,7 +133,7 @@ describe("automatic name-only HBTI result", () => {
     await user.click(screen.getByRole("button", { name: "Share my match" }));
     await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
     expect(writeText.mock.calls[0][0]).toContain("Your next bite: Blueberry Puff");
-    expect(writeText.mock.calls[0][0]).toContain("Blueberry Puff · Clear-eyed Observer");
+    expect(writeText.mock.calls[0][0]).toContain("Clear-eyed Observer");
     expect(writeText.mock.calls[0][0]).not.toMatch(/SGD|\$|Matcha|Pretzel/);
     expect(vi.mocked(createResultCardPng).mock.calls[0][0].result.signatureOrder).toBe("Blueberry Puff");
   });

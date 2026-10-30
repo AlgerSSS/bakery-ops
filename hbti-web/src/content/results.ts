@@ -1,4 +1,4 @@
-import { defaultHbtiProductId, hbtiProductName } from "@/content/products";
+import { defaultHbtiProductId, hbtiProductName, type HbtiProductId } from "@/content/products";
 import type {
   HbtiAxis,
   HbtiCode,
@@ -114,289 +114,305 @@ export const results = {
   ILBA: localizedResult(
     "ILBA",
     {
-      name: "The Clear-Eyed Bagel",
+      name: "Clear-eyed Observer",
       description:
-        "You're rarely the first to speak, but you see everything. No sugar, no fuss—your calm isn't coldness. It's saving your strength for what actually matters.",
+        "You notice the small things before anyone says a word. You take your time, keep your own rhythm and save your energy for what matters.",
     },
     {
-      name: "清醒贝果",
+      name: "清醒观察家",
       description:
-        "你很少最先开口，但什么都看见了。不加糖、不凑热闹，你的冷静不是冷漠——是把力气留给真正重要的事。",
+        "你很少最先开口，却总能看见细节。不急着跟风，也不忙着表态，你把力气留给真正重要的事。",
     },
     {
-      name: "Bagel Mata Jernih",
+      name: "Pemerhati Jernih",
       description:
-        "Anda jarang bersuara dulu, tapi semuanya anda nampak. Tanpa gula, tanpa gimik—ketenangan anda bukan dingin, cuma menyimpan tenaga untuk perkara yang benar-benar penting.",
+        "Anda nampak butiran kecil sebelum sesiapa bersuara. Anda ikut rentak sendiri dan simpan tenaga untuk perkara yang penting.",
     },
   ),
   ILBT: localizedResult(
     "ILBT",
     {
-      name: "The Wholegrain Strategist",
+      name: "Quiet Strategist",
       description:
-        "When friends clash, everyone looks at you first. You don't play referee—you just lay things out straight. You're the wholegrain of the group: nothing fancy, quietly essential.",
+        "When opinions clash, people look to you. You make the messy bits clear, then quietly help everyone move forward.",
     },
     {
-      name: "全麦军师",
+      name: "稳场军师",
       description:
-        "朋友吵起来，大家先看你。你不劝架，只把事情摊开说清。你是人群里那片全麦：不花哨，但谁都离不开你。",
+        "朋友各执一词时，大家总会先看你。你把事情捋清，再陪着大家往前走，靠谱藏在不声不响的照顾里。",
     },
     {
-      name: "Jurutaktik Mil Penuh",
+      name: "Perancang Tenang",
       description:
-        "Bila kawan bertelagah, semua pandang anda dulu. Anda tak jadi pengadil—anda cuma susun perkara sampai jelas. Andalah roti mil penuh kumpulan itu: tak bergaya, tapi semua perlukan anda.",
+        "Bila pendapat bercanggah, semua memandang anda. Anda jelaskan perkara yang berserabut, kemudian bantu semua bergerak ke depan.",
     },
   ),
   ILDA: localizedResult(
     "ILDA",
     {
-      name: "The Layered Croissant",
+      name: "Gentle Dreamer",
       description:
-        "You need one hour that belongs to no one. Phone face-down, window seat claimed—your softness comes in layers, and the innermost one is yours alone.",
+        "You always leave a little room for daydreams. A window seat and an unhurried hour are enough to make the day feel like yours.",
     },
     {
-      name: "千层牛角",
+      name: "柔软梦想家",
       description:
-        "你需要一小时不属于任何人。手机反扣，窗边坐好——你的温柔分很多层，最里面那一层，只留给自己。",
+        "你总会给自己留一点发呆的空隙。靠窗坐好，慢慢享受，这一小段时间只属于你。",
     },
     {
-      name: "Croissant Berlapis",
+      name: "Pemimpi Lembut",
       description:
-        "Anda perlukan satu jam yang bukan milik sesiapa. Telefon diterbalikkan, tempat tepi tingkap dituntut—kelembutan anda berlapis-lapis, dan lapisan paling dalam itu milik anda sendiri.",
+        "Anda sentiasa beri ruang untuk berangan. Tempat di tepi tingkap dan masa tanpa tergesa-gesa sudah cukup untuk diri sendiri.",
     },
   ),
   ILDT: localizedResult(
     "ILDT",
     {
-      name: "The Picnic Focaccia",
+      name: "Joyful Connector",
       description:
-        "The \"shall we go out?\" text usually comes from you. Good weather, something sweet, everyone present—that's your whole recipe for joy. Tear a piece; there's enough for all.",
+        "You are usually the one who suggests getting together. Good company and a little surprise can turn an ordinary afternoon into a favourite memory.",
     },
     {
-      name: "野餐佛卡夏",
+      name: "快乐召集人",
       description:
-        "群里那句「出来坐坐？」通常是你发的。天气好、东西甜、人到齐，你的快乐就这么简单——撕一块，人人有份。",
+        "群里那句「出来坐坐？」通常是你发的。把喜欢的人聚到一起，再添一点小惊喜，平常的下午也能值得纪念。",
     },
     {
-      name: "Focaccia Piknik",
+      name: "Pencetus Ceria",
       description:
-        "Mesej \"jom keluar?\" selalunya datang daripada anda. Cuaca elok, ada yang manis, semua orang cukup—itulah resipi kebahagiaan anda. Koyak sekeping; semua orang dapat.",
+        "Andalah yang selalu mengajak semua berkumpul. Teman yang baik dan sedikit kejutan boleh menjadikan petang biasa satu kenangan indah.",
     },
   ),
   ISBA: localizedResult(
     "ISBA",
     {
-      name: "The Midnight Rye",
+      name: "Night Navigator",
       description:
-        "You don't need comforting—you need clarity. One iced Americano that asks no questions, one table nobody touches, and you'll win whatever tonight demands.",
+        "You think most clearly when the noise settles. Give yourself a quiet corner and a clear goal, and you will find the next step.",
     },
     {
-      name: "深夜黑麦",
+      name: "深夜领航员",
       description:
-        "你不需要安慰，只需要清醒。一杯不说话的冰美式，一张没人打扰的桌子，你就能把今晚该赢的仗打完。",
+        "周围安静下来，你反而更清醒。给自己一个不被打扰的角落，把目标想明白，接下来就交给行动。",
     },
     {
-      name: "Rai Tengah Malam",
+      name: "Pemandu Malam",
       description:
-        "Anda tak perlukan pujukan—anda perlukan kejernihan. Satu Americano ais yang tak banyak tanya, satu meja tanpa gangguan, dan anda akan menang apa sahaja malam ini.",
+        "Fikiran anda paling jelas apabila suasana tenang. Dengan sudut yang sunyi dan matlamat yang jelas, anda tahu langkah seterusnya.",
     },
   ),
   ISBT: localizedResult(
     "ISBT",
     {
-      name: "The Pretzel Comrade",
+      name: "Steady Finisher",
       description:
-        "Small talk isn't your sport; finishing things is. Like a pretzel—looks twisted, but every knot is tied firm and true. Under pressure, you're the professional.",
+        "You would rather get something done than talk about doing it. When things get busy, you steady the pace and make sure nothing is left unfinished.",
     },
     {
-      name: "碱水战友",
+      name: "靠谱行动派",
       description:
-        "你不擅长寒暄，擅长把事情推完。像碱水结：看着拧，其实每个结都打得又稳又准——扛压这块，你是专业的。",
+        "你不爱空谈，喜欢把事情一件件做好。越是忙乱的时候，越能看见你的稳，答应的事总会放在心上。",
     },
     {
-      name: "Pretzel Seperjuangan",
+      name: "Pelaksana Teguh",
       description:
-        "Berbasa-basi bukan bidang anda; menyiapkan kerja itu baru bidang anda. Macam pretzel—nampak berpintal, tapi setiap simpulannya kemas dan kukuh. Soal tahan tekanan, andalah pakarnya.",
+        "Anda lebih suka bertindak daripada sekadar bercakap. Bila keadaan sibuk, anda tenangkan rentak dan pastikan semuanya selesai.",
     },
   ),
   ISDA: localizedResult(
     "ISDA",
     {
-      name: "The Coffee Bun Paradox",
+      name: "Quiet Romantic",
       description:
-        "Cold brew on the surface, butter at the core. You move sharp and travel light, yet always keep something sweet in your pocket—no explanations. Contrast isn't contradiction; it's the room you save for yourself.",
+        "You look decisive, but keep a soft spot for little surprises. Your practical side and your romantic side get along just fine.",
     },
     {
-      name: "反差咖啡包",
+      name: "反差浪漫派",
       description:
-        "表面冷萃，内心黄油。你外表利落，兜里却总揣着一点甜——不解释。反差不是矛盾，是你留给自己的余地。",
+        "你看起来利落干脆，却总会为小惊喜留个位置。认真做事，也认真喜欢，反差里藏着只有熟人知道的浪漫。",
     },
     {
-      name: "Roti Kopi Manis Rahsia",
+      name: "Romantis Bersahaja",
       description:
-        "Kopi pekat di luaran, mentega di dalaman. Anda nampak tangkas dan kemas, tapi dalam poket sentiasa ada sedikit manis—tanpa penjelasan. Kontras bukan konflik; ia ruang yang anda simpan untuk diri sendiri.",
+        "Anda nampak tegas, tetapi tetap menyukai kejutan kecil. Sisi praktikal dan sisi romantik anda saling melengkapi.",
     },
   ),
   ISDT: localizedResult(
     "ISDT",
     {
-      name: "The Party Donut",
+      name: "Life of the Party",
       description:
-        "Ending early is your one fear. One strong, sweet cup and you're good for two more hours—someone has to be in charge of keeping the night alive, and it's you.",
+        "You bring the extra spark that keeps everyone smiling. Another story, another laugh, and suddenly nobody is in a hurry to leave.",
     },
     {
-      name: "派对甜甜圈",
+      name: "气氛点火者",
       description:
-        "散场太早是你最怕的事。又浓又甜的一杯下去，你还能再撑两小时——热闹这件事，总得有人负责到底。",
+        "有你在，气氛总能再热一点。多讲一个故事，多留一会儿，你喜欢让每个人都尽兴。",
     },
     {
-      name: "Donat Parti",
+      name: "Penyeri Suasana",
       description:
-        "Bersurai awal ialah satu-satunya perkara yang anda takut. Satu minuman pekat dan manis, anda boleh bertahan dua jam lagi—mesti ada orang yang menjaga kemeriahan sampai habis, dan orangnya anda.",
+        "Anda membawa keceriaan yang membuat semua tersenyum. Satu lagi cerita, satu lagi gelak, dan tiada siapa mahu pulang dulu.",
     },
   ),
   HLBA: localizedResult(
     "HLBA",
     {
-      name: "The Sourdough Ritualist",
+      name: "Ritual Keeper",
       description:
-        "Your day begins with a stretch of morning nobody touches. Like sourdough, you rise slowly and refuse to be rushed—you learned long ago that good things take their time.",
+        "Small routines make your day feel right. You like a gentle start, a familiar place and enough time to enjoy the details.",
     },
     {
-      name: "晨间酸种",
+      name: "日常仪式家",
       description:
-        "你的一天从一段没人打扰的清晨开始。像酸种一样慢慢发酵，不赶时间——你早就明白，好东西都需要等。",
+        "你喜欢用熟悉的小习惯，慢慢打开一天。把节奏放稳，把细节照顾好，平凡的日常也能过得很有滋味。",
     },
     {
-      name: "Sourdough Ritual Pagi",
+      name: "Penjaga Rutin",
       description:
-        "Hari anda bermula dengan pagi yang tiada siapa ganggu. Macam sourdough, anda naik perlahan dan enggan diburu—anda dah lama faham, benda yang baik memang ambil masa.",
+        "Rutin kecil membuat hari anda terasa lengkap. Anda suka permulaan yang tenang, tempat yang biasa dan masa untuk menikmati setiap butiran.",
     },
   ),
   HLBT: localizedResult(
     "HLBT",
     {
-      name: "The Long-Talk Scone",
+      name: "Patient Listener",
       description:
-        "You can sit with someone's story for three hours without rushing to fix it. Refill the cup when it cools, pick the thread back up when it drifts—things feel lighter simply because you're there.",
+        "You let people finish their stories without rushing to find an answer. A patient pause and a well-timed question make you easy to talk to.",
     },
     {
-      name: "长谈司康",
+      name: "耐心倾听者",
       description:
-        "你能陪人聊三个小时，不急着给答案。杯凉了续，话散了捡——你在，事情就没那么难。",
+        "别人说话时，你愿意认真听完。一个恰好的停顿、一句接得住的话，就能让身边的人慢慢放松下来。",
     },
     {
-      name: "Skon Teman Bicara",
+      name: "Pendengar Setia",
       description:
-        "Anda boleh menemani cerita seseorang tiga jam tanpa tergesa-gesa membetulkannya. Cawan sejuk, dituang semula; topik hanyut, dikutip kembali—segalanya terasa ringan semata-mata kerana anda ada.",
+        "Anda mendengar hingga selesai tanpa tergesa-gesa memberi jawapan. Kesabaran dan soalan yang tepat membuat orang selesa bercerita.",
     },
   ),
   HLDA: localizedResult(
     "HLDA",
     {
-      name: "The Shokupan Nest",
+      name: "Cozy Homebody",
       description:
-        "You're good at looking after yourself: something hot, something sweet, something soft, in the warmest seat. It's a little house you built for one—not open to visitors.",
+        "You know how to make a small moment comfortable. A favourite seat and some time to yourself can turn an ordinary break into a little retreat.",
     },
     {
-      name: "暖房生吐司",
+      name: "温柔独享家",
       description:
-        "你很会照顾自己：热的、甜的、软的，坐在暖的地方。这是你给自己盖的小房子——不对外开放，谢绝参观。",
+        "你很会给自己安排一点舒服。挑个喜欢的位置，享受一小段独处，把普通的休息过成专属的小假期。",
     },
     {
-      name: "Sarang Roti Susu",
+      name: "Pencinta Nyaman",
       description:
-        "Anda pandai menjaga diri: yang panas, yang manis, yang lembut, di tempat paling hangat. Itu rumah kecil yang anda bina untuk seorang—tidak dibuka untuk pelawat.",
+        "Anda tahu menjadikan saat kecil lebih selesa. Tempat duduk kegemaran dan masa sendiri boleh terasa seperti percutian singkat.",
     },
   ),
   HLDT: localizedResult(
     "HLDT",
     {
-      name: "The Madeleine Host",
+      name: "Thoughtful Host",
       description:
-        "Who skips nuts, who wants less sugar, who only drinks it hot—you remember it all. People keep coming back: half for the pastries, half for you.",
+        "You remember the little things that help others feel welcome. People feel cared for around you, often before they realise why.",
     },
     {
-      name: "下午茶玛德琳",
+      name: "贴心照顾者",
       description:
-        "谁不吃坚果、谁要少糖、谁必须热的——你全记得。大家愿意来，一半为了茶点，一半为了你。",
+        "谁喜欢什么、谁今天有点累，你常常都记得。你的贴心不用大张旗鼓，却总能让人觉得被好好照顾着。",
     },
     {
-      name: "Madeleine Tuan Rumah",
+      name: "Tuan Rumah Prihatin",
       description:
-        "Siapa tak makan kacang, siapa mahu kurang gula, siapa mesti minum panas—semuanya anda ingat. Orang datang lagi dan lagi: separuh kerana kuih, separuh kerana anda.",
+        "Anda ingat perkara kecil yang membuat orang rasa dialu-alukan. Bersama anda, mereka rasa dijaga tanpa perlu meminta.",
     },
   ),
   HSBA: localizedResult(
     "HSBA",
     {
-      name: "The Baguette Purist",
+      name: "Principled Maker",
       description:
-        "Flour, water, salt—three things done right are enough. You hold a standard for \"good\" and don't plan to lower it, not even to fit in. That's not being difficult. That's respect.",
+        "You know what good work looks like and take the time to do it properly. Details matter to you because care shows in the finished thing.",
     },
     {
-      name: "硬核法棍",
+      name: "认真坚持派",
       description:
-        "面粉、水、盐，三样就够——你对「好」有标准，而且不打算降。不为合群点头。这不是挑剔，是尊重。",
+        "你对喜欢的事有自己的标准，也愿意为细节多花一点心思。把事情认真做好，是你表达在意的方式。",
     },
     {
-      name: "Baguette Tulen",
+      name: "Pembuat Berprinsip",
       description:
-        "Tepung, air, garam—tiga bahan yang betul sudah memadai. Anda ada piawai untuk \"yang baik\" dan tak berniat menurunkannya, walau untuk menyenangkan sesiapa. Itu bukan cerewet. Itu hormat.",
+        "Anda tahu hasil yang baik dan sanggup meluangkan masa untuknya. Bagi anda, setiap butiran menunjukkan kesungguhan.",
     },
   ),
   HSBT: localizedResult(
     "HSBT",
     {
-      name: "The Midnight Basque",
+      name: "After-hours Confidant",
       description:
-        "Quiet by day, honest after dark. Under the burnt shell it's all softness—and that \"actually, I've been meaning to tell you…\" in the last half-hour before closing is saved for the few you trust.",
+        "You take a little time to open up, then give people your full attention. The stories you share are saved for those who have earned your trust.",
     },
     {
-      name: "深夜巴斯克",
+      name: "慢热知心人",
       description:
-        "白天话不多，越夜越真心。烤焦的外壳底下全是软的——打烊前那句「其实我一直想说」，你只留给信得过的人。",
+        "你熟起来需要一点时间，走近以后却很真诚。那些没对外说过的心事，你会留给真正信任的人。",
     },
     {
-      name: "Basque Larut Malam",
+      name: "Sahabat Akrab",
       description:
-        "Pendiam pada siang hari, paling jujur selepas gelap. Di bawah kulit rentung itu semuanya lembut—dan ayat \"sebenarnya, dah lama saya nak cakap…\" pada setengah jam terakhir sebelum kedai tutup, hanya untuk orang yang anda percaya.",
+        "Anda perlukan masa untuk membuka hati, kemudian memberi perhatian sepenuhnya. Cerita peribadi anda disimpan untuk orang yang benar-benar dipercayai.",
     },
   ),
   HSDA: localizedResult(
     "HSDA",
     {
-      name: "The Pistachio Tart",
+      name: "Balanced Optimist",
       description:
-        "You can hold the bitter and still welcome the sweet. Like a pistachio: nutty edge on the shell, cream at the heart—life was never black and white, and you've known it for years.",
+        "You can see the complicated side of things and still find something to enjoy. You make room for different feelings without losing your curiosity.",
     },
     {
-      name: "开心果蛋挞",
+      name: "通透乐天派",
       description:
-        "苦你受得住，甜你不推辞。像开心果：壳有果仁的苦香，心是奶油的甜——日子从不非黑即白，你早就懂了。",
+        "你看得见生活的复杂，也愿意发现其中的可爱。不急着把一切分成好坏，心里有分寸，眼里有期待。",
     },
     {
-      name: "Tat Pistachio",
+      name: "Optimis Seimbang",
       description:
-        "Pahit anda tahan, manis anda tak tolak. Macam pistachio: kulitnya berbau kacang yang pahit-wangi, hatinya krim yang manis—hidup tak pernah hitam-putih, dan anda dah lama faham.",
+        "Anda nampak kerumitan hidup tetapi tetap menemui kegembiraan. Anda menerima pelbagai perasaan tanpa kehilangan rasa ingin tahu.",
     },
   ),
   HSDT: localizedResult(
     "HSDT",
     {
-      name: "The Cake Person",
+      name: "Celebration Maker",
       description:
-        "You remember every birthday, and somehow the cake is always yours to order. The second the candles catch, you're happier than the birthday kid—because you believe joy deserves to be taken seriously.",
+        "You remember the dates and little wins that deserve a celebration. You enjoy making a moment special, especially when someone else gets to feel loved.",
     },
     {
-      name: "生日蛋糕主理人",
+      name: "庆祝主理人",
       description:
-        "谁的生日你都记得，蛋糕永远你订。蜡烛点亮那刻，你比寿星还开心——你相信高兴这件事，值得认真对待。",
+        "你记得值得庆祝的日子，也不放过平常的小进步。准备一点惊喜，看见别人开心，你就觉得这份心思很值得。",
     },
     {
-      name: "Ketua Kek Hari Jadi",
+      name: "Pencipta Keraian",
       description:
-        "Anda ingat setiap hari jadi, dan entah bagaimana kek sentiasa anda yang tempah. Saat lilin menyala, anda lebih gembira daripada orang yang diraikan—kerana anda percaya kegembiraan patut diambil serius.",
+        "Anda ingat tarikh dan kejayaan kecil yang patut diraikan. Anda suka menjadikan sesuatu saat istimewa supaya orang lain rasa disayangi.",
     },
   ),
 } satisfies Record<HbtiCode, Localized<HbtiResultContent>>;
+
+/** Use the matched product in the title. A code alone only identifies a personality. */
+export function getHbtiResult(
+  code: HbtiCode,
+  locale: Locale,
+  productId?: HbtiProductId,
+): HbtiResultContent {
+  const personality = results[code][locale];
+  if (!productId) return personality;
+  const productName = hbtiProductName(productId, locale);
+  return {
+    ...personality,
+    name: `${productName} · ${personality.name}`,
+    signatureOrder: productName,
+  };
+}

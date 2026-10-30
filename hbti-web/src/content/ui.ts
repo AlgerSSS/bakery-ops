@@ -128,7 +128,7 @@ export interface UiCopy {
   rewardName: string;
   rewardNote: string;
   openWallet: string;
-  /** 周边发完时的结果页。不是错误提示——面包人格照常出，只是柜台没礼物了。 */
+  /** 周边发完时的结果页。不是错误提示——HBTI 结果照常出，只是柜台没礼物了。 */
   giftSoldOutEyebrow: string;
   giftSoldOutTitle: string;
   giftSoldOutBody: string;
@@ -213,7 +213,7 @@ export const uiCopy: Localized<UiCopy> = {
     hbti: "HBTI",
     languageLabel: "Language",
     questionNavigationLabel: "Question navigation",
-    hbtiTypeLabel: (code) => `HBTI bread type ${code}`,
+    hbtiTypeLabel: (code) => `HBTI personality ${code}`,
     authEyebrow: "Hot Crush · Fresh out",
     authTitle: "Freshly made. Unmistakably you.",
     authBody:
@@ -280,7 +280,7 @@ export const uiCopy: Localized<UiCopy> = {
     memberLinkedBody: (maskedPhone) =>
       `Your HBTI gift will be added to ${maskedPhone}.`,
     demoModeTitle: "Guest preview",
-    demoModeBody: "Browse freely—meet all sixteen breads without signing in.",
+    demoModeBody: "Take a look around and find your match—no sign-in needed.",
     demoCompleteEyebrow: "Preview complete",
     demoCompleteTitle: "That’s the full HBTI experience.",
     demoCompleteBody:
@@ -288,19 +288,19 @@ export const uiCopy: Localized<UiCopy> = {
     demoRewardLabel: "Live member reward",
     demoRewardNote: "Preview only · no coupon issued",
     landingEyebrow: "Hot Crush · Member experience",
-    landingTitle: "Your bread personality might know you better than you do.",
+    landingTitle: "Meet your Hot Crush match.",
     landingBody:
-      "A dozen small choices reveal how you proof, how you bake, and how people remember you.",
+      "Fifteen small choices reveal how you proof, how you bake, and how people remember you.",
     landingNote:
       "Your personal test link arrives by SMS after you join our member programme.",
     invitationOnly: "Open your SMS invitation to begin",
     introEyebrow: "Freshly Crafted Every Day",
-    introTitle: "Which bread on our shelf is you?",
+    introTitle: "What's your Hot Crush match?",
     introBody:
-      "Sixteen bread personalities, baked fresh every morning. A few small questions to claim the one with your name on it.",
+      "Sixteen personalities, a few little choices. Find the character and the treat that feel like you.",
     introTime: "15 little choices · take your time",
     introReward: "P.S. There's a little something waiting at the counter once yours is out of the oven.",
-    begin: "Claim my bread",
+    begin: "Find my match",
     resume: "The dough's still proofing—continue",
     back: "Back",
     next: "Next",
@@ -377,8 +377,8 @@ export const uiCopy: Localized<UiCopy> = {
     },
     sendGift: "Out of the oven!",
     sendingGift: "Wrapping it up…",
-    saveCard: "Save my bread card",
-    shareCard: "Send a friend to the shelf",
+    saveCard: "Save my HBTI card",
+    shareCard: "Share my match",
     cardSaved: "Your HBTI card has been saved.",
     cardShared: "Your HBTI card is ready to share.",
     shareCopied: "A token-free result link has been copied.",
@@ -396,7 +396,7 @@ export const uiCopy: Localized<UiCopy> = {
     rewardNote: "Physical Gift Coupon · one-time redemption",
     openWallet: "View it in my member wallet",
     giftSoldOutEyebrow: "Still warm · Straight from the oven",
-    giftSoldOutTitle: "Your bread type is yours to keep.",
+    giftSoldOutTitle: "Your HBTI result is yours to keep.",
     giftSoldOutBody:
       "Every gift on the counter has found a home. Your result stays in your member account—come say hello on your next visit.",
     giftSoldOutLabel: "The gift counter",
@@ -433,7 +433,7 @@ export const uiCopy: Localized<UiCopy> = {
     hbti: "HBTI",
     languageLabel: "语言",
     questionNavigationLabel: "答题导航",
-    hbtiTypeLabel: (code) => `HBTI 面包性格 ${code}`,
+    hbtiTypeLabel: (code) => `HBTI 心动性格 ${code}`,
     authEyebrow: "Hot Crush · 新鲜出炉",
     authTitle: "新鲜出炉，刚好是你。",
     authBody:
@@ -491,23 +491,23 @@ export const uiCopy: Localized<UiCopy> = {
     memberLinkedBody: (maskedPhone) =>
       `HBTI 周边兑换券会进入 ${maskedPhone} 的账户。`,
     demoModeTitle: "访客预览",
-    demoModeBody: "先随便逛逛，不登录也能把 16 块面包看完。",
+    demoModeBody: "先随便逛逛，不登录也能找到你的心动配方。",
     demoCompleteEyebrow: "预览完成",
     demoCompleteTitle: "这就是完整的 HBTI 体验。",
     demoCompleteBody: "访客预览不会创建会员账户，也不会发放优惠券。",
     demoRewardLabel: "正式会员礼物",
     demoRewardNote: "仅供预览 · 不会发券",
     landingEyebrow: "Hot Crush · 会员体验",
-    landingTitle: "你的面包性格，可能比你更懂你。",
+    landingTitle: "你的心动配方，正等你揭晓。",
     landingBody: "十几个小选择，看看你怎样发酵、怎样出炉、怎样被人记住。",
     landingNote: "加入会员后，你会通过短信收到专属测试链接。",
     invitationOnly: "请从短信里的专属邀请进入",
     introEyebrow: "Freshly Crafted Every Day · 每日新鲜制作",
-    introTitle: "你是货架上的哪一块？",
-    introBody: "16 种面包性格，每天新鲜出炉。几个小问题，认领那块和你同名的。",
+    introTitle: "哪款心动，最像你？",
+    introBody: "16 种心动性格，藏在几个小选择里。找到你的个性，也找到此刻想尝的那一款。",
     introTime: "15 个小选择 · 跟着第一感觉",
     introReward: "顺便说一句：出炉之后，柜台有一份小心意等你。",
-    begin: "认领我的面包",
+    begin: "找到我的心动",
     resume: "面团还醒着，接着来",
     back: "返回",
     next: "下一题",
@@ -575,8 +575,8 @@ export const uiCopy: Localized<UiCopy> = {
     },
     sendGift: "出炉！",
     sendingGift: "正在装袋…",
-    saveCard: "保存我的面包卡",
-    shareCard: "给朋友也测一块",
+    saveCard: "保存我的心动卡",
+    shareCard: "分享我的心动配方",
     cardSaved: "HBTI 人格卡已经保存。",
     cardShared: "HBTI 人格卡已经准备好分享。",
     shareCopied: "不含私人邀请的结果链接已复制。",
@@ -590,7 +590,7 @@ export const uiCopy: Localized<UiCopy> = {
     rewardNote: "周边实物兑换券 · 仅可兑换一次",
     openWallet: "去会员账户查看",
     giftSoldOutEyebrow: "趁热 · 刚出炉",
-    giftSoldOutTitle: "这块面包，是你的了。",
+    giftSoldOutTitle: "这份心动配方，属于你。",
     giftSoldOutBody:
       "柜台的小礼物已经全被领走了。你的结果留在会员账户里——下次来店里，记得给我们看看。",
     giftSoldOutLabel: "礼物柜台",
@@ -623,7 +623,7 @@ export const uiCopy: Localized<UiCopy> = {
     hbti: "HBTI",
     languageLabel: "Bahasa",
     questionNavigationLabel: "Navigasi soalan",
-    hbtiTypeLabel: (code) => `Jenis roti HBTI ${code}`,
+    hbtiTypeLabel: (code) => `Personaliti HBTI ${code}`,
     authEyebrow: "Hot Crush · Segar dibuat",
     authTitle: "Dibuat segar. Seunik diri anda.",
     authBody:
@@ -691,7 +691,7 @@ export const uiCopy: Localized<UiCopy> = {
     memberLinkedBody: (maskedPhone) =>
       `Hadiah HBTI anda akan dimasukkan ke ${maskedPhone}.`,
     demoModeTitle: "Pratonton tetamu",
-    demoModeBody: "Lihat-lihat dulu—jumpa semua enam belas roti tanpa log masuk.",
+    demoModeBody: "Cari padanan anda tanpa perlu log masuk.",
     demoCompleteEyebrow: "Pratonton selesai",
     demoCompleteTitle: "Itulah pengalaman HBTI yang lengkap.",
     demoCompleteBody:
@@ -699,19 +699,19 @@ export const uiCopy: Localized<UiCopy> = {
     demoRewardLabel: "Ganjaran ahli sebenar",
     demoRewardNote: "Pratonton sahaja · tiada kupon dikeluarkan",
     landingEyebrow: "Hot Crush · Pengalaman ahli",
-    landingTitle: "Personaliti roti anda mungkin lebih memahami anda.",
+    landingTitle: "Temui padanan Hot Crush anda.",
     landingBody:
       "Belasan pilihan kecil mendedahkan cara anda menunggu, cara anda matang, dan cara orang mengingati anda.",
     landingNote:
       "Selepas menyertai program ahli, pautan ujian peribadi akan dihantar melalui SMS.",
     invitationOnly: "Buka jemputan SMS anda untuk bermula",
     introEyebrow: "Freshly Crafted Every Day · Segar setiap hari",
-    introTitle: "Anda roti yang mana di rak kami?",
+    introTitle: "Apakah padanan Hot Crush anda?",
     introBody:
-      "Enam belas personaliti roti, dibakar segar setiap pagi. Beberapa soalan kecil untuk menuntut yang tertulis nama anda.",
+      "Enam belas personaliti, beberapa pilihan kecil. Temui padanan Hot Crush anda dan pilihan untuk dinikmati.",
     introTime: "15 pilihan kecil · ikut rasa hati",
-    introReward: "P.S. Ada sedikit buah tangan menanti di kaunter selepas roti anda keluar ketuhar.",
-    begin: "Tuntut roti saya",
+    introReward: "P.S. Ada sedikit buah tangan menanti di kaunter selepas keputusan anda siap.",
+    begin: "Cari padanan saya",
     resume: "Doh masih menunggu—sambung",
     back: "Kembali",
     next: "Seterusnya",
@@ -782,8 +782,8 @@ export const uiCopy: Localized<UiCopy> = {
     },
     sendGift: "Keluar ketuhar!",
     sendingGift: "Sedang dibungkus…",
-    saveCard: "Simpan kad roti saya",
-    shareCard: "Ajak kawan pilih roti",
+    saveCard: "Simpan kad HBTI saya",
+    shareCard: "Kongsi padanan saya",
     cardSaved: "Kad HBTI anda telah disimpan.",
     cardShared: "Kad HBTI anda sedia untuk dikongsi.",
     shareCopied: "Pautan keputusan tanpa jemputan peribadi telah disalin.",
@@ -798,7 +798,7 @@ export const uiCopy: Localized<UiCopy> = {
     rewardNote: "Kupon Hadiah Fizikal · penebusan sekali sahaja",
     openWallet: "Lihat dalam dompet ahli saya",
     giftSoldOutEyebrow: "Masih panas · Baru keluar ketuhar",
-    giftSoldOutTitle: "Roti ini milik anda.",
+    giftSoldOutTitle: "Padanan ini milik anda.",
     giftSoldOutBody:
       "Semua buah tangan di kaunter sudah bertuan. Keputusan anda tersimpan dalam akaun ahli—singgah menyapa kami pada kunjungan seterusnya.",
     giftSoldOutLabel: "Kaunter hadiah",

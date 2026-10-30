@@ -10,10 +10,9 @@ import {
 
 import { BrandHeader } from "@/components/BrandHeader";
 import { MemberSignIn } from "@/components/MemberSignIn";
-import { hbtiProductName } from "@/content/products";
 import { recommendHbtiProduct } from "@/lib/hbti/recommendation";
 import { questions } from "@/content/questions";
-import { results } from "@/content/results";
+import { getHbtiResult, results } from "@/content/results";
 import type {
   HbtiAnswerValue,
   HbtiAnswers,
@@ -351,12 +350,13 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
     () => (hasCompleteAnswers(answers) ? scoreHbti(answers) : null),
     [answers],
   );
+  const productId = score ? recommendHbtiProduct(answers) : undefined;
   const result = score
-    ? {
-        ...results[score.code][locale],
-        signatureOrder: hbtiProductName(recommendHbtiProduct(answers), locale),
-      }
+    ? getHbtiResult(score.code, locale, productId)
     : null;
+  const completionResult = confirmedCode
+    ? getHbtiResult(confirmedCode, locale, confirmedCode === score?.code ? productId : undefined)
+    : result;
 
   function chooseAnswer(
     question: HbtiQuestion,
@@ -622,11 +622,7 @@ export function HbtiExperience({ demoMode = false }: { demoMode?: boolean }) {
             <CompletionState
               state={submission}
               resultCode={confirmedCode ?? score?.code}
-              resultName={
-                confirmedCode
-                  ? results[confirmedCode][locale].name
-                  : result?.name
-              }
+              resultName={completionResult?.name}
               rewardTemplateName={rewardTemplateName}
               memberWalletUrl={memberWalletUrl}
               color={confirmedColor ?? color}

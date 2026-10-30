@@ -246,7 +246,7 @@ describe("customer HBTI journey", () => {
     );
     expect(
       await screen.findByRole("heading", {
-        name: "Which bread on our shelf is you?",
+        name: "What's your Hot Crush match?",
       }),
     ).toBeInTheDocument();
     expect(
@@ -292,7 +292,7 @@ describe("customer HBTI journey", () => {
     await user.click(
       await screen.findByRole(
         "button",
-        { name: /Claim my bread|proofing—continue|认领我的面包|接着来/ },
+        { name: /Find my match|proofing—continue|找到我的心动|接着来/ },
         { timeout: 5_000 },
       ),
     );
@@ -323,7 +323,7 @@ describe("customer HBTI journey", () => {
     );
 
     expect(
-      await screen.findByRole("button", { name: /Claim my bread|proofing—continue|认领我的面包|接着来/ }),
+      await screen.findByRole("button", { name: /Find my match|proofing—continue|找到我的心动|接着来/ }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /Continue where I left off/ }),
@@ -361,10 +361,10 @@ describe("customer HBTI journey", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("HSDA")).toBeInTheDocument();
-    expect(screen.getByText("The Pistachio Tart")).toBeInTheDocument();
+    expect(screen.getByText("Balanced Optimist")).toBeInTheDocument();
     expect(screen.getByText("Heart Scent Card")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Claim my bread/ }),
+      screen.queryByRole("button", { name: /Find my match/ }),
     ).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe("/api/auth/session");
@@ -422,7 +422,7 @@ describe("customer HBTI journey", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("HSDA")).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /Claim my bread/ }),
+      screen.queryByRole("button", { name: /Find my match/ }),
     ).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
@@ -452,9 +452,9 @@ describe("customer HBTI journey", () => {
     render(<HbtiExperience />);
 
     await screen.findByRole("heading", {
-      name: "Which bread on our shelf is you?",
+      name: "What's your Hot Crush match?",
     });
-    await user.click(screen.getByRole("button", { name: /Claim my bread|proofing—continue|认领我的面包|接着来/ }));
+    await user.click(screen.getByRole("button", { name: /Find my match|proofing—continue|找到我的心动|接着来/ }));
 
     // 按题目展示顺序作答，凑出 ILBA：
     // 温度 iced,iced,(morning=hot) → I；浓淡三票 light → L；
@@ -481,7 +481,7 @@ describe("customer HBTI journey", () => {
     }
 
     expect(
-      await screen.findByRole("heading", { name: "The Clear-Eyed Bagel" }),
+      await screen.findByRole("heading", { name: "Strawberry Tart · Clear-eyed Observer" }),
     ).toBeInTheDocument();
 
     await user.click(
@@ -504,7 +504,7 @@ describe("customer HBTI journey", () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("HSDT")).toBeInTheDocument();
-    expect(screen.getByText("The Cake Person")).toBeInTheDocument();
+    expect(screen.getByText("Celebration Maker")).toBeInTheDocument();
     expect(screen.getByText("HSDT").closest("div")).toHaveAttribute(
       "data-color",
       "cocoa",
@@ -588,11 +588,11 @@ describe("周边发完之后", () => {
     // 最要紧的一条：答完 15 题的人必须还能看到自己的面包人格。
     expect(
       await screen.findByRole("heading", {
-        name: "Your bread type is yours to keep.",
+        name: "Your HBTI result is yours to keep.",
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("HSDT")).toBeInTheDocument();
-    expect(screen.getByText("The Cake Person")).toBeInTheDocument();
+    expect(screen.getByText("Celebration Maker")).toBeInTheDocument();
     expect(screen.getByText("All claimed for now")).toBeInTheDocument();
     expect(screen.getByText("Nothing to redeem this time")).toBeInTheDocument();
     // 绝不能退回兜底的礼物名——顾客会拿着它去柜台扑空。
@@ -657,10 +657,10 @@ async function walkTheWholeJourney(
   user: ReturnType<typeof userEvent.setup>,
 ) {
   await screen.findByRole("heading", {
-    name: "Which bread on our shelf is you?",
+    name: "What's your Hot Crush match?",
   });
   await user.click(
-    screen.getByRole("button", { name: /Claim my bread|proofing—continue/ }),
+    screen.getByRole("button", { name: /Find my match|proofing—continue/ }),
   );
   for (const option of [
     /Something iced: 'Wake up. It's fine now.'/,

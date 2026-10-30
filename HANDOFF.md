@@ -6,6 +6,23 @@
 
 ---
 
+## HBTI 商品与人格文案统一（2026-10-30，Codex，验证通过待发布）
+
+活跃分支：`codex/hbti-curated-products`；隔离工作树：`/Users/weiliangshao/.codex/projects/hbti-curated-products`。
+用户指出结果页仍显示「全麦军师」等旧商品标题。本次将 16 型中英马三语名称、描述统一为人格角色，
+由 `src/content/results.ts:getHbtiResult` 组合实际自动推荐商品名，如「蓝莓泡芙 · 稳场军师」。
+结果、颜色预览、当前会话完成页、分享文字及 PNG 共用同一名称；旧记录只有 code 时只显示角色，
+不凭空补推商品。入口、分享按钮和页面 metadata 一并清除「16 种面包」等过时措辞。
+PNG 按测量宽度调整长标题字号，保持完整名称。题目、人格计分、自动推荐分支、六款目录及无价格规则不变。
+
+验证：TypeScript、ESLint、Next production build 通过；Vitest 378 通过 / 39 集成测试按配置跳过；
+基于 production build 的 Playwright 18/18 通过（320/375/430 宽度，三语名称、长标题 PNG、ILBT 原问题、
+旧会员结果恢复、完整 15 题、分享及模拟重试）。320px 结果和中英文长标题 PNG 已视觉检查，无裁切/溢出。
+证据：`/Users/weiliangshao/Documents/Codex/2026-09-29/wo-xi/outputs/hbti-product-personas-20261030`。
+没有真实 OTP、会员写入、发券或数据库变更。下一步使用现有 Vercel 项目 staged production 发布、验证后 promote，
+正式域名 `hbti-test.hotcrush.net`；发布前线上仍为 `dpl_3AQRXZ3ek9kxeSZypbEpXaTfwV3o`。
+Vercel 插件要求重新授权，本机 CLI 已认证且项目/团队绑定已核实；不用根目录东京 deploy.sh。
+
 ## HBTI 场景题自动推荐（2026-10-29，Codex，已提交并部署）
 
 活跃分支：`codex/hbti-curated-products`；隔离工作树：`/Users/weiliangshao/.codex/projects/hbti-curated-products`。

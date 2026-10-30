@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     template: "%s — Hot Crush",
   },
   description:
-    "Sixteen bread personalities, baked fresh every morning. Claim the one with your name on it.",
+    "Sixteen personalities, a few little choices. Find your Hot Crush match.",
   icons: {
     icon: "/hot-crush-arrow.png",
     apple: "/hot-crush-arrow.png",

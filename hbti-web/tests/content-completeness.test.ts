@@ -2,10 +2,30 @@ import { describe, expect, it } from "vitest";
 
 import { defaultLocale, supportedLocales } from "@/content/locales";
 import { questions } from "@/content/questions";
-import { hbtiCodes, results } from "@/content/results";
+import { hbtiProducts } from "@/content/products";
+import { getHbtiResult, hbtiCodes, results } from "@/content/results";
 import { giftTemplateNames, uiCopy } from "@/content/ui";
 
 describe("HBTI localized content", () => {
+  it("keeps every personality title aligned with the matched catalogue product", () => {
+    for (const code of hbtiCodes) {
+      for (const locale of supportedLocales) {
+        for (const product of hbtiProducts) {
+          const result = getHbtiResult(code, locale, product.id);
+          expect(result.name.startsWith(`${product.name[locale]} · `)).toBe(true);
+          expect(result.signatureOrder).toBe(product.name[locale]);
+          expect(result.name + result.description).not.toMatch(
+            /全麦|贝果|牛角|佛卡夏|黑麦|酸种|司康|生吐司|玛德琳|法棍|巴斯克|bagel|wholegrain|croissant|focaccia|sourdough|scone|shokupan|madeleine|baguette|basque/i,
+          );
+        }
+      }
+    }
+    expect(getHbtiResult("ILBT", "zh-CN", "blueberry-puff").name).toBe("蓝莓泡芙 · 稳场军师");
+    expect(getHbtiResult("ILBT", "zh-CN", "wellington").name).toBe("惠灵顿 · 稳场军师");
+    // An older completion supplies only a code; do not pretend it identifies a product.
+    expect(getHbtiResult("ILBT", "zh-CN").name).toBe("稳场军师");
+  });
+
   it("provides all fifteen questions in English, Chinese and Malaysia Malay", () => {
     expect(defaultLocale).toBe("en");
     expect(supportedLocales).toEqual(["en", "zh-CN", "ms-MY"]);

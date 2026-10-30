@@ -170,6 +170,10 @@ export async function createResultCardPng({
 
   context.fillStyle = BRAND.oxblood;
   context.font = fontForLocale(locale, 62, 700);
+  const nameWidth = context.measureText(result.name).width;
+  if (nameWidth > 920) {
+    context.font = fontForLocale(locale, Math.floor((62 * 920) / nameWidth), 700);
+  }
   context.fillText(result.name, 80, 526);
 
   context.font = fontForLocale(locale, 28, 600);

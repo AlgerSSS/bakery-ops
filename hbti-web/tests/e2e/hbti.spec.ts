@@ -166,7 +166,7 @@ async function openInvitation(page: Page) {
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
-      name: "Which bread on our shelf is you?",
+      name: "What's your Hot Crush match?",
     }),
   ).toBeVisible();
 }
@@ -186,7 +186,7 @@ const TOTAL_QUESTIONS = 15;
 const DEFAULT_ANSWER_PATH = [1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0] as const;
 
 async function startQuiz(page: Page) {
-  await page.getByRole("button", { name: /Claim my bread/ }).click();
+  await page.getByRole("button", { name: /Find my match/ }).click();
   await expect(page.getByRole("progressbar")).toHaveAttribute(
     "aria-valuenow",
     "1",
@@ -265,7 +265,7 @@ test("offers a direct guest preview without authentication or reward calls", asy
   await expect(page.getByText("Guest preview")).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: "Which bread on our shelf is you?",
+      name: "What's your Hot Crush match?",
     }),
   ).toBeVisible();
   await expect(
@@ -300,9 +300,9 @@ test("derives a name-only product from food scenes without a product picker", as
     localStorage.setItem("hot-crush-hbti-draft-v3:e2e-member-draft-123456", JSON.stringify({
       version: 3, savedAt: Date.now(), currentQuestion: 14, stage: "result",
       answers: {
-        q1: "iced", q2: "light", q3: "bitter", q4: "alone", q5: "morning",
+        q1: "iced", q2: "light", q3: "bitter", q4: "together", q5: "morning",
         q6: "drink", q7: "iced", q8: "light", q9: "light", q10: "bitter",
-        q11: "bitter", q12: "alone", q13: "alone", q14: "fruity", q15: "soft",
+        q11: "bitter", q12: "together", q13: "together", q14: "fruity", q15: "soft",
       },
     }));
   });
@@ -312,6 +312,8 @@ test("derives a name-only product from food scenes without a product picker", as
   await expect(page.locator("details")).toHaveCount(0);
   await page.getByRole("button", { name: /简体中文/ }).click();
   await expect(page.getByText("蓝莓泡芙", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "蓝莓泡芙 · 稳场军师" })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("全麦");
   await expect(page.locator("body")).not.toContainText("SGD");
   await expect(page.locator("body")).not.toContainText("换一款");
   await assertNoHorizontalOverflow(page);
@@ -320,6 +322,45 @@ test("derives a name-only product from food scenes without a product picker", as
   await expect(page.getByTestId("result-colour-preview")).toContainText("蓝莓泡芙");
   await expect(page.getByTestId("result-colour-preview")).not.toContainText("SGD");
   await assertNoHorizontalOverflow(page);
+});
+
+test("keeps long product personality names inside trilingual share cards", async ({ page }) => {
+  await installResultCardCapture(page);
+  await mockPrivateNetwork(page);
+  await page.addInitScript(() => {
+    localStorage.setItem("hot-crush-hbti-draft-v3:e2e-member-draft-123456", JSON.stringify({
+      version: 3, savedAt: Date.now(), currentQuestion: 14, stage: "result",
+      answers: {
+        q1: "hot", q2: "strong", q3: "bitter", q4: "together", q5: "night",
+        q6: "bakery", q7: "hot", q8: "strong", q9: "strong", q10: "bitter",
+        q11: "bitter", q12: "together", q13: "together", q14: "cocoa", q15: "crisp",
+      },
+    }));
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Chocolate Crispy Pretzel · After-hours Confidant" })).toBeVisible();
+  await page.getByRole("button", { name: /Collect my fresh-out gift/ }).click();
+  await page.getByRole("button", { name: "Cherry red", exact: true }).click();
+
+  for (const item of [
+    { language: /English/, name: "Chocolate Crispy Pretzel · After-hours Confidant", save: "Save my HBTI card", file: "en" },
+    { language: /简体中文/, name: "巧克力薄脆碱水结 · 慢热知心人", save: "保存我的心动卡", file: "zh" },
+    { language: /Bahasa Melayu/, name: "Pretzel Coklat Rangup · Sahabat Akrab", save: "Simpan kad HBTI saya", file: "ms" },
+  ]) {
+    await page.getByRole("button", { name: item.language }).click();
+    await expect(page.getByTestId("result-colour-preview")).toContainText(item.name);
+    await assertNoHorizontalOverflow(page);
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: item.save, exact: true }).click();
+    const download = await downloadPromise;
+    await download.saveAs(test.info().outputPath(`product-personality-card-${item.file}.png`));
+    const capture = await readResultCardCapture(page);
+    const title = capture.canvasTextBounds.find((entry) => entry.text === item.name);
+    expect(title).toBeDefined();
+    expect(title!.x + title!.width).toBeLessThanOrEqual(1000);
+    expect(title!.y).toBe(526);
+    expect(capture.canvasText.join(" ")).not.toMatch(/全麦|贝果|巴斯克|Basque|SGD/);
+  }
 });
 
 test("restores an existing member result before offering the quiz", async ({
@@ -351,10 +392,10 @@ test("restores an existing member result before offering the quiz", async ({
     }),
   ).toBeVisible();
   await expect(page.getByText("HSDA")).toBeVisible();
-  await expect(page.getByText("The Pistachio Tart")).toBeVisible();
+  await expect(page.getByText("Balanced Optimist")).toBeVisible();
   await expect(page.getByText("Heart Scent Card")).toBeVisible();
   await expect(
-    page.getByRole("button", { name: /Claim my bread/ }),
+    page.getByRole("button", { name: /Find my match/ }),
   ).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: /View it in my member wallet/ }),
@@ -459,7 +500,7 @@ test("retires personal-link entry points without preserving the token", async ({
   await expect(page).toHaveURL(`${localOrigin}/`);
   await expect(
     page.getByRole("heading", {
-      name: "Which bread on our shelf is you?",
+      name: "What's your Hot Crush match?",
     }),
   ).toBeVisible();
   expect(page.url()).not.toContain(privateMarker);
@@ -558,14 +599,14 @@ test("switches the same page between English, Chinese, and Malay", async ({
 
   await page.getByRole("button", { name: /简体中文/ }).click();
   await expect(
-    page.getByRole("heading", { name: "你是货架上的哪一块？" }),
+    page.getByRole("heading", { name: "哪款心动，最像你？" }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
 
   await page.getByRole("button", { name: /Bahasa Melayu/ }).click();
   await expect(
     page.getByRole("heading", {
-      name: "Anda roti yang mana di rak kami?",
+      name: "Apakah padanan Hot Crush anda?",
     }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "ms-MY");
@@ -573,7 +614,7 @@ test("switches the same page between English, Chinese, and Malay", async ({
   await page.getByRole("button", { name: /English/ }).click();
   await expect(
     page.getByRole("heading", {
-      name: "Which bread on our shelf is you?",
+      name: "What's your Hot Crush match?",
     }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
@@ -588,7 +629,7 @@ test("restores a local draft and Back returns to the saved answer", async ({
   const network = await mockPrivateNetwork(page);
   await openInvitation(page);
 
-  await page.getByRole("button", { name: /Claim my bread/ }).click();
+  await page.getByRole("button", { name: /Find my match/ }).click();
   await page
     .getByRole("button", { name: /Something hot: 'Slow down. No rush.'/ })
     .click();
@@ -691,7 +732,7 @@ test("completes all fifteen questions and safely retries from 500 to issued", as
   await answerAllQuestions(page);
 
   await expect(
-    page.getByRole("heading", { name: "The Clear-Eyed Bagel" }),
+    page.getByRole("heading", { name: "Strawberry Tart · Clear-eyed Observer" }),
   ).toBeVisible();
   await assertNoHorizontalOverflow(page);
   await page
@@ -731,7 +772,7 @@ test("completes all fifteen questions and safely retries from 500 to issued", as
 
   const downloadPromise = page.waitForEvent("download");
   await page
-    .getByRole("button", { name: "Save my bread card", exact: true })
+    .getByRole("button", { name: "Save my HBTI card", exact: true })
     .click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("hot-crush-ilba.png");
@@ -752,7 +793,7 @@ test("completes all fifteen questions and safely retries from 500 to issued", as
 
   await page
     .getByRole("button", {
-      name: "Send a friend to the shelf",
+      name: "Share my match",
       exact: true,
     })
     .click();
@@ -763,7 +804,7 @@ test("completes all fifteen questions and safely retries from 500 to issued", as
   ).toHaveText("Your HBTI card is ready to share.");
   const cardCapture = await readResultCardCapture(page);
   expect(cardCapture.share).toMatchObject({
-    title: "HBTI ILBA · The Clear-Eyed Bagel",
+    title: "HBTI ILBA · Strawberry Tart · Clear-eyed Observer",
     url: `${localOrigin}/`,
     files: [
       {
@@ -888,18 +929,18 @@ for (const localizedJourney of [
   {
     label: "Chinese",
     languageButton: /简体中文/,
-    begin: "认领我的面包",
+    begin: "找到我的心动",
     firstQuestion: "辛苦一天之后，你更想被怎样安慰？",
-    resultName: "清醒贝果",
+    resultName: "草莓挞 · 清醒观察家",
     lang: "zh-CN",
   },
   {
     label: "Malay",
     languageButton: /Bahasa Melayu/,
-    begin: "Tuntut roti saya",
+    begin: "Cari padanan saya",
     firstQuestion:
       "Selepas hari yang panjang, pujukan mana yang anda mahu?",
-    resultName: "Bagel Mata Jernih",
+    resultName: "Tat Strawberi · Pemerhati Jernih",
     lang: "ms-MY",
   },
 ] as const) {
@@ -953,10 +994,10 @@ test("supports the core journey with keyboard input only", async ({ page }) => {
   await openInvitation(page);
 
   const introHeading = page.getByRole("heading", {
-    name: "Which bread on our shelf is you?",
+    name: "What's your Hot Crush match?",
   });
   await expect(introHeading).toBeFocused();
-  const begin = page.getByRole("button", { name: "Claim my bread" });
+  const begin = page.getByRole("button", { name: "Find my match" });
   await tabTo(page, begin);
   await expectFocusIndicator(begin);
   await page.keyboard.press("Enter");
@@ -1098,6 +1139,7 @@ async function expectFocusIndicator(target: ReturnType<Page["locator"]>) {
 
 interface ResultCardCapture {
   canvasText: string[];
+  canvasTextBounds: Array<{ text: string; x: number; y: number; width: number }>;
   share?: {
     title: string;
     text: string;
@@ -1111,7 +1153,7 @@ async function installResultCardCapture(page: Page) {
     const captureWindow = window as typeof window & {
       __hbtiResultCardCapture?: ResultCardCapture;
     };
-    captureWindow.__hbtiResultCardCapture = { canvasText: [] };
+    captureWindow.__hbtiResultCardCapture = { canvasText: [], canvasTextBounds: [] };
 
     const originalFillText =
       CanvasRenderingContext2D.prototype.fillText;
@@ -1124,6 +1166,9 @@ async function installResultCardCapture(page: Page) {
       captureWindow.__hbtiResultCardCapture?.canvasText.push(
         String(text),
       );
+      captureWindow.__hbtiResultCardCapture?.canvasTextBounds.push({
+        text: String(text), x, y, width: this.measureText(String(text)).width,
+      });
       if (typeof maxWidth === "number") {
         return originalFillText.call(this, text, x, y, maxWidth);
       }

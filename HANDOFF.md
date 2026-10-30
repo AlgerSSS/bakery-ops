@@ -6,7 +6,7 @@
 
 ---
 
-## HBTI 商品与人格文案统一（2026-10-30，Codex，最终样式验证通过待发布）
+## HBTI 商品与人格文案统一（2026-10-30，Codex，已提交部署并回读）
 
 活跃分支：`codex/hbti-curated-products`；隔离工作树：`/Users/weiliangshao/.codex/projects/hbti-curated-products`。
 用户指出「全麦军师」等旧商品标题不符当前菜单，已更新 16 型中英马三语名称与描述；不再出现全麦、贝果等旧商品比喻。
@@ -17,11 +17,15 @@
 
 最新验证：TypeScript、ESLint、Next production build 通过；Vitest 378 通过 / 39 集成测试按配置跳过；
 production build 的 Playwright 9/9 通过（320/375/430 宽度，纯性格标题、独立推荐商品、三语 PNG、完整 15 题及分享）。
-分享 PNG 已视觉检查。证据在 `.../wo-xi/outputs/hbti-product-personas-20261030/final/`；同级旧截图为首版，已被用户修正。
-没有真实 OTP、会员写入、发券或数据库变更。首版提交 `8143a36` 已上线到
-`dpl_6zY6gujP478ydetNTUPDekLHbaCY`，但其中商品前缀已被本次最终样式删除；下一步发布最新修改并回读正式域名。
+分享 PNG 已视觉检查。证据在 `/Users/weiliangshao/Documents/Codex/2026-09-29/wo-xi/outputs/hbti-product-personas-20261030/final/`；同级旧截图为首版，已被用户修正。
+没有真实 OTP、会员写入、发券或数据库变更。最终代码提交 `d44beeef9247688db572aabdc46f2d67fb339fa3` 已推送；
+部署 `dpl_79YNEMu9HHhPEBa7bo16PuBJB8Hb`（`hotcrush-hbti-mr79087b3-algersss-projects.vercel.app`）READY 并已 promote。
+别名 API 独立确认 `hbti-test.hotcrush.net` 已指向此部署。线上 `/demo` 实际走完两组 15 题，
+ILBT 标题为「稳场军师」、HSBT 为「慢热知心人」；标题无商品前缀，下方各自保留蓝莓泡芙和巧克力薄脆碱水结。
+真实下载分享 PNG，320px 中英文页面已视觉检查；无溢出/页面错误，API 请求数 0。
+首版 `8143a36` / `dpl_6zY6gujP478ydetNTUPDekLHbaCY` 的组合标题已被最终要求覆盖，不再作为当前样式。
 沿用现有 Vercel `hotcrush-hbti`，插件需要重新授权时使用已认证 CLI，不用根目录东京 deploy.sh。
-发布前基线仍为 db/alert/signIn=ok、既有 RES 券模板检查 res=fail；不将文案发布当作真实发券链路验收。
+发布前后健康基线一致：db/alert/signIn=ok、既有 RES 券模板检查 res=fail；不将文案发布当作真实发券链路验收。
 
 ## HBTI 场景题自动推荐（2026-10-29，Codex，已提交并部署）
 
